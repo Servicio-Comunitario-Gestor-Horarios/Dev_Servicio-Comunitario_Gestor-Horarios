@@ -1,0 +1,71 @@
+# Dockerfile.dev — Entorno de desarrollo para Gestor-Horarios
+# ===
+# Proposito: Contenedor con todas las dependencias necesarias para
+# compilar y desarrollar el proyecto Gestor-Horarios.
+#
+# Incluye:
+#   - OR-Tools v9.15 (optimización, CP-SAT, routing)
+#   - Qt6 (Core + Sql) para interfaz gráfica y base de datos
+#   - CMake 3.25 + Ninja como toolchain de compilación
+#   - Build essentials (g++, make, etc.)
+#
+# Uso:
+#   docker compose -f docker/docker-compose.yml build
+#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.yml exec dev bash
+#
+# Para reconstruir desde cero:
+#   docker compose -f docker/docker-compose.yml build --no-cache
+
+FROM debian:12-slim
+
+# Evita prompts interactivos durante apt-get
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ── Paquetes del sistema ──
+# Se instalan en una sola capa para mantener la imagen liviana.
+# build-essential  → compilador g++, make y herramientas base
+# cmake            → generador del build system
+# ninja-build      → build system rápido (alternativa a make)
+# curl + ca-certificates → necesario para descargar OR-Tools
+# git              → control de versiones (útil adentro del contenedor)
+# lsb-release      → requerido por scripts de OR-Tools
+# pkg-config       → útil para detectar bibliotecas del sistema
+# qt6-base-dev     → Qt6 Core, Widgets, GUI
+# libqt6sql6-sqlite → driver SQLite para Qt6
+# libgl1-mesa-dev  → dependencia de OpenGL para Qt6
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ninja-build \
+    curl \
+    ca-certificates \
+    git \
+    lsb-release \
+    pkg-config \
+    qt6-base-dev \
+    libqt6sql6-sqlite \
+    libgl1-mesa-dev \
+    && apt-get clean
+
+# ── OR-Tools v9.15 ──
+# Se usa el binario pre-compilado oficial para Debian 12 en amd64.
+# Alternativa a compilar desde fuente (que requiere ~4GB RAM y 30+ min).
+# URL: https://github.com/google/or-tools/releases/tag/v9.15
+#
+# --strip-components=1 elimina el directorio raíz del tarball
+# (or-tools_x86_64_Debian-12_cpp_v9.15.6755/) y extrae directo en /usr/local/.
+# Esto deja include/, lib/, bin/ y share/ en las rutas estándar.
+RUN curl -fsSL \
+    https://github.com/google/or-tools/releases/download/v9.15/or-tools_amd64_debian-12_cpp_v9.15.6755.tar.gz \
+    -o /tmp/or-tools.tar.gz \
+    && tar -xzf /tmp/or-tools.tar.gz -C /usr/local --strip-components=1 \
+    && ldconfig \
+    && rm -rf /tmp/or-tools*
+
+# ── Directorio de trabajo ──
+# El volumen monta el proyecto en /workspace/ (definido en docker-compose.yml)
+WORKDIR /workspace
+
+# Mantiene el contenedor vivo para desarrollo interactivo
+CMD ["sleep", "infinity"]

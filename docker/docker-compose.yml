@@ -1,0 +1,46 @@
+# docker-compose.yml — Entorno de desarrollo Gestor-Horarios
+# ===
+# Define el servicio 'dev' que construye y ejecuta el contenedor
+# de desarrollo con OR-Tools, Qt6, CMake y Ninja.
+#
+# Uso:
+#   docker compose -f docker/docker-compose.yml build    # construir imagen
+#   docker compose -f docker/docker-compose.yml up -d    # arrancar contenedor
+#   docker compose -f docker/docker-compose.yml exec dev bash  # entrar
+#   docker compose -f docker/docker-compose.yml down     # apagar
+#
+# Alias disponibles (en ~/.zshrc):
+#   docker-build, docker-up, docker-shell, docker-down
+
+services:
+  dev:
+    # Construcción de la imagen
+    build:
+      context: ..                  # raíz del proyecto como contexto
+      dockerfile: docker/Dockerfile.dev
+
+    # Nombre de la imagen y del contenedor
+    image: gestor-horarios-dev
+    container_name: gestor-dev
+
+    # Volúmenes
+    volumes:
+      # Monta la raíz del proyecto en /workspace/ dentro del contenedor.
+      # Los cambios son bidireccionales y en tiempo real.
+      - ..:/workspace
+
+      # Persiste la carpeta build/ para no recompilar desde cero
+      # cada vez que se reinicia el contenedor.
+      - build_cache:/workspace/build
+
+    # Variables de entorno
+    environment:
+      - DISPLAY=${DISPLAY}         # para usar X11 (GUI en Linux)
+
+    # Modo interactivo (para mantener el contenedor vivo con sleep infinity)
+    stdin_open: true
+    tty: true
+
+# Volúmenes persistentes
+volumes:
+  build_cache:
