@@ -1,0 +1,4 @@
+# CODEOWNERS - Gestor Horarios
+# Cada cambio necesita aprobación de tech-leads y QA
+
+* @Servicio-Comunitario-Gestor-Horarios/Tech-Leads @Servicio-Comunitario-Gestor-Horarios/QA
