@@ -16,7 +16,7 @@ body:
     attributes:
       label: Funcionalidad a Mejorar
       description: ¿Qué funcionalidad existente necesita mejora?
-      placeholder: Ej: Login, CRUD de profesores, generación de horarios...
+      placeholder: "Ej: Login, CRUD de profesores, generación de horarios..."
     validations:
       required: true
 
