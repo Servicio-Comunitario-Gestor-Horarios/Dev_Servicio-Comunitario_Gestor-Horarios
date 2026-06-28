@@ -15,6 +15,9 @@
 
 add_library(frontend STATIC)
 
+
+
+
 target_sources(frontend PRIVATE
     main_window.cpp
     main_window.hpp
