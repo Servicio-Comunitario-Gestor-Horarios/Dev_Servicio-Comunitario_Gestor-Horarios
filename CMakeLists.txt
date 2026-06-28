@@ -38,7 +38,7 @@ find_package(ortools CONFIG REQUIRED)
 
 # Qt6: framework de interfaz gráfica y base de datos
 # Se usa Core (eventos, hilos) y Sql (SQLite).
-find_package(Qt6 REQUIRED COMPONENTS Core Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets)
 
 # ── Opciones de compilación ──
 include(cmake/CompilerWarnings.cmake)

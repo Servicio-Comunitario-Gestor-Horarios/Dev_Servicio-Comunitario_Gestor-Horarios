@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "SQLite Database Expert": {
+      "source": "martinholovsky/claude-skills-generator",
+      "sourceType": "github",
+      "skillPath": "skills/sqlite/SKILL.md",
+      "computedHash": "0e75baa1c3159dba4c6db79330634327039c9813410256b73357dcbb0ed9d0ea"
+    },
+    "agile-metrics": {
+      "source": "djalmajr/skills",
+      "sourceType": "github",
+      "skillPath": "skills/agile-metrics/SKILL.md",
+      "computedHash": "952d75bad9f289633e232928eb61cb0ad9c2f0f324065fbf976c01f91400236c"
+    },
+    "agile-retro": {
+      "source": "djalmajr/skills",
+      "sourceType": "github",
+      "skillPath": "skills/agile-retro/SKILL.md",
+      "computedHash": "df332839de9f930727685fef268d373d4d7a03dace79823d19b042392850c6ff"
+    },
+    "github-multi-repo": {
+      "source": "ruvnet/claude-flow",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/github-multi-repo/SKILL.md",
+      "computedHash": "7d6b2eda19e9effeeacd59c5d1942a8f37cdd7c0b53975c9caa5719909207f88"
+    },
+    "ortools": {
+      "source": "tondevrel/scientific-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ortools/SKILL.md",
+      "computedHash": "b252f5fbfe6e8608d7e35db2a7a22b8a7451081ecb7504d3c34c0db080ca48ab"
+    },
+    "qt-cpp-docs": {
+      "source": "theqtcompanyrnd/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/qt-cpp-docs/SKILL.md",
+      "computedHash": "d1cd15ea7f284cd41ee0a8563ddda94a13695c6670fd4f95eae3bf23641e72f2"
+    },
+    "team-workflow": {
+      "source": "owl-listener/designer-skills",
+      "sourceType": "github",
+      "skillPath": "design-ops/skills/team-workflow/SKILL.md",
+      "computedHash": "9e6ec734363b9ed4ed5b328fc53f8567b2c79659b478371a0cf0e41808acd353"
+    }
+  }
+}

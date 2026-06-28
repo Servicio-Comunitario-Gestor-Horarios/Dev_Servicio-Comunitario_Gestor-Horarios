@@ -1,7 +1,2 @@
 build/
 .env
-
-# Guías de desarrollo locales (no se comparten en el repo)
-DOCKER_WORKFLOW.md
-CMAKE_GUIDE.md
-SESION_*.md

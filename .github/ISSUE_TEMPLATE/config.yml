@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discusión General
+    url: https://github.com/Servicio-Comunitario-Gestor-Horarios/Dev_Servicio-Comunitario_Gestor-Horarios/discussions
+    about: Para preguntas, ideas o discusiones que no sean bugs ni features concretas.

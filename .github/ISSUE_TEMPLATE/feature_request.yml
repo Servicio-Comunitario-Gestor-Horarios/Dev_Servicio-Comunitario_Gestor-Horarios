@@ -1,0 +1,60 @@
+name: Solicitud de Funcionalidad
+description: Sugerir una idea o mejora para el proyecto
+title: "[Feature]: "
+labels: ["enhancement", "status:needs-review"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Antes de solicitar
+        - [ ] Verifiqué que esta funcionalidad no haya sido solicitada antes
+        - [ ] Revisé las issues existentes y no encontré algo similar
+        - [ ] La funcionalidad está alineada con los objetivos del proyecto
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema Relacionado
+      description: ¿Hay algún problema que esta funcionalidad resolvería? Describilo.
+      placeholder: Me frustra cuando...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solución Propuesta
+      description: Describí la funcionalidad que te gustaría ver implementada.
+      placeholder: Me gustaría que el sistema...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área Afectada
+      description: ¿Qué parte del proyecto impacta esta solicitud?
+      options:
+        - Frontend
+        - Backend
+        - Middleware
+        - Docs
+        - Infra
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas Consideradas
+      description: ¿Hay soluciones alternativas que hayas considerado?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto Adicional
+      description: Cualquier detalle extra, capturas, referencias útiles.
+    validations:
+      required: false
