@@ -16,6 +16,7 @@
 #   3. Agregar acá: add_subdirectory(<modulo>)
 #   4. Si otro módulo lo necesita, linkearlo desde su CMakeLists.txt
 
+add_subdirectory(common)
 add_subdirectory(backend)
 add_subdirectory(frontend)
 add_subdirectory(middleware)

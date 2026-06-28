@@ -69,7 +69,7 @@ Si **funciona pero podría mejorar** → enhancement.
 |-------|-------|--------------|
 | `area-backend` | 🔴 `#d73a4a` | Lógica, OR-Tools, DB |
 | `area-frontend` | 🔵 `#2d9ff3` | UI, widgets, ventanas |
-| `area-middleware/qa` | 🟡 `#fbca04` | Comunicación, tests |
+| `area-middleware` | 🟡 `#fbca04` | Comunicación, tests |
 | `area-docs` | 🟣 `#7057ff` | Documentación |
 
 ### Labels de sprint
@@ -160,7 +160,7 @@ gh issue create --template feature_request.yml \
 # Uso: ghi "título" "labels" "descripción" [asignado]
 ghi "Módulo de profesores" "area-backend" "CRUD de profesores"
 ghi "Login UI" "area-frontend" "Pantalla de login" "Paola"
-ghi "Testear comunicación" "area-middleware/qa,sprint-3" "Tests de integración" "magrmanuel25"
+ghi "Testear comunicación" "area-middleware,sprint-3" "Tests de integración" "magrmanuel25"
 ```
 
 El alias `ghi` agrega la issue al Project Board automáticamente.

@@ -5,32 +5,35 @@
 # También maneja validación de datos, transformación de formatos,
 # y orquestación de flujos de trabajo.
 #
+# API pública → include/middleware/ (mensajes IPC, tipos compartidos)
+# Implementación → src/ (servidor IPC, cliente, validación)
+#
 # Dependencias externas:
-#   - (ninguna por ahora — solo STL)
-#
-# Dependencias internas:
-#   - backend    → llama a los modelos de optimización
-#   - frontend   → expone interfaces para la UI (opcional, por ahora separado)
-#
-# ¿Cómo usar?
-#   Crear tus .hpp/.cpp en src/middleware/ y agregarlos acá.
+#   - (ninguna por ahora — solo STL + Qt Core para IPC)
 #
 # Nota: middleware NO linkea frontend ni backend directamente.
 #   app (el ejecutable) es quien conecta todo.
-#   Si middleware necesita tipos de backend/frontend,
-#   agregar target_link_libraries acá y sacarlos de app.
 
 add_library(middleware STATIC)
 
 target_sources(middleware PRIVATE
-    middleware_placeholder.cpp
+    src/server/middleware_placeholder.cpp
     # TODO: Reemplazar placeholder por fuentes reales:
-    # schedule_service.cpp
-    # data_validator.cpp
+    # src/server/ipc_server.cpp
+    # src/client/ipc_client.cpp
+    # src/validation/data_validator.cpp
 )
 
 target_include_directories(middleware PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_include_directories(middleware PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(middleware PUBLIC
+    Qt6::Core
 )
 
 set_project_warnings(middleware)

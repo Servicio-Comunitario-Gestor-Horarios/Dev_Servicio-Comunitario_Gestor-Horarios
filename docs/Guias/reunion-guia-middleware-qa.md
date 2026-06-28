@@ -210,7 +210,7 @@ Esto abre OpenCode en modo interactivo. Le podés pedir cualquier cosa en lengua
    └── Verificar que los mensajes fluyen correctamente
 
 5. Reportar issues encontrados
-   └── Crear issues con label area-middleware/qa
+   └── Crear issues con label area-middleware
 ```
 
 ### Para testear sin Docker

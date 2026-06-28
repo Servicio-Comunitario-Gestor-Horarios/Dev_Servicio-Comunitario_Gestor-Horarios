@@ -5,7 +5,7 @@ Diagramas Mermaid de issues por milestone con colores por área y flechas de dep
 **Leyenda:**
 - 🔴 `area-backend` — Luis, Dani, Nicole
 - 🔵 `area-frontend` — Paola
-- 🟡 `area-middleware/qa` — Manuel
+- 🟡 `area-middleware` — Manuel
 - 🟣 `area-docs` — Documentación
 
 ---

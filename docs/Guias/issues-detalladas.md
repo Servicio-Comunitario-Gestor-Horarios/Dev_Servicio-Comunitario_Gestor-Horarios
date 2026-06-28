@@ -55,8 +55,8 @@ Todas las structs con serialización JSON (`QJsonObject`/`QJsonDocument`) para m
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-2` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-2` |
 | **Milestone** | MVP Base |
 | **Dependencias** | S2-I1 (estructuras), S2-I5 (SQLite) |
 
@@ -117,8 +117,8 @@ Maqueta Qt6 Widgets:
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-2` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-2` |
 | **Milestone** | MVP Base |
 | **Dependencias** | Ninguna (paralelizable con S2-I1 y S2-I3) |
 
@@ -314,8 +314,8 @@ Formulario de registro/edición de profesores:
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-3` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-3` |
 | **Milestone** | MVP Base |
 | **Dependencias** | S2-I2 (endpoints middleware) |
 
@@ -493,8 +493,8 @@ Paola diseña los formularios de entrada docente/sección:
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-4` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-4` |
 | **Milestone** | MVP Base |
 | **Dependencias** | S3-I1 (data model) |
 
@@ -669,8 +669,8 @@ Existen formularios de profesores y secciones pero no hay formularios para gesti
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-5` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-5` |
 | **Milestone** | MVP Base |
 | **Dependencias** | S4-I4 (unit tests) |
 
@@ -844,8 +844,8 @@ Calendario semanal visual:
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-6` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-6` |
 | **Milestone** | Beta |
 | **Dependencias** | S3-I4 (routing) |
 
@@ -1019,8 +1019,8 @@ Paola diseña los módulos administrativos:
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-7` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-7` |
 | **Milestone** | Beta |
 | **Dependencias** | S6-I4 (integration tests) |
 
@@ -1196,8 +1196,8 @@ El dashboard actual es básico sin métricas ni estadísticas visuales. Los admi
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-8` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-8` |
 | **Milestone** | Beta |
 | **Dependencias** | S7-I4 (conflict tests) |
 
@@ -1372,8 +1372,8 @@ La integración entre frontend y backend es parcial. Hay pantallas que aún no c
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-9` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-9` |
 | **Milestone** | Beta |
 | **Dependencias** | S8-I4 (load tests) |
 
@@ -1547,8 +1547,8 @@ La UI es funcional pero no se han realizado pruebas formales de usabilidad. Pued
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Manuel |
-| **Área** | area-middleware/qa |
-| **Labels** | `enhancement`, `status:needs-review`, `area-middleware/qa`, `sprint-10` |
+| **Área** | area-middleware |
+| **Labels** | `enhancement`, `status:needs-review`, `area-middleware`, `sprint-10` |
 | **Milestone** | Release 1.0 |
 | **Dependencias** | S9-I4 (integration tests) |
 
@@ -1982,8 +1982,8 @@ El sistema está completo pero pueden surgir dudas técnicas durante la capacita
 | Campo | Valor |
 |-------|-------|
 | **Asignado** | Dani |
-| **Área** | area-docs |
-| **Labels** | `enhancement`, `status:needs-review`, `area-docs`, `sprint-13` |
+| **Área** | area-frontend |
+| **Labels** | `enhancement`, `status:needs-review`, `area-frontend`, `sprint-13` |
 | **Milestone** | Release 1.0 |
 | **Dependencias** | S12-I2 (user manual) |
 

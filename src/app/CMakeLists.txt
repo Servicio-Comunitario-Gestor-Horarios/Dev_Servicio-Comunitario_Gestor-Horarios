@@ -25,6 +25,7 @@ target_link_libraries(gestor-horarios PRIVATE
     frontend
     backend
     middleware
+    common
 )
 
 set_project_warnings(gestor-horarios)
