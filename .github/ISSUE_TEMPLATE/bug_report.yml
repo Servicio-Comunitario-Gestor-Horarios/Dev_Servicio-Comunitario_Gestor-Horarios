@@ -50,6 +50,41 @@ body:
       required: true
 
   - type: dropdown
+    id: area
+    attributes:
+      label: Área Afectada
+      description: ¿Qué área del proyecto afecta este bug?
+      options:
+        - area-backend
+        - area-frontend
+        - area-middleware/qa
+        - area-docs
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sprint
+    attributes:
+      label: Sprint Detectado
+      description: ¿En qué sprint se detectó el bug? (opcional)
+      options:
+        - Sin definir
+        - Sprint 2
+        - Sprint 3
+        - Sprint 4
+        - Sprint 5
+        - Sprint 6
+        - Sprint 7
+        - Sprint 8
+        - Sprint 9
+        - Sprint 10
+        - Sprint 11
+        - Sprint 12
+        - Sprint 13
+    validations:
+      required: false
+
+  - type: dropdown
     id: os
     attributes:
       label: Sistema Operativo

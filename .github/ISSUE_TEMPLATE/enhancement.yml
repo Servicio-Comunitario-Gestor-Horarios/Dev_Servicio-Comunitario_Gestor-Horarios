@@ -1,31 +1,53 @@
-name: Solicitud de Funcionalidad
-description: Sugerir una nueva funcionalidad o mejora significativa para el proyecto
-title: "[Feature]: "
+name: Mejora de Funcionalidad Existente
+description: Proponer una mejora, refactor técnico o pulido sobre una funcionalidad existente
+title: "[Enhancement]: "
 labels: ["enhancement", "status:needs-review"]
 body:
   - type: markdown
     attributes:
       value: |
         ## Antes de solicitar
-        - [ ] Verifiqué que esta funcionalidad no haya sido solicitada antes
+        - [ ] Verifiqué que esta mejora no haya sido solicitada antes
         - [ ] Revisé las issues existentes y no encontré algo similar
-        - [ ] La funcionalidad está alineada con los objetivos del proyecto
+        - [ ] La mejora está alineada con los objetivos del proyecto
 
-  - type: textarea
-    id: problem
+  - type: input
+    id: feature
     attributes:
-      label: Problema
-      description: ¿Qué necesidad resuelve esta funcionalidad? Describí el problema o carencia actual.
-      placeholder: Actualmente no es posible hacer X, lo que causa Y...
+      label: Funcionalidad a Mejorar
+      description: ¿Qué funcionalidad existente necesita mejora?
+      placeholder: Ej: Login, CRUD de profesores, generación de horarios...
     validations:
       required: true
 
   - type: textarea
-    id: solution
+    id: limitation
     attributes:
-      label: Solución Propuesta
-      description: ¿Cómo debería funcionar desde la perspectiva del usuario? Describí el comportamiento esperado.
-      placeholder: El sistema debería permitir al usuario hacer X mediante...
+      label: Limitación Actual
+      description: Describí el problema o limitación que tiene la funcionalidad hoy.
+      placeholder: Actualmente la funcionalidad X hace Y, pero cuando Z ocurre... 
+    validations:
+      required: true
+
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Mejora Propuesta
+      description: Describí el cambio propuesto y cómo mejora la situación actual.
+      placeholder: Se debería cambiar X para que haga Y, lo que permitiría...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: enhancement_type
+    attributes:
+      label: Tipo de Mejora
+      description: ¿Qué tipo de mejora es?
+      options:
+        - tech-debt
+        - refactor
+        - performance
+        - ux-polish
     validations:
       required: true
 
@@ -33,7 +55,7 @@ body:
     id: area
     attributes:
       label: Área Afectada
-      description: ¿Qué área del proyecto impacta esta solicitud?
+      description: ¿Qué área del proyecto impacta esta mejora?
       options:
         - area-backend
         - area-frontend
@@ -46,12 +68,11 @@ body:
     id: acceptance
     attributes:
       label: Criterios de Aceptación
-      description: Condiciones medibles que debe cumplir esta funcionalidad para considerarse completa.
+      description: Condiciones medibles que debe cumplir esta mejora para considerarse completa.
       placeholder: |
-        - [ ] El usuario puede hacer X
-        - [ ] El sistema responde con Y en menos de Z segundos
-        - [ ] Los datos persisten correctamente en la base de datos
-        - [ ] Se manejan correctamente los errores (campo vacío, conexión perdida, etc.)
+        - [ ] El rendimiento mejora un X%
+        - [ ] El código refactorizado pasa los tests existentes
+        - [ ] La UX es consistente con el resto de la aplicación
       render: markdown
     validations:
       required: true
@@ -61,16 +82,7 @@ body:
     attributes:
       label: Contexto Técnico
       description: Referencias de arquitectura, archivos afectados, patrones a seguir. Opcional.
-      placeholder: "Módulos involucrados: backend/src/database/, middleware/common/\nReferencia: docs/arquitectura-comunicacion-frontend-backend.md"
-    validations:
-      required: false
-
-  - type: input
-    id: dependencies
-    attributes:
-      label: Dependencias
-      description: Números de issues de las que depende esta funcionalidad (ej: #5, #12). Opcional.
-      placeholder: "#5, #12"
+      placeholder: "Archivos involucrados: backend/src/database/..."
     validations:
       required: false
 
@@ -114,7 +126,7 @@ body:
     id: alternatives
     attributes:
       label: Alternativas Consideradas
-      description: Otras soluciones o enfoques que hayas considerado y por qué fueron descartados. Opcional.
-      placeholder: "Se consideró hacer X de otra forma, pero se descartó porque..."
+      description: Otras soluciones o enfoques que hayas considerado. Opcional.
+      placeholder: "Se consideró no hacer nada, pero..."
     validations:
       required: false
