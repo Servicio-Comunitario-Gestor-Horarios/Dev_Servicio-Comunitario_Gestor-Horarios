@@ -8,6 +8,7 @@ FPS=60
 SPD=0.5
 START_DATE=""
 STOP_DATE=""
+GOURCE_PATH=()
 
 # --- help ---
 usage() {
@@ -23,6 +24,8 @@ Options:
   -s, --seconds-per-day N Speed — seconds per day in video (default: 0.5)
   --start-date DATE       Git log start (e.g. "2024-01-01")
   --stop-date DATE        Git log end (e.g. "2024-12-31")
+  -p, --path DIR          Only track files under DIR (default: whole repo)
+                           Use multiple times: -p src/ -p include/
   -h, --help              Show this help and exit
 EOF
   exit 0
@@ -71,6 +74,7 @@ while [[ $# -gt 0 ]]; do
     -s|--seconds-per-day) SPD="$2"; shift 2 ;;
     --start-date) START_DATE="$2"; shift 2 ;;
     --stop-date) STOP_DATE="$2"; shift 2 ;;
+    -p|--path) GOURCE_PATH+=("$2"); shift 2 ;;
     -h|--help) usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
@@ -104,8 +108,11 @@ echo "  FPS:          $FPS"
 echo "  Speed:        ${SPD}s/day"
 [[ -n "$START_DATE" ]] && echo "  Start date:   $START_DATE"
 [[ -n "$STOP_DATE" ]] && echo "  Stop date:    $STOP_DATE"
+if [[ ${#GOURCE_PATH[@]} -gt 0 ]]; then
+  echo "  Path(s):      ${GOURCE_PATH[*]}"
+fi
 
-gource "${GOURCE_ARGS[@]}" -o - \
+gource "${GOURCE_ARGS[@]}" "${GOURCE_PATH[@]}" -o - \
   | ffmpeg -y -r "$FPS" -f image2pipe -vcodec ppm -i - \
     -vcodec libx264 -preset medium -pix_fmt yuv420p -crf 23 \
     "$OUTPUT"
