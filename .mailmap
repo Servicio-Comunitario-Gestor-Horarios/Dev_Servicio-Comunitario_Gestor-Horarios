@@ -1,0 +1,12 @@
+# .mailmap — Git canonical author names
+# Gource respeta este archivo automáticamente
+# Formato: Nombre Real <email>
+
+# === Equipo ===
+Luis Rojas <luisalexanderrojasguevara@gmail.com>
+Daniel Reyna <dan.a.reyna2018@gmail.com>
+
+# === Próximos (agregar cuando pusheen) ===
+# Paola Peña <email>
+# Manuel Garcia <email>
+# Nicole Sereno <email>
