@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
 
 const TOKEN = process.env.GH_TOKEN;
-const OWNER = 'LuisRojas260305';
+const OWNER = 'Servicio-Comunitario-Gestor-Horarios';
 const PROJECT_NUMBER = 1;
 
 async function graphql(query, variables = {}) {
@@ -25,7 +25,7 @@ async function graphql(query, variables = {}) {
 async function fetchProjectData() {
   const query = `
     query($owner: String!, $number: Int!) {
-      user(login: $owner) {
+      organization(login: $owner) {
         projectV2(number: $number) {
           title
           items(first: 50) {
@@ -85,7 +85,7 @@ async function fetchProjectData() {
     }`;
 
   const data = await graphql(query, { owner: OWNER, number: PROJECT_NUMBER });
-  const project = data.user.projectV2;
+  const project = data.organization.projectV2;
   return project;
 }
 

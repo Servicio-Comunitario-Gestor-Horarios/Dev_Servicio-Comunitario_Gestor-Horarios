@@ -55,12 +55,12 @@ jobs:
 
             console.log(`Issue #${issueNumber} → moving to "${targetStatus}"`);
 
-            const owner = 'LuisRojas260305';
+            const owner = 'Servicio-Comunitario-Gestor-Horarios';
             const projectNumber = 1;
 
             const projectData = await github.graphql(`
               query($owner: String!, $projectNumber: Int!) {
-                user(login: $owner) {
+                organization(login: $owner) {
                   projectV2(number: $projectNumber) {
                     id
                     title
@@ -78,7 +78,7 @@ jobs:
               }
             `, { owner, projectNumber });
 
-            const project = projectData.user.projectV2;
+            const project = projectData.organization.projectV2;
             const projectId = project.id;
             console.log(`Project: "${project.title}" (${projectId})`);
 
