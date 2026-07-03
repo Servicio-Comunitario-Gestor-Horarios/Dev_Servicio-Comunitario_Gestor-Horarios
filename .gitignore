@@ -1,2 +1,4 @@
 build/
 .env
+timelapse-*.mp4
+docs/timelapses/*.mp4

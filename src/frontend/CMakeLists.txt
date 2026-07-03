@@ -1,45 +1,36 @@
-# src/frontend/CMakeLists.txt
-# ===
-# Módulo frontend: interfaz de usuario con Qt6.
-# Contiene ventanas, formularios, tablas, y toda la interacción visual.
-#
-# API pública → include/frontend/ (si otros módulos necesitan tipos de UI)
-# Implementación → src/ (vistas, diálogos, widgets, modelos)
-# Recursos → resources/ (iconos, QRC, estilos)
-#
-# Dependencias externas:
-#   - Qt6::Core     → eventos, señales, slots
-#   - Qt6::Sql      → conexión a base de datos SQLite
-#   - Qt6::Widgets  → widgets de ventana (QMainWindow, etc.)
-#
-# Qt6 requiere AUTOMOC para procesar macros Q_OBJECT.
+﻿cmake_minimum_required(VERSION 3.16)
+project(gestor-horarios-frontend VERSION 1.0.0 LANGUAGES CXX)
 
-add_library(frontend STATIC)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
-target_sources(frontend PRIVATE
-    src/views/main_window.cpp
-    src/views/main_window.hpp
-    # TODO: Agregar más fuentes:
-    # src/views/dashboard_view.cpp
-    # src/dialogs/login_dialog.cpp
-    # src/widgets/schedule_table.cpp
-    # src/models/schedule_model.cpp
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+
+qt6_standard_project_setup()
+
+set(SOURCES
+    src/main.cpp
+    src/logindialog.cpp
 )
 
-target_include_directories(frontend PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+set(HEADERS
+    src/logindialog.h
 )
 
-target_include_directories(frontend PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+qt6_add_executable(gestor-horarios-frontend
+    ${SOURCES}
+    ${HEADERS}
 )
 
-target_link_libraries(frontend PUBLIC
+# ¡Importante: usar PRIVATE!
+target_link_libraries(gestor-horarios-frontend PRIVATE
     Qt6::Core
-    Qt6::Sql
     Qt6::Widgets
 )
 
-set_target_properties(frontend PROPERTIES AUTOMOC ON)
-
-set_project_warnings(frontend)
+target_compile_definitions(gestor-horarios-frontend PRIVATE
+    PROJECT_VERSION="${PROJECT_VERSION}"
+)

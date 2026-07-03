@@ -61,7 +61,7 @@ main
 | └─ Allowed merge methods | Solo **Squash** |
 | Require linear history | ✅ |
 | Block force pushes | ✅ |
-| Required reviewers | Tech-Leads (1 approval) + QA (1 approval) |
+| Required reviewers | Tech-Leads (2 approvals) |
 
 ### `develop-protection` — Rama `develop`
 
@@ -75,7 +75,7 @@ main
 | └─ Allowed merge methods | Solo **Squash** |
 | Require linear history | ✅ |
 | Block force pushes | ✅ |
-| Required reviewers | Tech-Leads (1 approval) + QA (1 approval) |
+| Required reviewers | Tech-Leads (2 approvals) |
 
 ---
 
@@ -84,10 +84,9 @@ main
 Archivo: `.github/CODEOWNERS`
 
 ```codeowners
-* @Servicio-Comunitario-Gestor-Horarios/Tech-Leads @Servicio-Comunitario-Gestor-Horarios/QA
-```
+* @Servicio-Comunitario-Gestor-Horarios/Tech-Leads
 
-Todo cambio necesita aprobación de al menos un Tech-Lead y QA como code owners.
+Todo cambio necesita aprobación de ambos Tech-Leads como code owners.
 
 ---
 
@@ -204,9 +203,9 @@ git push origin feature/mi-cambio
 
 **4. Esperar revisión**
 
-- El PR asigna automáticamente a **Tech-Leads** y **QA** como reviewers
-- Se requieren **2 approvals**
-- Si Tech-Lead y QA aprueban → se puede mergear
+- El PR asigna automáticamente a **Tech-Leads** como reviewers
+- Se requieren **2 approvals** (ambos Tech-Leads)
+- Si ambos Tech-Leads aprueban → se puede mergear
 
 **5. Mergear**
 

@@ -110,7 +110,7 @@ hotfix/[descripción]
  7. Programar, commitear, pushear
  8. gh pr create --base develop --title "..." --body "Closes #N"
  9. Esperar revisiones
-10. Tech-Lead + QA aprueban → lo mergean
+10. Ambos Tech-Leads aprueban → lo mergean
 11. Listo 🎉
 ```
 
@@ -129,7 +129,7 @@ hotfix/[descripción]
  1. Revisar PRs del área que lideran
  2. Verificar que cumplan los requisitos del PR
  3. Aprobar
- 4. Cuando QA también apruebe → Squash and merge
+ 4. Cuando el otro Tech-Lead también apruebe → Squash and merge
  5. Eliminar la rama (automático si configuramos)
 ```
 
@@ -143,7 +143,7 @@ Cuando algo en **producción** está roto y no puede esperar:
  1. Crear rama desde main: git checkout -b hotfix/descripcion main
  2. Programar la corrección
  3. Hacer PR a main (no a develop)
- 4. Tech-Lead aprueba + QA aprueba → merge a main
+ 4. Ambos Tech-Leads aprueban → merge a main
  5. Inmediatamente después, mergear main a develop para no perder el fix
 ```
 
@@ -164,7 +164,7 @@ Los Tech-Leads tienen **bypass** en los rulesets. Esto significa que pueden:
 ### ¿Cuándo usarlo?
 
 - Emergencia real (producción caída, bug crítico)
-- Algo que necesita salir **ya** y no hay tiempo de esperar QA
+- Algo que necesita salir **ya** y no hay tiempo de esperar al otro Tech-Lead
 
 ### ¿Cuándo NO usarlo?
 
