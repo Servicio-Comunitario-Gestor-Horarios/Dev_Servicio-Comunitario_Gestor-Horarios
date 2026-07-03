@@ -47,7 +47,7 @@ jobs:
             if (isMerged) {
               targetStatus = 'Done';
             } else if (action === 'opened' || action === 'ready_for_review') {
-              targetStatus = 'In-review';
+              targetStatus = 'In review';
             } else {
               console.log(`Action '${action}' no requiere cambio de status`);
               return;
@@ -89,8 +89,9 @@ jobs:
               process.exit(1);
             }
 
+            const normalize = s => s.toLowerCase().replace(/[-_\s]+/g, ' ');
             const targetOption = statusField.options.find(o =>
-              o.name.toLowerCase() === targetStatus.toLowerCase()
+              normalize(o.name) === normalize(targetStatus)
             );
             if (!targetOption) {
               console.log(`ERROR: No '${targetStatus}' option. Available:`,
