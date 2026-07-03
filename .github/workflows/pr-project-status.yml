@@ -102,9 +102,9 @@ jobs:
             console.log(`Target option: ${targetOption.name} (${targetOption.id})`);
 
             const itemData = await github.graphql(`
-              query($owner: String!, $projectId: ID!, $issueNumber: Int!) {
-                user(login: $owner) {
-                  projectV2(id: $projectId) {
+              query($projectId: ID!, $issueNumber: Int!) {
+                node(id: $projectId) {
+                  ... on ProjectV2 {
                     items(first: 50) {
                       nodes {
                         id
@@ -118,9 +118,9 @@ jobs:
                   }
                 }
               }
-            `, { owner, projectId, issueNumber });
+            `, { projectId, issueNumber });
 
-            const item = itemData.user.projectV2.items.nodes.find(
+            const item = itemData.node.items.nodes.find(
               n => n.content && n.content.number === issueNumber
             );
 
