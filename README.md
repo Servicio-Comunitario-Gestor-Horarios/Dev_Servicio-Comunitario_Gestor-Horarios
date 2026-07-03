@@ -68,7 +68,12 @@ Gestor-Horarios/
 │   ├── docker-compose.yml
 │   └── verify-dev-env.sh
 ├── docs/                   # Documentacion del proyecto
-│   └── Guias/              # Guias de trabajo, workflow, sprints, issues
+│   ├── guias/              # Guias de trabajo, workflow, sprints, issues
+│   ├── propuestas/         # Propuestas y anteproyectos
+│   ├── timelapses/         # Videos MP4 generados
+│   ├── imagenes/           # Screenshots de issues y diagramas
+│   ├── manual-usuario/     # Futuro manual de usuario
+│   └── manual-tecnico/     # Futura documentacion tecnica
 ├── build/                  # Directorio de build (generado, no committear)
 ├── .github/                # Configuracion de GitHub (templates, workflows)
 │   └── ISSUE_TEMPLATE/     # Plantillas para crear issues
@@ -299,6 +304,6 @@ docker compose exec dev bash
 
 La planificacion detallada por sprints y las issues asociadas estan en:
 
-- `docs/Guias/planificacion-sprints.md` — que hace cada quien en cada sprint
-- `docs/Guias/issues-detalladas.md` — desglose de issues por persona y sprint
-- `docs/Guias/WORKFLOW_COMPLETO.md` — guia extendida de trabajo en equipo
+- `docs/guias/planificacion/planificacion-sprints.md` — que hace cada quien en cada sprint
+- `docs/guias/planificacion/issues-detalladas.md` — desglose de issues por persona y sprint
+- `docs/guias/workflow/WORKFLOW_COMPLETO.md` — guia extendida de trabajo en equipo
