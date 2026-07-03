@@ -11,6 +11,7 @@ jobs:
       - uses: actions/github-script@v7
         id: find-issue
         with:
+          github-token: ${{ secrets.GH_PROJECT_TOKEN }}
           result-encoding: string
           script: |
             const body = context.payload.pull_request.body || '';
@@ -28,6 +29,7 @@ jobs:
             return '';
 
       - name: Move project card
+        id: move-card
         if: steps.find-issue.outputs.result != ''
         uses: actions/github-script@v7
         env:
@@ -35,12 +37,12 @@ jobs:
           PR_STATE: ${{ github.event.pull_request.merged && 'merged' || github.event.pull_request.state }}
           PR_ACTION: ${{ github.event.action }}
         with:
+          github-token: ${{ secrets.GH_PROJECT_TOKEN }}
           script: |
             const issueNumber = parseInt(process.env.ISSUE, 10);
             const isMerged = process.env.PR_STATE === 'merged';
             const action = process.env.PR_ACTION;
 
-            // Determinar el status segun la accion del PR
             let targetStatus;
             if (isMerged) {
               targetStatus = 'Done';
@@ -53,7 +55,6 @@ jobs:
 
             console.log(`Issue #${issueNumber} → moving to "${targetStatus}"`);
 
-            // 1. Obtener el ProjectV2 ID
             const owner = 'LuisRojas260305';
             const projectNumber = 1;
 
@@ -81,20 +82,18 @@ jobs:
             const projectId = project.id;
             console.log(`Project: "${project.title}" (${projectId})`);
 
-            // 2. Encontrar el Status field
             const statusField = project.fields.nodes.find(f => f.name === 'Status');
             if (!statusField) {
-              console.log('ERROR: No "Status" field found. Available fields:',
-                project.fields.nodes.map(f => f.name).join(', '));
+              console.log('ERROR: No "Status" field. Available:',
+                project.fields.nodes.map(o => o.name).join(', '));
               process.exit(1);
             }
 
-            // 3. Encontrar la option target
             const targetOption = statusField.options.find(o =>
               o.name.toLowerCase() === targetStatus.toLowerCase()
             );
             if (!targetOption) {
-              console.log(`ERROR: No '${targetStatus}' option in Status field. Available:`,
+              console.log(`ERROR: No '${targetStatus}' option. Available:`,
                 statusField.options.map(o => o.name).join(', '));
               process.exit(1);
             }
@@ -102,7 +101,6 @@ jobs:
             console.log(`Status field: ${statusField.id}`);
             console.log(`Target option: ${targetOption.name} (${targetOption.id})`);
 
-            // 4. Buscar el item en el project asociado a la issue
             const itemData = await github.graphql(`
               query($owner: String!, $projectId: ID!, $issueNumber: Int!) {
                 user(login: $owner) {
@@ -127,13 +125,12 @@ jobs:
             );
 
             if (!item) {
-              console.log(`Issue #${issueNumber} not found in project board. It may not have been added yet.`);
+              console.log(`Issue #${issueNumber} not found in project board.`);
               return;
             }
 
             console.log(`Found item: ${item.id}`);
 
-            // 5. Actualizar el status
             await github.graphql(`
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(
