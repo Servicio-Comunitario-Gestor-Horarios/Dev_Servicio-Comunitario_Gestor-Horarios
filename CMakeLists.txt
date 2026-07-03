@@ -48,7 +48,7 @@ endif()
 
 # Qt6: framework de interfaz gráfica y base de datos
 # Se usa Core (eventos, hilos) y Sql (SQLite). Siempre necesaria (frontend).
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Test)
 
 include(cmake/CompilerWarnings.cmake)
 
