@@ -59,12 +59,6 @@ async function fetchProjectData() {
                     repository { nameWithOwner }
                     field { ... on ProjectV2FieldCommon { name } }
                   }
-                  ... on ProjectV2ItemFieldLabelValue {
-                    labels(first: 5) {
-                      nodes { name color }
-                    }
-                    field { ... on ProjectV2FieldCommon { name } }
-                  }
                 }
               }
               content {
@@ -108,16 +102,11 @@ function renderHtml(project) {
     const type = content.__typename || 'Item';
 
     // Extract field values
-    let status = '', assignee = '', labels = '';
+    let status = '', assignee = '';
     for (const fv of item.fieldValues.nodes) {
       if (fv.field?.name === 'Status') status = fv.name || '';
       if (fv.field?.name === 'Assignees' && fv.users) {
         assignee = fv.users.nodes.map(a => a.login).join(', ');
-      }
-      if (fv.field?.name === 'Labels' && fv.labels) {
-        labels = fv.labels.nodes.map(l =>
-          `<span style="background:${l.color}22;color:#${l.color};padding:2px 6px;border-radius:4px;font-size:11px">${l.name}</span>`
-        ).join(' ');
       }
     }
 
@@ -140,9 +129,7 @@ function renderHtml(project) {
       <td style="padding:8px 12px;border-bottom:1px solid #d0d7de;font-size:13px;color:#656d76">
         ${assignee || ''}
       </td>
-      <td style="padding:8px 12px;border-bottom:1px solid #d0d7de">
-        ${labels || ''}
-      </td>
+
     </tr>`;
   }
 
@@ -168,7 +155,7 @@ function renderHtml(project) {
       <th>State</th>
       <th>Status</th>
       <th>Assignees</th>
-      <th>Labels</th>
+
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
