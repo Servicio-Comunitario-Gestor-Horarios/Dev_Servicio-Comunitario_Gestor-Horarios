@@ -1,0 +1,10 @@
+{
+    "cmake.configureSettings": {
+        "BUILD_BACKEND": "ON"
+    },
+    "cmake.generator": "Ninja",
+    "cmake.cmakePath": "/usr/bin/cmake",
+    "C_Cpp.intelliSenseEngine": "default",
+    "editor.cursorStyle": "line",
+    "editor.insertMode": "insert"
+}
