@@ -49,8 +49,8 @@ async function fetchProjectData() {
                     milestone { title }
                     field { ... on ProjectV2FieldCommon { name } }
                   }
-                  ... on ProjectV2ItemFieldAssigneeValue {
-                    assignees(first: 5) {
+                  ... on ProjectV2ItemFieldUserValue {
+                    users(first: 5) {
                       nodes { login }
                     }
                     field { ... on ProjectV2FieldCommon { name } }
@@ -111,8 +111,8 @@ function renderHtml(project) {
     let status = '', assignee = '', labels = '';
     for (const fv of item.fieldValues.nodes) {
       if (fv.field?.name === 'Status') status = fv.name || '';
-      if (fv.field?.name === 'Assignees' && fv.assignees) {
-        assignee = fv.assignees.nodes.map(a => a.login).join(', ');
+      if (fv.field?.name === 'Assignees' && fv.users) {
+        assignee = fv.users.nodes.map(a => a.login).join(', ');
       }
       if (fv.field?.name === 'Labels' && fv.labels) {
         labels = fv.labels.nodes.map(l =>
