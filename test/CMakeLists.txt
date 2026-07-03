@@ -1,37 +1,88 @@
 # test/CMakeLists.txt
 # ===
-# Tests del proyecto. La estructura espeja src/ para facilitar
-# la correspondencia entre código y pruebas.
-#
-# Cada test se registra con add_test() y se ejecuta con ctest.
+# Tests del proyecto. Soporta QTest (tests Qt nativos) y Google Test
+# (tests de lógica general con mocks).
 #
 # Flujo:
 #   cmake --build build
 #   ctest --test-dir build
 #
-# ¿Cómo agregar un test?
-#   1. Crear el archivo en el directorio matching de test/
-#      (ej: test/backend/test_schedule_model.cpp)
-#   2. Agregar acá:
-#        add_executable(test_backend_schedule test/backend/test_schedule_model.cpp)
-#        target_link_libraries(test_backend_schedule PRIVATE backend common)
-#        add_test(NAME backend/schedule COMMAND test_backend_schedule)
+# Para ejecutar un test específico:
+#   ctest --test-dir build -R franja        # tests que contengan "franja"
+#   ctest --test-dir build -R backend       # todos los tests de backend
 
 enable_testing()
 
-# TODO: Agregar tests acá
-#
-# Backend:
-#   add_executable(test_backend_data test/backend/test_data_models.cpp)
-#   target_link_libraries(test_backend_data PRIVATE backend common)
-#   add_test(NAME backend/data COMMAND test_backend_data)
-#
-# Middleware:
-#   add_executable(test_middleware_routing test/middleware/test_routing.cpp)
-#   target_link_libraries(test_middleware_routing PRIVATE middleware common)
-#   add_test(NAME middleware/routing COMMAND test_middleware_routing)
-#
-# Frontend:
-#   add_executable(test_frontend_login test/frontend/test_login_dialog.cpp)
-#   target_link_libraries(test_frontend_login PRIVATE frontend common)
-#   add_test(NAME frontend/login COMMAND test_frontend_login)
+# ── Google Test (opcional) ──
+find_package(GTest QUIET)
+if(GTest_FOUND)
+    message(STATUS "Google Test found — GTest tests enabled")
+else()
+    message(STATUS "Google Test NOT found — install libgtest-dev to enable")
+endif()
+
+# ── Helper: registrar un test con QTest ──
+function(add_qtest NAME SOURCE)
+    add_executable(${NAME} ${SOURCE})
+    set_target_properties(${NAME} PROPERTIES AUTOMOC ON)
+    target_link_libraries(${NAME} PRIVATE
+        ${ARGN}
+        Qt6::Test
+        Qt6::Core
+    )
+    add_test(NAME ${NAME} COMMAND ${NAME})
+endfunction()
+
+# ── Helper: registrar un test con Google Test ──
+function(add_gtest NAME SOURCE)
+    if(NOT GTest_FOUND)
+        message(WARNING "Skipping ${NAME} — Google Test not available")
+        return()
+    endif()
+    add_executable(${NAME} ${SOURCE})
+    target_link_libraries(${NAME} PRIVATE
+        ${ARGN}
+        GTest::GTest
+        GTest::Main
+    )
+    add_test(NAME ${NAME} COMMAND ${NAME})
+endfunction()
+
+# ============================================================
+# Tests de backend — datos (serialización con QTest)
+# ============================================================
+
+add_qtest(test_backend_franja_horaria
+    backend/test_franja_horaria.cpp
+    backend
+)
+
+add_qtest(test_backend_aula
+    backend/test_aula.cpp
+    backend
+)
+
+add_qtest(test_backend_materia
+    backend/test_materia.cpp
+    backend
+)
+
+add_qtest(test_backend_profesor
+    backend/test_profesor.cpp
+    backend
+)
+
+add_qtest(test_backend_horario
+    backend/test_horario.cpp
+    backend
+)
+
+add_qtest(test_backend_plan_estudio
+    backend/test_plan_estudio.cpp
+    backend
+)
+
+# ============================================================
+# Tests de backend — lógica (Google Test, cuando existan)
+# ============================================================
+# add_gtest(test_backend_solver test/backend/test_solver.cpp backend)

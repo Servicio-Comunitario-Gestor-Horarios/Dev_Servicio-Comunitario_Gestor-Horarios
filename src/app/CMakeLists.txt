@@ -23,9 +23,15 @@ target_sources(gestor-horarios PRIVATE
 
 target_link_libraries(gestor-horarios PRIVATE
     frontend
-    backend
-    middleware
     common
 )
+
+# backend y middleware existen solo si BUILD_BACKEND=ON
+if(TARGET backend)
+    target_link_libraries(gestor-horarios PRIVATE backend)
+endif()
+if(TARGET middleware)
+    target_link_libraries(gestor-horarios PRIVATE middleware)
+endif()
 
 set_project_warnings(gestor-horarios)
