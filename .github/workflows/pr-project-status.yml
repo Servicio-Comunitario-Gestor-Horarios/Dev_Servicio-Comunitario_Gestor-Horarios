@@ -54,12 +54,12 @@ jobs:
             console.log(`Issue #${issueNumber} → moving to "${targetStatus}"`);
 
             // 1. Obtener el ProjectV2 ID
-            const org = context.repo.owner;
+            const owner = 'LuisRojas260305';
             const projectNumber = 1;
 
             const projectData = await github.graphql(`
-              query($org: String!, $projectNumber: Int!) {
-                organization(login: $org) {
+              query($owner: String!, $projectNumber: Int!) {
+                user(login: $owner) {
                   projectV2(number: $projectNumber) {
                     id
                     title
@@ -75,9 +75,9 @@ jobs:
                   }
                 }
               }
-            `, { org, projectNumber });
+            `, { owner, projectNumber });
 
-            const project = projectData.organization.projectV2;
+            const project = projectData.user.projectV2;
             const projectId = project.id;
             console.log(`Project: "${project.title}" (${projectId})`);
 
@@ -104,8 +104,8 @@ jobs:
 
             // 4. Buscar el item en el project asociado a la issue
             const itemData = await github.graphql(`
-              query($org: String!, $projectId: ID!, $issueNumber: Int!) {
-                organization(login: $org) {
+              query($owner: String!, $projectId: ID!, $issueNumber: Int!) {
+                user(login: $owner) {
                   projectV2(id: $projectId) {
                     items(first: 50) {
                       nodes {
@@ -120,9 +120,9 @@ jobs:
                   }
                 }
               }
-            `, { org, projectId, issueNumber });
+            `, { owner, projectId, issueNumber });
 
-            const item = itemData.organization.projectV2.items.nodes.find(
+            const item = itemData.user.projectV2.items.nodes.find(
               n => n.content && n.content.number === issueNumber
             );
 
