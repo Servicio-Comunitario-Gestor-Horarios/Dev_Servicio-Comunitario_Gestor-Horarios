@@ -1,0 +1,157 @@
+name: PR Project Status Sync
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, closed]
+
+jobs:
+  sync-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        id: find-issue
+        with:
+          result-encoding: string
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const title = context.payload.pull_request.title || '';
+
+            // Buscar "Closes #N", "Fixes #N", "Resolves #N" en el body o title
+            const match = body.match(/(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*#(\d+)/i)
+                       || title.match(/#(\d+)/);
+            if (match) {
+              const issueNumber = parseInt(match[1], 10);
+              console.log(`Found linked issue: #${issueNumber}`);
+              return String(issueNumber);
+            }
+            console.log('No linked issue found in PR body or title');
+            return '';
+
+      - name: Move project card
+        if: steps.find-issue.outputs.result != ''
+        uses: actions/github-script@v7
+        env:
+          ISSUE: ${{ steps.find-issue.outputs.result }}
+          PR_STATE: ${{ github.event.pull_request.merged && 'merged' || github.event.pull_request.state }}
+          PR_ACTION: ${{ github.event.action }}
+        with:
+          script: |
+            const issueNumber = parseInt(process.env.ISSUE, 10);
+            const isMerged = process.env.PR_STATE === 'merged';
+            const action = process.env.PR_ACTION;
+
+            // Determinar el status segun la accion del PR
+            let targetStatus;
+            if (isMerged) {
+              targetStatus = 'Done';
+            } else if (action === 'opened' || action === 'ready_for_review') {
+              targetStatus = 'In Review';
+            } else {
+              console.log(`Action '${action}' no requiere cambio de status`);
+              return;
+            }
+
+            console.log(`Issue #${issueNumber} → moving to "${targetStatus}"`);
+
+            // 1. Obtener el ProjectV2 ID
+            const org = context.repo.owner;
+            const projectNumber = 1;
+
+            const projectData = await github.graphql(`
+              query($org: String!, $projectNumber: Int!) {
+                organization(login: $org) {
+                  projectV2(number: $projectNumber) {
+                    id
+                    title
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options { id name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { org, projectNumber });
+
+            const project = projectData.organization.projectV2;
+            const projectId = project.id;
+            console.log(`Project: "${project.title}" (${projectId})`);
+
+            // 2. Encontrar el Status field
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) {
+              console.log('ERROR: No "Status" field found. Available fields:',
+                project.fields.nodes.map(f => f.name).join(', '));
+              process.exit(1);
+            }
+
+            // 3. Encontrar la option target
+            const targetOption = statusField.options.find(o =>
+              o.name.toLowerCase() === targetStatus.toLowerCase()
+            );
+            if (!targetOption) {
+              console.log(`ERROR: No '${targetStatus}' option in Status field. Available:`,
+                statusField.options.map(o => o.name).join(', '));
+              process.exit(1);
+            }
+
+            console.log(`Status field: ${statusField.id}`);
+            console.log(`Target option: ${targetOption.name} (${targetOption.id})`);
+
+            // 4. Buscar el item en el project asociado a la issue
+            const itemData = await github.graphql(`
+              query($org: String!, $projectId: ID!, $issueNumber: Int!) {
+                organization(login: $org) {
+                  projectV2(id: $projectId) {
+                    items(first: 50) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            number
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { org, projectId, issueNumber });
+
+            const item = itemData.organization.projectV2.items.nodes.find(
+              n => n.content && n.content.number === issueNumber
+            );
+
+            if (!item) {
+              console.log(`Issue #${issueNumber} not found in project board. It may not have been added yet.`);
+              return;
+            }
+
+            console.log(`Found item: ${item.id}`);
+
+            // 5. Actualizar el status
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(
+                  input: {
+                    projectId: $projectId
+                    itemId: $itemId
+                    fieldId: $fieldId
+                    value: { singleSelectOptionId: $optionId }
+                  }
+                ) {
+                  projectV2Item { id }
+                }
+              }
+            `, {
+              projectId,
+              itemId: item.id,
+              fieldId: statusField.id,
+              optionId: targetOption.id
+            });
+
+            console.log(`✅ Issue #${issueNumber} moved to "${targetOption.name}"`);
