@@ -45,7 +45,7 @@ jobs:
             if (isMerged) {
               targetStatus = 'Done';
             } else if (action === 'opened' || action === 'ready_for_review') {
-              targetStatus = 'In Review';
+              targetStatus = 'In-review';
             } else {
               console.log(`Action '${action}' no requiere cambio de status`);
               return;
