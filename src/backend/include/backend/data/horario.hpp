@@ -15,6 +15,8 @@ struct Asignacion {
     Materia materia;
     Profesor profesor;
 
+    QJsonObject toJson() const;
+    static Asignacion fromJson(const QJsonObject& obj);
 };
 
 struct Horario {
