@@ -2,7 +2,7 @@ name: PR Project Status Sync
 
 on:
   pull_request:
-    types: [opened, ready_for_review, closed]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
 
 jobs:
   sync-status:
