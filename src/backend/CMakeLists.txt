@@ -13,7 +13,12 @@
 add_library(backend STATIC)
 
 target_sources(backend PRIVATE
-    src/data/backend_placeholder.cpp
+    src/data/aula.cpp
+    src/data/franja_horaria.cpp
+    src/data/horario.cpp
+    src/data/materia.cpp
+    src/data/plan_estudio.cpp
+    src/data/profesor.cpp
     # TODO: Agregar fuentes reales:
     # src/data/schedule.cpp
     # src/data/teacher.cpp
@@ -37,6 +42,7 @@ target_include_directories(backend PRIVATE
 
 target_link_libraries(backend PUBLIC
     ortools::ortools
+    Qt6::Core
 )
 
 set_project_warnings(backend)
