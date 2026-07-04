@@ -83,6 +83,16 @@ add_qtest(test_backend_plan_estudio
 )
 
 # ============================================================
+# Tests de middleware — health-check IPC
+# ============================================================
+
+add_qtest(test_middleware_health_check
+    test_health_check.cpp
+    middleware
+    Qt6::Network
+)
+
+# ============================================================
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================
 # add_gtest(test_backend_solver test/backend/test_solver.cpp backend)

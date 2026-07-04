@@ -9,7 +9,8 @@
 # Implementación → src/ (servidor IPC, cliente, validación)
 #
 # Dependencias externas:
-#   - (ninguna por ahora — solo STL + Qt Core para IPC)
+#   - Qt6::Core    → eventos, hilos
+#   - Qt6::Network → IPC (QLocalServer / QLocalSocket)
 #
 # Nota: middleware NO linkea frontend ni backend directamente.
 #   app (el ejecutable) es quien conecta todo.
@@ -17,11 +18,8 @@
 add_library(middleware STATIC)
 
 target_sources(middleware PRIVATE
-    src/server/middleware_placeholder.cpp
-    # TODO: Reemplazar placeholder por fuentes reales:
-    # src/server/ipc_server.cpp
-    # src/client/ipc_client.cpp
-    # src/validation/data_validator.cpp
+    src/server/internalserver.cpp
+    src/client/internalclient.cpp
 )
 
 target_include_directories(middleware PUBLIC
@@ -34,6 +32,9 @@ target_include_directories(middleware PRIVATE
 
 target_link_libraries(middleware PUBLIC
     Qt6::Core
+    Qt6::Network
 )
+
+set_target_properties(middleware PROPERTIES AUTOMOC ON)
 
 set_project_warnings(middleware)
