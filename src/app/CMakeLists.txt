@@ -16,11 +16,10 @@
 add_executable(gestor-horarios)
 
 target_sources(gestor-horarios PRIVATE
-    main_placeholder.cpp
-    # TODO: Reemplazar placeholder por fuentes reales:
-    # main.cpp
+     main.cpp
 )
 
+# Al vincular 'frontend', hereda automáticamente Qt6
 target_link_libraries(gestor-horarios PRIVATE
     frontend
     common

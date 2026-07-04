@@ -4,23 +4,27 @@
 #include <QMainWindow>
 #include <QStackedWidget>
 
-class MainWindow : public QMainWindow {
-    Q_OBJECT
+namespace gestor::frontend::views {
 
-public:
-    explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow() override = default;
+    class MainWindow : public QMainWindow {
+        Q_OBJECT
 
-private slots:
-    void on_action_salir();
-    void on_action_acerca_de();
+    public:
+        explicit MainWindow(QWidget *parent = nullptr);
+        ~MainWindow() override = default;
 
-private:
-    QStackedWidget *m_central_stack;
+    private slots:
+        void on_action_salir();
+        void on_action_acerca_de();
 
-    void setup_menu_bar();
-    void setup_toolbar();
-    void setup_status_bar();
-};
+    private:
+        QStackedWidget *m_central_stack;
+
+        void setup_menu_bar();
+        void setup_toolbar();
+        void setup_status_bar();
+    };
+
+} // Cierre del namespace
 
 #endif // MAIN_WINDOW_HPP
