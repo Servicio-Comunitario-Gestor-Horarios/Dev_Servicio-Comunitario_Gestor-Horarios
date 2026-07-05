@@ -9,27 +9,28 @@ set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
+qt6_standard_project_setup()
+
 set(SOURCES
-    src/dialogs/login_dialog.cpp
-    src/views/main_window.cpp
+    src/main.cpp
+    src/logindialog.cpp
 )
 
 set(HEADERS
-    src/dialogs/login_dialog.hpp
-    src/views/main_window.hpp
+    src/logindialog.h
 )
 
-# CAMBIO CLAVE: Ahora es una librería estática, no un ejecutable
-qt6_add_library(frontend STATIC
+qt6_add_executable(gestor-horarios-frontend
     ${SOURCES}
     ${HEADERS}
 )
 
-# Permitimos que otros módulos encuentren las carpetas 'dialogs' y 'views'
-target_include_directories(frontend PUBLIC src)
-
-# PUBLIC asegura que quien use el frontend (como nuestra app) herede Qt6 automáticamente
-target_link_libraries(frontend PUBLIC
+# ¡Importante: usar PRIVATE!
+target_link_libraries(gestor-horarios-frontend PRIVATE
     Qt6::Core
     Qt6::Widgets
+)
+
+target_compile_definitions(gestor-horarios-frontend PRIVATE
+    PROJECT_VERSION="${PROJECT_VERSION}"
 )
