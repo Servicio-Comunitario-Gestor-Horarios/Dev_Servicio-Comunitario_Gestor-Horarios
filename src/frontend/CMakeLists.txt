@@ -18,6 +18,7 @@ set(FRONTEND_HEADERS
 if(FRONTEND_STANDALONE)
     # === MODO Qt CREATOR ===
     # Ejecutable independiente para desarrollo frontend puro
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
     qt6_add_executable(gestor-horarios-frontend
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
