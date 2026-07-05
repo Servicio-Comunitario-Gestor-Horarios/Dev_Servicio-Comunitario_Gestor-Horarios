@@ -1,4 +1,4 @@
-#include "internalclient.h"
+#include <middleware/internalclient.h>
 
 #include <QJsonDocument>
 #include <QJsonObject>
