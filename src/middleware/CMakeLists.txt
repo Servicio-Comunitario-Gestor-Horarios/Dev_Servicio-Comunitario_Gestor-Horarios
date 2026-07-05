@@ -20,6 +20,9 @@ add_library(middleware STATIC)
 target_sources(middleware PRIVATE
     src/server/internalserver.cpp
     src/client/internalclient.cpp
+    include/middleware/internalserver.h
+    include/middleware/internalclient.h
+    include/middleware/messages.h
 )
 
 target_include_directories(middleware PUBLIC

@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     InternalClient client;
 
     // Conectamos la respuesta del cliente para verificar el éxito del Health-Check
-    QObject::connect(&client, &InternalClient::healthCheckResponseReceived, [](bool success) {
+    QObject::connect(&client, &InternalClient::healthCheckResponseReceived, [&a](bool success) {
         qDebug() << "\n==================================================";
         if (success) {
             qDebug() << " [TEST UNITARIO]: ¡ÉXITO COMPLETO!";
@@ -29,7 +29,11 @@ int main(int argc, char *argv[]) {
             qCritical() << " [TEST UNITARIO]: ¡FALLÓ!";
         }
         qDebug() << "==================================================\n";
+        a.quit();
     });
+
+    // Timeout de seguridad: salir si no hay respuesta en 5s
+    QTimer::singleShot(5000, &a, &QCoreApplication::quit);
 
     // Esperar 1 segundo tras encender el servidor para lanzar la prueba automáticamente
     QTimer::singleShot(1000, &client, &InternalClient::sendHealthCheck);
