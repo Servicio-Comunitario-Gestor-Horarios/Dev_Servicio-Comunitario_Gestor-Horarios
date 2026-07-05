@@ -30,6 +30,10 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_HEADERS}
         src/main.cpp
     )
+    target_include_directories(gestor-horarios-frontend PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
     target_link_libraries(gestor-horarios-frontend PRIVATE
         Qt6::Core
         Qt6::Widgets
