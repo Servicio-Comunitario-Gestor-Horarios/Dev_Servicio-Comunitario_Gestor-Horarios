@@ -30,26 +30,17 @@ project(Gestor-Horarios
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ── Opciones de compilación ──
-
-# BUILD_BACKEND: controla si se compila backend+middleware (requiere OR-Tools).
-# Desactivar para compilar solo frontend (útil para desarrolladores de UI
-# que no tienen OR-Tools instalado localmente).
-#   cmake -S . -B build -G Ninja -DBUILD_BACKEND=OFF
-option(BUILD_BACKEND "Build backend and middleware modules" ON)
-
 # ── Dependencias externas ──
 
 # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
-# Solo necesaria si BUILD_BACKEND=ON.
-if(BUILD_BACKEND)
-    find_package(ortools CONFIG REQUIRED)
-endif()
+# Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
+find_package(ortools CONFIG REQUIRED)
 
-# Qt6: framework de interfaz gráfica y base de datos
-# Se usa Core (eventos, hilos) y Sql (SQLite). Siempre necesaria (frontend).
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Test)
+# Qt6: framework de interfaz gráfica, base de datos e IPC
+# Core (eventos/hilos), Sql (SQLite), Widgets (UI), Network (IPC/QLocalServer)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network)
 
+# ── Opciones de compilación ──
 include(cmake/CompilerWarnings.cmake)
 
 # ── Módulos del proyecto ──
