@@ -9,12 +9,12 @@ set_target_properties(gestor-horarios PROPERTIES AUTOMOC ON)
 
 target_sources(gestor-horarios PRIVATE
     main.cpp
-    src/frontend_application.cpp
-    src/backend_application.cpp
-    src/backend_process_manager.cpp
-    include/app/backend_process_manager.hpp
-    include/app/frontend_application.hpp
-    include/app/backend_application.hpp
+    src/aplicacion_frontend.cpp
+    src/aplicacion_backend.cpp
+    src/gestor_proceso_backend.cpp
+    include/app/gestor_proceso_backend.hpp
+    include/app/aplicacion_frontend.hpp
+    include/app/aplicacion_backend.hpp
 )
 
 target_include_directories(gestor-horarios PRIVATE

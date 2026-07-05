@@ -5,11 +5,26 @@
 #include <QDateTime>
 #include <QDebug>
 
-InternalServer::InternalServer(QObject *parent) : QObject(parent) {
-    m_server = new QLocalServer(this);
+/**
+ * @brief Constructor — crea el servidor local.
+ */
+InternalServer::InternalServer(QObject *parent)
+    : QObject(parent)
+    , m_server(new QLocalServer(this))
+{
 }
 
-bool InternalServer::start() {
+/**
+ * @brief Inicia el servidor IPC.
+ *
+ * 1. Elimina cualquier instancia previa del servidor (removeServer).
+ * 2. Escucha en el nombre configurado (SERVER_NAME).
+ * 3. Conecta la señal newConnection al slot onNewConnection.
+ *
+ * @return true si el servidor inició correctamente.
+ */
+bool InternalServer::start()
+{
     QLocalServer::removeServer(Middleware::SERVER_NAME);
 
     if (!m_server->listen(Middleware::SERVER_NAME)) {
@@ -21,70 +36,112 @@ bool InternalServer::start() {
     return true;
 }
 
-void InternalServer::onNewConnection() {
-    QLocalSocket *clientSocket = m_server->nextPendingConnection();
-    if (!clientSocket) return;
+/**
+ * @brief Slot llamado cuando un nuevo cliente se conecta.
+ *
+ * Obtiene el socket del cliente y conecta las señales readyRead
+ * y disconnected para manejar la comunicación.
+ */
+void InternalServer::onNewConnection()
+{
+    QLocalSocket *clienteSocket = m_server->nextPendingConnection();
+    if (!clienteSocket) return;
 
-    connect(clientSocket, &QLocalSocket::readyRead, this, &InternalServer::onReadyRead);
-    connect(clientSocket, &QLocalSocket::disconnected, this, &InternalServer::onClientDisconnected);
+    connect(clienteSocket, &QLocalSocket::readyRead,
+            this, &InternalServer::onReadyRead);
+    connect(clienteSocket, &QLocalSocket::disconnected,
+            this, &InternalServer::onClientDisconnected);
 }
 
-void InternalServer::onReadyRead() {
-    QLocalSocket *clientSocket = qobject_cast<QLocalSocket*>(sender());
-    if (!clientSocket) return;
+/**
+ * @brief Procesa los mensajes entrantes de los clientes IPC.
+ *
+ * Parsea el JSON recibido, identifica la operación por el campo "op",
+ * y construye la respuesta apropiada.
+ *
+ * ## Operaciones soportadas
+ * - health_check → confirma que el backend está vivo
+ * - ready → confirmación de disponibilidad
+ * - shutdown → prepara el apagado graceful
+ * - teacher_* → operaciones CRUD (placeholder)
+ * - cualquier otra → RESP_INVALIDO
+ */
+void InternalServer::onReadyRead()
+{
+    QLocalSocket *clienteSocket = qobject_cast<QLocalSocket*>(sender());
+    if (!clienteSocket) return;
 
-    QByteArray data = clientSocket->readAll();
+    QByteArray data = clienteSocket->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
     if (!doc.isNull() && doc.isObject()) {
         QJsonObject obj = doc.object();
         QString op = obj["op"].toString();
 
-        logConnection("Frontend -> Middleware", op);
+        registrarConexion("Frontend -> Middleware", op);
 
-        QJsonObject response;
+        QJsonObject respuesta;
 
         if (op == Middleware::OP_HEALTH_CHECK) {
-            response["status"] = "ok";
-            response["code"] = Middleware::RESP_OK;
-            logConnection("Middleware -> Frontend", "Respuesta health-check [ok]");
-        } else if (op == Middleware::OP_READY) {
-            response["status"] = "ok";
-            response["code"] = Middleware::RESP_OK;
-            logConnection("Middleware -> Frontend", "Respuesta ready [ok]");
-        } else if (op == Middleware::OP_SHUTDOWN) {
-            response["status"] = "ok";
-            response["code"] = Middleware::RESP_OK;
-            logConnection("Middleware -> Frontend", "Respuesta shutdown [ok]");
-        } else if (op == Middleware::OP_TEACHER_LIST
-                || op == Middleware::OP_TEACHER_GET
-                || op == Middleware::OP_TEACHER_CREATE
-                || op == Middleware::OP_TEACHER_UPDATE
-                || op == Middleware::OP_TEACHER_DELETE) {
-            response["status"] = "ok";
-            response["code"] = Middleware::RESP_OK;
-            response["op"] = op;
-            logConnection("Middleware -> Frontend", "Respuesta CRUD [ok] — " + op);
+            respuesta["status"] = "ok";
+            respuesta["code"] = Middleware::RESP_EXITO;
+            registrarConexion("Middleware -> Frontend", "health-check [ok]");
+        } else if (op == Middleware::OP_LISTO) {
+            respuesta["status"] = "ok";
+            respuesta["code"] = Middleware::RESP_EXITO;
+            registrarConexion("Middleware -> Frontend", "ready [ok]");
+        } else if (op == Middleware::OP_APAGAR) {
+            respuesta["status"] = "ok";
+            respuesta["code"] = Middleware::RESP_EXITO;
+            registrarConexion("Middleware -> Frontend", "shutdown [ok]");
+        } else if (op == Middleware::OP_LISTA_PROFESORES
+                || op == Middleware::OP_OBTENER_PROFESOR
+                || op == Middleware::OP_CREAR_PROFESOR
+                || op == Middleware::OP_ACTUALIZAR_PROFESOR
+                || op == Middleware::OP_ELIMINAR_PROFESOR) {
+            respuesta["status"] = "ok";
+            respuesta["code"] = Middleware::RESP_EXITO;
+            respuesta["op"] = op;
+            registrarConexion("Middleware -> Frontend", "CRUD [ok] — " + op);
         } else {
-            response["status"] = "error";
-            response["code"] = Middleware::RESP_INVALID;
-            logConnection("Middleware -> Frontend", "Respuesta [error] — operación desconocida: " + op);
+            respuesta["status"] = "error";
+            respuesta["code"] = Middleware::RESP_INVALIDO;
+            registrarConexion("Middleware -> Frontend",
+                              "operación desconocida: " + op);
         }
 
-        QJsonDocument responseDoc(response);
-        clientSocket->write(responseDoc.toJson(QJsonDocument::Compact));
-        clientSocket->flush();
+        QJsonDocument docRespuesta(respuesta);
+        clienteSocket->write(docRespuesta.toJson(QJsonDocument::Compact));
+        clienteSocket->flush();
     }
 }
 
-void InternalServer::onClientDisconnected() {
-    QLocalSocket *clientSocket = qobject_cast<QLocalSocket*>(sender());
-    if (clientSocket) {
-        clientSocket->deleteLater();
+/**
+ * @brief Slot llamado cuando un cliente se desconecta.
+ *
+ * Elimina el socket del cliente para liberar recursos.
+ */
+void InternalServer::onClientDisconnected()
+{
+    QLocalSocket *clienteSocket = qobject_cast<QLocalSocket*>(sender());
+    if (clienteSocket) {
+        clienteSocket->deleteLater();
     }
 }
 
-void InternalServer::logConnection(const QString &direction, const QString &operation) {
-    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
-    qDebug() << QString("[%1] [%2] Operación: %3").arg(timestamp, direction, operation);
+/**
+ * @brief Registra una operación en el log de depuración.
+ *
+ * Formato: [timestamp] [direccion] Operación: nombre
+ *
+ * @param direccion "Frontend -> Middleware" o "Middleware -> Frontend".
+ * @param operacion Nombre o descripción de la operación.
+ */
+void InternalServer::registrarConexion(const QString &direccion,
+                                        const QString &operacion)
+{
+    QString timestamp = QDateTime::currentDateTime()
+                            .toString("yyyy-MM-dd hh:mm:ss.zzz");
+    qDebug() << QStringLiteral("[%1] [%2] Operación: %3")
+                    .arg(timestamp, direccion, operacion);
 }
