@@ -1,36 +1,39 @@
-﻿cmake_minimum_required(VERSION 3.16)
-project(gestor-horarios-frontend VERSION 1.0.0 LANGUAGES CXX)
+﻿# Opcion para desarrollo frontend standalone (Qt Creator)
+option(FRONTEND_STANDALONE "Build frontend as standalone executable" OFF)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
-
-qt6_standard_project_setup()
-
-set(SOURCES
-    src/main.cpp
+set(FRONTEND_SOURCES
+    src/frontend_application.cpp
     src/logindialog.cpp
 )
 
-set(HEADERS
+set(FRONTEND_HEADERS
+    include/frontend/frontend_application.hpp
     src/logindialog.h
 )
 
-qt6_add_executable(gestor-horarios-frontend
-    ${SOURCES}
-    ${HEADERS}
-)
-
-# ¡Importante: usar PRIVATE!
-target_link_libraries(gestor-horarios-frontend PRIVATE
-    Qt6::Core
-    Qt6::Widgets
-)
-
-target_compile_definitions(gestor-horarios-frontend PRIVATE
-    PROJECT_VERSION="${PROJECT_VERSION}"
-)
+if(FRONTEND_STANDALONE)
+    # === MODO Qt CREATOR ===
+    # Ejecutable independiente para desarrollo frontend puro
+    qt6_add_executable(gestor-horarios-frontend
+        ${FRONTEND_SOURCES}
+        ${FRONTEND_HEADERS}
+        src/main.cpp
+    )
+    target_link_libraries(gestor-horarios-frontend PRIVATE
+        Qt6::Core
+        Qt6::Widgets
+    )
+else()
+    # === MODO INTEGRADO ===
+    # Libreria estatica para linkear en el binario unico
+    add_library(frontend STATIC)
+    target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS})
+    target_include_directories(frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(frontend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(frontend PUBLIC Qt6::Core Qt6::Widgets)
+    target_compile_definitions(frontend PUBLIC PROJECT_VERSION="${PROJECT_VERSION}")
+endif()
