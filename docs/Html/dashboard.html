@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - Gestión de Usuarios</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0" />
+    <style>
+        :root {
+            /* Mismos tonos del login */
+            --primary-color: #1e3a8a; 
+            --primary-hover: #1e40af;
+            --primary-light: #eff6ff; /* Para hovers y estados activos */
+            
+            --bg-main: #f8fafc; 
+            --bg-panel: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border-light: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            
+            /* Status colors */
+            --status-active-bg: #dcfce7;
+            --status-active-text: #166534;
+            --status-suspended-bg: #fee2e2;
+            --status-suspended-text: #991b1b;
+            --status-inactive-bg: #f1f5f9;
+            --status-inactive-text: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-light);
+            height: 65px; 
+        }
+
+        .sidebar-brand img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            mix-blend-mode: multiply;
+        }
+
+        .sidebar-brand-text {
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.2;
+            color: var(--text-dark);
+        }
+
+        .sidebar-brand-text span {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .sidebar-nav {
+            padding: 10px 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 15px 20px 5px 20px;
+        }
+
+        .nav-section:first-child {
+            margin-top: 5px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .nav-item.active {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-item .material-symbols-outlined {
+            font-size: 1.2rem;
+            transition: color 0.2s ease;
+        }
+        
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+
+        /* --- MAIN WRAPPER --- */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* --- TOPBAR --- */
+        .topbar {
+            height: 65px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            z-index: 10;
+        }
+
+        .menu-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: background 0.2s;
+        }
+        
+        .menu-toggle:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 10px 4px 4px;
+            background-color: var(--hover-bg);
+            border-radius: 30px;
+            border: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .user-profile:hover {
+            background-color: #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .user-avatar-text {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            margin-right: 5px;
+        }
+
+        .user-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            line-height: 1.1;
+        }
+
+        .user-role {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        
+        .user-dropdown-icon {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* --- CONTENT AREA --- */
+        .content-area {
+            flex: 1;
+            padding: 20px 30px;
+            overflow-y: auto;
+            min-height: 0;
+            /* Mismo patrón de puntos sutil del login */
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 30px 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .page-title h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+            letter-spacing: -0.5px;
+        }
+
+        .page-title p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(30, 58, 138, 0.3);
+        }
+        
+        .btn-primary .material-symbols-outlined {
+            font-size: 1.2rem;
+        }
+
+        /* --- DATA TABLE SECTION --- */
+        .data-section {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.03), 0 8px 10px -6px rgba(0,0,0,0.01);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            flex-shrink: 0;
+            flex-grow: 1;
+        }
+        
+        /* Acento visual estilo Login */
+        .data-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+            z-index: 1;
+        }
+
+        /* Search Bar */
+        .search-container {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            margin-top: 4px; /* por el borde superior */
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 16px 8px 40px;
+            border: 1px solid var(--border-light);
+            border-radius: 18px;
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            background-color: var(--bg-main);
+            outline: none;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary-color);
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+        }
+
+        .search-box .material-symbols-outlined {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            pointer-events: none;
+        }
+
+        /* Contenedor de la tabla sin scroll interno (la paginación maneja el límite) */
+        .table-responsive {
+            /* flex: 1 removido para evitar que se aplaste */
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8fafc;
+            padding: 12px 20px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        td {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            vertical-align: middle;
+        }
+
+        tr {
+            transition: background-color 0.2s ease;
+        }
+
+        tr:hover {
+            background-color: var(--hover-bg);
+        }
+
+        /* Highlighted hover row */
+        tr.highlighted-row {
+            background-color: var(--primary-light);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        tr.highlighted-row td:first-child {
+            padding-left: 17px;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background-color: var(--status-active-bg);
+            color: var(--status-active-text);
+        }
+
+        .status-suspended {
+            background-color: var(--status-suspended-bg);
+            color: var(--status-suspended-text);
+        }
+
+        .status-inactive {
+            background-color: var(--status-inactive-bg);
+            color: var(--status-inactive-text);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 5px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: #ffffff;
+            border-color: var(--border-light);
+            color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .action-btn .material-symbols-outlined {
+            font-size: 1rem;
+        }
+
+        /* Pagination & Footer */
+        .table-footer {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid var(--border-light);
+            background-color: #f8fafc;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .pagination-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .page-btn {
+            width: 26px;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-light);
+            background-color: #ffffff;
+            border-radius: 4px;
+            color: var(--text-dark);
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .page-btn.active {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #ffffff;
+        }
+
+        .app-footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+        }
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal {
+            background-color: var(--bg-panel);
+            width: 100%;
+            max-width: 500px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--border-light);
+        }
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8fafc;
+        }
+        .modal-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .modal-title .material-symbols-outlined {
+            color: var(--primary-color);
+        }
+        .close-modal {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .close-modal:hover {
+            background-color: #e2e8f0;
+            color: var(--text-dark);
+        }
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            background-color: var(--bg-main);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+        }
+        select.form-control {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748b%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px top 50%;
+            background-size: 10px auto;
+            padding-right: 30px;
+        }
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background-color: #f8fafc;
+        }
+        .btn-outline {
+            background-color: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-light);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-outline:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+            border-color: #cbd5e1;
+        }
+        /* DROPDOWN PANEL STYLES */
+        .menu-toggle { position: relative; }
+        .dropdown-panel {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            width: 220px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            cursor: default;
+            text-align: left;
+        }
+        .dropdown-panel.show { display: flex; }
+        .dropdown-header {
+            padding: 15px; border-bottom: 1px solid var(--border-light);
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .dropdown-header strong { font-size: 0.9rem; color: var(--text-dark); line-height: 1.2; }
+        .dropdown-header span { font-size: 0.75rem; color: var(--text-muted); }
+        .dropdown-item {
+            padding: 12px 15px; display: flex; align-items: center; gap: 10px;
+            color: var(--text-dark); text-decoration: none; font-size: 0.85rem; font-weight: 500;
+            transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: var(--hover-bg); color: var(--primary-color); }
+        .dropdown-divider { height: 1px; background: var(--border-light); margin: 5px 0; }
+        .text-danger { color: #dc2626 !important; }
+        .text-danger:hover { background: #fef2f2 !important; color: #dc2626 !important; }
+
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="logo.png" alt="Logo Liceo Robert Serra">
+            <div class="sidebar-brand-text">
+                Liceo Nacional<br><span>Robert Serra</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="Admin.html" class="nav-item">
+                <span class="material-symbols-outlined">home</span>
+                Inicio
+            </a>
+            <div class="nav-section">Configuración</div>
+            <a href="dashboard.html" class="nav-item active">
+                <span class="material-symbols-outlined">manage_accounts</span>
+                Gestión de usuario
+            </a>
+            <div class="nav-section">Académico</div>
+            <a href="Admin-Gestion-docente.html" class="nav-item">
+                <span class="material-symbols-outlined">school</span>
+                Docentes
+            </a>
+            <a href="Admin-gestion-aulas.html" class="nav-item">
+                <span class="material-symbols-outlined">meeting_room</span>
+                Aulas
+            </a>
+            <a href="Admin-gestion-asignatura.html" class="nav-item">
+                <span class="material-symbols-outlined">menu_book</span>
+                Asignaturas
+            </a>
+            <div class="nav-section">Horarios</div>
+            <a href="Admin-generacion-horarios.html" class="nav-item">
+                <span class="material-symbols-outlined">calendar_clock</span>
+                Generación de horario
+            </a>
+            <a href="Admin-visualizar-horarios.html" class="nav-item">
+                <span class="material-symbols-outlined">event_note</span>
+                Visualización de horario
+            </a>
+        </nav>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="main-wrapper">
+        
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="menu-toggle" onclick="toggleProfileMenu(event)">
+                <span class="material-symbols-outlined" style="font-size: 1.5rem;">menu</span>
+                <div class="dropdown-panel" id="dropdownPanel" onclick="event.stopPropagation()">
+                    <div class="dropdown-header">
+                        <strong>Administrador</strong>
+                        <span>admin@liceorobertserra.com</span>
+                    </div>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('profileModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">person</span> Mi Perfil
+                    </a>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('configModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">settings</span> Configuración
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="login.html" class="dropdown-item text-danger">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">logout</span> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+            
+            <div class="user-profile">
+                <!-- Avatar de texto -->
+                <div class="user-avatar-text">A</div>
+                <div class="user-info">
+                    <span class="user-name">A. Pérez</span>
+                    <span class="user-role">Super Admin</span>
+                </div>
+                <span class="material-symbols-outlined user-dropdown-icon">expand_more</span>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <main class="content-area">
+            
+            <div class="page-header">
+                <div class="page-title">
+                    <h2>Gestión de usuario</h2>
+                    <p>Administra los usuarios del sistema</p>
+                </div>
+                <button class="btn-primary">
+                    <span class="material-symbols-outlined">add</span>
+                    Nuevo usuario
+                </button>
+            </div>
+
+            <div class="data-section">
+                <!-- Búsqueda -->
+                <div class="search-container">
+                    <div class="search-box">
+                        <span class="material-symbols-outlined">search</span>
+                        <input type="text" placeholder="Buscar usuario">
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <!-- Tabla de Datos -->
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Nombre</th>
+                                <th>Rol</th>
+                                <th>Estado</th>
+                                <th>Último acceso</th>
+                                <th>Edit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Fila con resaltado hover -->
+                            <tr class="highlighted-row">
+                                <td>user2</td>
+                                <td style="font-weight: 500;">Ana García</td>
+                                <td>Directivo</td>
+                                <td><span class="status-badge status-active">Activo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-26 14:30</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user4</td>
+                                <td style="font-weight: 500;">María Fernández</td>
+                                <td>Coordinador</td>
+                                <td><span class="status-badge status-active">Activo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-27 11:45</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user1</td>
+                                <td style="font-weight: 500;">Juan Silva</td>
+                                <td>Docente</td>
+                                <td><span class="status-badge status-active">Activo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-27 10:15</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user5</td>
+                                <td style="font-weight: 500;">Roberto Díaz</td>
+                                <td>Docente</td>
+                                <td><span class="status-badge status-inactive">Inactivo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-20 16:20</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user7</td>
+                                <td style="font-weight: 500;">David Castro</td>
+                                <td>Docente</td>
+                                <td><span class="status-badge status-active">Activo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-26 17:05</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user6</td>
+                                <td style="font-weight: 500;">Carmen Ruiz</td>
+                                <td>Administrativo</td>
+                                <td><span class="status-badge status-active">Activo</span></td>
+                                <td style="color: var(--text-muted);">2023-10-27 08:30</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>user3</td>
+                                <td style="font-weight: 500;">Carlos López</td>
+                                <td>Personal</td>
+                                <td><span class="status-badge status-suspended">Suspendido</span></td>
+                                <td style="color: var(--text-muted);">2023-10-25 09:00</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="action-btn"><span class="material-symbols-outlined">visibility</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">edit</span></button>
+                                        <button class="action-btn"><span class="material-symbols-outlined">more_vert</span></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Paginación y pie de tabla -->
+                <div class="table-footer">
+                    <div class="pagination-info">Mostrando 1-7 de 120 usuarios</div>
+                    <div class="pagination-controls">
+                        <button class="page-btn"><span class="material-symbols-outlined">chevron_left</span></button>
+                        <button class="page-btn active">1</button>
+                        <button class="page-btn">2</button>
+                        <button class="page-btn">3</button>
+                        <button class="page-btn"><span class="material-symbols-outlined">chevron_right</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="app-footer">
+                &copy; 2026 Liceo Nacional Robert Serra - Sistema de Gestión v1.0
+            </div>
+            
+        </main>
+    </div>
+    <!-- MODAL REGISTRO/EDICIÓN USUARIO -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined">person_add</span>
+                    <span id="modalTitleText">Registrar Nuevo Usuario</span>
+                </div>
+                <button class="close-modal" id="closeModalBtn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm" onsubmit="event.preventDefault();">
+                    <div class="form-group full-width">
+                        <label for="fullName">Nombre Completo</label>
+                        <input type="text" id="fullName" class="form-control" placeholder="Ej. Juan Pérez" required>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="userId">ID de Usuario</label>
+                            <input type="text" id="userId" class="form-control" placeholder="Ej. user8" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="username">Nombre de Usuario</label>
+                            <input type="text" id="username" class="form-control" placeholder="Ej. jperez" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="role">Rol / Jerarquía</label>
+                            <select id="role" class="form-control" required>
+                                <option value="" disabled selected>Seleccione un rol</option>
+                                <option value="Directivo">Directivo</option>
+                                <option value="Coordinador">Coordinador</option>
+                                <option value="Docente">Docente</option>
+                                <option value="Administrativo">Administrativo</option>
+                                <option value="Personal">Personal (Obrero/Apoyo)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="status">Estado</label>
+                            <select id="status" class="form-control" required>
+                                <option value="Activo" selected>Activo</option>
+                                <option value="Inactivo">Inactivo</option>
+                                <option value="Suspendido">Suspendido</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" id="cancelModalBtn">Cancelar</button>
+                <button class="btn-primary" id="saveUserBtn">
+                    <span class="material-symbols-outlined">save</span>
+                    Guardar Usuario
+                </button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- MODAL MI PERFIL -->
+    <div class="modal-overlay" id="profileModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">person</span>
+                    Mi Perfil
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('profileModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div class="user-avatar-text" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 15px auto;">
+                    A
+                </div>
+                <h3 style="margin-bottom: 5px; color: var(--text-dark);">Administrador</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">admin@liceorobertserra.com</p>
+                
+                <div style="text-align: left; margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Cambiar Contraseña</label>
+                    <input type="password" class="form-control" placeholder="Nueva contraseña" style="margin-bottom: 10px;">
+                    <input type="password" class="form-control" placeholder="Confirmar contraseña">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('profileModal')">Cerrar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('profileModal'); alert('Perfil actualizado con éxito');">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- MODAL CONFIGURACIÓN -->
+    <div class="modal-overlay" id="configModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">settings</span>
+                    Configuración del Sistema
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('configModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <!-- General Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Preferencias Generales</h4>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Modo Oscuro</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Apariencia de la interfaz</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Notificaciones por Email</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Avisos de cruces de horarios</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Respaldo Automático</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Copia de seguridad diaria</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Academic Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Parámetros Académicos</h4>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Duración de Bloque</strong>
+                        <select class="form-control" style="font-size: 0.85rem; padding: 8px 12px; background-color: #f8fafc;">
+                            <option>45 Minutos (Estándar)</option>
+                            <option>60 Minutos (Largo)</option>
+                            <option>90 Minutos (Bloque Doble)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Jornada Laboral Diaria</strong>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="time" class="form-control" value="07:00" style="font-size: 0.85rem; padding: 8px;">
+                            <span style="align-self: center; font-weight: bold; color: var(--text-muted);">-</span>
+                            <input type="time" class="form-control" value="17:00" style="font-size: 0.85rem; padding: 8px;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Evitar Sobrecarga</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">No exceder 8h continuas</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('configModal')">Descartar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('configModal'); alert('Ajustes del sistema actualizados satisfactoriamente.');">Guardar Configuración</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Modal Logic
+        const modal = document.getElementById('userModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const modalTitleText = document.getElementById('modalTitleText');
+        const userForm = document.getElementById('userForm');
+        
+        // Setup "Nuevo usuario" button
+        const newUserBtn = document.querySelector('.page-header .btn-primary');
+        if(newUserBtn) {
+            newUserBtn.addEventListener('click', () => {
+                modalTitleText.textContent = 'Registrar Nuevo Usuario';
+                document.querySelector('.modal-title .material-symbols-outlined').textContent = 'person_add';
+                userForm.reset();
+                modal.classList.add('active');
+            });
+        }
+
+        // Setup Edit buttons on table rows
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            const icon = btn.querySelector('.material-symbols-outlined');
+            if(icon && icon.textContent.trim() === 'edit') {
+                btn.addEventListener('click', () => {
+                    modalTitleText.textContent = 'Editar Usuario';
+                    document.querySelector('.modal-title .material-symbols-outlined').textContent = 'edit';
+                    // Aquí iría la lógica para cargar datos del usuario si fuera dinámico
+                    modal.classList.add('active');
+                });
+            }
+        });
+
+        // Close functions
+        const closeModal = () => {
+            modal.classList.remove('active');
+        };
+
+        closeModalBtn.addEventListener('click', closeModal);
+        cancelModalBtn.addEventListener('click', closeModal);
+
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if(e.target === modal) {
+                closeModal();
+            }
+        });
+        
+        // Form Save Event
+        document.getElementById('saveUserBtn').addEventListener('click', () => {
+            if (userForm.checkValidity()) {
+                // Aquí iría la lógica del CRUD para guardar en BD
+                alert('¡Usuario guardado exitosamente!');
+                closeModal();
+            } else {
+                userForm.reportValidity();
+            }
+        });
+        function closeDropdown() { const p = document.getElementById('dropdownPanel'); if(p) p.classList.remove('show'); }
+        // Profile Menu Toggle
+        function toggleProfileMenu(e) {
+            e.stopPropagation();
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.toggle('show');
+        }
+        window.addEventListener('click', () => {
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.remove('show');
+        });
+    </script>
+
+    <script>
+        function openSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.add('active'); 
+        }
+        function closeSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.remove('active'); 
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Horarios - Visualización de Horarios</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0" />
+    <style>
+        :root {
+            --primary-color: #1e3a8a; 
+            --primary-hover: #1e40af;
+            --primary-light: #eff6ff; 
+            
+            --bg-main: #f8fafc; 
+            --bg-panel: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border-light: #e2e8f0;
+            --hover-bg: #f1f5f9;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-light);
+            height: 65px; 
+        }
+
+        .sidebar-brand img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            mix-blend-mode: multiply;
+        }
+
+        .sidebar-brand-text {
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.2;
+            color: var(--text-dark);
+        }
+
+        .sidebar-brand-text span {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .sidebar-nav {
+            padding: 10px 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 15px 20px 5px 20px;
+        }
+
+        .nav-section:first-child {
+            margin-top: 5px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .nav-item.active {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-item .material-symbols-outlined {
+            font-size: 1.2rem;
+            transition: color 0.2s ease;
+        }
+        
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+
+        /* --- MAIN WRAPPER --- */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* --- TOPBAR --- */
+        .topbar {
+            height: 65px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            z-index: 10;
+        }
+
+        .menu-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: background 0.2s;
+        }
+        
+        .menu-toggle:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 10px 4px 4px;
+            background-color: var(--hover-bg);
+            border-radius: 30px;
+            border: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .user-profile:hover {
+            background-color: #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .user-avatar-text {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #e0e7ff;
+            color: #4338ca;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            margin-right: 5px;
+        }
+
+        .user-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            line-height: 1.1;
+        }
+
+        .user-role {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* --- CONTENT AREA --- */
+        .content-area {
+            flex: 1;
+            padding: 25px 30px;
+            overflow-y: hidden;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 30px 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .page-title h2 {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+
+        .page-title p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        /* --- VISUALIZATION PANEL --- */
+        .visualization-panel {
+            background-color: #e2e8f0; /* Grey background matching mockup */
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Filters */
+        .filters-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .filter-item select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background-color: white;
+            font-family: inherit;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            outline: none;
+        }
+
+        /* Split Content */
+        .vis-content {
+            display: flex;
+            gap: 16px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Calendar Grid */
+        .calendar-container {
+            flex: 2.5; /* Takes up most space */
+            background: var(--bg-panel);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            border: 1px solid var(--border-light);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: 80px repeat(5, 1fr);
+            width: 100%;
+        }
+
+        .calendar-header-cell {
+            background: #f8fafc;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 12px 10px;
+            border-bottom: 2px solid var(--border-light);
+            border-right: 1px solid var(--border-light);
+            color: var(--text-dark);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .time-col {
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 12px 10px;
+            border-right: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-muted);
+            background: white;
+        }
+
+        .calendar-cell {
+            border-right: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            padding: 6px;
+            min-height: 70px;
+            background: white;
+        }
+
+        /* Class Blocks */
+        .class-block {
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.75rem;
+            line-height: 1.3;
+            color: #0f172a;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            font-weight: 500;
+        }
+
+        .class-block.blue { background-color: #bae6fd; }
+        .class-block.green { background-color: #bbf7d0; }
+        .class-block.red { background-color: #fecaca; }
+        .class-block.yellow { background-color: #fef08a; }
+
+        .block-title { font-weight: 700; }
+        
+        .break-block {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* Right Side Stats Panel */
+        .stats-sidebar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 250px;
+            overflow-y: auto; /* Enable scrolling for the sidebar if content is too tall */
+        }
+
+        .stat-card {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-light);
+            flex-shrink: 0; /* Prevent the card from shrinking too much and causing overlap */
+        }
+
+        .stat-card h4 {
+            font-size: 1.05rem;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 10px;
+            color: var(--text-dark);
+        }
+
+        /* Circular progress bars */
+        .circular-progress-container {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+        }
+
+        .circular-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            width: 50%;
+        }
+
+        .circle-wrapper {
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+
+        /* Conic gradients for circles */
+        .circle-progress.green { background: conic-gradient(#16a34a 100%, #e2e8f0 0); }
+        .circle-progress.gray { background: conic-gradient(#e2e8f0 100%, #e2e8f0 0); } /* Represents 0 */
+
+        .circle-progress {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .circle-progress::before {
+            content: "";
+            position: absolute;
+            inset: 8px;
+            background-color: white;
+            border-radius: 50%;
+        }
+
+        .circle-value {
+            position: relative;
+            z-index: 1;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        .circle-progress.green .circle-value { color: #16a34a; }
+        .circle-progress.gray .circle-value { color: #22c55e; } /* In Mockup the '0' is green */
+
+        /* Conflict table */
+        .conflict-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .conflict-table th {
+            text-align: left;
+            padding: 8px 4px;
+            border-bottom: 2px solid var(--border-light);
+            color: var(--text-dark);
+        }
+        .conflict-table td {
+            padding: 12px 4px; /* Reduced padding from 20px to save vertical space */
+            color: var(--text-muted);
+            text-align: center;
+            font-style: italic;
+            line-height: 1.4;
+        }
+
+        /* Bottom Action Bar */
+        .bottom-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding: 0 10px;
+        }
+
+        .back-link {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--primary-color); }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .btn-outline:hover {
+            background-color: var(--primary-light);
+        }
+
+        /* TOAST NOTIFICATIONS */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1000;
+        }
+        .toast {
+            background: var(--bg-panel);
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            padding: 16px 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            min-width: 300px;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.success { border-left-color: #16a34a; }
+        .toast.success .toast-icon { color: #16a34a; }
+        .toast-icon {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+        }
+        .toast-content h4 { font-size: 0.95rem; margin-bottom: 2px; color: var(--text-dark); }
+        .toast-content p { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* EDIT MODE STYLE */
+        .calendar-grid.edit-mode .class-block {
+            cursor: grab;
+            border: 2px dashed #64748b;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            opacity: 0.9;
+        }
+        .calendar-grid.edit-mode .class-block:hover {
+            filter: brightness(0.95);
+        }
+
+    
+        /* DROPDOWN PANEL STYLES */
+        .menu-toggle { position: relative; }
+        .dropdown-panel {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            width: 220px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            cursor: default;
+            text-align: left;
+        }
+        .dropdown-panel.show { display: flex; }
+        .dropdown-header {
+            padding: 15px; border-bottom: 1px solid var(--border-light);
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .dropdown-header strong { font-size: 0.9rem; color: var(--text-dark); line-height: 1.2; }
+        .dropdown-header span { font-size: 0.75rem; color: var(--text-muted); }
+        .dropdown-item {
+            padding: 12px 15px; display: flex; align-items: center; gap: 10px;
+            color: var(--text-dark); text-decoration: none; font-size: 0.85rem; font-weight: 500;
+            transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: var(--hover-bg); color: var(--primary-color); }
+        .dropdown-divider { height: 1px; background: var(--border-light); margin: 5px 0; }
+        .text-danger { color: #dc2626 !important; }
+        .text-danger:hover { background: #fef2f2 !important; color: #dc2626 !important; }
+    
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1; pointer-events: auto;
+        }
+        .modal {
+            background-color: var(--bg-panel, #ffffff);
+            width: 100%; max-width: 600px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            display: flex; flex-direction: column;
+            overflow: hidden; border: 1px solid var(--border-light, #e2e8f0);
+        }
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        .modal-header {
+            padding: 20px 24px; border-bottom: 1px solid var(--border-light, #e2e8f0);
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: #f8fafc;
+        }
+        .modal-title {
+            font-size: 1.15rem; font-weight: 700; color: var(--text-dark, #0f172a);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .close-modal {
+            background: transparent; border: none; color: var(--text-muted, #64748b);
+            cursor: pointer; border-radius: 6px; width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .close-modal:hover { background-color: #e2e8f0; color: var(--text-dark, #0f172a); }
+        .modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; background-color: var(--bg-panel, #ffffff); }
+        .modal-footer {
+            padding: 16px 24px; border-top: 1px solid var(--border-light, #e2e8f0);
+            display: flex; justify-content: flex-end; gap: 12px; background-color: #f8fafc;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="logo.png" alt="Logo Liceo Robert Serra">
+            <div class="sidebar-brand-text">
+                Liceo Nacional<br><span>Robert Serra</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="Admin.html" class="nav-item">
+                <span class="material-symbols-outlined">home</span>
+                Inicio
+            </a>
+            <div class="nav-section">Académico</div>
+            <a href="Admin-Gestion-docente.html" class="nav-item">
+                <span class="material-symbols-outlined">school</span>
+                Docentes
+            </a>
+            <a href="Admin-gestion-aulas.html" class="nav-item">
+                <span class="material-symbols-outlined">meeting_room</span>
+                Aulas
+            </a>
+            <a href="Admin-gestion-asignatura.html" class="nav-item">
+                <span class="material-symbols-outlined">menu_book</span>
+                Asignaturas
+            </a>
+            <div class="nav-section">Horarios</div>
+            <a href="Admin-generacion-horarios.html" class="nav-item">
+                <span class="material-symbols-outlined">calendar_clock</span>
+                Generación de horario
+            </a>
+            <a href="Admin-visualizar-horarios.html" class="nav-item active">
+                <span class="material-symbols-outlined">event_note</span>
+                Visualización de horario
+            </a>
+        </nav>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="main-wrapper">
+        
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="menu-toggle" onclick="toggleProfileMenu(event)">
+                <span class="material-symbols-outlined" style="font-size: 1.5rem;">menu</span>
+                <div class="dropdown-panel" id="dropdownPanel" onclick="event.stopPropagation()">
+                    <div class="dropdown-header">
+                        <strong>Administrador</strong>
+                        <span>admin@liceorobertserra.com</span>
+                    </div>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('profileModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">person</span> Mi Perfil
+                    </a>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('configModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">settings</span> Configuración
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="login.html" class="dropdown-item text-danger">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">logout</span> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+            
+            <div class="user-profile">
+                <div class="user-avatar-text">A</div>
+                <div class="user-info">
+                    <span class="user-name">Header</span>
+                    <span class="user-role">Subhead</span>
+                </div>
+                <span class="material-symbols-outlined user-dropdown-icon">expand_more</span>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <main class="content-area">
+            
+            <div class="page-header">
+                <div class="page-title">
+                    <h2>Visualizacion de horarios</h2>
+                    <p>Consulta, analiza y edita el horario academico actual</p>
+                </div>
+                <button class="btn-primary" onclick="simulateDownload(this)">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem;">download</span>
+                    Descargar Horario
+                </button>
+            </div>
+
+            <!-- VISUALIZATION PANEL -->
+            <div class="visualization-panel">
+                
+                <!-- Filtros -->
+                <div class="filters-bar">
+                    <div class="filter-item">
+                        Tipo de Vista:
+                        <select id="viewType" onchange="updateViewFilter()">
+                            <option value="curso">Por Curso</option>
+                            <option value="docente" selected>Por Docente</option>
+                            <option value="aula">Por Aula</option>
+                        </select>
+                    </div>
+                    <div class="filter-item" id="entityFilterContainer">
+                        Docente:
+                        <select id="entitySelect" onchange="simulateFilterUpdate()">
+                            <option value="all">Todos los Docentes</option>
+                            <option value="1">A.M. Castro</option>
+                            <option value="2">Luis Gonzalez</option>
+                            <option value="3">Maria Perez</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        Periodo: 
+                        <select onchange="simulateFilterUpdate()">
+                            <option>2024-2025 Mañana</option>
+                            <option>2024-2025 Tarde</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Contenido (Calendario + Stats) -->
+                <div class="vis-content">
+                    
+                    <!-- CALENDARIO -->
+                    <div class="calendar-container">
+                        <div class="calendar-grid">
+                            <!-- Headers -->
+                            <div class="calendar-header-cell">Hora</div>
+                            <div class="calendar-header-cell">Lunes</div>
+                            <div class="calendar-header-cell">Martes</div>
+                            <div class="calendar-header-cell">Miércoles</div>
+                            <div class="calendar-header-cell">Jueves</div>
+                            <div class="calendar-header-cell">Viernes</div>
+
+                            <!-- Row 7:00 AM -->
+                            <div class="time-col">7:00 AM</div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+
+                            <!-- Row 8:00 AM -->
+                            <div class="time-col">8:00 AM</div>
+                            <div class="calendar-cell">
+                                <div class="class-block blue">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block green">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block red">
+                                    <span class="block-title">MAT-02 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block yellow">
+                                    <span class="block-title">MAT-02 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block blue">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+
+                            <!-- Row 9:00 AM -->
+                            <div class="time-col">9:00 AM</div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+
+                            <!-- Row 10:00 AM -->
+                            <div class="time-col">10:00 AM</div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+
+                            <!-- Row 11:00 AM -->
+                            <div class="time-col">11:00 AM</div>
+                            <div class="calendar-cell"><div class="class-block blue break-block">Aula A101</div></div>
+                            <div class="calendar-cell"><div class="class-block green break-block">Aula A101</div></div>
+                            <div class="calendar-cell"><div class="class-block yellow break-block">Aula A101</div></div>
+                            <div class="calendar-cell"><div class="class-block red break-block">Aula A101</div></div>
+                            <div class="calendar-cell"><div class="class-block yellow break-block">Aula A101</div></div>
+
+                            <!-- Row 1:00 PM -->
+                            <div class="time-col">1:00 PM</div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+                            <div class="calendar-cell"></div>
+
+                            <!-- Row 2:00 PM -->
+                            <div class="time-col">2:00 PM</div>
+                            <div class="calendar-cell">
+                                <div class="class-block green">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block yellow">
+                                    <span class="block-title">MAT-02 | Consejo</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block red">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block blue">
+                                    <span class="block-title">MAT-02 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            <div class="calendar-cell">
+                                <div class="class-block green">
+                                    <span class="block-title">MAT-01 | Matemáticas</span>
+                                    <span>A.M. Castro</span>
+                                    <span>A101</span>
+                                    <span>1er Año</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Filler Rows just to show scrolling -->
+                            <div class="time-col">3:00 PM</div>
+                            <div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div>
+                            <div class="time-col">4:00 PM</div>
+                            <div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div>
+                            <div class="time-col">5:00 PM</div>
+                            <div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div><div class="calendar-cell"></div>
+
+                        </div>
+                    </div>
+
+                    <!-- ESTADISTICAS -->
+                    <div class="stats-sidebar">
+                        
+                        <div class="stat-card">
+                            <h4>Estado del Horario Actual</h4>
+                            <div class="circular-progress-container">
+                                <div class="circular-stat">
+                                    <span>Conflictos</span>
+                                    <div class="circle-wrapper">
+                                        <div class="circle-progress gray">
+                                            <span class="circle-value">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="circular-stat">
+                                    <span>Carga Académica<br>Total Cubierta</span>
+                                    <div class="circle-wrapper">
+                                        <div class="circle-progress green">
+                                            <span class="circle-value">100%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card" style="flex: 1;">
+                            <h4>Conflictos Detectados (0)</h4>
+                            <table class="conflict-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Fecha/Hora</th>
+                                        <th style="text-align: right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="3">No se han detectado conflictos en este horario.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- Botones Inferiores -->
+                <div class="bottom-action-bar">
+                    <a href="Admin-generacion-horarios.html" class="back-link">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                        Volver a Generación
+                    </a>
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="simulateSave(this)">
+                            <span class="material-symbols-outlined">save</span>
+                            Guardar Horario Actual
+                        </button>
+                        <button class="btn-outline" id="editBtn" onclick="toggleEditMode()">
+                            <span class="material-symbols-outlined">edit</span>
+                            Editar Horario (Manual)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    
+    <!-- MODAL MI PERFIL -->
+    <div class="modal-overlay" id="profileModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">person</span>
+                    Mi Perfil
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('profileModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div class="user-avatar-text" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 15px auto;">
+                    A
+                </div>
+                <h3 style="margin-bottom: 5px; color: var(--text-dark);">Administrador</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">admin@liceorobertserra.com</p>
+                
+                <div style="text-align: left; margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Cambiar Contraseña</label>
+                    <input type="password" class="form-control" placeholder="Nueva contraseña" style="margin-bottom: 10px;">
+                    <input type="password" class="form-control" placeholder="Confirmar contraseña">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('profileModal')">Cerrar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('profileModal'); alert('Perfil actualizado con éxito');">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- MODAL CONFIGURACIÓN -->
+    <div class="modal-overlay" id="configModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">settings</span>
+                    Configuración del Sistema
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('configModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <!-- General Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Preferencias Generales</h4>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Modo Oscuro</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Apariencia de la interfaz</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Notificaciones por Email</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Avisos de cruces de horarios</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Respaldo Automático</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Copia de seguridad diaria</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Academic Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Parámetros Académicos</h4>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Duración de Bloque</strong>
+                        <select class="form-control" style="font-size: 0.85rem; padding: 8px 12px; background-color: #f8fafc;">
+                            <option>45 Minutos (Estándar)</option>
+                            <option>60 Minutos (Largo)</option>
+                            <option>90 Minutos (Bloque Doble)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Jornada Laboral Diaria</strong>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="time" class="form-control" value="07:00" style="font-size: 0.85rem; padding: 8px;">
+                            <span style="align-self: center; font-weight: bold; color: var(--text-muted);">-</span>
+                            <input type="time" class="form-control" value="17:00" style="font-size: 0.85rem; padding: 8px;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Evitar Sobrecarga</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">No exceder 8h continuas</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('configModal')">Descartar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('configModal'); alert('Ajustes del sistema actualizados satisfactoriamente.');">Guardar Configuración</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        function showToast(title, message, isSuccess = false, duration = 3000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${isSuccess ? 'success' : ''}`;
+            
+            const icon = isSuccess ? 'check_circle' : 'info';
+            
+            toast.innerHTML = `
+                <span class="material-symbols-outlined toast-icon">${icon}</span>
+                <div class="toast-content">
+                    <h4>${title}</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Remove
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        function simulateDownload(btn) {
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1.2rem;">sync</span> Generando PDF...';
+            showToast('Preparando Descarga', 'Generando documento PDF del horario...');
+            
+            setTimeout(() => {
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 1.2rem;">download</span> Descargar Horario';
+                showToast('Descarga Completa', 'El horario ha sido descargado exitosamente.', true);
+            }, 2000);
+        }
+
+        function simulateSave(btn) {
+            btn.innerHTML = '<span class="material-symbols-outlined">sync</span> Guardando...';
+            showToast('Guardando Cambios', 'Actualizando la base de datos...');
+            
+            setTimeout(() => {
+                btn.innerHTML = '<span class="material-symbols-outlined">save</span> Guardar Horario Actual';
+                showToast('Horario Oficializado', 'El horario se ha guardado y publicado correctamente.', true);
+            }, 1500);
+        }
+
+        let isEditMode = false;
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const btn = document.getElementById('editBtn');
+            const grid = document.querySelector('.calendar-grid');
+            
+            if (isEditMode) {
+                btn.innerHTML = '<span class="material-symbols-outlined">edit_off</span> Salir de Edición';
+                btn.style.backgroundColor = 'var(--primary-light)';
+                grid.classList.add('edit-mode');
+                showToast('Modo Edición Activado', 'Ahora puedes arrastrar y soltar las materias para moverlas.');
+            } else {
+                btn.innerHTML = '<span class="material-symbols-outlined">edit</span> Editar Horario (Manual)';
+                btn.style.backgroundColor = 'transparent';
+                grid.classList.remove('edit-mode');
+                showToast('Modo Edición Desactivado', 'Los cambios manuales se han conservado temporalmente.');
+            }
+        }
+
+        // Logic for Filter Bar
+        const entityData = {
+            curso: { label: 'Curso', options: ['Todos los Cursos', '1er Año', '2do Año', '3er Año', '4to Año', '5to Año'] },
+            docente: { label: 'Docente', options: ['Todos los Docentes', 'A.M. Castro', 'Luis Gonzalez', 'Maria Perez'] },
+            aula: { label: 'Aula', options: ['Todas las Aulas', 'A101', 'A102', 'Lab Biología', 'Cancha Múltiple'] }
+        };
+
+        function updateViewFilter() {
+            const viewType = document.getElementById('viewType').value;
+            const container = document.getElementById('entityFilterContainer');
+            const select = document.getElementById('entitySelect');
+            
+            // Update Label
+            container.childNodes[0].nodeValue = entityData[viewType].label + ": ";
+            
+            // Update Options
+            select.innerHTML = '';
+            entityData[viewType].options.forEach(opt => {
+                const optionElement = document.createElement('option');
+                optionElement.value = opt;
+                optionElement.textContent = opt;
+                select.appendChild(optionElement);
+            });
+            
+            simulateFilterUpdate();
+        }
+
+        function simulateFilterUpdate() {
+            // Optional: You could show a quick loading state or toast when a filter changes
+            // showToast('Actualizando Vista', 'Cargando horario...', false, 1500);
+        }
+    </script>
+
+    <script>
+        function closeDropdown() { const p = document.getElementById('dropdownPanel'); if(p) p.classList.remove('show'); }
+        // Profile Menu Toggle
+        function toggleProfileMenu(e) {
+            e.stopPropagation();
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.toggle('show');
+        }
+        window.addEventListener('click', () => {
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.remove('show');
+        });
+    </script>
+
+    <script>
+        function openSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.add('active'); 
+        }
+        function closeSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.remove('active'); 
+        }
+    </script>
+
+</body>
+</html>

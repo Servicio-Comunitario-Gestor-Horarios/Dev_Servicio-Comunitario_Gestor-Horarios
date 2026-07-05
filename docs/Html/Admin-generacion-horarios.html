@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Horarios - Generación de Horarios</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0" />
+    <style>
+        :root {
+            --primary-color: #1e3a8a; 
+            --primary-hover: #1e40af;
+            --primary-light: #eff6ff; 
+            
+            --bg-main: #f8fafc; 
+            --bg-panel: #ffffff;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --border-light: #e2e8f0;
+            --hover-bg: #f1f5f9;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-light);
+            height: 65px; 
+        }
+
+        .sidebar-brand img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            mix-blend-mode: multiply;
+        }
+
+        .sidebar-brand-text {
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.2;
+            color: var(--text-dark);
+        }
+
+        .sidebar-brand-text span {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .sidebar-nav {
+            padding: 10px 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 15px 20px 5px 20px;
+        }
+
+        .nav-section:first-child {
+            margin-top: 5px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border-left: 4px solid transparent;
+        }
+
+        .nav-item:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .nav-item.active {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-item .material-symbols-outlined {
+            font-size: 1.2rem;
+            transition: color 0.2s ease;
+        }
+        
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+
+        /* --- MAIN WRAPPER --- */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* --- TOPBAR --- */
+        .topbar {
+            height: 65px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            z-index: 10;
+        }
+
+        .menu-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: background 0.2s;
+        }
+        
+        .menu-toggle:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-dark);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 10px 4px 4px;
+            background-color: var(--hover-bg);
+            border-radius: 30px;
+            border: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .user-profile:hover {
+            background-color: #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .user-avatar-text {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #e0e7ff;
+            color: #4338ca;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            margin-right: 5px;
+        }
+
+        .user-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            line-height: 1.1;
+        }
+
+        .user-role {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* --- CONTENT AREA --- */
+        .content-area {
+            flex: 1;
+            padding: 25px 30px;
+            overflow-y: hidden;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 30px 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+        }
+
+        .page-title h2 {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+
+        .page-title p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);
+            width: 100%;
+            margin-top: auto;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        /* --- GRID LAYOUT --- */
+        .management-grid {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+            padding-bottom: 10px;
+        }
+
+        /* --- CONFIG PANEL --- */
+        .config-panel {
+            flex: 1;
+            max-width: 450px;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .config-panel h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label.main-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .radio-group label {
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        
+        .radio-group input[type="radio"] {
+            accent-color: var(--primary-color);
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .checkbox-group label {
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            accent-color: var(--primary-color);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* --- HISTORY PANEL --- */
+        .history-panel {
+            flex: 1.5;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .history-panel h3 {
+            padding: 24px 24px 16px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .history-panel table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .history-panel th {
+            background-color: #f8fafc;
+            padding: 14px 24px;
+            font-size: 0.8rem;
+            color: var(--text-dark);
+            font-weight: 700;
+            border-bottom: 2px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .history-panel td {
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.85rem;
+            color: var(--text-dark);
+            vertical-align: middle;
+        }
+        
+        .history-panel tr:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-complete {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-pending {
+            background-color: #fef9c3;
+            color: #854d0e;
+        }
+
+        .action-dots {
+            color: var(--text-muted);
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 2px;
+            padding: 5px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .action-dots:hover {
+            background-color: #e2e8f0;
+            color: var(--text-dark);
+        }
+
+        /* --- MODAL STYLES --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1; pointer-events: auto;
+        }
+        .modal {
+            background-color: var(--bg-panel);
+            width: 100%; max-width: 450px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            display: flex; flex-direction: column;
+            overflow: hidden; border: 1px solid var(--border-light);
+            text-align: center;
+            padding: 30px;
+        }
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-title {
+            font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 10px;
+        }
+        .loading-text {
+            font-size: 0.9rem; color: var(--text-muted); margin-bottom: 25px;
+        }
+        .progress-bar {
+            width: 100%; height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background-color: var(--primary-color); width: 0%;
+            transition: width 0.3s ease;
+        }
+    
+        /* DROPDOWN PANEL STYLES */
+        .menu-toggle { position: relative; }
+        .dropdown-panel {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            width: 220px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            cursor: default;
+            text-align: left;
+        }
+        .dropdown-panel.show { display: flex; }
+        .dropdown-header {
+            padding: 15px; border-bottom: 1px solid var(--border-light);
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .dropdown-header strong { font-size: 0.9rem; color: var(--text-dark); line-height: 1.2; }
+        .dropdown-header span { font-size: 0.75rem; color: var(--text-muted); }
+        .dropdown-item {
+            padding: 12px 15px; display: flex; align-items: center; gap: 10px;
+            color: var(--text-dark); text-decoration: none; font-size: 0.85rem; font-weight: 500;
+            transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: var(--hover-bg); color: var(--primary-color); }
+        .dropdown-divider { height: 1px; background: var(--border-light); margin: 5px 0; }
+        .text-danger { color: #dc2626 !important; }
+        .text-danger:hover { background: #fef2f2 !important; color: #dc2626 !important; }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <img src="logo.png" alt="Logo Liceo Robert Serra">
+            <div class="sidebar-brand-text">
+                Liceo Nacional<br><span>Robert Serra</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="Admin.html" class="nav-item">
+                <span class="material-symbols-outlined">home</span>
+                Inicio
+            </a>
+            <div class="nav-section">Académico</div>
+            <a href="Admin-Gestion-docente.html" class="nav-item">
+                <span class="material-symbols-outlined">school</span>
+                Docentes
+            </a>
+            <a href="Admin-gestion-aulas.html" class="nav-item">
+                <span class="material-symbols-outlined">meeting_room</span>
+                Aulas
+            </a>
+            <a href="Admin-gestion-asignatura.html" class="nav-item">
+                <span class="material-symbols-outlined">menu_book</span>
+                Asignaturas
+            </a>
+            <div class="nav-section">Horarios</div>
+            <a href="Admin-generacion-horarios.html" class="nav-item active">
+                <span class="material-symbols-outlined">calendar_clock</span>
+                Generación de horario
+            </a>
+            <a href="Admin-visualizar-horarios.html" class="nav-item">
+                <span class="material-symbols-outlined">event_note</span>
+                Visualización de horario
+            </a>
+        </nav>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="main-wrapper">
+        
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="menu-toggle" onclick="toggleProfileMenu(event)">
+                <span class="material-symbols-outlined" style="font-size: 1.5rem;">menu</span>
+                <div class="dropdown-panel" id="dropdownPanel" onclick="event.stopPropagation()">
+                    <div class="dropdown-header">
+                        <strong>Administrador</strong>
+                        <span>admin@liceorobertserra.com</span>
+                    </div>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('profileModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">person</span> Mi Perfil
+                    </a>
+                    <a href="#" class="dropdown-item" onclick="closeDropdown(); openSystemModal('configModal'); return false;">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">settings</span> Configuración
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="login.html" class="dropdown-item text-danger">
+                        <span class="material-symbols-outlined" style="font-size: 1.2rem;">logout</span> Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+            
+            <div class="user-profile">
+                <div class="user-avatar-text">A</div>
+                <div class="user-info">
+                    <span class="user-name">Header</span>
+                    <span class="user-role">Subhead</span>
+                </div>
+                <span class="material-symbols-outlined user-dropdown-icon">expand_more</span>
+            </div>
+        </header>
+
+        <!-- CONTENT -->
+        <main class="content-area">
+            
+            <div class="page-header">
+                <div class="page-title">
+                    <h2>Generacion de horarios</h2>
+                    <p>define parametro y ejecuta los algoritmos</p>
+                </div>
+            </div>
+
+            <!-- MANAGEMENT GRID -->
+            <div class="management-grid">
+                
+                <!-- Panel de Configuración -->
+                <div class="config-panel">
+                    <h3>
+                        1. Configurar Parámetros
+                        <span class="material-symbols-outlined" style="color: var(--text-muted); cursor: pointer;">expand_less</span>
+                    </h3>
+                    
+                    <div class="form-group">
+                        <label class="main-label">Año Escolar</label>
+                        <select class="form-control">
+                            <option>2024-2025</option>
+                            <option>2025-2026</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="main-label">Grados/Cursos</label>
+                        <select class="form-control" multiple style="height: 100px;">
+                            <option selected>1er Año</option>
+                            <option selected>2do Año</option>
+                            <option selected>3er Año</option>
+                            <option>4to Año</option>
+                            <option>5to Año</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="main-label">Turno</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="turno" checked> Mañana</label>
+                            <label><input type="radio" name="turno"> Tarde</label>
+                            <label><input type="radio" name="turno"> Completo</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="main-label">Ponderación de Restricciones</label>
+                        <div class="slider-container">
+                            <input type="range" min="1" max="100" value="30">
+                            <div class="slider-labels">
+                                <span>Balanced</span>
+                                <span>Prioritize Preferences</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="main-label">Restricciones Activas</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" checked> Docente Disponibilidad</label>
+                            <label><input type="checkbox" checked> Aula Tipo</label>
+                            <label><input type="checkbox" checked> Capacidad Máxima</label>
+                            <label><input type="checkbox"> Evitar Horas Libres (Ventanas)</label>
+                        </div>
+                    </div>
+
+                    <!-- Botón para ejecutar -->
+                    <button class="btn-primary" onclick="startGeneration()">
+                        <span class="material-symbols-outlined">play_circle</span>
+                        Generar Horario
+                    </button>
+                </div>
+
+                <!-- Panel de Historial -->
+                <div class="history-panel">
+                    <h3>Generaciones Anteriores (Historial)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Fecha/Hora</th>
+                                    <th>Estado</th>
+                                    <th>Conflictos</th>
+                                    <th style="text-align: center;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-weight: 600;">GEN-01</td>
+                                    <td>2024-10-25 03:00 AM</td>
+                                    <td><span class="status-badge status-complete">Completo</span></td>
+                                    <td>0</td>
+                                    <td style="text-align: center;"><span class="action-dots">•••</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">GEN-02</td>
+                                    <td>2024-10-25 05:00 AM</td>
+                                    <td><span class="status-badge status-complete">Completo</span></td>
+                                    <td>0</td>
+                                    <td style="text-align: center;"><span class="action-dots">•••</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">GEN-03</td>
+                                    <td>2024-10-26 09:15 AM</td>
+                                    <td><span class="status-badge status-error">Con Errores</span></td>
+                                    <td style="color: #ef4444; font-weight: bold;">3</td>
+                                    <td style="text-align: center;"><span class="action-dots">•••</span></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-weight: 600;">GEN-04</td>
+                                    <td>2024-10-27 10:30 AM</td>
+                                    <td><span class="status-badge status-pending">En Progreso</span></td>
+                                    <td>-</td>
+                                    <td style="text-align: center;"><span class="action-dots">•••</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MODAL GENERANDO HORARIOS -->
+    <div class="modal-overlay" id="processingModal">
+        <div class="modal">
+            <div class="spinner"></div>
+            <div class="loading-title">Generando Horarios...</div>
+            <div class="loading-text" id="loadingMessage">Inicializando algoritmo genético...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <button class="btn-primary" id="successBtn" style="display: none; margin-top: 25px; background-color: #166534;" onclick="closeProcessingModal()">
+                <span class="material-symbols-outlined">check_circle</span>
+                Ver Horario Generado
+            </button>
+        </div>
+    </div>
+
+    
+    <!-- MODAL MI PERFIL -->
+    <div class="modal-overlay" id="profileModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">person</span>
+                    Mi Perfil
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('profileModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <div class="user-avatar-text" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 15px auto;">
+                    A
+                </div>
+                <h3 style="margin-bottom: 5px; color: var(--text-dark);">Administrador</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">admin@liceorobertserra.com</p>
+                
+                <div style="text-align: left; margin-bottom: 15px;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px;">Cambiar Contraseña</label>
+                    <input type="password" class="form-control" placeholder="Nueva contraseña" style="margin-bottom: 10px;">
+                    <input type="password" class="form-control" placeholder="Confirmar contraseña">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('profileModal')">Cerrar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('profileModal'); alert('Perfil actualizado con éxito');">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- MODAL CONFIGURACIÓN -->
+    <div class="modal-overlay" id="configModal">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="material-symbols-outlined" style="color: var(--primary-color);">settings</span>
+                    Configuración del Sistema
+                </div>
+                <button class="close-modal" onclick="closeSystemModal('configModal')"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <!-- General Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Preferencias Generales</h4>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Modo Oscuro</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Apariencia de la interfaz</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Notificaciones por Email</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Avisos de cruces de horarios</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Respaldo Automático</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Copia de seguridad diaria</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Academic Settings Column -->
+                <div>
+                    <h4 style="font-size: 0.95rem; color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--border-light); padding-bottom: 6px;">Parámetros Académicos</h4>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Duración de Bloque</strong>
+                        <select class="form-control" style="font-size: 0.85rem; padding: 8px 12px; background-color: #f8fafc;">
+                            <option>45 Minutos (Estándar)</option>
+                            <option>60 Minutos (Largo)</option>
+                            <option>90 Minutos (Bloque Doble)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 16px;">
+                        <strong style="display: block; font-size: 0.9rem; margin-bottom: 6px;">Jornada Laboral Diaria</strong>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="time" class="form-control" value="07:00" style="font-size: 0.85rem; padding: 8px;">
+                            <span style="align-self: center; font-weight: bold; color: var(--text-muted);">-</span>
+                            <input type="time" class="form-control" value="17:00" style="font-size: 0.85rem; padding: 8px;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 22px;">
+                        <div>
+                            <strong style="display: block; font-size: 0.9rem;">Evitar Sobrecarga</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">No exceder 8h continuas</span>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 40px; height: 22px;">
+                            <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--primary-color); border-radius: 20px; transition: .4s;">
+                                <span style="position: absolute; height: 16px; width: 16px; left: 21px; bottom: 3px; background-color: white; border-radius: 50%; transition: .4s;"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-outline" onclick="closeSystemModal('configModal')">Descartar</button>
+                <button type="button" class="btn-primary" onclick="closeSystemModal('configModal'); alert('Ajustes del sistema actualizados satisfactoriamente.');">Guardar Configuración</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        function startGeneration() {
+            const modal = document.getElementById('processingModal');
+            const message = document.getElementById('loadingMessage');
+            const fill = document.getElementById('progressFill');
+            const btn = document.getElementById('successBtn');
+            const spinner = document.querySelector('.spinner');
+            
+            modal.classList.add('active');
+            
+            // Reset state
+            fill.style.width = '0%';
+            btn.style.display = 'none';
+            spinner.style.display = 'block';
+            spinner.style.borderTopColor = 'var(--primary-color)';
+            document.querySelector('.loading-title').textContent = 'Generando Horarios...';
+            
+            // Simulate algorithm progress
+            setTimeout(() => { message.textContent = 'Analizando restricciones docentes...'; fill.style.width = '25%'; }, 1000);
+            setTimeout(() => { message.textContent = 'Cruzando disponibilidad de aulas...'; fill.style.width = '50%'; }, 2500);
+            setTimeout(() => { message.textContent = 'Resolviendo conflictos de asignaturas...'; fill.style.width = '75%'; }, 4000);
+            setTimeout(() => { 
+                message.textContent = '¡Horario generado exitosamente con 0 conflictos!'; 
+                fill.style.width = '100%'; 
+                fill.style.backgroundColor = '#166534';
+                spinner.style.borderTopColor = '#166534';
+                
+                // Show success
+                setTimeout(() => {
+                    spinner.style.display = 'none';
+                    document.querySelector('.loading-title').textContent = '¡Proceso Completado!';
+                    document.querySelector('.loading-title').style.color = '#166534';
+                    btn.style.display = 'flex';
+                }, 500);
+            }, 5500);
+        }
+
+        function closeProcessingModal() {
+            document.getElementById('processingModal').classList.remove('active');
+            // Reset colors for next time
+            setTimeout(() => {
+                document.getElementById('progressFill').style.backgroundColor = 'var(--primary-color)';
+                document.querySelector('.loading-title').style.color = 'var(--text-dark)';
+            }, 300);
+        }
+    </script>
+
+    <script>
+        function closeDropdown() { const p = document.getElementById('dropdownPanel'); if(p) p.classList.remove('show'); }
+        // Profile Menu Toggle
+        function toggleProfileMenu(e) {
+            e.stopPropagation();
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.toggle('show');
+        }
+        window.addEventListener('click', () => {
+            const panel = document.getElementById('dropdownPanel');
+            if(panel) panel.classList.remove('show');
+        });
+    </script>
+
+    <script>
+        function openSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.add('active'); 
+        }
+        function closeSystemModal(id) { 
+            const m = document.getElementById(id);
+            if(m) m.classList.remove('active'); 
+        }
+    </script>
+
+</body>
+</html>
