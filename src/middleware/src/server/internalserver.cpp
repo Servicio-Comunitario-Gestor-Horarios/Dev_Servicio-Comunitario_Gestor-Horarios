@@ -42,16 +42,38 @@ void InternalServer::onReadyRead() {
 
         logConnection("Frontend -> Middleware", op);
 
+        QJsonObject response;
+
         if (op == Middleware::OP_HEALTH_CHECK) {
-            QJsonObject response;
             response["status"] = "ok";
-
-            QJsonDocument responseDoc(response);
-            clientSocket->write(responseDoc.toJson(QJsonDocument::Compact));
-            clientSocket->flush();
-
+            response["code"] = Middleware::RESP_OK;
             logConnection("Middleware -> Frontend", "Respuesta health-check [ok]");
+        } else if (op == Middleware::OP_READY) {
+            response["status"] = "ok";
+            response["code"] = Middleware::RESP_OK;
+            logConnection("Middleware -> Frontend", "Respuesta ready [ok]");
+        } else if (op == Middleware::OP_SHUTDOWN) {
+            response["status"] = "ok";
+            response["code"] = Middleware::RESP_OK;
+            logConnection("Middleware -> Frontend", "Respuesta shutdown [ok]");
+        } else if (op == Middleware::OP_TEACHER_LIST
+                || op == Middleware::OP_TEACHER_GET
+                || op == Middleware::OP_TEACHER_CREATE
+                || op == Middleware::OP_TEACHER_UPDATE
+                || op == Middleware::OP_TEACHER_DELETE) {
+            response["status"] = "ok";
+            response["code"] = Middleware::RESP_OK;
+            response["op"] = op;
+            logConnection("Middleware -> Frontend", "Respuesta CRUD [ok] — " + op);
+        } else {
+            response["status"] = "error";
+            response["code"] = Middleware::RESP_INVALID;
+            logConnection("Middleware -> Frontend", "Respuesta [error] — operación desconocida: " + op);
         }
+
+        QJsonDocument responseDoc(response);
+        clientSocket->write(responseDoc.toJson(QJsonDocument::Compact));
+        clientSocket->flush();
     }
 }
 

@@ -1,10 +1,9 @@
 #include <middleware/internalclient.h>
+#include <middleware/messages.h>
 
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
-
-#include <middleware/messages.h>
 
 InternalClient::InternalClient(QObject *parent)
     : QObject(parent)
@@ -17,16 +16,25 @@ InternalClient::InternalClient(QObject *parent)
 
 void InternalClient::sendHealthCheck()
 {
-    qDebug() << "Cliente: Conectando al servidor IPC...";
+    sendRequest(Middleware::OP_HEALTH_CHECK);
+}
+
+void InternalClient::sendRequest(const QString &op, const QJsonObject &payload)
+{
+    m_pendingOp = op;
+    m_pendingPayload = payload;
+    qDebug() << "Cliente: Conectando al servidor IPC para operación:" << op;
     m_socket->connectToServer(Middleware::SERVER_NAME);
 }
 
 void InternalClient::onConnected()
 {
-    qDebug() << "Cliente: Conectado al servidor. Enviando health-check...";
+    qDebug() << "Cliente: Conectado al servidor. Enviando solicitud...";
 
     QJsonObject request;
-    request["op"] = Middleware::OP_HEALTH_CHECK;
+    request["op"] = m_pendingOp;
+    if (!m_pendingPayload.isEmpty())
+        request["payload"] = m_pendingPayload;
 
     QJsonDocument doc(request);
     m_socket->write(doc.toJson(QJsonDocument::Compact));
@@ -43,11 +51,13 @@ void InternalClient::onReadyRead()
         bool success = (obj["status"].toString() == "ok");
         qDebug() << "Cliente: Respuesta recibida —" << (success ? "ÉXITO" : "FALLO");
         emit healthCheckResponseReceived(success);
+        emit responseReceived(obj);
     }
 }
 
 void InternalClient::onErrorOccurred(QLocalSocket::LocalSocketError error)
 {
-    qCritical() << "Cliente: Error de conexión:" << error << m_socket->errorString();
+    Q_UNUSED(error)
+    qCritical() << "Cliente: Error de conexión:" << m_socket->errorString();
     emit healthCheckResponseReceived(false);
 }
