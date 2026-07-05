@@ -6,64 +6,80 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QLabel> // Añadido para el texto de bienvenida
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , m_central_stack(new QStackedWidget(this))
-{
-    setCentralWidget(m_central_stack);
-    setup_menu_bar();
-    setup_toolbar();
-    setup_status_bar();
-}
+namespace gestor::frontend::views {
 
-void MainWindow::setup_menu_bar()
-{
-    // ── Archivo ──
-    QMenu *menu_archivo = menuBar()->addMenu(tr("&Archivo"));
+    MainWindow::MainWindow(QWidget *parent)
+        : QMainWindow(parent)
+        , m_central_stack(new QStackedWidget(this))
+    {
+        setWindowTitle("Dashboard Principal - Gestor Horarios");
+        resize(800, 600);
 
-    QAction *act_salir = menu_archivo->addAction(tr("&Salir"));
-    act_salir->setShortcut(QKeySequence::Quit);
-    connect(act_salir, &QAction::triggered, this, &MainWindow::on_action_salir);
+        setCentralWidget(m_central_stack);
 
-    // ── Ver ──
-    QMenu *menu_ver = menuBar()->addMenu(tr("&Ver"));
-    menu_ver->addAction(tr("&Pantalla completa"))->setShortcut(QKeySequence(Qt::Key_F11));
+        // --- Placeholder para tu maqueta (Ticket Sprint 2) ---
+        auto *placeholder = new QLabel("Bienvenido al Dashboard.\nLas futuras vistas se cargarán aquí.", this);
+        placeholder->setAlignment(Qt::AlignCenter);
+        placeholder->setStyleSheet("font-size: 18px; color: gray;");
+        m_central_stack->addWidget(placeholder);
+        // -----------------------------------------------------
 
-    // ── Ayuda ──
-    QMenu *menu_ayuda = menuBar()->addMenu(tr("&Ayuda"));
+        setup_menu_bar();
+        setup_toolbar();
+        setup_status_bar();
+    }
 
-    QAction *act_acerca_de = menu_ayuda->addAction(tr("&Acerca de..."));
-    connect(act_acerca_de, &QAction::triggered, this, &MainWindow::on_action_acerca_de);
-}
+    void MainWindow::setup_menu_bar()
+    {
+        // ── Archivo ──
+        QMenu *menu_archivo = menuBar()->addMenu(tr("&Archivo"));
 
-void MainWindow::setup_toolbar()
-{
-    QToolBar *toolbar = addToolBar(tr("Principal"));
-    toolbar->setMovable(false);
+        QAction *act_salir = menu_archivo->addAction(tr("&Salir"));
+        act_salir->setShortcut(QKeySequence::Quit);
+        connect(act_salir, &QAction::triggered, this, &MainWindow::on_action_salir);
 
-    toolbar->addAction(tr("Nuevo"));
-    toolbar->addAction(tr("Abrir"));
-    toolbar->addAction(tr("Guardar"));
-}
+        // ── Ver ──
+        QMenu *menu_ver = menuBar()->addMenu(tr("&Ver"));
+        menu_ver->addAction(tr("&Pantalla completa"))->setShortcut(QKeySequence(Qt::Key_F11));
 
-void MainWindow::setup_status_bar()
-{
-    statusBar()->showMessage(tr("Listo"));
-}
+        // ── Ayuda ──
+        QMenu *menu_ayuda = menuBar()->addMenu(tr("&Ayuda"));
 
-// ── Slots ──
+        QAction *act_acerca_de = menu_ayuda->addAction(tr("&Acerca de..."));
+        connect(act_acerca_de, &QAction::triggered, this, &MainWindow::on_action_acerca_de);
+    }
 
-void MainWindow::on_action_salir()
-{
-    QApplication::quit();
-}
+    void MainWindow::setup_toolbar()
+    {
+        QToolBar *toolbar = addToolBar(tr("Principal"));
+        toolbar->setMovable(false);
 
-void MainWindow::on_action_acerca_de()
-{
-    QMessageBox::about(this,
-        tr("Acerca de Gestor-Horarios"),
-        tr("Gestor-Horarios v0.1.0\n\n"
-           "Sistema de gestión de horarios con optimización\n"
-           "basado en OR-Tools y Qt6."));
-}
+        toolbar->addAction(tr("Nuevo"));
+        toolbar->addAction(tr("Abrir"));
+        toolbar->addAction(tr("Guardar"));
+    }
+
+    void MainWindow::setup_status_bar()
+    {
+        statusBar()->showMessage(tr("Listo"));
+    }
+
+    // ── Slots ──
+
+    void MainWindow::on_action_salir()
+    {
+        QApplication::quit();
+    }
+
+    void MainWindow::on_action_acerca_de()
+    {
+        QMessageBox::about(this,
+            tr("Acerca de Gestor-Horarios"),
+            tr("Gestor-Horarios v0.1.0\n\n"
+               "Sistema de gestión de horarios con optimización\n"
+               "basado en OR-Tools y Qt6."));
+    }
+
+} // Cierre del namespace
