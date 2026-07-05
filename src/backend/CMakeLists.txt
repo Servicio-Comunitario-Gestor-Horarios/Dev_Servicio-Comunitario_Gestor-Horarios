@@ -46,3 +46,19 @@ target_link_libraries(backend PUBLIC
 )
 
 set_project_warnings(backend)
+
+target_sources(backend PRIVATE
+
+    src/data/backend_placeholder.cpp
+
+    src/database/DatabaseManager.cpp
+
+)
+
+target_link_libraries(backend PUBLIC
+
+    ortools::ortools
+
+    Qt6::Sql
+
+)
