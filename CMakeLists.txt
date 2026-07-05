@@ -37,7 +37,7 @@ option(BUILD_TESTING "Build tests" ON)
 # ── Dependencias externas ──
 # Qt6: framework de interfaz gráfica, base de datos e IPC
 # Core (eventos/hilos), Sql (SQLite), Widgets (UI), Network (IPC/QLocalServer)
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network Test)
 
 if(BUILD_BACKEND)
     # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
