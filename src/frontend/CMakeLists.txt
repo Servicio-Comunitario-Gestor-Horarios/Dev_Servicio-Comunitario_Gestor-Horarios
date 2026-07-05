@@ -1,6 +1,12 @@
 ﻿# Opcion para desarrollo frontend standalone (Qt Creator)
 option(FRONTEND_STANDALONE "Build frontend as standalone executable" OFF)
 
+# En modo standalone, este archivo es el CMakeLists.txt raíz
+if(FRONTEND_STANDALONE)
+    cmake_minimum_required(VERSION 3.24)
+    project(gestor-horarios-frontend LANGUAGES CXX)
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
