@@ -82,6 +82,12 @@ add_qtest(test_backend_plan_estudio
     backend
 )
 
+add_qtest(test_backend_database
+    backend/test_database.cpp
+    backend
+    Qt6::Sql
+)
+
 # ============================================================
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================

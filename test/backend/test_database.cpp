@@ -1,87 +1,72 @@
-#include <QCoreApplication>
+#include <QTest>
 #include <QTemporaryDir>
 #include <QSqlQuery>
-#include <cassert>
+#include <QSqlError>
+#include <backend/data/DatabaseManager.hpp>
 
-#include "backend/database_manager.hpp"
+class TestDatabase : public QObject {
+    Q_OBJECT
 
-#ifndef QVERIFY
-#define QVERIFY(condition) assert(condition)
-#endif
+private slots:
+    void initAndCheckTables() {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
 
-int main(int argc, char* argv[])
-{
-    QCoreApplication app(argc, argv);
+        const QString dbPath = tempDir.filePath("test.db");
 
-    QTemporaryDir tempDir;
+        DatabaseManager db;
+        QVERIFY(db.initialize(dbPath));
+        QVERIFY(db.isInitialized());
 
-    QVERIFY(tempDir.isValid());
+        // Verificar tabla teachers
+        {
+            QSqlQuery query(db.database());
+            QVERIFY(query.exec(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name='teachers'"
+            ));
+            QVERIFY(query.next());
+        }
 
-    const QString dbPath = tempDir.filePath("test.db");
+        // Verificar tabla classrooms
+        {
+            QSqlQuery query(db.database());
+            QVERIFY(query.exec(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name='classrooms'"
+            ));
+            QVERIFY(query.next());
+        }
 
-    DatabaseManager db;
+        // Insertar y leer en teachers
+        {
+            QSqlQuery query(db.database());
+            QVERIFY(query.exec(
+                "INSERT INTO teachers(name,email) "
+                "VALUES('Profesor','profesor@test.com')"
+            ));
+            QVERIFY(query.exec("SELECT COUNT(*) FROM teachers"));
+            QVERIFY(query.next());
+            QCOMPARE(query.value(0).toInt(), 1);
+        }
 
-    QVERIFY(db.initialize(dbPath));
-
-    QVERIFY(db.isInitialized());
-
-    {
-        QSqlQuery query(db.database());
-
-        QVERIFY(query.exec(
-
-            "SELECT name FROM sqlite_master "
-
-            "WHERE type='table' "
-
-            "AND name='teachers'"
-
-        ));
-
-        QVERIFY(query.next());
+        db.close();
+        QVERIFY(!db.isInitialized());
     }
 
-    {
-        QSqlQuery query(db.database());
+    void doubleInitialize_isIdempotent() {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
 
-        QVERIFY(query.exec(
+        DatabaseManager db;
+        QVERIFY(db.initialize(tempDir.filePath("test.db")));
+        QVERIFY(db.isInitialized());
 
-            "SELECT name FROM sqlite_master "
-
-            "WHERE type='table' "
-
-            "AND name='classrooms'"
-
-        ));
-
-        QVERIFY(query.next());
+        // Segunda inicialización no debe fallar
+        QVERIFY(db.initialize(tempDir.filePath("test.db")));
+        QVERIFY(db.isInitialized());
     }
+};
 
-    {
-        QSqlQuery query(db.database());
-
-        QVERIFY(query.exec(
-
-            "INSERT INTO teachers(name,email)"
-
-            "VALUES('Profesor','profesor@test.com')"
-
-        ));
-
-        QVERIFY(query.exec(
-
-            "SELECT COUNT(*) FROM teachers"
-
-        ));
-
-        QVERIFY(query.next());
-
-        QVERIFY(query.value(0).toInt() == 1);
-    }
-
-    db.close();
-
-    QVERIFY(!db.isInitialized());
-
-    return 0;
-}
+QTEST_MAIN(TestDatabase)
+#include "test_database.moc"

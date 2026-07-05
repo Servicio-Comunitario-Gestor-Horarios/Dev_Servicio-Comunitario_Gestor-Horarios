@@ -1,11 +1,22 @@
-#include "backend/database_manager.hpp"
+#include "backend/data/DatabaseManager.hpp"
 
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
 
+DatabaseManager::~DatabaseManager()
+{
+    close();
+}
+
 bool DatabaseManager::initialize(const QString& dbPath)
 {
+    if (m_initialized)
+    {
+        qWarning() << "DatabaseManager ya inicializado, cerrando conexión previa...";
+        close();
+    }
+
     m_db = QSqlDatabase::addDatabase("QSQLITE");
 
     m_db.setDatabaseName(dbPath);
@@ -17,6 +28,9 @@ bool DatabaseManager::initialize(const QString& dbPath)
 
         return false;
     }
+
+    QSqlQuery pragma(m_db);
+    pragma.exec("PRAGMA foreign_keys = ON");
 
     if (!runMigrations())
     {
@@ -39,6 +53,12 @@ void DatabaseManager::close()
         m_db.close();
     }
 
+    // Libera la conexión registrada para permitir re-inicialización
+    if (QSqlDatabase::contains(QSqlDatabase::defaultConnection))
+    {
+        QSqlDatabase::removeDatabase(QSqlDatabase::defaultConnection);
+    }
+
     m_initialized = false;
 }
 
@@ -48,6 +68,11 @@ bool DatabaseManager::isInitialized() const
 }
 
 QSqlDatabase& DatabaseManager::database()
+{
+    return m_db;
+}
+
+const QSqlDatabase& DatabaseManager::database() const
 {
     return m_db;
 }
@@ -73,7 +98,6 @@ bool DatabaseManager::runMigrations()
         "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
 
         ")"
-
     ))
     {
         qCritical() << "Error creando tabla teachers:"
@@ -91,6 +115,7 @@ bool DatabaseManager::runMigrations()
         "name TEXT NOT NULL UNIQUE,"
 
         "capacity INTEGER NOT NULL,"
+        "CHECK(capacity > 0),"
 
         "building TEXT,"
 
@@ -101,7 +126,6 @@ bool DatabaseManager::runMigrations()
         "updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
 
         ")"
-
     ))
     {
         qCritical() << "Error creando tabla classrooms:"

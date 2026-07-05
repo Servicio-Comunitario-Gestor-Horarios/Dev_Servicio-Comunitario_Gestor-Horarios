@@ -51,7 +51,7 @@ target_sources(backend PRIVATE
 
     src/data/backend_placeholder.cpp
 
-    src/database/database_manager.cpp
+    src/database/DatabaseManager.cpp
 
 )
 
