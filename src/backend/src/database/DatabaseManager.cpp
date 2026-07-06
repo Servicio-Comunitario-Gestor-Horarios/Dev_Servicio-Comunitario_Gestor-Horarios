@@ -114,8 +114,7 @@ bool DatabaseManager::runMigrations()
 
         "name TEXT NOT NULL UNIQUE,"
 
-        "capacity INTEGER NOT NULL,"
-        "CHECK(capacity > 0),"
+        "capacity INTEGER NOT NULL CHECK(capacity > 0),"
 
         "building TEXT,"
 

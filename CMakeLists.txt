@@ -30,15 +30,24 @@ project(Gestor-Horarios
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# --- Opciones de compilacion ---
+option(BUILD_BACKEND "Build backend, middleware, and solver (requires OR-Tools)" ON)
+option(BUILD_TESTING "Build tests" ON)
+
 # ── Dependencias externas ──
-
-# OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
-# Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
-find_package(ortools CONFIG REQUIRED)
-
 # Qt6: framework de interfaz gráfica, base de datos e IPC
 # Core (eventos/hilos), Sql (SQLite), Widgets (UI), Network (IPC/QLocalServer)
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network Test)
+
+if(BUILD_BACKEND)
+    # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
+    # Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
+    find_package(ortools CONFIG REQUIRED)
+    message(STATUS "OR-Tools found - backend and solver enabled")
+else()
+    message(STATUS "BUILD_BACKEND=OFF - backend and OR-Tools disabled")
+endif()
+    
 
 # ── Opciones de compilación ──
 include(cmake/CompilerWarnings.cmake)
@@ -47,4 +56,7 @@ include(cmake/CompilerWarnings.cmake)
 add_subdirectory(src)
 
 # ── Tests ──
-add_subdirectory(test)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(test)
+endif()

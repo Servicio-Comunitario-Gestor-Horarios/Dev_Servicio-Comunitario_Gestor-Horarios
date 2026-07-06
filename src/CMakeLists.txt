@@ -18,10 +18,10 @@
 
 add_subdirectory(common)
 add_subdirectory(frontend)
+add_subdirectory(middleware)
 
 if(BUILD_BACKEND)
     add_subdirectory(backend)
-    add_subdirectory(middleware)
 endif()
 
 add_subdirectory(app)
