@@ -1,0 +1,4 @@
+/workspace/build-fe/CMakeFiles/gestor-horarios-frontend.dir
+/workspace/build-fe/CMakeFiles/edit_cache.dir
+/workspace/build-fe/CMakeFiles/rebuild_cache.dir
+/workspace/build-fe/CMakeFiles/gestor-horarios-frontend_autogen.dir

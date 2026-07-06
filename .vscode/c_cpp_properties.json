@@ -11,7 +11,8 @@
                 "/usr/lib/x86_64-linux-gnu/glib-2.0/include",
                 "/usr/include/glib-2.0",
                 "${workspaceFolder}/src/backend/include/backend/data",
-                "${workspaceFolder}/src/backend/include"
+                "${workspaceFolder}/src/backend/include",
+                "${workspaceFolder}/src/frontend/include"
             ],
             "defines": [
                 "QT_CORE_LIB",
