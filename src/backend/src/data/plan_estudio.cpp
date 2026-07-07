@@ -18,6 +18,7 @@ MateriaEnPlan MateriaEnPlan::fromJson(const QJsonObject& obj) {
     materia_plan.horas = obj["horas"].toInt();
     materia_plan.materia = Materia::fromJson(obj["materia"].toObject());
 
+    return materia_plan;
 }
 
 QJsonObject PlanEstudio::toJson() const {
