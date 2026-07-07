@@ -20,15 +20,29 @@ private slots:
         m2.horas_semanales = 4;
         m2.requerimientos = {"Laboratorio"};
 
-        plan.materias = {m1, m2};
+        MateriaEnPlan mep1, mep2;
+        mep1.curso = 1;
+        mep1.horas = 6;
+        mep1.materia = m1;
+        mep2.curso = 2;
+        mep2.horas = 4;
+        mep2.materia = m2;
+
+        plan.materias = {mep1, mep2};
 
         QJsonObject obj = plan.toJson();
 
         QCOMPARE(obj["nombre"].toString(), QString("Ingenieria en Sistemas"));
-        QJsonArray materias = obj["materias"].toArray();
-        QCOMPARE(materias.size(), 2);
-        QCOMPARE(materias[0].toObject()["nombre"].toString(), QString("Programacion"));
-        QCOMPARE(materias[1].toObject()["requerimientos"].toArray()[0].toString(), QString("Laboratorio"));
+        QJsonArray materiasArr = obj["materias"].toArray();
+        QCOMPARE(materiasArr.size(), 2);
+
+        QJsonObject primera = materiasArr[0].toObject();
+        QCOMPARE(primera["curso"].toInt(), 1);
+        QCOMPARE(primera["horas"].toInt(), 6);
+        QCOMPARE(primera["materia"].toObject()["nombre"].toString(), QString("Programacion"));
+
+        QJsonObject segunda = materiasArr[1].toObject();
+        QCOMPARE(segunda["materia"].toObject()["requerimientos"].toArray()[0].toString(), QString("Laboratorio"));
     }
 
     void fromJson_reconstructsObject() {
@@ -36,16 +50,22 @@ private slots:
         m1["nombre"] = "Redes"; m1["horas_semanales"] = 5;
         m2["nombre"] = "Seguridad"; m2["horas_semanales"] = 4;
 
+        QJsonObject mep1, mep2;
+        mep1["curso"] = 1; mep1["horas"] = 5; mep1["materia"] = m1;
+        mep2["curso"] = 2; mep2["horas"] = 4; mep2["materia"] = m2;
+
         QJsonObject obj;
         obj["nombre"] = "Ingenieria en Computacion";
-        obj["materias"] = QJsonArray{m1, m2};
+        obj["materias"] = QJsonArray{mep1, mep2};
 
         PlanEstudio plan = PlanEstudio::fromJson(obj);
 
         QCOMPARE(plan.nombre, QString("Ingenieria en Computacion"));
         QCOMPARE(plan.materias.size(), 2);
-        QCOMPARE(plan.materias[0].nombre, QString("Redes"));
-        QCOMPARE(plan.materias[1].nombre, QString("Seguridad"));
+        QCOMPARE(plan.materias[0].curso, 1);
+        QCOMPARE(plan.materias[0].horas, 5);
+        QCOMPARE(plan.materias[0].materia.nombre, QString("Redes"));
+        QCOMPARE(plan.materias[1].materia.nombre, QString("Seguridad"));
     }
 
     void plan_withoutSubjects() {
@@ -67,16 +87,23 @@ private slots:
         m.horas_semanales = 8;
         m.requerimientos = {"IDE", "Pizarron"};
 
-        original.materias = {m};
+        MateriaEnPlan mep;
+        mep.curso = 1;
+        mep.horas = 8;
+        mep.materia = m;
+
+        original.materias = {mep};
 
         QJsonObject json = original.toJson();
         PlanEstudio result = PlanEstudio::fromJson(json);
 
         QCOMPARE(result.nombre, original.nombre);
         QCOMPARE(result.materias.size(), original.materias.size());
-        QCOMPARE(result.materias[0].nombre, original.materias[0].nombre);
-        QCOMPARE(result.materias[0].horas_semanales, original.materias[0].horas_semanales);
-        QCOMPARE(result.materias[0].requerimientos, original.materias[0].requerimientos);
+        QCOMPARE(result.materias[0].curso, original.materias[0].curso);
+        QCOMPARE(result.materias[0].horas, original.materias[0].horas);
+        QCOMPARE(result.materias[0].materia.nombre, original.materias[0].materia.nombre);
+        QCOMPARE(result.materias[0].materia.horas_semanales, original.materias[0].materia.horas_semanales);
+        QCOMPARE(result.materias[0].materia.requerimientos, original.materias[0].materia.requerimientos);
     }
 };
 

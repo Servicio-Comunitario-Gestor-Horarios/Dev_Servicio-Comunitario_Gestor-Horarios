@@ -53,6 +53,8 @@ target_sources(backend PRIVATE
 
     src/database/DatabaseManager.cpp
 
+    src/database/migracion.cpp
+
 )
 
 target_link_libraries(backend PUBLIC

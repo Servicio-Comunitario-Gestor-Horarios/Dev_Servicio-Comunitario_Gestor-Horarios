@@ -8,6 +8,8 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/profesor.hpp>
 
+/// Asignación de una materia en un aula con un profesor en una franja.
+/// Value object del solver — sin id de persistencia.
 struct Asignacion {
 
     Aula aula;
@@ -19,6 +21,8 @@ struct Asignacion {
     static Asignacion fromJson(const QJsonObject& obj);
 };
 
+/// Horario completo compuesto por asignaciones.
+/// Value object del solver — sin id de persistencia.
 struct Horario {
 
     QVector<Asignacion> asignaciones;
