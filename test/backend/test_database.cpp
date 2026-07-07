@@ -2,7 +2,7 @@
 #include <QTemporaryDir>
 #include <QSqlQuery>
 #include <QSqlError>
-#include <backend/data/DatabaseManager.hpp>
+#include <backend/database/DatabaseManager.hpp>
 
 class TestDatabase : public QObject {
     Q_OBJECT
@@ -18,34 +18,34 @@ private slots:
         QVERIFY(db.initialize(dbPath));
         QVERIFY(db.isInitialized());
 
-        // Verificar tabla teachers
+        // Verificar tabla Profesores
         {
             QSqlQuery query(db.database());
             QVERIFY(query.exec(
                 "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='teachers'"
+                "WHERE type='table' AND name='Profesores'"
             ));
             QVERIFY(query.next());
         }
 
-        // Verificar tabla classrooms
+        // Verificar tabla Aulas
         {
             QSqlQuery query(db.database());
             QVERIFY(query.exec(
                 "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='classrooms'"
+                "WHERE type='table' AND name='Aulas'"
             ));
             QVERIFY(query.next());
         }
 
-        // Insertar y leer en teachers
+        // Insertar y leer en Profesores
         {
             QSqlQuery query(db.database());
             QVERIFY(query.exec(
-                "INSERT INTO teachers(name,email) "
-                "VALUES('Profesor','profesor@test.com')"
+                "INSERT INTO Profesores(id,nombre,email) "
+                "VALUES('P001','Profesor','profesor@test.com')"
             ));
-            QVERIFY(query.exec("SELECT COUNT(*) FROM teachers"));
+            QVERIFY(query.exec("SELECT COUNT(*) FROM Profesores"));
             QVERIFY(query.next());
             QCOMPARE(query.value(0).toInt(), 1);
         }

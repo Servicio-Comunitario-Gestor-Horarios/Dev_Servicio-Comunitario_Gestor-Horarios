@@ -88,6 +88,11 @@ add_qtest(test_backend_database
     Qt6::Sql
 )
 
+add_qtest(test_backend_entity_graph
+    backend/test_entity_graph.cpp
+    backend
+)
+
 # ============================================================
 # Tests de middleware — health-check IPC
 # ============================================================
