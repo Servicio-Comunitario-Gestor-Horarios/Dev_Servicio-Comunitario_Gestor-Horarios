@@ -12,7 +12,8 @@
                 "/usr/include/glib-2.0",
                 "${workspaceFolder}/src/backend/include/backend/data",
                 "${workspaceFolder}/src/backend/include",
-                "${workspaceFolder}/src/frontend/include"
+                "${workspaceFolder}/src/frontend/include",
+                "/usr/include/qt6/QtTest"
             ],
             "defines": [
                 "QT_CORE_LIB",

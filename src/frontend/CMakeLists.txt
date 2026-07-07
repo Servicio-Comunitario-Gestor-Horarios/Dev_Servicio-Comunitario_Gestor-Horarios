@@ -37,6 +37,7 @@ if(FRONTEND_STANDALONE)
     target_link_libraries(gestor-horarios-frontend PRIVATE
         Qt6::Core
         Qt6::Widgets
+        Qt6::Network
     )
 else()
     # === MODO INTEGRADO ===
@@ -45,6 +46,6 @@ else()
     target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS})
     target_include_directories(frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(frontend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_link_libraries(frontend PUBLIC Qt6::Core Qt6::Widgets)
+    target_link_libraries(frontend PUBLIC Qt6::Core Qt6::Widgets Qt6::Network)
     target_compile_definitions(frontend PUBLIC PROJECT_VERSION="${PROJECT_VERSION}")
 endif()
