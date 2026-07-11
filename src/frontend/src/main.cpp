@@ -1,18 +1,23 @@
 #include <QApplication>
 #include "logindialog.h"
+#include "views/main_window.hpp" // Incluimos nuestra nueva ventana principal
 
-int main(int argc, char *argv[])
-{
-    QApplication app(argc, argv);
+int main(int argc, char *argv[]) {
+    QApplication a(argc, argv);
 
+    // 1. Creamos y mostramos la ventana de inicio de sesión
     LoginDialog login;
+
+    // 2. Si el usuario ingresa sus datos y se acepta el inicio de sesión...
     if (login.exec() == QDialog::Accepted) {
-        // Aquí abrirías la ventana principal en el futuro.
-        // Por ahora, solo mostramos un mensaje en consola.
-        qDebug() << "Login exitoso (mock)";
-        // app.exec() no es necesario porque el diálogo ya es modal.
-        // Si hubiera ventana principal, se mostraría aquí.
+        // 3. Creamos y mostramos la ventana principal
+        MainWindow w;
+        w.show();
+
+        // 4. Mantenemos la aplicación corriendo
+        return a.exec();
     }
 
+    // Si el usuario presiona "Cancelar" o cierra la ventana de login, la app se cierra.
     return 0;
 }

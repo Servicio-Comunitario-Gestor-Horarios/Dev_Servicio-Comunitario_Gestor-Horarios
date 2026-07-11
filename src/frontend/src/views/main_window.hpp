@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QStackedWidget>
+#include <QPushButton>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -12,15 +13,15 @@ public:
     ~MainWindow() override = default;
 
 private slots:
-    void on_action_salir();
-    void on_action_acerca_de();
+    void mostrarInicio();
+    void mostrarDocentes();
 
 private:
-    QStackedWidget *m_central_stack;
+    void configurarEstilosMenu();
 
-    void setup_menu_bar();
-    void setup_toolbar();
-    void setup_status_bar();
+    QStackedWidget *contenedorVistas;
+    QPushButton *btnInicio;
+    QPushButton *btnDocentes;
 };
 
 #endif // MAIN_WINDOW_HPP

@@ -14,21 +14,37 @@ set(CMAKE_AUTORCC ON)
 set(FRONTEND_SOURCES
     src/aplicacion_frontend.cpp
     src/logindialog.cpp
+    src/views/main_window.cpp
+    src/views/teacher_list_widget.cpp
+    src/forms/teacher_form_dialog.cpp
+
 )
 
 set(FRONTEND_HEADERS
     include/frontend/aplicacion_frontend.hpp
     src/logindialog.h
+    src/views/main_window.hpp
+    src/views/teacher_list_widget.hpp
+    src/forms/teacher_form_dialog.hpp
+
 )
 
 if(FRONTEND_STANDALONE)
     # === MODO Qt CREATOR ===
     # Ejecutable independiente para desarrollo frontend puro
-    find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
     qt6_add_executable(gestor-horarios-frontend
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
         src/main.cpp
+        src/views/main_window.cpp
+        src/views/main_window.hpp
+        src/views/teacher_list_widget.hpp
+        src/views/teacher_list_widget.cpp
+        src/forms/teacher_form_dialog.hpp
+        src/forms/teacher_form_dialog.cpp
+
+
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
