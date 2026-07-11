@@ -61,4 +61,26 @@ private:
      * @param operacion Nombre o descripción de la operación.
      */
     void registrarConexion(const QString &direccion, const QString &operacion);
+
+    /**
+     * @brief Envía una respuesta IPC al cliente.
+     * @param status Código de estado (RESP_EXITO, RESP_ERROR, etc.).
+     * @param data Payload de la respuesta.
+     * @param clienteSocket Socket del cliente destino.
+     */
+    void sendResponse(int status, const QJsonValue &data,
+                      QLocalSocket *clienteSocket);
+
+    // ── CRUD Profesores (stubs — conectar al backend cuando esté listo) ──
+
+    /** @brief Retorna lista vacía de profesores. */
+    void handleTeacherList(QLocalSocket *clienteSocket);
+    /** @brief Retorna profesor por ID o error no encontrado. */
+    void handleTeacherGet(const QJsonObject &data, QLocalSocket *clienteSocket);
+    /** @brief Valida campos y crea profesor (stub). */
+    void handleTeacherCreate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    /** @brief Actualiza profesor existente (stub). */
+    void handleTeacherUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    /** @brief Elimina profesor por ID (stub). */
+    void handleTeacherDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
 };
