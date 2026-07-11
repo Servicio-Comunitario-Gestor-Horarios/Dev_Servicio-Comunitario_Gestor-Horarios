@@ -18,6 +18,8 @@ set(FRONTEND_SOURCES
     src/views/teacher_list_widget.cpp
     src/forms/teacher_form_dialog.cpp
 
+    src/views/view_placeholder.cpp
+
 )
 
 set(FRONTEND_HEADERS
@@ -26,6 +28,7 @@ set(FRONTEND_HEADERS
     src/views/main_window.hpp
     src/views/teacher_list_widget.hpp
     src/forms/teacher_form_dialog.hpp
+
 
 )
 
@@ -37,6 +40,13 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
         src/main.cpp
+
+
+        src/views/view_placeholder.cpp
+        src/views/dashboard_widget.hpp
+        src/views/dashboard_widget.hpp
+        src/views/dashboard_widget.cpp
+        src/views/view_placeholder.hpp
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
