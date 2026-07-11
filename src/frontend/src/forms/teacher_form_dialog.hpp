@@ -18,6 +18,8 @@ public:
     explicit TeacherFormDialog(QWidget *parent = nullptr);
     ~TeacherFormDialog() override = default;
 
+    void cargarDatos(const QString& id, const QString& nombre, const QString& email, const QString& telefono, const QString& materias);
+
 signals:
     void profesorGuardado(const QString& id, const QString& nombre, const QString& email, const QString& telefono, const QString& materias);
 

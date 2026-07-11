@@ -74,14 +74,37 @@ void TeacherFormDialog::configurarValidadores() {
 }
 
 void TeacherFormDialog::guardarProfesor() {
+    // TF4: Validación de email
     if (!campoEmail->hasAcceptableInput() && !campoEmail->text().isEmpty()) {
         QMessageBox::warning(this, "Error de Validación", "El formato del email es incorrecto.");
         return;
     }
 
-    // Enviamos los 5 campos capturados
+    // TF3 y TF5: Simulación de InternalClient y manejo de servidor caído
+    bool servidorDisponible = false; // TODO: Conectar con backend real
+
+    if (!servidorDisponible) {
+        // TF5: QMessageBox de error si el servidor no responde
+        QMessageBox::critical(this, "Error de Conexión", "El servidor (InternalClient) no está disponible en este momento.");
+
+        // NOTA: Para que puedas seguir probando la interfaz visualmente,
+        // no vamos a detener la ejecución aquí (return;), pero en el
+        // futuro deberías descomentar el return para que no se guarde si falla.
+        // return;
+    } else {
+        // TF3: Aquí iría la llamada real IPC (OP_CREAR_PROFESOR)
+        // InternalClient::getInstance()->sendRequest("OP_CREAR_PROFESOR", datos);
+    }
+
     emit profesorGuardado(campoId->text(), campoNombre->text(), campoEmail->text(), campoTelefono->text(), campoMaterias->text());
     accept();
+}
+void TeacherFormDialog::cargarDatos(const QString& id, const QString& nombre, const QString& email, const QString& telefono, const QString& materias) {
+    campoId->setText(id);
+    campoNombre->setText(nombre);
+    campoEmail->setText(email != "N/A" ? email : "");
+    campoTelefono->setText(telefono != "N/A" ? telefono : "");
+    campoMaterias->setText(materias != "N/A" ? materias : "");
 }
 
 } // namespace gestor::frontend::forms

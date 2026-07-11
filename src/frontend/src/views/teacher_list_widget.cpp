@@ -15,6 +15,7 @@
 #include <QHeaderView>
 #include <QFrame>
 #include "../forms/teacher_form_dialog.hpp"
+#include <QMessageBox>
 
 TeacherListWidget::TeacherListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
@@ -217,8 +218,84 @@ void TeacherListWidget::agregarProfesorATabla(const QString& id, const QString& 
     itemMaterias->setTextAlignment(Qt::AlignCenter);
     m_table->setItem(fila, 4, itemMaterias);
 
-    // 6. Acciones
-    QTableWidgetItem *acciones = new QTableWidgetItem("...");
-    acciones->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(fila, 5, acciones);
+    // 6. Acciones (TF2: Botones reales de Editar y Eliminar)
+    QWidget *panelAcciones = new QWidget();
+    QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
+    layoutAcciones->setContentsMargins(0, 0, 0, 0);
+    layoutAcciones->setSpacing(10);
+
+    QPushButton *btnEditar = new QPushButton("✏️");
+    btnEditar->setStyleSheet("color: #2563eb; background: transparent; border: none; font-weight: bold;");
+    btnEditar->setCursor(Qt::PointingHandCursor);
+
+    QPushButton *btnEliminar = new QPushButton("️🗑️");
+    btnEliminar->setStyleSheet("color: #dc2626; background: transparent; border: none; font-weight: bold;");
+    btnEliminar->setCursor(Qt::PointingHandCursor);
+
+    layoutAcciones->addStretch();
+    layoutAcciones->addWidget(btnEditar);
+    layoutAcciones->addWidget(btnEliminar);
+    layoutAcciones->addStretch();
+
+    // --- LÓGICA DE LOS BOTONES ---
+
+    // Conectar botón Eliminar
+    connect(btnEliminar, &QPushButton::clicked, this, [this, panelAcciones]() {
+        QMessageBox::StandardButton respuesta;
+        respuesta = QMessageBox::question(this, "Confirmar eliminación",
+                                          "¿Estás seguro de que deseas eliminar a este docente?",
+                                          QMessageBox::Yes | QMessageBox::No);
+
+        if (respuesta == QMessageBox::Yes) {
+            // Buscamos en qué fila está el botón que presionamos y la borramos
+            for (int i = 0; i < m_table->rowCount(); ++i) {
+                if (m_table->cellWidget(i, 5) == panelAcciones) {
+                    m_table->removeRow(i);
+                    break;
+                }
+            }
+        }
+    });
+
+    // Conectar botón Editar
+    connect(btnEditar, &QPushButton::clicked, this, [this, panelAcciones]() {
+        int filaEditar = -1;
+        // Buscamos qué fila vamos a editar
+        for (int i = 0; i < m_table->rowCount(); ++i) {
+            if (m_table->cellWidget(i, 5) == panelAcciones) {
+                filaEditar = i;
+                break;
+            }
+        }
+
+        if (filaEditar != -1) {
+            // 1. Extraemos los datos actuales de la tabla
+            QString id = m_table->item(filaEditar, 0)->text();
+            QString nombre = m_table->item(filaEditar, 1)->text();
+            QString email = m_table->item(filaEditar, 2)->text();
+            QString telefono = m_table->item(filaEditar, 3)->text();
+            QString materias = m_table->item(filaEditar, 4)->text();
+
+            // 2. Abrimos el formulario y le pasamos los datos
+            gestor::frontend::forms::TeacherFormDialog dialogo(this);
+            dialogo.setWindowTitle("Editar Docente");
+            dialogo.cargarDatos(id, nombre, email, telefono, materias);
+
+            // 3. Capturamos el guardado para actualizar la fila (sin crear una nueva)
+            connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
+                    this, [this, filaEditar](const QString& nId, const QString& nNombre, const QString& nEmail, const QString& nTelefono, const QString& nMaterias) {
+                        m_table->item(filaEditar, 0)->setText(nId);
+                        m_table->item(filaEditar, 1)->setText(nNombre);
+                        m_table->item(filaEditar, 2)->setText(nEmail.isEmpty() ? "N/A" : nEmail);
+                        m_table->item(filaEditar, 3)->setText(nTelefono.isEmpty() ? "N/A" : nTelefono);
+                        m_table->item(filaEditar, 4)->setText(nMaterias.isEmpty() ? "N/A" : nMaterias);
+                    });
+
+            dialogo.exec();
+        }
+    });
+
+    // -----------------------------
+
+    m_table->setCellWidget(fila, 5, panelAcciones);
 }

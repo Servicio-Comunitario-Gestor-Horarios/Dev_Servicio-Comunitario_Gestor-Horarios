@@ -1,3 +1,14 @@
+/* Proyecto:       Sistema de Gestión de Horarios
+ * Archivo:        [main_window.cpp]
+ * Autor:          Paola Peña
+ * Fecha:          10 de Julio de 2026
+ * Descripción:    Implementación de la interfaz gráfica (Frontend) utilizando
+ *                 C++ y Qt6 para el módulo de gestión de docentes. Incluye el
+ *                 diseño de la vista principal, la tabla de listado de docentes,
+ *                 y el formulario de registro con validación de datos.
+ */
+
+
 #include "main_window.hpp"
 #include "teacher_list_widget.hpp"
 #include <QHBoxLayout>
