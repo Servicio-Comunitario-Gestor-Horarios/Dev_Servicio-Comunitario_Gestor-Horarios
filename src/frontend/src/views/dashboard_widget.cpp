@@ -1,3 +1,8 @@
+/**
+ * @file dashboard_widget.cpp
+ * @brief Implementación del widget del panel principal del dashboard
+ */
+
 #include "dashboard_widget.hpp"
 #include <QPainter>
 #include <QProgressBar>
@@ -162,19 +167,19 @@ QWidget* DashboardWidget::crearPanelGeneracion()
 
     QHBoxLayout *actionsLayout = new QHBoxLayout();
     actionsLayout->setSpacing(10);
-    btnVerDetalles = new QPushButton("Ver Detalles");
-    btnVerDetalles->setStyleSheet("QPushButton { background-color: transparent; color: #0f172a; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #f1f5f9; }");
-    btnResolverConflictos = new QPushButton("Resolver Conflictos");
-    btnResolverConflictos->setStyleSheet("QPushButton { background-color: #0f172a; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #1e293b; }");
-    actionsLayout->addWidget(btnVerDetalles);
-    actionsLayout->addWidget(btnResolverConflictos);
+    m_btnVerDetalles = new QPushButton("Ver Detalles");
+    m_btnVerDetalles->setStyleSheet("QPushButton { background-color: transparent; color: #0f172a; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #f1f5f9; }");
+    m_btnResolverConflictos = new QPushButton("Resolver Conflictos");
+    m_btnResolverConflictos->setStyleSheet("QPushButton { background-color: #0f172a; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #1e293b; }");
+    actionsLayout->addWidget(m_btnVerDetalles);
+    actionsLayout->addWidget(m_btnResolverConflictos);
     detailsLayout->addLayout(actionsLayout);
 
     statusLayout->addLayout(detailsLayout);
     layout->addLayout(statusLayout);
 
-    connect(btnVerDetalles, &QPushButton::clicked, this, &DashboardWidget::mostrarDetalles);
-    connect(btnResolverConflictos, &QPushButton::clicked, this, &DashboardWidget::resolverConflictos);
+    connect(m_btnVerDetalles, &QPushButton::clicked, this, &DashboardWidget::mostrarDetalles);
+    connect(m_btnResolverConflictos, &QPushButton::clicked, this, &DashboardWidget::resolverConflictos);
 
     return panel;
 }

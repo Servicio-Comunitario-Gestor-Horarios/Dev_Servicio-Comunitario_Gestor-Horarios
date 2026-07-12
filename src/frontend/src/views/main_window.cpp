@@ -33,71 +33,71 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setupSidebar();
     setupCentralArea();
 
-    mainLayout->addWidget(sidebar);
-    mainLayout->addWidget(rightContainer);
+    mainLayout->addWidget(m_sidebar);
+    mainLayout->addWidget(m_rightContainer);
 
     setCentralWidget(centralWidget);
 
     // Conectar botones
-    connect(btnInicio, &QPushButton::clicked, this, &MainWindow::mostrarInicio);
-    connect(btnDocentes, &QPushButton::clicked, this, &MainWindow::mostrarDocentes);
-    connect(btnAulas, &QPushButton::clicked, this, &MainWindow::mostrarAulas);
-    connect(btnAsignaturas, &QPushButton::clicked, this, &MainWindow::mostrarAsignaturas);
-    connect(btnGeneracion, &QPushButton::clicked, this, &MainWindow::mostrarGeneracion);
-    connect(btnVisualizacion, &QPushButton::clicked, this, &MainWindow::mostrarVisualizacion);
+    connect(m_btnInicio, &QPushButton::clicked, this, &MainWindow::mostrarInicio);
+    connect(m_btnDocentes, &QPushButton::clicked, this, &MainWindow::mostrarDocentes);
+    connect(m_btnAulas, &QPushButton::clicked, this, &MainWindow::mostrarAulas);
+    connect(m_btnAsignaturas, &QPushButton::clicked, this, &MainWindow::mostrarAsignaturas);
+    connect(m_btnGeneracion, &QPushButton::clicked, this, &MainWindow::mostrarGeneracion);
+    connect(m_btnVisualizacion, &QPushButton::clicked, this, &MainWindow::mostrarVisualizacion);
 
     mostrarInicio();
 }
 
 void MainWindow::setupSidebar() {
-    sidebar = new QFrame(this);
-    sidebar->setObjectName("Sidebar");
-    sidebar->setFixedWidth(250);
-    sidebar->setStyleSheet("#Sidebar { background-color: white; border-right: 1px solid #e0e0e0; }");
+    m_sidebar = new QFrame(this);
+    m_sidebar->setObjectName("Sidebar");
+    m_sidebar->setFixedWidth(250);
+    m_sidebar->setStyleSheet("#Sidebar { background-color: white; border-right: 1px solid #e0e0e0; }");
 
-    QVBoxLayout *sidebarLayout = new QVBoxLayout(sidebar);
+    QVBoxLayout *sidebarLayout = new QVBoxLayout(m_sidebar);
     sidebarLayout->setAlignment(Qt::AlignTop);
     sidebarLayout->setContentsMargins(0, 20, 0, 20);
 
-    QLabel *logoLabel = new QLabel("Liceo Nacional\nRobert Serra", sidebar);
+    QLabel *logoLabel = new QLabel("Liceo Nacional\nRobert Serra", m_sidebar);
     logoLabel->setStyleSheet("font-weight: bold; font-size: 16px; color: #1a237e; border: none; background: transparent; margin-left: 20px;");
 
-    btnInicio = new QPushButton("🏠 Inicio", sidebar);
-    btnDocentes = new QPushButton("🎓 Docentes", sidebar);
-    btnAulas = new QPushButton("🏫 Aulas", sidebar);
-    btnAsignaturas = new QPushButton("📚 Asignaturas", sidebar);
-    btnGeneracion = new QPushButton("📅 Generación de horario", sidebar);
-    btnVisualizacion = new QPushButton("👁️ Visualización de horario", sidebar);
+    m_btnInicio = new QPushButton("🏠 Inicio", m_sidebar);
+    m_btnDocentes = new QPushButton("🎓 Docentes", m_sidebar);
+    m_btnAulas = new QPushButton("🏫 Aulas", m_sidebar);
+    m_btnAsignaturas = new QPushButton("📚 Asignaturas", m_sidebar);
+    m_btnGeneracion = new QPushButton("📅 Generación de horario", m_sidebar);
+    m_btnVisualizacion = new QPushButton("👁️ Visualización de horario", m_sidebar);
 
-    QList<QPushButton*> botones = {btnInicio, btnDocentes, btnAulas, btnAsignaturas, btnGeneracion, btnVisualizacion};
+    QList<QPushButton*> botones = {m_btnInicio, m_btnDocentes, m_btnAulas, m_btnAsignaturas, m_btnGeneracion, m_btnVisualizacion};
     for (auto btn : botones) {
         btn->setCursor(Qt::PointingHandCursor);
         btn->setStyleSheet("text-align: left; padding: 10px 20px; border: none; font-size: 14px; color: #4b5563; background-color: transparent; border-left: 4px solid transparent;");
     }
 
-    QLabel *tituloAcademico = new QLabel("ACADÉMICO", sidebar);
+    QLabel *tituloAcademico = new QLabel("ACADÉMICO", m_sidebar);
     tituloAcademico->setStyleSheet("color: #6b7280; font-size: 11px; font-weight: bold; border: none; background: transparent; margin-left: 20px; margin-top: 15px;");
-    QLabel *tituloHorarios = new QLabel("HORARIOS", sidebar);
+    QLabel *tituloHorarios = new QLabel("HORARIOS", m_sidebar);
     tituloHorarios->setStyleSheet("color: #6b7280; font-size: 11px; font-weight: bold; border: none; background: transparent; margin-left: 20px; margin-top: 15px;");
 
     sidebarLayout->addWidget(logoLabel);
     sidebarLayout->addSpacing(20);
-    sidebarLayout->addWidget(btnInicio);
+    sidebarLayout->addWidget(m_btnInicio);
     sidebarLayout->addWidget(tituloAcademico);
-    sidebarLayout->addWidget(btnDocentes);
-    sidebarLayout->addWidget(btnAulas);
-    sidebarLayout->addWidget(btnAsignaturas);
+    sidebarLayout->addWidget(m_btnDocentes);
+    sidebarLayout->addWidget(m_btnAulas);
+    sidebarLayout->addWidget(m_btnAsignaturas);
     sidebarLayout->addWidget(tituloHorarios);
-    sidebarLayout->addWidget(btnGeneracion);
-    sidebarLayout->addWidget(btnVisualizacion);
+    sidebarLayout->addWidget(m_btnGeneracion);
+    sidebarLayout->addWidget(m_btnVisualizacion);
 }
 
 void MainWindow::setupCentralArea() {
-    rightContainer = new QWidget(this);
-    rightContainer->setObjectName("RightContainer");
-    rightContainer->setStyleSheet("#RightContainer { background: transparent; }");
+    m_rightContainer = new QWidget(this);
+    m_rightContainer->setObjectName("RightContainer");
+    m_rightContainer->setStyleSheet("#RightContainer { background: transparent; }");
 
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightContainer);
+    QVBoxLayout *rightLayout = new QVBoxLayout(m_rightContainer);
     rightLayout->setContentsMargins(0, 0, 0, 0);
     rightLayout->setSpacing(0);
 
@@ -117,30 +117,30 @@ void MainWindow::setupCentralArea() {
     headerLayout->addWidget(userProfile);
 
     // Contenedor de vistas
-    contenedorVistas = new QStackedWidget(this);
+    m_contenedorVistas = new QStackedWidget(this);
 
     // Vista Inicio (Dashboard)
     DashboardWidget *vistaInicio = new DashboardWidget(this);
-    contenedorVistas->addWidget(vistaInicio);
+    m_contenedorVistas->addWidget(vistaInicio);
 
     // Vista Docentes (ya existente)
     TeacherListWidget *vistaDocentes = new TeacherListWidget(this);
-    contenedorVistas->addWidget(vistaDocentes);
+    m_contenedorVistas->addWidget(vistaDocentes);
 
     // Otras vistas placeholder
-    contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Aulas", this));
-    contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Asignaturas", this));
-    contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
-    contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
+    m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Aulas", this));
+    m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Asignaturas", this));
+    m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
+    m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
 
     rightLayout->addWidget(topHeader);
-    rightLayout->addWidget(contenedorVistas);
+    rightLayout->addWidget(m_contenedorVistas);
 }
 
 void MainWindow::mostrarInicio() {
-    contenedorVistas->setCurrentIndex(0);
+    m_contenedorVistas->setCurrentIndex(0);
     configurarEstilosMenu();
-    btnInicio->setStyleSheet(
+    m_btnInicio->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -148,9 +148,9 @@ void MainWindow::mostrarInicio() {
 }
 
 void MainWindow::mostrarDocentes() {
-    contenedorVistas->setCurrentIndex(1);
+    m_contenedorVistas->setCurrentIndex(1);
     configurarEstilosMenu();
-    btnDocentes->setStyleSheet(
+    m_btnDocentes->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -158,9 +158,9 @@ void MainWindow::mostrarDocentes() {
 }
 
 void MainWindow::mostrarAulas() {
-    contenedorVistas->setCurrentIndex(2);
+    m_contenedorVistas->setCurrentIndex(2);
     configurarEstilosMenu();
-    btnAulas->setStyleSheet(
+    m_btnAulas->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -168,9 +168,9 @@ void MainWindow::mostrarAulas() {
 }
 
 void MainWindow::mostrarAsignaturas() {
-    contenedorVistas->setCurrentIndex(3);
+    m_contenedorVistas->setCurrentIndex(3);
     configurarEstilosMenu();
-    btnAsignaturas->setStyleSheet(
+    m_btnAsignaturas->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -178,9 +178,9 @@ void MainWindow::mostrarAsignaturas() {
 }
 
 void MainWindow::mostrarGeneracion() {
-    contenedorVistas->setCurrentIndex(4);
+    m_contenedorVistas->setCurrentIndex(4);
     configurarEstilosMenu();
-    btnGeneracion->setStyleSheet(
+    m_btnGeneracion->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -188,9 +188,9 @@ void MainWindow::mostrarGeneracion() {
 }
 
 void MainWindow::mostrarVisualizacion() {
-    contenedorVistas->setCurrentIndex(5);
+    m_contenedorVistas->setCurrentIndex(5);
     configurarEstilosMenu();
-    btnVisualizacion->setStyleSheet(
+    m_btnVisualizacion->setStyleSheet(
         "text-align: left; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "background-color: #e8eaf6; color: #1a237e;"
         "border: none; border-left: 4px solid #1a237e;"
@@ -199,10 +199,10 @@ void MainWindow::mostrarVisualizacion() {
 
 void MainWindow::configurarEstilosMenu() {
     QString estiloInactivo = "text-align: left; padding: 10px 20px; border: none; font-size: 14px; color: #4b5563; background-color: transparent; border-left: 4px solid transparent;";
-    btnInicio->setStyleSheet(estiloInactivo);
-    btnDocentes->setStyleSheet(estiloInactivo);
-    btnAulas->setStyleSheet(estiloInactivo);
-    btnAsignaturas->setStyleSheet(estiloInactivo);
-    btnGeneracion->setStyleSheet(estiloInactivo);
-    btnVisualizacion->setStyleSheet(estiloInactivo);
+    m_btnInicio->setStyleSheet(estiloInactivo);
+    m_btnDocentes->setStyleSheet(estiloInactivo);
+    m_btnAulas->setStyleSheet(estiloInactivo);
+    m_btnAsignaturas->setStyleSheet(estiloInactivo);
+    m_btnGeneracion->setStyleSheet(estiloInactivo);
+    m_btnVisualizacion->setStyleSheet(estiloInactivo);
 }

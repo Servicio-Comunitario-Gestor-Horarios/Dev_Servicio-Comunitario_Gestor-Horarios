@@ -1,5 +1,9 @@
-#ifndef VIEW_PLACEHOLDER_HPP
-#define VIEW_PLACEHOLDER_HPP
+/**
+ * @file view_placeholder.hpp
+ * @brief Widget de placeholder para vistas pendientes
+ */
+
+#pragma once
 
 #include <QWidget>
 #include <QLabel>
@@ -11,5 +15,3 @@ class ViewPlaceholder : public QWidget
 public:
     explicit ViewPlaceholder(const QString &title, QWidget *parent = nullptr);
 };
-
-#endif // VIEW_PLACEHOLDER_HPP

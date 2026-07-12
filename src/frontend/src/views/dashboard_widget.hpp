@@ -1,5 +1,9 @@
-#ifndef DASHBOARD_WIDGET_HPP
-#define DASHBOARD_WIDGET_HPP
+/**
+ * @file dashboard_widget.hpp
+ * @brief Widget del panel principal del dashboard
+ */
+
+#pragma once
 
 #include <QWidget>
 #include <QLabel>
@@ -25,8 +29,6 @@ private:
     QWidget* crearPanelGeneracion();
     QWidget* crearPanelNotificaciones();
 
-    QPushButton *btnVerDetalles;
-    QPushButton *btnResolverConflictos;
+    QPushButton *m_btnVerDetalles;
+    QPushButton *m_btnResolverConflictos;
 };
-
-#endif // DASHBOARD_WIDGET_HPP

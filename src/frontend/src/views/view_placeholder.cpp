@@ -1,3 +1,8 @@
+/**
+ * @file view_placeholder.cpp
+ * @brief Implementación del widget de placeholder para vistas pendientes
+ */
+
 #include "view_placeholder.hpp"
 
 ViewPlaceholder::ViewPlaceholder(const QString &title, QWidget *parent)

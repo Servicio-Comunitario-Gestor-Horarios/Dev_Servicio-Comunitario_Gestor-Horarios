@@ -1,5 +1,4 @@
-#ifndef MAIN_WINDOW_HPP
-#define MAIN_WINDOW_HPP
+#pragma once
 
 #include <QMainWindow>
 #include <QStackedWidget>
@@ -26,15 +25,13 @@ private:
     void setupSidebar();
     void setupCentralArea();
 
-    QStackedWidget *contenedorVistas;
-    QPushButton *btnInicio;
-    QPushButton *btnDocentes;
-    QPushButton *btnAulas;
-    QPushButton *btnAsignaturas;
-    QPushButton *btnGeneracion;
-    QPushButton *btnVisualizacion;
-    QFrame *sidebar;
-    QWidget *rightContainer;
+    QStackedWidget *m_contenedorVistas;
+    QPushButton *m_btnInicio;
+    QPushButton *m_btnDocentes;
+    QPushButton *m_btnAulas;
+    QPushButton *m_btnAsignaturas;
+    QPushButton *m_btnGeneracion;
+    QPushButton *m_btnVisualizacion;
+    QFrame *m_sidebar;
+    QWidget *m_rightContainer;
 };
-
-#endif // MAIN_WINDOW_HPP
