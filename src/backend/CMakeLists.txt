@@ -64,3 +64,44 @@ target_link_libraries(backend PUBLIC
     Qt6::Sql
 
 )
+
+add_library(backend STATIC)
+
+target_sources(backend PRIVATE
+    # Data structs
+    src/data/aula.cpp
+    src/data/franja_horaria.cpp
+    src/data/horario.cpp
+    src/data/materia.cpp
+    src/data/plan_estudio.cpp
+    src/data/profesor.cpp
+
+    # Database
+    src/database/DatabaseManager.cpp
+    src/database/migracion.cpp
+
+    # Services - Issue #23 (Aulas)
+    src/services/ServicioAula.cpp
+
+    # Services - Issue #21 (Materias - usando tablas existentes)
+    src/services/ServicioMaterias.cpp
+    src/services/ServicioPlanesEstudio.cpp
+    src/services/ServicioCargaHoraria.cpp
+    src/services/ServicioComposicionPlan.cpp
+)
+
+target_include_directories(backend PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_include_directories(backend PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(backend PUBLIC
+    ortools::ortools
+    Qt6::Core
+    Qt6::Sql
+)
+
+set_project_warnings(backend)

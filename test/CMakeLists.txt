@@ -107,3 +107,43 @@ add_qtest(test_middleware_health_check
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================
 # add_gtest(test_backend_solver test/backend/test_solver.cpp backend)
+
+
+
+# Tests para servicios del backend
+add_executable(backend-tests)
+
+target_sources(backend-tests PRIVATE
+    test_servicio_aula.cpp
+    test_servicio_materias.cpp
+    test_servicio_planes_estudio.cpp
+    test_servicio_carga_horaria.cpp
+    test_composicion_plan.cpp
+)
+
+target_include_directories(backend-tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/backend/include
+    ${CMAKE_SOURCE_DIR}/src/backend/src
+)
+
+target_link_libraries(backend-tests PRIVATE
+    backend
+    Qt6::Core
+    Qt6::Sql
+    Qt6::Test
+)
+
+set_target_properties(backend-tests PROPERTIES
+    AUTOMOC ON
+    AUTOUIC ON
+)
+
+add_test(NAME backend-tests COMMAND backend-tests)
+
+
+if(BUILD_BACKEND)
+    add_subdirectory(backend)
+endif()
+
+# Tests existentes para middleware y database
+# ... (mantener los existentes)
