@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlQuery>
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
@@ -154,6 +155,17 @@ private slots:
     void eliminarPlan_inexistente_falla() {
         bool eliminado = m_servicio->eliminarPlan("PLAN-999");
         QVERIFY(!eliminado);
+    }
+
+    void eliminarPlan_codigoVacio_falla() {
+        bool eliminado = m_servicio->eliminarPlan("");
+        QVERIFY(!eliminado);
+    }
+
+    void obtenerPlan_codigoLargo_falla() {
+        QString codigoLargo(21, 'X');
+        auto resultado = m_servicio->obtenerPlan(codigoLargo);
+        QVERIFY(!resultado.ok);
     }
 
 private:

@@ -5,6 +5,7 @@
  * @brief Servicio para gestión de materias (tabla Materias existente).
  */
 
+#include <QSqlDatabase>
 #include <QVector>
 #include <backend/resultado.hpp>
 #include <backend/data/materia.hpp>

@@ -59,6 +59,14 @@ Resultado<MateriaDTO> ServicioMaterias::crearMateria(const QString& nombre, cons
         return Resultado<MateriaDTO>::error(error);
     }
 
+    // Verificar duplicado antes de INSERT (schema no tiene UNIQUE en nombre)
+    QSqlQuery checkQuery(m_db);
+    checkQuery.prepare("SELECT id FROM Materias WHERE nombre = :nombre");
+    checkQuery.bindValue(":nombre", nombre.trimmed());
+    if (checkQuery.exec() && checkQuery.next()) {
+        return Resultado<MateriaDTO>::error("Ya existe una materia con ese nombre.", -2);
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "INSERT INTO Materias (nombre, requisitos) "

@@ -201,6 +201,33 @@ private slots:
         QVERIFY(excede3);
     }
 
+    void asignarCarga_horasNegativas_falla() {
+        auto resultado = m_servicioCarga->asignarCarga("PLAN-TEST", 1, 1, -5);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("mayores a 0"));
+    }
+
+    void asignarCarga_planVacio_falla() {
+        auto resultado = m_servicioCarga->asignarCarga("", 1, 1, 4);
+        QVERIFY(!resultado.ok);
+    }
+
+    void asignarCarga_materiaIdCero_falla() {
+        auto resultado = m_servicioCarga->asignarCarga("PLAN-TEST", 0, 1, 4);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("inválido"));
+    }
+
+    void eliminarCarga_planVacio_falla() {
+        bool eliminado = m_servicioCarga->eliminarCarga(1, "");
+        QVERIFY(!eliminado);
+    }
+
+    void eliminarCarga_materiaIdCero_falla() {
+        bool eliminado = m_servicioCarga->eliminarCarga(0, "PLAN-TEST");
+        QVERIFY(!eliminado);
+    }
+
 private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;

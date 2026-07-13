@@ -5,6 +5,7 @@
  * @brief Servicio para gestión de carga horaria de planes (tabla PlanEstudio_Materia existente).
  */
 
+#include <QSqlDatabase>
 #include <QVector>
 #include <backend/resultado.hpp>
 

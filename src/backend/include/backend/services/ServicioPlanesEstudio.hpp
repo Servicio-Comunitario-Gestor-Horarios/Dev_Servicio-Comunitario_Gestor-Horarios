@@ -5,6 +5,7 @@
  * @brief Servicio para gestión de planes de estudio (tabla PlanEstudio existente).
  */
 
+#include <QSqlDatabase>
 #include <QVector>
 #include <backend/resultado.hpp>
 

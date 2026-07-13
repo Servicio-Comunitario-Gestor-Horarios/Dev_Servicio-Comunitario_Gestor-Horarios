@@ -169,6 +169,26 @@ private slots:
         QCOMPARE(resultado.valor.capacidad, 25);
     }
 
+    void obtenerAula_idCero_falla() {
+        auto resultado = m_servicio->obtenerAula(0);
+        QVERIFY(!resultado.ok);
+    }
+
+    void obtenerAula_idNegativo_falla() {
+        auto resultado = m_servicio->obtenerAula(-5);
+        QVERIFY(!resultado.ok);
+    }
+
+    void eliminarAula_idCero_falla() {
+        bool eliminado = m_servicio->eliminarAula(0);
+        QVERIFY(!eliminado);
+    }
+
+    void eliminarAula_idNegativo_falla() {
+        bool eliminado = m_servicio->eliminarAula(-1);
+        QVERIFY(!eliminado);
+    }
+
 private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;

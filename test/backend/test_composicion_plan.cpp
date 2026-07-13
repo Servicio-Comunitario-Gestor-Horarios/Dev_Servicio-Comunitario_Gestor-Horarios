@@ -161,6 +161,20 @@ private slots:
         QVERIFY(!planes.isEmpty());
     }
 
+    void componerPlanCompleto_planSinMaterias_falla() {
+        // Crear un plan sin materias
+        m_servicioPlanes->crearPlan("PLAN-VACIO", "Plan Vacío");
+
+        auto resultado = m_servicioComposicion->componerPlanCompleto("PLAN-VACIO");
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("no tiene materias asignadas"));
+    }
+
+    void obtenerMateriasConCarga_codigoConEspacios() {
+        auto materias = m_servicioComposicion->obtenerMateriasConCarga("  ");
+        QVERIFY(materias.isEmpty());
+    }
+
 private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;

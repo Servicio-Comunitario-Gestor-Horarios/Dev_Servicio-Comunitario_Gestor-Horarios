@@ -5,6 +5,7 @@
  * @brief Servicio para gestión de aulas.
  */
 
+#include <QSqlDatabase>
 #include <QVector>
 #include <backend/resultado.hpp>
 #include <backend/data/aula.hpp>

@@ -172,6 +172,26 @@ private slots:
         QVERIFY(materia.requerimientos.isEmpty());
     }
 
+    void obtenerMateria_idCero_falla() {
+        auto resultado = m_servicio->obtenerMateria(0);
+        QVERIFY(!resultado.ok);
+    }
+
+    void obtenerMateria_idNegativo_falla() {
+        auto resultado = m_servicio->obtenerMateria(-3);
+        QVERIFY(!resultado.ok);
+    }
+
+    void eliminarMateria_idCero_falla() {
+        bool eliminado = m_servicio->eliminarMateria(0);
+        QVERIFY(!eliminado);
+    }
+
+    void eliminarMateria_idNegativo_falla() {
+        bool eliminado = m_servicio->eliminarMateria(-1);
+        QVERIFY(!eliminado);
+    }
+
 private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;

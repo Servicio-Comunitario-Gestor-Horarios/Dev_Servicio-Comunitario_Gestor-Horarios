@@ -111,39 +111,32 @@ add_qtest(test_middleware_health_check
 
 
 # Tests para servicios del backend
-add_executable(backend-tests)
-
-target_sources(backend-tests PRIVATE
-    test_servicio_aula.cpp
-    test_servicio_materias.cpp
-    test_servicio_planes_estudio.cpp
-    test_servicio_carga_horaria.cpp
-    test_composicion_plan.cpp
-)
-
-target_include_directories(backend-tests PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/backend/include
-    ${CMAKE_SOURCE_DIR}/src/backend/src
-)
-
-target_link_libraries(backend-tests PRIVATE
+add_qtest(test_servicio_aula
+    backend/test_servicio_aula.cpp
     backend
-    Qt6::Core
     Qt6::Sql
-    Qt6::Test
 )
 
-set_target_properties(backend-tests PROPERTIES
-    AUTOMOC ON
-    AUTOUIC ON
+add_qtest(test_servicio_materias
+    backend/test_servicio_materias.cpp
+    backend
+    Qt6::Sql
 )
 
-add_test(NAME backend-tests COMMAND backend-tests)
+add_qtest(test_servicio_planes_estudio
+    backend/test_servicio_planes_estudio.cpp
+    backend
+    Qt6::Sql
+)
 
+add_qtest(test_servicio_carga_horaria
+    backend/test_servicio_carga_horaria.cpp
+    backend
+    Qt6::Sql
+)
 
-if(BUILD_BACKEND)
-    add_subdirectory(backend)
-endif()
-
-# Tests existentes para middleware y database
-# ... (mantener los existentes)
+add_qtest(test_composicion_plan
+    backend/test_composicion_plan.cpp
+    backend
+    Qt6::Sql
+)

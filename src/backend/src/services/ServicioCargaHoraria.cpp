@@ -70,8 +70,8 @@ CargaHorariaDTO ServicioCargaHoraria::mapearARecord(const QSqlRecord& record) co
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
 Resultado<CargaHorariaDTO> ServicioCargaHoraria::asignarCarga(const QString& codigoPlan,
-                                                              int idMateria, int curso,
-                                                              int horas) {
+                                                               int idMateria, int curso,
+                                                               int horas) {
     QString error;
     if (!validarCarga(codigoPlan, idMateria, curso, horas, error)) {
         return Resultado<CargaHorariaDTO>::error(error);
@@ -101,6 +101,11 @@ Resultado<CargaHorariaDTO> ServicioCargaHoraria::asignarCarga(const QString& cod
         );
     }
 
+    if (!m_db.transaction()) {
+        qCritical() << "Error al iniciar transacción:" << m_db.lastError().text();
+        return Resultado<CargaHorariaDTO>::error("Error al iniciar la transacción.");
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "INSERT INTO PlanEstudio_Materia (codigo_PlanEstudio, id_Materia, curso, horas) "
@@ -113,7 +118,14 @@ Resultado<CargaHorariaDTO> ServicioCargaHoraria::asignarCarga(const QString& cod
 
     if (!query.exec()) {
         qCritical() << "Error al asignar carga:" << query.lastError().text();
+        m_db.rollback();
         return Resultado<CargaHorariaDTO>::error("Error al guardar la carga en la base de datos.");
+    }
+
+    if (!m_db.commit()) {
+        qCritical() << "Error al confirmar transacción:" << m_db.lastError().text();
+        m_db.rollback();
+        return Resultado<CargaHorariaDTO>::error("Error al confirmar la transacción.");
     }
 
     return obtenerCarga(idMateria, codigoPlan);
@@ -182,8 +194,8 @@ QVector<CargaHorariaDTO> ServicioCargaHoraria::listarCargaPorPlan(const QString&
 }
 
 Resultado<CargaHorariaDTO> ServicioCargaHoraria::actualizarCarga(int idMateria,
-                                                                 const QString& codigoPlan,
-                                                                 int horas) {
+                                                                  const QString& codigoPlan,
+                                                                  int horas) {
     if (idMateria <= 0) {
         return Resultado<CargaHorariaDTO>::error("ID de materia inválido.");
     }
@@ -213,6 +225,11 @@ Resultado<CargaHorariaDTO> ServicioCargaHoraria::actualizarCarga(int idMateria,
         );
     }
 
+    if (!m_db.transaction()) {
+        qCritical() << "Error al iniciar transacción:" << m_db.lastError().text();
+        return Resultado<CargaHorariaDTO>::error("Error al iniciar la transacción.");
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "UPDATE PlanEstudio_Materia SET "
@@ -226,13 +243,21 @@ Resultado<CargaHorariaDTO> ServicioCargaHoraria::actualizarCarga(int idMateria,
 
     if (!query.exec()) {
         qCritical() << "Error al actualizar carga:" << query.lastError().text();
+        m_db.rollback();
         return Resultado<CargaHorariaDTO>::error("Error al actualizar la carga en la base de datos.");
     }
 
     if (query.numRowsAffected() == 0) {
+        m_db.rollback();
         return Resultado<CargaHorariaDTO>::error(
             "No se encontró la materia en el plan especificado.", -3
         );
+    }
+
+    if (!m_db.commit()) {
+        qCritical() << "Error al confirmar transacción:" << m_db.lastError().text();
+        m_db.rollback();
+        return Resultado<CargaHorariaDTO>::error("Error al confirmar la transacción.");
     }
 
     return obtenerCarga(idMateria, codigoPlan);

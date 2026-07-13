@@ -65,7 +65,7 @@ QVector<MateriaEnPlan> ServicioComposicionPlan::obtenerMateriasConCarga(const QS
 
     QSqlQuery query(m_db);
     query.prepare(
-        "SELECT pm.id_Materia, pm.curso, pm.horas, m.nombre "
+        "SELECT pm.id_Materia, pm.curso, pm.horas, m.nombre, m.requisitos "
         "FROM PlanEstudio_Materia pm "
         "JOIN Materias m ON pm.id_Materia = m.id "
         "WHERE pm.codigo_PlanEstudio = :codigoPlan "
@@ -83,11 +83,19 @@ QVector<MateriaEnPlan> ServicioComposicionPlan::obtenerMateriasConCarga(const QS
         item.curso = query.value("curso").toInt();
         item.horas = query.value("horas").toInt();
 
-        // Construir Materia struct del solver
         Materia materia;
         materia.nombre = query.value("nombre").toString();
         materia.horas_semanales = item.horas;
-        materia.requerimientos = obtenerRequisitos(query.value("id_Materia").toInt());
+
+        QString reqText = query.value("requisitos").toString();
+        if (!reqText.isEmpty()) {
+            for (const QString& req : reqText.split(',')) {
+                QString trimmed = req.trimmed();
+                if (!trimmed.isEmpty()) {
+                    materia.requerimientos.append(trimmed);
+                }
+            }
+        }
 
         item.materia = materia;
         resultado.append(item);

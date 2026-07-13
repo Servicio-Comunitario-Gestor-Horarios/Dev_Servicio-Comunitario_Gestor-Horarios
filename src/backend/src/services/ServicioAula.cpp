@@ -60,6 +60,14 @@ Resultado<AulaDTO> ServicioAula::crearAula(const QString& nombre, int capacidad,
         return Resultado<AulaDTO>::error(error);
     }
 
+    // Verificar duplicado antes de INSERT (schema no tiene UNIQUE en nombre)
+    QSqlQuery checkQuery(m_db);
+    checkQuery.prepare("SELECT id FROM Aulas WHERE nombre = :nombre");
+    checkQuery.bindValue(":nombre", nombre.trimmed());
+    if (checkQuery.exec() && checkQuery.next()) {
+        return Resultado<AulaDTO>::error("Ya existe un aula con ese nombre.", -2);
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "INSERT INTO Aulas (nombre, capacidad, edificio, piso) "

@@ -5,6 +5,7 @@
  * @brief Servicio para ensamblar planes de estudio para el solver usando tablas existentes.
  */
 
+#include <QSqlDatabase>
 #include <backend/resultado.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/data/materia.hpp>
