@@ -13,23 +13,26 @@
 add_library(backend STATIC)
 
 target_sources(backend PRIVATE
+    # Data structs
     src/data/aula.cpp
     src/data/franja_horaria.cpp
     src/data/horario.cpp
     src/data/materia.cpp
     src/data/plan_estudio.cpp
     src/data/profesor.cpp
-    # TODO: Agregar fuentes reales:
-    # src/data/schedule.cpp
-    # src/data/teacher.cpp
-    # src/data/classroom.cpp
-    # src/data/subject.cpp
-    # src/solver/core/model.cpp
-    # src/solver/constraints/hard_constraints.cpp
-    # src/solver/constraints/soft_constraints.cpp
-    # src/services/generation_service.cpp
-    # src/services/export_service.cpp
-    # src/database/schema.cpp
+
+    # Database
+    src/database/DatabaseManager.cpp
+    src/database/migracion.cpp
+
+    # Services - Issue #23 (Aulas)
+    src/services/ServicioAula.cpp
+
+    # Services - Issue #21 (Materias - usando tablas existentes)
+    src/services/ServicioMaterias.cpp
+    src/services/ServicioPlanesEstudio.cpp
+    src/services/ServicioCargaHoraria.cpp
+    src/services/ServicioComposicionPlan.cpp
 )
 
 target_include_directories(backend PUBLIC
@@ -43,24 +46,7 @@ target_include_directories(backend PRIVATE
 target_link_libraries(backend PUBLIC
     ortools::ortools
     Qt6::Core
+    Qt6::Sql
 )
 
 set_project_warnings(backend)
-
-target_sources(backend PRIVATE
-
-    src/data/backend_placeholder.cpp
-
-    src/database/DatabaseManager.cpp
-
-    src/database/migracion.cpp
-
-)
-
-target_link_libraries(backend PUBLIC
-
-    ortools::ortools
-
-    Qt6::Sql
-
-)

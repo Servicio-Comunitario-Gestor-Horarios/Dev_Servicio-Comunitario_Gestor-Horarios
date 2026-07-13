@@ -107,3 +107,36 @@ add_qtest(test_middleware_health_check
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================
 # add_gtest(test_backend_solver test/backend/test_solver.cpp backend)
+
+
+
+# Tests para servicios del backend
+add_qtest(test_servicio_aula
+    backend/test_servicio_aula.cpp
+    backend
+    Qt6::Sql
+)
+
+add_qtest(test_servicio_materias
+    backend/test_servicio_materias.cpp
+    backend
+    Qt6::Sql
+)
+
+add_qtest(test_servicio_planes_estudio
+    backend/test_servicio_planes_estudio.cpp
+    backend
+    Qt6::Sql
+)
+
+add_qtest(test_servicio_carga_horaria
+    backend/test_servicio_carga_horaria.cpp
+    backend
+    Qt6::Sql
+)
+
+add_qtest(test_composicion_plan
+    backend/test_composicion_plan.cpp
+    backend
+    Qt6::Sql
+)
