@@ -1,8 +1,9 @@
-#ifndef MAIN_WINDOW_HPP
-#define MAIN_WINDOW_HPP
+#pragma once
 
 #include <QMainWindow>
 #include <QStackedWidget>
+#include <QPushButton>
+#include <QFrame>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -12,15 +13,25 @@ public:
     ~MainWindow() override = default;
 
 private slots:
-    void on_action_salir();
-    void on_action_acerca_de();
+    void mostrarInicio();
+    void mostrarDocentes();
+    void mostrarAulas();
+    void mostrarAsignaturas();
+    void mostrarGeneracion();
+    void mostrarVisualizacion();
 
 private:
-    QStackedWidget *m_central_stack;
+    void configurarEstilosMenu();
+    void setupSidebar();
+    void setupCentralArea();
 
-    void setup_menu_bar();
-    void setup_toolbar();
-    void setup_status_bar();
+    QStackedWidget *m_contenedorVistas;
+    QPushButton *m_btnInicio;
+    QPushButton *m_btnDocentes;
+    QPushButton *m_btnAulas;
+    QPushButton *m_btnAsignaturas;
+    QPushButton *m_btnGeneracion;
+    QPushButton *m_btnVisualizacion;
+    QFrame *m_sidebar;
+    QWidget *m_rightContainer;
 };
-
-#endif // MAIN_WINDOW_HPP
