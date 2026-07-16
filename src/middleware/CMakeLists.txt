@@ -1,39 +1,24 @@
-# src/middleware/CMakeLists.txt
-# ===
-# Módulo middleware: capa de comunicación entre frontend y backend.
-# Traduce peticiones de la UI en llamadas al backend y viceversa.
-# También maneja validación de datos, transformación de formatos,
-# y orquestación de flujos de trabajo.
-#
-# API pública → include/middleware/ (mensajes IPC, tipos compartidos)
-# Implementación → src/ (servidor IPC, cliente, validación)
-#
-# Dependencias externas:
-#   - (ninguna por ahora — solo STL + Qt Core para IPC)
-#
-# Nota: middleware NO linkea frontend ni backend directamente.
-#   app (el ejecutable) es quien conecta todo.
+# Configuración del proyecto para el módulo común
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
-add_library(middleware STATIC)
-
-target_sources(middleware PRIVATE
-    src/server/middleware_placeholder.cpp
-    # TODO: Reemplazar placeholder por fuentes reales:
-    # src/server/ipc_server.cpp
-    # src/client/ipc_client.cpp
-    # src/validation/data_validator.cpp
+# Definición de la librería estática 'common'
+add_library(common STATIC
+    internalserver.cpp
+    internalserver.h
+    messages.h
 )
 
-target_include_directories(middleware PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+# Inclusión de directorios para que encuentre los archivos .h
+# Se incluye el directorio actual y el padre para acceder a la carpeta backend
+target_include_directories(common PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
 )
 
-target_include_directories(middleware PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
+# Búsqueda de los componentes necesarios de Qt
+find_package(Qt6 COMPONENTS Core Network REQUIRED)
 
-target_link_libraries(middleware PUBLIC
-    Qt6::Core
-)
-
-set_project_warnings(middleware)
+# Enlace con las librerías de Qt
+target_link_libraries(common PUBLIC Qt6::Core Qt6::Network)
