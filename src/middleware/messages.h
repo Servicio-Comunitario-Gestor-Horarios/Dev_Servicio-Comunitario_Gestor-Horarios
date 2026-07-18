@@ -4,33 +4,35 @@
 #include <QString>
 
 namespace Middleware {
+
 // --- CRUD Materias ---
-inline const QString OP_LISTA_MATERIAS = "subject_list";
-inline const QString OP_OBTENER_MATERIA = "subject_get";
-inline const QString OP_CREAR_MATERIA = "subject_create";
-inline const QString OP_ACTUALIZAR_MATERIA = "subject_update";
-inline const QString OP_ELIMINAR_MATERIA = "subject_delete";
+inline constexpr auto OP_LISTA_MATERIAS = QStringLiteral("subject_list");
+inline constexpr auto OP_OBTENER_MATERIA = QStringLiteral("subject_get");
+inline constexpr auto OP_CREAR_MATERIA = QStringLiteral("subject_create");
+inline constexpr auto OP_ACTUALIZAR_MATERIA = QStringLiteral("subject_update");
+inline constexpr auto OP_ELIMINAR_MATERIA = QStringLiteral("subject_delete");
 
 // --- CRUD Aulas ---
-inline const QString OP_LISTA_AULAS = "classroom_list";
-inline const QString OP_OBTENER_AULA = "classroom_get";
-inline const QString OP_CREAR_AULA = "classroom_create";
-inline const QString OP_ACTUALIZAR_AULA = "classroom_update";
-inline const QString OP_ELIMINAR_AULA = "classroom_delete";
+inline constexpr auto OP_LISTA_AULAS = QStringLiteral("classroom_list");
+inline constexpr auto OP_OBTENER_AULA = QStringLiteral("classroom_get");
+inline constexpr auto OP_CREAR_AULA = QStringLiteral("classroom_create");
+inline constexpr auto OP_ACTUALIZAR_AULA = QStringLiteral("classroom_update");
+inline constexpr auto OP_ELIMINAR_AULA = QStringLiteral("classroom_delete");
 
 // --- CRUD Planes de Estudio ---
-inline const QString OP_LISTA_PLANES = "plan_list";
-inline const QString OP_OBTENER_PLAN = "plan_get";
-inline const QString OP_CREAR_PLAN = "plan_create";
-inline const QString OP_ACTUALIZAR_PLAN = "plan_update";
-inline const QString OP_ELIMINAR_PLAN = "plan_delete";
+inline constexpr auto OP_LISTA_PLANES = QStringLiteral("plan_list");
+inline constexpr auto OP_OBTENER_PLAN = QStringLiteral("plan_get");
+inline constexpr auto OP_CREAR_PLAN = QStringLiteral("plan_create");
+inline constexpr auto OP_ACTUALIZAR_PLAN = QStringLiteral("plan_update");
+inline constexpr auto OP_ELIMINAR_PLAN = QStringLiteral("plan_delete");
 
 // --- Carga Horaria ---
-inline const QString OP_ASIGNAR_CARGA = "load_assign";
-inline const QString OP_ACTUALIZAR_CARGA = "load_update";
-inline const QString OP_ELIMINAR_CARGA = "load_delete";
-inline const QString OP_LISTAR_CARGA_PLAN = "load_list_by_plan";
-inline const QString OP_OBTENER_COMPOSICION_PLAN = "plan_composition";
-}
+inline constexpr auto OP_ASIGNAR_CARGA = QStringLiteral("load_assign");
+inline constexpr auto OP_ACTUALIZAR_CARGA = QStringLiteral("load_update");
+inline constexpr auto OP_ELIMINAR_CARGA = QStringLiteral("load_delete");
+inline constexpr auto OP_LISTAR_CARGA_PLAN = QStringLiteral("load_list_by_plan");
+inline constexpr auto OP_OBTENER_COMPOSICION_PLAN = QStringLiteral("plan_composition");
+
+} // namespace Middleware
 
 #endif // MESSAGES_H
