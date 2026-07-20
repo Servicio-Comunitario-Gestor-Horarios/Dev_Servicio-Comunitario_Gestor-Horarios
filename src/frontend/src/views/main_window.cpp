@@ -11,6 +11,7 @@
 
 #include "main_window.hpp"
 #include "teacher_list_widget.hpp"
+#include "subject_list_widget.hpp"
 #include "dashboard_widget.hpp"
 #include "view_placeholder.hpp"
 #include <QHBoxLayout>
@@ -116,21 +117,24 @@ void MainWindow::setupCentralArea() {
     headerLayout->addStretch();
     headerLayout->addWidget(userProfile);
 
-    // Contenedor de vistas
     m_contenedorVistas = new QStackedWidget(this);
 
-    // Vista Inicio (Dashboard)
-    DashboardWidget *vistaInicio = new DashboardWidget(this);
-    m_contenedorVistas->addWidget(vistaInicio);
+    // Índice 0: Dashboard
+    m_contenedorVistas->addWidget(new DashboardWidget(this));
 
-    // Vista Docentes (ya existente)
-    TeacherListWidget *vistaDocentes = new TeacherListWidget(this);
-    m_contenedorVistas->addWidget(vistaDocentes);
+    // Índice 1: Docentes
+    m_contenedorVistas->addWidget(new TeacherListWidget(this));
 
-    // Otras vistas placeholder
+    // Índice 2: Aulas (placeholder)
     m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Aulas", this));
-    m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Asignaturas", this));
+
+    // Índice 3: Asignaturas (AHORA SÍ)
+    m_contenedorVistas->addWidget(new SubjectListWidget(this));
+
+    // Índice 4: Generación de horarios
     m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
+
+    // Índice 5: Visualización de horarios
     m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
 
     rightLayout->addWidget(topHeader);

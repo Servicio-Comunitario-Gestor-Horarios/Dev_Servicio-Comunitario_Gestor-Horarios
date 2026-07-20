@@ -4,10 +4,7 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QFormLayout>
 #include <QRegularExpressionValidator>
-#include <QMessageBox>
-#include <QString>
 
 namespace gestor::frontend::forms {
 
@@ -18,22 +15,26 @@ public:
     explicit TeacherFormDialog(QWidget *parent = nullptr);
     ~TeacherFormDialog() override = default;
 
-    void cargarDatos(const QString& id, const QString& nombre, const QString& email, const QString& telefono, const QString& materias);
+    void cargarDatos(const QString& cedula, const QString& id,
+                     const QString& nombre, const QString& email,
+                     const QString& telefono);
 
 signals:
-    void profesorGuardado(const QString& id, const QString& nombre, const QString& email, const QString& telefono, const QString& materias);
+    void profesorGuardado(const QString& cedula, const QString& id,
+                          const QString& nombre, const QString& email,
+                          const QString& telefono);
 
 private slots:
     void guardarProfesor();
 
 private:
-    void configurarValidadores();
+    bool validarCampos();
 
+    QLineEdit *campoCedula;
     QLineEdit *campoId;
     QLineEdit *campoNombre;
     QLineEdit *campoEmail;
     QLineEdit *campoTelefono;
-    QLineEdit *campoMaterias;
     QPushButton *botonGuardar;
     QPushButton *botonCancelar;
 };
