@@ -129,7 +129,7 @@ void MainWindow::setupCentralArea() {
     m_contenedorVistas->addWidget(vistaDocentes);
 
     // Otras vistas placeholder
-    m_contenedorVistas->addWidget(new gestor::frontend::views::ClassroomListWidget(this));
+    m_contenedorVistas->addWidget(new ClassroomListWidget(this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Asignaturas", this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));

@@ -17,8 +17,6 @@
 #include <QMessageBox>
 #include <QFrame>
 
-namespace gestor::frontend::views {
-
 ClassroomListWidget::ClassroomListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
 }
@@ -139,8 +137,8 @@ void ClassroomListWidget::setupUi() {
 }
 
 void ClassroomListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::ClassroomFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
+    ClassroomFormDialog dialogo(this);
+    connect(&dialogo, &ClassroomFormDialog::aulaGuardada,
             this, &ClassroomListWidget::agregarAulaATabla);
     dialogo.exec();
 }
@@ -212,11 +210,11 @@ void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad
             QString vEdificio = m_table->item(filaEditar, 2)->text();
             QString vPiso = m_table->item(filaEditar, 3)->text();
 
-            gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+            ClassroomFormDialog dialogo(this);
             dialogo.setWindowTitle("Editar Aula");
             dialogo.cargarDatos(vNombre, vCapacidad, vEdificio, vPiso);
 
-            connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
+            connect(&dialogo, &ClassroomFormDialog::aulaGuardada,
                     this, [this, filaEditar](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
                         m_table->item(filaEditar, 0)->setText(nNombre);
                         m_table->item(filaEditar, 1)->setText(QString::number(nCapacidad));
@@ -226,6 +224,4 @@ void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad
             dialogo.exec();
         }
     });
-}
-
 }

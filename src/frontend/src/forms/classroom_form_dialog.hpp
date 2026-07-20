@@ -6,8 +6,7 @@
  * Descripción:    Cabecera del formulario de registro y edición de aulas.
  ******************************************************************************/
 
-#ifndef CLASSROOM_FORM_DIALOG_H
-#define CLASSROOM_FORM_DIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QLineEdit>
@@ -17,6 +16,12 @@
 
 namespace gestor::frontend::forms {
 
+/**
+ * @brief Diálogo de formulario para el registro y edición de aulas.
+ *
+ * Permite ingresar nombre, capacidad, edificio y piso de un aula.
+ * Emite la señal aulaGuardada con los datos validados al guardar.
+ */
 class ClassroomFormDialog : public QDialog {
     Q_OBJECT
 
@@ -24,11 +29,10 @@ public:
     explicit ClassroomFormDialog(QWidget *parent = nullptr);
     ~ClassroomFormDialog() override = default;
 
-    // Método para pre-cargar datos al editar
+    /** @brief Precarga datos del aula para modo edición. */
     void cargarDatos(const QString& nombre, int capacidad, const QString& edificio, const QString& piso);
 
 signals:
-    // Señal con los campos exactos del ticket
     void aulaGuardada(const QString& nombre, int capacidad, const QString& edificio, const QString& piso);
 
 private slots:
@@ -44,5 +48,3 @@ private:
 };
 
 } // namespace gestor::frontend::forms
-
-#endif // CLASSROOM_FORM_DIALOG_H

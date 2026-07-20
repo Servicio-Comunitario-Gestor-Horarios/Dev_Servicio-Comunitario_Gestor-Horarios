@@ -1,11 +1,8 @@
-#ifndef CLASSROOM_LIST_WIDGET_HPP
-#define CLASSROOM_LIST_WIDGET_HPP
+#pragma once
 
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
-
-namespace gestor::frontend::views {
 
 /**
  * @brief Widget para visualizar y gestionar la lista de aulas.
@@ -39,7 +36,3 @@ private:
     QTableWidget *m_table;
     QPushButton *m_registerButton;
 };
-
-} // namespace gestor::frontend::views
-
-#endif // CLASSROOM_LIST_WIDGET_HPP
