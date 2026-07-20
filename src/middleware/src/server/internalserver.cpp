@@ -279,41 +279,6 @@ void InternalServer::handleClassroomUpdate(const QJsonObject &data,
     registrarConexion("Middleware -> Frontend", "classroom_update [stub]");
 }
 
-// ─── CRUD Aulas (stubs) ────────────────────────────────────────────
-// TODO: Conectar con backend/data/aula.hpp cuando los servicios existan.
-
-void InternalServer::handleClassroomList(QLocalSocket *clienteSocket)
-{
-    // TODO: Consultar servicio de aulas del backend
-    sendResponse(Middleware::RESP_EXITO, QJsonArray(), clienteSocket);
-    registrarConexion("Middleware -> Frontend", "classroom_list [stub]");
-}
-
-void InternalServer::handleClassroomCreate(const QJsonObject &data,
-                                           QLocalSocket *clienteSocket)
-{
-    // Validación básica de ejemplo (ajusta los campos según tu frontend)
-    if (!data.contains("nombre") || !data.contains("capacidad")) {
-        sendResponse(Middleware::RESP_INVALIDO, "Faltan campos requeridos", clienteSocket);
-        return;
-    }
-    // TODO: Validar duplicados y crear en el backend
-    sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
-    registrarConexion("Middleware -> Frontend", "classroom_create [stub]");
-}
-
-void InternalServer::handleClassroomUpdate(const QJsonObject &data,
-                                           QLocalSocket *clienteSocket)
-{
-    if (!data.contains("id")) {
-        sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
-        return;
-    }
-    // TODO: Actualizar aula en el backend
-    sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
-    registrarConexion("Middleware -> Frontend", "classroom_update [stub]");
-}
-
 void InternalServer::handleClassroomDelete(const QJsonObject &data,
                                            QLocalSocket *clienteSocket)
 {

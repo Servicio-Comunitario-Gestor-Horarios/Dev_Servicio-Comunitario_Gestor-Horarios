@@ -17,6 +17,8 @@
 #include <QMessageBox>
 #include <QFrame>
 
+namespace gestor::frontend::views {
+
 ClassroomListWidget::ClassroomListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
 }
@@ -224,4 +226,6 @@ void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad
             dialogo.exec();
         }
     });
+}
+
 }
