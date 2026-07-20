@@ -21,6 +21,8 @@ set(FRONTEND_SOURCES
     src/views/dashboard_widget.cpp
     src/forms/classroom_form_dialog.cpp
     src/views/classroom_list_widget.cpp
+    src/forms/subject_form_dialog.cpp
+    src/views/subject_list_widget.cpp
 )
 
 set(FRONTEND_HEADERS
@@ -33,6 +35,8 @@ set(FRONTEND_HEADERS
     src/views/dashboard_widget.hpp
     src/forms/classroom_form_dialog.hpp
     src/views/classroom_list_widget.hpp
+    src/forms/subject_form_dialog.hpp
+    src/views/subject_list_widget.hpp
 )
 
 if(FRONTEND_STANDALONE)
@@ -43,6 +47,7 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
         src/main.cpp
+        resources/resources.qrc
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -57,7 +62,7 @@ else()
     # === MODO INTEGRADO ===
     # Libreria estatica para linkear en el binario unico
     add_library(frontend STATIC)
-    target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS})
+    target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS} resources/resources.qrc)
     target_include_directories(frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(frontend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(frontend PUBLIC Qt6::Core Qt6::Widgets Qt6::Network)

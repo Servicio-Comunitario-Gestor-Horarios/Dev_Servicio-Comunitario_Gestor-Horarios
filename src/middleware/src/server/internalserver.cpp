@@ -65,6 +65,8 @@ void InternalServer::onNewConnection()
  * - ready → confirmación de disponibilidad
  * - shutdown → prepara el apagado graceful
  * - teacher_* → operaciones CRUD (placeholder)
+ * - classroom_* → operaciones CRUD (placeholder)
+ * - subject_* → operaciones CRUD (placeholder)
  * - cualquier otra → RESP_INVALIDO
  */
 void InternalServer::onReadyRead()
@@ -113,7 +115,7 @@ void InternalServer::onReadyRead()
             handleTeacherDelete(obj["data"].toObject(), clienteSocket);
             return;
 
-            // ─── AULAS  ───
+            // ─── AULAS ───
         } else if (op == Middleware::OP_LISTA_AULAS) {
             handleClassroomList(clienteSocket);
             return;
@@ -125,6 +127,23 @@ void InternalServer::onReadyRead()
             return;
         } else if (op == Middleware::OP_ELIMINAR_AULA) {
             handleClassroomDelete(obj["data"].toObject(), clienteSocket);
+            return;
+
+            // ─── MATERIAS ───
+        } else if (op == Middleware::OP_LISTA_MATERIAS) {
+            handleSubjectList(clienteSocket);
+            return;
+        } else if (op == Middleware::OP_OBTENER_MATERIA) {
+            handleSubjectGet(obj["data"].toObject(), clienteSocket);
+            return;
+        } else if (op == Middleware::OP_CREAR_MATERIA) {
+            handleSubjectCreate(obj["data"].toObject(), clienteSocket);
+            return;
+        } else if (op == Middleware::OP_ACTUALIZAR_MATERIA) {
+            handleSubjectUpdate(obj["data"].toObject(), clienteSocket);
+            return;
+        } else if (op == Middleware::OP_ELIMINAR_MATERIA) {
+            handleSubjectDelete(obj["data"].toObject(), clienteSocket);
             return;
 
             // ─── SI NO ENCUENTRA NINGUNA OPERACIÓN ───
@@ -189,7 +208,6 @@ void InternalServer::sendResponse(int status, const QJsonValue &data,
 
 void InternalServer::handleTeacherList(QLocalSocket *clienteSocket)
 {
-    // TODO: Consultar servicio de profesores del backend
     sendResponse(Middleware::RESP_EXITO, QJsonArray(), clienteSocket);
     registrarConexion("Middleware -> Frontend", "teacher_list [stub]");
 }
@@ -202,7 +220,6 @@ void InternalServer::handleTeacherGet(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
         return;
     }
-    // TODO: Buscar profesor por ID en el backend
     sendResponse(Middleware::RESP_NO_ENCONTRADO, QJsonObject(), clienteSocket);
     registrarConexion("Middleware -> Frontend", "teacher_get [stub]");
 }
@@ -214,7 +231,6 @@ void InternalServer::handleTeacherCreate(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Faltan campos requeridos", clienteSocket);
         return;
     }
-    // TODO: Validar duplicados y crear en el backend
     sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
     registrarConexion("Middleware -> Frontend", "teacher_create [stub]");
 }
@@ -226,7 +242,6 @@ void InternalServer::handleTeacherUpdate(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
         return;
     }
-    // TODO: Actualizar profesor en el backend
     sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
     registrarConexion("Middleware -> Frontend", "teacher_update [stub]");
 }
@@ -239,7 +254,6 @@ void InternalServer::handleTeacherDelete(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
         return;
     }
-    // TODO: Eliminar profesor en el backend
     sendResponse(Middleware::RESP_EXITO, "Eliminado", clienteSocket);
     registrarConexion("Middleware -> Frontend", "teacher_delete [stub]");
 }
@@ -249,7 +263,6 @@ void InternalServer::handleTeacherDelete(const QJsonObject &data,
 
 void InternalServer::handleClassroomList(QLocalSocket *clienteSocket)
 {
-    // TODO: Consultar servicio de aulas del backend
     sendResponse(Middleware::RESP_EXITO, QJsonArray(), clienteSocket);
     registrarConexion("Middleware -> Frontend", "classroom_list [stub]");
 }
@@ -257,12 +270,10 @@ void InternalServer::handleClassroomList(QLocalSocket *clienteSocket)
 void InternalServer::handleClassroomCreate(const QJsonObject &data,
                                            QLocalSocket *clienteSocket)
 {
-    // Validación básica de ejemplo (ajusta los campos según tu frontend)
     if (!data.contains("nombre") || !data.contains("capacidad")) {
         sendResponse(Middleware::RESP_INVALIDO, "Faltan campos requeridos", clienteSocket);
         return;
     }
-    // TODO: Validar duplicados y crear en el backend
     sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
     registrarConexion("Middleware -> Frontend", "classroom_create [stub]");
 }
@@ -274,7 +285,6 @@ void InternalServer::handleClassroomUpdate(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
         return;
     }
-    // TODO: Actualizar aula en el backend
     sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
     registrarConexion("Middleware -> Frontend", "classroom_update [stub]");
 }
@@ -287,7 +297,61 @@ void InternalServer::handleClassroomDelete(const QJsonObject &data,
         sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
         return;
     }
-    // TODO: Eliminar aula en el backend
     sendResponse(Middleware::RESP_EXITO, "Eliminado", clienteSocket);
     registrarConexion("Middleware -> Frontend", "classroom_delete [stub]");
+}
+
+// ─── CRUD Materias (stubs) ────────────────────────────────────────
+// TODO: Conectar con backend/data/materia.hpp cuando los servicios existan.
+
+void InternalServer::handleSubjectList(QLocalSocket *clienteSocket)
+{
+    sendResponse(Middleware::RESP_EXITO, QJsonArray(), clienteSocket);
+    registrarConexion("Middleware -> Frontend", "subject_list [stub]");
+}
+
+void InternalServer::handleSubjectGet(const QJsonObject &data,
+                                      QLocalSocket *clienteSocket)
+{
+    QString id = data["id"].toString();
+    if (id.isEmpty()) {
+        sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
+        return;
+    }
+    sendResponse(Middleware::RESP_NO_ENCONTRADO, QJsonObject(), clienteSocket);
+    registrarConexion("Middleware -> Frontend", "subject_get [stub]");
+}
+
+void InternalServer::handleSubjectCreate(const QJsonObject &data,
+                                         QLocalSocket *clienteSocket)
+{
+    if (!data.contains("nombre") || !data.contains("tipoAula")) {
+        sendResponse(Middleware::RESP_INVALIDO, "Faltan campos requeridos", clienteSocket);
+        return;
+    }
+    sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
+    registrarConexion("Middleware -> Frontend", "subject_create [stub]");
+}
+
+void InternalServer::handleSubjectUpdate(const QJsonObject &data,
+                                         QLocalSocket *clienteSocket)
+{
+    if (!data.contains("id")) {
+        sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
+        return;
+    }
+    sendResponse(Middleware::RESP_EXITO, data, clienteSocket);
+    registrarConexion("Middleware -> Frontend", "subject_update [stub]");
+}
+
+void InternalServer::handleSubjectDelete(const QJsonObject &data,
+                                         QLocalSocket *clienteSocket)
+{
+    QString id = data["id"].toString();
+    if (id.isEmpty()) {
+        sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
+        return;
+    }
+    sendResponse(Middleware::RESP_EXITO, "Eliminado", clienteSocket);
+    registrarConexion("Middleware -> Frontend", "subject_delete [stub]");
 }
