@@ -29,6 +29,12 @@ private:
     void handleTeacherUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
     void handleTeacherDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
 
+    // ─── Handlers Aulas ───────────────────────────────────────────
+    void handleClassroomList(QLocalSocket *clienteSocket);
+    void handleClassroomCreate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    void handleClassroomUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    void handleClassroomDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
+
     // ─── Handlers Materias ────────────────────────────────────────
     void handleSubjectList(QLocalSocket *clienteSocket);
     void handleSubjectGet(const QJsonObject &data, QLocalSocket *clienteSocket);

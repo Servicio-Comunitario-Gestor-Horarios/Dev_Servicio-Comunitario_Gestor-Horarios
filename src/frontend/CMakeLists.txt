@@ -19,7 +19,8 @@ set(FRONTEND_SOURCES
     src/forms/teacher_form_dialog.cpp
     src/views/view_placeholder.cpp
     src/views/dashboard_widget.cpp
-    # Nuevos:
+    src/forms/classroom_form_dialog.cpp
+    src/views/classroom_list_widget.cpp
     src/forms/subject_form_dialog.cpp
     src/views/subject_list_widget.cpp
 )
@@ -30,9 +31,10 @@ set(FRONTEND_HEADERS
     src/views/main_window.hpp
     src/views/teacher_list_widget.hpp
     src/forms/teacher_form_dialog.hpp
-    src/views/dashboard_widget.hpp
     src/views/view_placeholder.hpp
-    # Nuevos:
+    src/views/dashboard_widget.hpp
+    src/forms/classroom_form_dialog.hpp
+    src/views/classroom_list_widget.hpp
     src/forms/subject_form_dialog.hpp
     src/views/subject_list_widget.hpp
 )
@@ -45,10 +47,6 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
         src/main.cpp
-        src/forms/subject_form_dialog.hpp
-        src/forms/subject_form_dialog.cpp
-        src/views/subject_list_widget.hpp
-        src/views/subject_list_widget.cpp
         resources/resources.qrc
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
