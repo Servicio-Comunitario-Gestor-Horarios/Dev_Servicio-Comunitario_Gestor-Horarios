@@ -39,6 +39,10 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_SOURCES}
         ${FRONTEND_HEADERS}
         src/main.cpp
+        src/forms/classroom_form_dialog.hpp
+        src/forms/classroom_form_dialog.cpp
+        src/views/classroom_list_widget.hpp
+        src/views/classroom_list_widget.cpp
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

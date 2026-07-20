@@ -83,4 +83,15 @@ private:
     void handleTeacherUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
     /** @brief Elimina profesor por ID (stub). */
     void handleTeacherDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
+
+    // ── CRUD Aulas (stubs — conectar al backend cuando esté listo) ──
+
+    /** @brief Retorna lista vacía de aulas. */
+    void handleClassroomList(QLocalSocket *clienteSocket);
+    /** @brief Valida campos y crea aula (stub). */
+    void handleClassroomCreate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    /** @brief Actualiza aula existente (stub). */
+    void handleClassroomUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
+    /** @brief Elimina aula por ID (stub). */
+    void handleClassroomDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
 };

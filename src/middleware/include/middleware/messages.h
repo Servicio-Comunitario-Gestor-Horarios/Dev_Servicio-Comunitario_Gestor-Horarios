@@ -39,6 +39,17 @@ inline const QString OP_ACTUALIZAR_PROFESOR = QStringLiteral("teacher_update");
 /** @brief Eliminar un profesor. */
 inline const QString OP_ELIMINAR_PROFESOR   = QStringLiteral("teacher_delete");
 
+// ─── Operaciones CRUD Aulas ────────────────────────────────────────
+
+/** @brief Obtener lista de aulas. */
+inline const QString OP_LISTA_AULAS     = QStringLiteral("classroom_list");
+/** @brief Crear una nueva aula. */
+inline const QString OP_CREAR_AULA      = QStringLiteral("classroom_create");
+/** @brief Actualizar un aula existente. */
+inline const QString OP_ACTUALIZAR_AULA = QStringLiteral("classroom_update");
+/** @brief Eliminar un aula. */
+inline const QString OP_ELIMINAR_AULA   = QStringLiteral("classroom_delete");
+
 // ─── Códigos de respuesta ──────────────────────────────────────────
 
 /** @brief Operación exitosa. */

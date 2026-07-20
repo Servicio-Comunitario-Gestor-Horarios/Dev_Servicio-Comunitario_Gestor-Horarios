@@ -17,6 +17,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QFrame>
+#include "classroom_list_widget.hpp"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Liceo Nacional Robert Serra - Gestión");
@@ -128,7 +129,7 @@ void MainWindow::setupCentralArea() {
     m_contenedorVistas->addWidget(vistaDocentes);
 
     // Otras vistas placeholder
-    m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Aulas", this));
+    m_contenedorVistas->addWidget(new ClassroomListWidget(this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Gestión de Asignaturas", this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
