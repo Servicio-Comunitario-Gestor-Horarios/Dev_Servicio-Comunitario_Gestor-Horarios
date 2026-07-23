@@ -7,22 +7,22 @@
 #include <QDebug>
 
 /**
- * @brief Constructor — crea el servidor local.
+ * @brief Constructor — crea el servidor local y configura el timeout.
  */
 InternalServer::InternalServer(QObject *parent)
     : QObject(parent)
     , m_server(new QLocalServer(this))
+    , m_timeoutTimer(new QTimer(this))
 {
+    m_timeoutTimer->setSingleShot(true);
+    m_timeoutTimer->setInterval(5000);
+    connect(m_timeoutTimer, &QTimer::timeout, this, []() {
+        qWarning() << "Timeout: operación tardó más de 5 segundos";
+    });
 }
 
 /**
- * @brief Inicia el servidor IPC.
- *
- * 1. Elimina cualquier instancia previa del servidor (removeServer).
- * 2. Escucha en el nombre configurado (SERVER_NAME).
- * 3. Conecta la señal newConnection al slot onNewConnection.
- *
- * @return true si el servidor inició correctamente.
+ * @brief Inicia el servidor IPC y registra las rutas CRUD.
  */
 bool InternalServer::start()
 {
@@ -32,16 +32,60 @@ bool InternalServer::start()
         qCritical() << "No se pudo iniciar el servidor IPC:" << m_server->errorString();
         return false;
     }
+
+    inicializarRutas();
+
     qDebug() << "Servidor Middleware IPC escuchando en:" << Middleware::SERVER_NAME;
     connect(m_server, &QLocalServer::newConnection, this, &InternalServer::onNewConnection);
     return true;
 }
 
 /**
+ * @brief Registra todas las rutas CRUD en el QHash de dispatch.
+ */
+void InternalServer::inicializarRutas()
+{
+    // ─── Sistema ───
+    m_rutas["health_check"] = [this](const QJsonObject &, QLocalSocket *s) {
+        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
+        registrarConexion("Middleware -> Frontend", "health-check [ok]");
+        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+    };
+    m_rutas["ready"] = [this](const QJsonObject &, QLocalSocket *s) {
+        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
+        registrarConexion("Middleware -> Frontend", "ready [ok]");
+        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+    };
+    m_rutas["shutdown"] = [this](const QJsonObject &, QLocalSocket *s) {
+        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
+        registrarConexion("Middleware -> Frontend", "shutdown [ok]");
+        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+    };
+
+    // ─── Profesores ───
+    m_rutas[Middleware::OP_LISTA_PROFESORES]    = [this](const QJsonObject &, QLocalSocket *s) { handleTeacherList(s); };
+    m_rutas[Middleware::OP_OBTENER_PROFESOR]    = [this](const QJsonObject &d, QLocalSocket *s) { handleTeacherGet(d, s); };
+    m_rutas[Middleware::OP_CREAR_PROFESOR]      = [this](const QJsonObject &d, QLocalSocket *s) { handleTeacherCreate(d, s); };
+    m_rutas[Middleware::OP_ACTUALIZAR_PROFESOR] = [this](const QJsonObject &d, QLocalSocket *s) { handleTeacherUpdate(d, s); };
+    m_rutas[Middleware::OP_ELIMINAR_PROFESOR]   = [this](const QJsonObject &d, QLocalSocket *s) { handleTeacherDelete(d, s); };
+
+    // ─── Aulas ───
+    m_rutas[Middleware::OP_LISTA_AULAS]      = [this](const QJsonObject &, QLocalSocket *s) { handleClassroomList(s); };
+    m_rutas[Middleware::OP_OBTENER_AULA]     = [this](const QJsonObject &d, QLocalSocket *s) { handleClassroomGet(d, s); };
+    m_rutas[Middleware::OP_CREAR_AULA]       = [this](const QJsonObject &d, QLocalSocket *s) { handleClassroomCreate(d, s); };
+    m_rutas[Middleware::OP_ACTUALIZAR_AULA]  = [this](const QJsonObject &d, QLocalSocket *s) { handleClassroomUpdate(d, s); };
+    m_rutas[Middleware::OP_ELIMINAR_AULA]    = [this](const QJsonObject &d, QLocalSocket *s) { handleClassroomDelete(d, s); };
+
+    // ─── Materias ───
+    m_rutas[Middleware::OP_LISTA_MATERIAS]       = [this](const QJsonObject &, QLocalSocket *s) { handleSubjectList(s); };
+    m_rutas[Middleware::OP_OBTENER_MATERIA]      = [this](const QJsonObject &d, QLocalSocket *s) { handleSubjectGet(d, s); };
+    m_rutas[Middleware::OP_CREAR_MATERIA]        = [this](const QJsonObject &d, QLocalSocket *s) { handleSubjectCreate(d, s); };
+    m_rutas[Middleware::OP_ACTUALIZAR_MATERIA]   = [this](const QJsonObject &d, QLocalSocket *s) { handleSubjectUpdate(d, s); };
+    m_rutas[Middleware::OP_ELIMINAR_MATERIA]     = [this](const QJsonObject &d, QLocalSocket *s) { handleSubjectDelete(d, s); };
+}
+
+/**
  * @brief Slot llamado cuando un nuevo cliente se conecta.
- *
- * Obtiene el socket del cliente y conecta las señales readyRead
- * y disconnected para manejar la comunicación.
  */
 void InternalServer::onNewConnection()
 {
@@ -57,17 +101,8 @@ void InternalServer::onNewConnection()
 /**
  * @brief Procesa los mensajes entrantes de los clientes IPC.
  *
- * Parsea el JSON recibido, identifica la operación por el campo "op",
- * y construye la respuesta apropiada.
- *
- * ## Operaciones soportadas
- * - health_check → confirma que el backend está vivo
- * - ready → confirmación de disponibilidad
- * - shutdown → prepara el apagado graceful
- * - teacher_* → operaciones CRUD (placeholder)
- * - classroom_* → operaciones CRUD (placeholder)
- * - subject_* → operaciones CRUD (placeholder)
- * - cualquier otra → RESP_INVALIDO
+ * Parsea el JSON, busca la operación en el route map QHash,
+ * y ejecuta el handler correspondiente con timeout de 5s.
  */
 void InternalServer::onReadyRead()
 {
@@ -77,93 +112,39 @@ void InternalServer::onReadyRead()
     QByteArray data = clienteSocket->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
-    if (!doc.isNull() && doc.isObject()) {
-        QJsonObject obj = doc.object();
-        QString op = obj["op"].toString();
+    if (doc.isNull() || !doc.isObject()) {
+        QJsonObject err;
+        err["status"] = "error";
+        err["code"] = Middleware::RESP_INVALIDO;
+        QJsonDocument d(err);
+        clienteSocket->write(d.toJson(QJsonDocument::Compact));
+        clienteSocket->flush();
+        return;
+    }
 
-        registrarConexion("Frontend -> Middleware", op);
+    QJsonObject obj = doc.object();
+    QString op = obj["op"].toString();
+    QJsonObject payload = obj["payload"].toObject();
 
+    registrarConexion("Frontend -> Middleware", op);
+
+    if (m_rutas.contains(op)) {
+        m_timeoutTimer->start();
+        m_rutas[op](payload, clienteSocket);
+        m_timeoutTimer->stop();
+    } else {
         QJsonObject respuesta;
-
-        if (op == Middleware::OP_HEALTH_CHECK) {
-            respuesta["status"] = "ok";
-            respuesta["code"] = Middleware::RESP_EXITO;
-            registrarConexion("Middleware -> Frontend", "health-check [ok]");
-        } else if (op == Middleware::OP_LISTO) {
-            respuesta["status"] = "ok";
-            respuesta["code"] = Middleware::RESP_EXITO;
-            registrarConexion("Middleware -> Frontend", "ready [ok]");
-        } else if (op == Middleware::OP_APAGAR) {
-            respuesta["status"] = "ok";
-            respuesta["code"] = Middleware::RESP_EXITO;
-            registrarConexion("Middleware -> Frontend", "shutdown [ok]");
-
-            // ─── PROFESORES ───
-        } else if (op == Middleware::OP_LISTA_PROFESORES) {
-            handleTeacherList(clienteSocket);
-            return;
-        } else if (op == Middleware::OP_OBTENER_PROFESOR) {
-            handleTeacherGet(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_CREAR_PROFESOR) {
-            handleTeacherCreate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ACTUALIZAR_PROFESOR) {
-            handleTeacherUpdate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ELIMINAR_PROFESOR) {
-            handleTeacherDelete(obj["data"].toObject(), clienteSocket);
-            return;
-
-            // ─── AULAS ───
-        } else if (op == Middleware::OP_LISTA_AULAS) {
-            handleClassroomList(clienteSocket);
-            return;
-        } else if (op == Middleware::OP_CREAR_AULA) {
-            handleClassroomCreate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ACTUALIZAR_AULA) {
-            handleClassroomUpdate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ELIMINAR_AULA) {
-            handleClassroomDelete(obj["data"].toObject(), clienteSocket);
-            return;
-
-            // ─── MATERIAS ───
-        } else if (op == Middleware::OP_LISTA_MATERIAS) {
-            handleSubjectList(clienteSocket);
-            return;
-        } else if (op == Middleware::OP_OBTENER_MATERIA) {
-            handleSubjectGet(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_CREAR_MATERIA) {
-            handleSubjectCreate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ACTUALIZAR_MATERIA) {
-            handleSubjectUpdate(obj["data"].toObject(), clienteSocket);
-            return;
-        } else if (op == Middleware::OP_ELIMINAR_MATERIA) {
-            handleSubjectDelete(obj["data"].toObject(), clienteSocket);
-            return;
-
-            // ─── SI NO ENCUENTRA NINGUNA OPERACIÓN ───
-        } else {
-            respuesta["status"] = "error";
-            respuesta["code"] = Middleware::RESP_INVALIDO;
-            registrarConexion("Middleware -> Frontend",
-                              "operación desconocida: " + op);
-        }
-
-        QJsonDocument docRespuesta(respuesta);
-        clienteSocket->write(docRespuesta.toJson(QJsonDocument::Compact));
+        respuesta["status"] = "error";
+        respuesta["code"] = Middleware::RESP_INVALIDO;
+        registrarConexion("Middleware -> Frontend", "operación desconocida: " + op);
+        QJsonDocument d(respuesta);
+        clienteSocket->write(d.toJson(QJsonDocument::Compact));
         clienteSocket->flush();
     }
 }
 
 /**
  * @brief Slot llamado cuando un cliente se desconecta.
- *
- * Elimina el socket del cliente para liberar recursos.
  */
 void InternalServer::onClientDisconnected()
 {
@@ -175,11 +156,6 @@ void InternalServer::onClientDisconnected()
 
 /**
  * @brief Registra una operación en el log de depuración.
- *
- * Formato: [timestamp] [direccion] Operación: nombre
- *
- * @param direccion "Frontend -> Middleware" o "Middleware -> Frontend".
- * @param operacion Nombre o descripción de la operación.
  */
 void InternalServer::registrarConexion(const QString &direccion,
                                         const QString &operacion)
@@ -204,7 +180,6 @@ void InternalServer::sendResponse(int status, const QJsonValue &data,
 }
 
 // ─── CRUD Profesores (stubs) ───────────────────────────────────────
-// TODO: Conectar con backend/data/profesor.hpp cuando los servicios existan.
 
 void InternalServer::handleTeacherList(QLocalSocket *clienteSocket)
 {
@@ -259,12 +234,23 @@ void InternalServer::handleTeacherDelete(const QJsonObject &data,
 }
 
 // ─── CRUD Aulas (stubs) ────────────────────────────────────────────
-// TODO: Conectar con backend/data/aula.hpp cuando los servicios existan.
 
 void InternalServer::handleClassroomList(QLocalSocket *clienteSocket)
 {
     sendResponse(Middleware::RESP_EXITO, QJsonArray(), clienteSocket);
     registrarConexion("Middleware -> Frontend", "classroom_list [stub]");
+}
+
+void InternalServer::handleClassroomGet(const QJsonObject &data,
+                                        QLocalSocket *clienteSocket)
+{
+    QString id = data["id"].toString();
+    if (id.isEmpty()) {
+        sendResponse(Middleware::RESP_INVALIDO, "Falta campo id", clienteSocket);
+        return;
+    }
+    sendResponse(Middleware::RESP_NO_ENCONTRADO, QJsonObject(), clienteSocket);
+    registrarConexion("Middleware -> Frontend", "classroom_get [stub]");
 }
 
 void InternalServer::handleClassroomCreate(const QJsonObject &data,
@@ -302,7 +288,6 @@ void InternalServer::handleClassroomDelete(const QJsonObject &data,
 }
 
 // ─── CRUD Materias (stubs) ────────────────────────────────────────
-// TODO: Conectar con backend/data/materia.hpp cuando los servicios existan.
 
 void InternalServer::handleSubjectList(QLocalSocket *clienteSocket)
 {

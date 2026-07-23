@@ -4,6 +4,9 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QJsonObject>
+#include <QHash>
+#include <QTimer>
+#include <functional>
 
 class InternalServer : public QObject {
     Q_OBJECT
@@ -18,7 +21,10 @@ private slots:
 
 private:
     QLocalServer *m_server;
+    QHash<QString, std::function<void(const QJsonObject&, QLocalSocket*)>> m_rutas;
+    QTimer *m_timeoutTimer;
 
+    void inicializarRutas();
     void registrarConexion(const QString &direccion, const QString &operacion);
     void sendResponse(int status, const QJsonValue &data, QLocalSocket *clienteSocket);
 
@@ -31,6 +37,7 @@ private:
 
     // ─── Handlers Aulas ───────────────────────────────────────────
     void handleClassroomList(QLocalSocket *clienteSocket);
+    void handleClassroomGet(const QJsonObject &data, QLocalSocket *clienteSocket);
     void handleClassroomCreate(const QJsonObject &data, QLocalSocket *clienteSocket);
     void handleClassroomUpdate(const QJsonObject &data, QLocalSocket *clienteSocket);
     void handleClassroomDelete(const QJsonObject &data, QLocalSocket *clienteSocket);
