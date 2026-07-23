@@ -108,8 +108,6 @@ add_qtest(test_middleware_health_check
 # ============================================================
 # add_gtest(test_backend_solver test/backend/test_solver.cpp backend)
 
-
-
 # Tests para servicios del backend
 add_qtest(test_servicio_aula
     backend/test_servicio_aula.cpp
@@ -139,4 +137,13 @@ add_qtest(test_composicion_plan
     backend/test_composicion_plan.cpp
     backend
     Qt6::Sql
+)
+
+# ============================================================
+# Tests de backend — edge cases
+# ============================================================
+
+add_qtest(test_edge_cases
+    test_edge_cases.cpp
+    backend
 )
