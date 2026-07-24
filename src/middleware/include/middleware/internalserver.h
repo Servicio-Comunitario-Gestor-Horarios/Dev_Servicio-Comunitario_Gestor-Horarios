@@ -13,6 +13,10 @@ class InternalServer : public QObject {
 public:
     explicit InternalServer(QObject *parent = nullptr);
     bool start();
+    void setTimeoutMs(int ms);
+    QString serverName() const;
+    void registerRoute(const QString &op,
+                       std::function<void(const QJsonObject&, QLocalSocket*)> handler);
 
 private slots:
     void onNewConnection();
@@ -22,9 +26,15 @@ private slots:
 private:
     QLocalServer *m_server;
     QHash<QString, std::function<void(const QJsonObject&, QLocalSocket*)>> m_rutas;
-    QTimer *m_timeoutTimer;
+    int m_timeoutMs = 5000;
+    bool m_responded = false;
 
     void inicializarRutas();
+    /**
+     * @brief Registra una operación en el log de depuración.
+     * @param direccion "Frontend -> Middleware" o "Middleware -> Frontend".
+     * @param operacion Nombre o descripción de la operación.
+     */
     void registrarConexion(const QString &direccion, const QString &operacion);
     void sendResponse(int status, const QJsonValue &data, QLocalSocket *clienteSocket);
 

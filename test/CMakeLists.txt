@@ -145,7 +145,7 @@ add_qtest(test_composicion_plan
 # Tests de middleware — rutas CRUD IPC
 # ============================================================
 
-add_qtest(test_crud_routes
+add_qtest(test_middleware_crud_routes
     test_crud_routes.cpp
     middleware
     Qt6::Network

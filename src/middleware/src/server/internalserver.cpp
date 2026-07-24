@@ -1,10 +1,12 @@
 #include <middleware/internalserver.h>
 #include <middleware/messages.h>
+#include <QCoreApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDateTime>
 #include <QDebug>
+#include <QPointer>
 
 /**
  * @brief Constructor — crea el servidor local y configura el timeout.
@@ -12,13 +14,7 @@
 InternalServer::InternalServer(QObject *parent)
     : QObject(parent)
     , m_server(new QLocalServer(this))
-    , m_timeoutTimer(new QTimer(this))
 {
-    m_timeoutTimer->setSingleShot(true);
-    m_timeoutTimer->setInterval(5000);
-    connect(m_timeoutTimer, &QTimer::timeout, this, []() {
-        qWarning() << "Timeout: operación tardó más de 5 segundos";
-    });
 }
 
 /**
@@ -47,19 +43,16 @@ void InternalServer::inicializarRutas()
 {
     // ─── Sistema ───
     m_rutas["health_check"] = [this](const QJsonObject &, QLocalSocket *s) {
-        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
         registrarConexion("Middleware -> Frontend", "health-check [ok]");
-        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+        sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
     m_rutas["ready"] = [this](const QJsonObject &, QLocalSocket *s) {
-        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
         registrarConexion("Middleware -> Frontend", "ready [ok]");
-        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+        sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
     m_rutas["shutdown"] = [this](const QJsonObject &, QLocalSocket *s) {
-        QJsonObject r; r["status"] = "ok"; r["code"] = Middleware::RESP_EXITO;
         registrarConexion("Middleware -> Frontend", "shutdown [ok]");
-        QJsonDocument d(r); s->write(d.toJson(QJsonDocument::Compact)); s->flush();
+        sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
 
     // ─── Profesores ───
@@ -113,12 +106,7 @@ void InternalServer::onReadyRead()
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
     if (doc.isNull() || !doc.isObject()) {
-        QJsonObject err;
-        err["status"] = "error";
-        err["code"] = Middleware::RESP_INVALIDO;
-        QJsonDocument d(err);
-        clienteSocket->write(d.toJson(QJsonDocument::Compact));
-        clienteSocket->flush();
+        sendResponse(Middleware::RESP_INVALIDO, "JSON malformado", clienteSocket);
         return;
     }
 
@@ -126,20 +114,24 @@ void InternalServer::onReadyRead()
     QString op = obj["op"].toString();
     QJsonObject payload = obj["payload"].toObject();
 
+    if (payload.isEmpty())
+        payload = obj["data"].toObject();
+
     registrarConexion("Frontend -> Middleware", op);
 
     if (m_rutas.contains(op)) {
-        m_timeoutTimer->start();
+        m_responded = false;
+        QPointer<QLocalSocket> socketPtr(clienteSocket);
+        QTimer::singleShot(m_timeoutMs, this, [this, socketPtr]() {
+            if (!m_responded && socketPtr && socketPtr->state() == QLocalSocket::ConnectedState) {
+                sendResponse(Middleware::RESP_TIEMPO_AGOTADO,
+                             "Operación tardó más de 5 segundos", socketPtr);
+            }
+        });
         m_rutas[op](payload, clienteSocket);
-        m_timeoutTimer->stop();
     } else {
-        QJsonObject respuesta;
-        respuesta["status"] = "error";
-        respuesta["code"] = Middleware::RESP_INVALIDO;
         registrarConexion("Middleware -> Frontend", "operación desconocida: " + op);
-        QJsonDocument d(respuesta);
-        clienteSocket->write(d.toJson(QJsonDocument::Compact));
-        clienteSocket->flush();
+        sendResponse(Middleware::RESP_INVALIDO, "Operación desconocida: " + op, clienteSocket);
     }
 }
 
@@ -154,8 +146,26 @@ void InternalServer::onClientDisconnected()
     }
 }
 
+void InternalServer::setTimeoutMs(int ms)
+{
+    m_timeoutMs = ms;
+}
+
+QString InternalServer::serverName() const
+{
+    return m_server->serverName();
+}
+
+void InternalServer::registerRoute(const QString &op,
+                                   std::function<void(const QJsonObject&, QLocalSocket*)> handler)
+{
+    m_rutas[op] = std::move(handler);
+}
+
 /**
  * @brief Registra una operación en el log de depuración.
+ * @param direccion "Frontend -> Middleware" o "Middleware -> Frontend".
+ * @param operacion Nombre o descripción de la operación.
  */
 void InternalServer::registrarConexion(const QString &direccion,
                                         const QString &operacion)
@@ -171,6 +181,7 @@ void InternalServer::registrarConexion(const QString &direccion,
 void InternalServer::sendResponse(int status, const QJsonValue &data,
                                   QLocalSocket *clienteSocket)
 {
+    m_responded = true;
     QJsonObject respuesta;
     respuesta["status"] = status;
     respuesta["data"] = data;

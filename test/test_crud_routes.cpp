@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QLocalSocket>
 
 #include <middleware/internalserver.h>
 #include <middleware/internalclient.h>
@@ -11,24 +12,45 @@
 
 #include <QtTest>
 
-class TestCrudRoutes : public QObject {
+class TestMiddlewareCrudRoutes : public QObject {
     Q_OBJECT
+private:
+    InternalServer *m_server = nullptr;
+
 private slots:
+    void initTestCase();
+    void cleanupTestCase();
+
     void healthCheck();
+    void ready();
+    void shutdown();
     void teacherList();
     void subjectList();
     void classroomList();
     void classroomGet();
+    void classroomGetMissingId();
     void invalidOp();
     void teacherCreateValid();
     void teacherCreateMissingFields();
+    void malformedJson();
+    void legacyDataKey();
+    void timeout();
 };
 
-void TestCrudRoutes::healthCheck()
+void TestMiddlewareCrudRoutes::initTestCase()
 {
-    InternalServer server;
-    QVERIFY(server.start());
+    m_server = new InternalServer(this);
+    QVERIFY(m_server->start());
+}
 
+void TestMiddlewareCrudRoutes::cleanupTestCase()
+{
+    delete m_server;
+    m_server = nullptr;
+}
+
+void TestMiddlewareCrudRoutes::healthCheck()
+{
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -37,15 +59,40 @@ void TestCrudRoutes::healthCheck()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
-    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["data"].toString(), QString("ok"));
 }
 
-void TestCrudRoutes::teacherList()
+void TestMiddlewareCrudRoutes::ready()
 {
-    InternalServer server;
-    QVERIFY(server.start());
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+    QVERIFY(spy.isValid());
 
+    client.enviarSolicitud(Middleware::OP_LISTO);
+    QVERIFY(spy.wait(3000));
+
+    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["data"].toString(), QString("ok"));
+}
+
+void TestMiddlewareCrudRoutes::shutdown()
+{
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+    QVERIFY(spy.isValid());
+
+    client.enviarSolicitud(Middleware::OP_APAGAR);
+    QVERIFY(spy.wait(3000));
+
+    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["data"].toString(), QString("ok"));
+}
+
+void TestMiddlewareCrudRoutes::teacherList()
+{
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -58,11 +105,8 @@ void TestCrudRoutes::teacherList()
     QVERIFY(respuesta["data"].isArray());
 }
 
-void TestCrudRoutes::subjectList()
+void TestMiddlewareCrudRoutes::subjectList()
 {
-    InternalServer server;
-    QVERIFY(server.start());
-
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -75,11 +119,8 @@ void TestCrudRoutes::subjectList()
     QVERIFY(respuesta["data"].isArray());
 }
 
-void TestCrudRoutes::classroomList()
+void TestMiddlewareCrudRoutes::classroomList()
 {
-    InternalServer server;
-    QVERIFY(server.start());
-
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -92,11 +133,8 @@ void TestCrudRoutes::classroomList()
     QVERIFY(respuesta["data"].isArray());
 }
 
-void TestCrudRoutes::classroomGet()
+void TestMiddlewareCrudRoutes::classroomGet()
 {
-    InternalServer server;
-    QVERIFY(server.start());
-
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -110,11 +148,22 @@ void TestCrudRoutes::classroomGet()
     QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_NO_ENCONTRADO);
 }
 
-void TestCrudRoutes::invalidOp()
+void TestMiddlewareCrudRoutes::classroomGetMissingId()
 {
-    InternalServer server;
-    QVERIFY(server.start());
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+    QVERIFY(spy.isValid());
 
+    QJsonObject payload;
+    client.enviarSolicitud(Middleware::OP_OBTENER_AULA, payload);
+    QVERIFY(spy.wait(3000));
+
+    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+}
+
+void TestMiddlewareCrudRoutes::invalidOp()
+{
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -123,14 +172,11 @@ void TestCrudRoutes::invalidOp()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_INVALIDO);
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
 }
 
-void TestCrudRoutes::teacherCreateValid()
+void TestMiddlewareCrudRoutes::teacherCreateValid()
 {
-    InternalServer server;
-    QVERIFY(server.start());
-
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -145,11 +191,8 @@ void TestCrudRoutes::teacherCreateValid()
     QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
 }
 
-void TestCrudRoutes::teacherCreateMissingFields()
+void TestMiddlewareCrudRoutes::teacherCreateMissingFields()
 {
-    InternalServer server;
-    QVERIFY(server.start());
-
     InternalClient client;
     QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
     QVERIFY(spy.isValid());
@@ -163,5 +206,71 @@ void TestCrudRoutes::teacherCreateMissingFields()
     QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
 }
 
-QTEST_MAIN(TestCrudRoutes)
+void TestMiddlewareCrudRoutes::malformedJson()
+{
+    QLocalSocket socket;
+    socket.connectToServer(m_server->serverName());
+    QVERIFY(socket.waitForConnected(3000));
+
+    socket.write("esto no es json");
+    socket.flush();
+
+    QSignalSpy spy(&socket, &QLocalSocket::readyRead);
+    QVERIFY(spy.wait(3000));
+
+    QByteArray data = socket.readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonObject respuesta = doc.object();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+    socket.disconnectFromServer();
+}
+
+void TestMiddlewareCrudRoutes::legacyDataKey()
+{
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+    QVERIFY(spy.isValid());
+
+    QJsonObject solicitud;
+    solicitud["op"] = Middleware::OP_LISTA_PROFESORES;
+    solicitud["data"] = QJsonObject();
+
+    QJsonDocument doc(solicitud);
+    client.enviarSolicitud(Middleware::OP_LISTA_PROFESORES);
+    QVERIFY(spy.wait(3000));
+
+    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QVERIFY(respuesta["data"].isArray());
+}
+
+void TestMiddlewareCrudRoutes::timeout()
+{
+    m_server->setTimeoutMs(100);
+
+    m_server->registerRoute("slow_op", [](const QJsonObject &, QLocalSocket *s) {
+        QTimer::singleShot(5000, s, [s]() {
+            QJsonObject r;
+            r["status"] = Middleware::RESP_EXITO;
+            r["data"] = "slow response";
+            QJsonDocument d(r);
+            s->write(d.toJson(QJsonDocument::Compact));
+            s->flush();
+        });
+    });
+
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+    QVERIFY(spy.isValid());
+
+    client.enviarSolicitud("slow_op");
+    QVERIFY(spy.wait(3000));
+
+    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_TIEMPO_AGOTADO);
+
+    m_server->setTimeoutMs(5000);
+}
+
+QTEST_MAIN(TestMiddlewareCrudRoutes)
 #include "test_crud_routes.moc"
