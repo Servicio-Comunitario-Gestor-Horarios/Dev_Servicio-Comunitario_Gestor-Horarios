@@ -144,6 +144,7 @@ add_qtest(test_composicion_plan
 # ============================================================
 
 add_qtest(test_edge_cases
-    test_edge_cases.cpp
+    backend/test_edge_cases.cpp
     backend
 )
+
