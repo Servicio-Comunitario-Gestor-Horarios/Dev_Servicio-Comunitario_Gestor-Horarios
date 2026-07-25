@@ -27,10 +27,11 @@ inline const QString OP_ELIMINAR_PROFESOR   = QStringLiteral("teacher_delete");
 
 // ─── Operaciones CRUD Aulas ────────────────────────────────────────
 
-inline const QString OP_LISTA_AULAS     = QStringLiteral("classroom_list");
-inline const QString OP_CREAR_AULA      = QStringLiteral("classroom_create");
-inline const QString OP_ACTUALIZAR_AULA = QStringLiteral("classroom_update");
-inline const QString OP_ELIMINAR_AULA   = QStringLiteral("classroom_delete");
+inline const QString OP_LISTA_AULAS      = QStringLiteral("classroom_list");
+inline const QString OP_OBTENER_AULA     = QStringLiteral("classroom_get");
+inline const QString OP_CREAR_AULA       = QStringLiteral("classroom_create");
+inline const QString OP_ACTUALIZAR_AULA  = QStringLiteral("classroom_update");
+inline const QString OP_ELIMINAR_AULA    = QStringLiteral("classroom_delete");
 
 // ─── Operaciones CRUD Materias ────────────────────────────────────
 

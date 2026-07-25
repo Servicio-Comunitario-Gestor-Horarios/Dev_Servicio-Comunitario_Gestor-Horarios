@@ -83,7 +83,7 @@ void InternalClient::onReadyRead()
 
     if (doc.isObject()) {
         QJsonObject obj = doc.object();
-        bool exito = (obj["status"].toString() == "ok");
+        bool exito = (obj["status"].toInt(-1) == 0);
         qDebug() << "Cliente: Respuesta recibida —" << (exito ? "ÉXITO" : "FALLO");
         emit healthCheckResponseReceived(exito);
         emit respuestaRecibida(obj);

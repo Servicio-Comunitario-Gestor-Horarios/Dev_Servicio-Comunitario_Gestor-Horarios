@@ -140,3 +140,13 @@ add_qtest(test_composicion_plan
     backend
     Qt6::Sql
 )
+
+# ============================================================
+# Tests de middleware — rutas CRUD IPC
+# ============================================================
+
+add_qtest(test_middleware_crud_routes
+    test_crud_routes.cpp
+    middleware
+    Qt6::Network
+)
