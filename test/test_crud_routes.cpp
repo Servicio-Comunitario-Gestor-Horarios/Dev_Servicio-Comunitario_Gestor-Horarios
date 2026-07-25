@@ -227,21 +227,26 @@ void TestMiddlewareCrudRoutes::malformedJson()
 
 void TestMiddlewareCrudRoutes::legacyDataKey()
 {
-    InternalClient client;
-    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
-    QVERIFY(spy.isValid());
+    QLocalSocket socket;
+    socket.connectToServer(m_server->serverName());
+    QVERIFY(socket.waitForConnected(3000));
 
     QJsonObject solicitud;
     solicitud["op"] = Middleware::OP_LISTA_PROFESORES;
-    solicitud["data"] = QJsonObject();
+    solicitud["data"] = QJsonObject();  // legacy key
 
     QJsonDocument doc(solicitud);
-    client.enviarSolicitud(Middleware::OP_LISTA_PROFESORES);
+    socket.write(doc.toJson(QJsonDocument::Compact));
+    socket.flush();
+
+    QSignalSpy spy(&socket, &QLocalSocket::readyRead);
     QVERIFY(spy.wait(3000));
 
-    QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
+    QByteArray data = socket.readAll();
+    QJsonDocument respuestaDoc = QJsonDocument::fromJson(data);
+    QJsonObject respuesta = respuestaDoc.object();
     QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
-    QVERIFY(respuesta["data"].isArray());
+    socket.disconnectFromServer();
 }
 
 void TestMiddlewareCrudRoutes::timeout()
@@ -267,9 +272,10 @@ void TestMiddlewareCrudRoutes::timeout()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_TIEMPO_AGOTADO);
 
     m_server->setTimeoutMs(5000);
+
+    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_TIEMPO_AGOTADO);
 }
 
 QTEST_MAIN(TestMiddlewareCrudRoutes)

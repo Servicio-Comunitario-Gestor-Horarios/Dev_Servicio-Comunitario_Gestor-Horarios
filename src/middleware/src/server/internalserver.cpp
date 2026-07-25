@@ -42,15 +42,15 @@ bool InternalServer::start()
 void InternalServer::inicializarRutas()
 {
     // ─── Sistema ───
-    m_rutas["health_check"] = [this](const QJsonObject &, QLocalSocket *s) {
+    m_rutas[Middleware::OP_HEALTH_CHECK] = [this](const QJsonObject &/*payload*/, QLocalSocket *s) {
         registrarConexion("Middleware -> Frontend", "health-check [ok]");
         sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
-    m_rutas["ready"] = [this](const QJsonObject &, QLocalSocket *s) {
+    m_rutas[Middleware::OP_LISTO] = [this](const QJsonObject &/*payload*/, QLocalSocket *s) {
         registrarConexion("Middleware -> Frontend", "ready [ok]");
         sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
-    m_rutas["shutdown"] = [this](const QJsonObject &, QLocalSocket *s) {
+    m_rutas[Middleware::OP_APAGAR] = [this](const QJsonObject &/*payload*/, QLocalSocket *s) {
         registrarConexion("Middleware -> Frontend", "shutdown [ok]");
         sendResponse(Middleware::RESP_EXITO, "ok", s);
     };
@@ -159,6 +159,9 @@ QString InternalServer::serverName() const
 void InternalServer::registerRoute(const QString &op,
                                    std::function<void(const QJsonObject&, QLocalSocket*)> handler)
 {
+    if (m_rutas.contains(op)) {
+        qWarning() << "Sobrescribiendo ruta existente:" << op;
+    }
     m_rutas[op] = std::move(handler);
 }
 
