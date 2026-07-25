@@ -1,5 +1,5 @@
 #include <QTest>
-#include <backend/data/output_schedule.hpp>
+#include <backend/data/horario_salida.hpp>
 #include <backend/services/ServicioConsultaHorario.hpp>
 
 /**

@@ -13,7 +13,7 @@
 #include <QPair>
 #include <QString>
 #include <backend/resultado.hpp>
-#include <backend/data/output_schedule.hpp>
+#include <backend/data/horario_salida.hpp>
 
 /**
  * @brief Asignación junto con su contexto de ubicación en el horario.

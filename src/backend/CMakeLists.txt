@@ -33,6 +33,9 @@ target_sources(backend PRIVATE
     src/services/ServicioPlanesEstudio.cpp
     src/services/ServicioCargaHoraria.cpp
     src/services/ServicioComposicionPlan.cpp
+
+    # Solver - Issues #25 + #32
+    src/solver/config/solver_config.cpp
 )
 
 target_include_directories(backend PUBLIC

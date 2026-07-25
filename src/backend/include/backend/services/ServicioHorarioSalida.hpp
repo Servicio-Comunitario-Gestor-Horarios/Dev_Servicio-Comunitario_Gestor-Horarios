@@ -3,7 +3,7 @@
 #include <QString>
 #include <QVector>
 #include <backend/resultado.hpp>
-#include <backend/data/output_schedule.hpp>
+#include <backend/data/horario_salida.hpp>
 
 /**
  * @brief Servicio CRUD para horarios de salida (archivos JSON del solver).
