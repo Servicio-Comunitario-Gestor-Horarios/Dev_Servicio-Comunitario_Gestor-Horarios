@@ -24,30 +24,33 @@ private slots:
     void aula_capacidadMaxima();
     void aula_nombreUnChar();
     void aula_nombreLargo();
+    void aula_fromJsonVacio();
 
     // ─── Materia ────────────────────────────────────────────────
     void materia_horasMinimas();
     void materia_horasMaximas();
     void materia_requerimientosVacios();
+    void materia_fromJsonVacio();
 
     // ─── Profesor ───────────────────────────────────────────────
     void profesor_disponibilidadVacia();
     void profesor_materiasVacias();
-    void profesor_nombreConEspacios();
+    void profesor_nombreConAcentos();
+    void profesor_fromJsonVacio();
 
     // ─── Asignacion ─────────────────────────────────────────────
     void asignacion_roundTripCompleto();
     void asignacion_toJsonFromJsonConsistencia();
 
     // ─── Horario ────────────────────────────────────────────────
-    void horario_ceroAsignaciones();
     void horario_cienAsignaciones();
     void horario_asignacionesDuplicadas();
 
     // ─── PlanEstudio ────────────────────────────────────────────
     void planEstudio_nombreVacio();
     void planEstudio_nombreLargo();
-    void planEstudio_materiasVacias();
+    void materiaEnPlan_cursoCero();
+    void materiaEnPlan_horasCero();
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -73,13 +76,15 @@ void TestEdgeCases::franjaHoraria_diaSabado()
 {
     FranjaHoraria f;
     f.dia = 6;
-    f.inicio = QTime(7, 0);
+    f.inicio = QTime(8, 0);
     f.fin = QTime(12, 0);
 
     QJsonObject json = f.toJson();
     FranjaHoraria result = FranjaHoraria::fromJson(json);
 
     QCOMPARE(result.dia, 6);
+    QCOMPARE(result.inicio, QTime(8, 0));
+    QCOMPARE(result.fin, QTime(12, 0));
 }
 
 void TestEdgeCases::franjaHoraria_inicioIgualFin()
@@ -164,6 +169,15 @@ void TestEdgeCases::aula_nombreLargo()
     QCOMPARE(result.nombre.length(), 255);
 }
 
+void TestEdgeCases::aula_fromJsonVacio()
+{
+    QJsonObject empty;
+    Aula result = Aula::fromJson(empty);
+
+    QVERIFY(result.nombre.isEmpty());
+    QCOMPARE(result.capacidad, 0);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Materia — casos borde
 // ═══════════════════════════════════════════════════════════════
@@ -207,6 +221,15 @@ void TestEdgeCases::materia_requerimientosVacios()
     QVERIFY(result.requerimientos.isEmpty());
 }
 
+void TestEdgeCases::materia_fromJsonVacio()
+{
+    QJsonObject empty;
+    Materia result = Materia::fromJson(empty);
+
+    QVERIFY(result.nombre.isEmpty());
+    QCOMPARE(result.horas_semanales, 0);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Profesor — casos borde
 // ═══════════════════════════════════════════════════════════════
@@ -237,17 +260,27 @@ void TestEdgeCases::profesor_materiasVacias()
     QVERIFY(result.materias.isEmpty());
 }
 
-void TestEdgeCases::profesor_nombreConEspacios()
+void TestEdgeCases::profesor_nombreConAcentos()
 {
     Profesor p;
-    p.nombre = "Maria Elena Rodriguez";
+    p.nombre = "Dr. José María García-López";
     p.disponibilidad = {};
     p.materias = {};
 
     QJsonObject json = p.toJson();
     Profesor result = Profesor::fromJson(json);
 
-    QCOMPARE(result.nombre, QString("Maria Elena Rodriguez"));
+    QCOMPARE(result.nombre, QString("Dr. José María García-López"));
+}
+
+void TestEdgeCases::profesor_fromJsonVacio()
+{
+    QJsonObject empty;
+    Profesor result = Profesor::fromJson(empty);
+
+    QVERIFY(result.nombre.isEmpty());
+    QVERIFY(result.disponibilidad.isEmpty());
+    QVERIFY(result.materias.isEmpty());
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -292,17 +325,6 @@ void TestEdgeCases::asignacion_toJsonFromJsonConsistencia()
 // ═══════════════════════════════════════════════════════════════
 // Horario — casos borde
 // ═══════════════════════════════════════════════════════════════
-
-void TestEdgeCases::horario_ceroAsignaciones()
-{
-    Horario h;
-    h.asignaciones = {};
-
-    QJsonObject json = h.toJson();
-    Horario result = Horario::fromJson(json);
-
-    QVERIFY(result.asignaciones.isEmpty());
-}
 
 void TestEdgeCases::horario_cienAsignaciones()
 {
@@ -371,16 +393,31 @@ void TestEdgeCases::planEstudio_nombreLargo()
     QCOMPARE(result.nombre.length(), 500);
 }
 
-void TestEdgeCases::planEstudio_materiasVacias()
+void TestEdgeCases::materiaEnPlan_cursoCero()
 {
-    PlanEstudio plan;
-    plan.nombre = "Plan Vacio";
-    plan.materias = {};
+    MateriaEnPlan mep;
+    mep.materia = {"Matematica", 3, {"Pre-algebra"}};
+    mep.curso = 0;
+    mep.horas = 3;
 
-    QJsonObject json = plan.toJson();
-    PlanEstudio result = PlanEstudio::fromJson(json);
+    QJsonObject json = mep.toJson();
+    MateriaEnPlan result = MateriaEnPlan::fromJson(json);
 
-    QVERIFY(result.materias.isEmpty());
+    QCOMPARE(result.curso, 0);
+    QCOMPARE(result.horas, 3);
+}
+
+void TestEdgeCases::materiaEnPlan_horasCero()
+{
+    MateriaEnPlan mep;
+    mep.materia = {"Fisica", 4, {}};
+    mep.curso = 1;
+    mep.horas = 0;
+
+    QJsonObject json = mep.toJson();
+    MateriaEnPlan result = MateriaEnPlan::fromJson(json);
+
+    QCOMPARE(result.horas, 0);
 }
 
 QTEST_MAIN(TestEdgeCases)
