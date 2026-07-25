@@ -1,0 +1,126 @@
+{
+	"BUILD_DIR" : "/workspace/build-test/src/app/gestor-horarios_autogen",
+	"CMAKE_BINARY_DIR" : "/workspace/build-test",
+	"CMAKE_CURRENT_BINARY_DIR" : "/workspace/build-test/src/app",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/workspace/src/app",
+	"CMAKE_EXECUTABLE" : "/usr/bin/cmake",
+	"CMAKE_LIST_FILES" : [ "/workspace/src/app/CMakeLists.txt" ],
+	"CMAKE_SOURCE_DIR" : "/workspace",
+	"DEP_FILE" : "/workspace/build-test/src/app/gestor-horarios_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "gestor-horarios_autogen/timestamp",
+	"HEADERS" : 
+	[
+		[
+			"/workspace/src/app/include/app/aplicacion_backend.hpp",
+			"Mu",
+			"KTF6LCBHT5/moc_aplicacion_backend.cpp",
+			null
+		],
+		[
+			"/workspace/src/app/include/app/aplicacion_frontend.hpp",
+			"Mu",
+			"KTF6LCBHT5/moc_aplicacion_frontend.cpp",
+			null
+		],
+		[
+			"/workspace/src/app/include/app/gestor_proceso_backend.hpp",
+			"Mu",
+			"KTF6LCBHT5/moc_gestor_proceso_backend.cpp",
+			null
+		]
+	],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/workspace/build-test/src/app/gestor-horarios_autogen/include",
+	"MOC_COMPILATION_FILE" : "/workspace/build-test/src/app/gestor-horarios_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : 
+	[
+		"EIGEN_MPL2_ONLY",
+		"HAVE_CONFIG_H",
+		"OR_PROTO_DLL=",
+		"PROJECT_VERSION=\"0.1.0\"",
+		"PROTOBUF_USE_DLLS",
+		"QT_CORE_LIB",
+		"QT_GUI_LIB",
+		"QT_NETWORK_LIB",
+		"QT_NO_DEBUG",
+		"QT_SQL_LIB",
+		"QT_WIDGETS_LIB",
+		"USE_BOP",
+		"USE_CBC",
+		"USE_CLP",
+		"USE_GLOP",
+		"USE_HIGHS",
+		"USE_MATH_OPT",
+		"USE_PDLP",
+		"USE_SCIP"
+	],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/workspace/src/app/include",
+		"/workspace/src/common/include",
+		"/workspace/src/frontend/include",
+		"/workspace/src/backend/include",
+		"/workspace/src/middleware/include",
+		"/usr/include/x86_64-linux-gnu/qt6/QtCore",
+		"/usr/include/x86_64-linux-gnu/qt6",
+		"/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++",
+		"/usr/include/x86_64-linux-gnu/qt6/QtWidgets",
+		"/usr/include/x86_64-linux-gnu/qt6/QtGui",
+		"/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+		"/usr/local/include/coin",
+		"/usr/local/include/highs",
+		"/usr/local/include/eigen3",
+		"/usr/include/x86_64-linux-gnu/qt6/QtSql",
+		"/usr/include",
+		"/usr/local/include",
+		"/usr/include/c++/12",
+		"/usr/include/x86_64-linux-gnu/c++/12",
+		"/usr/include/c++/12/backward",
+		"/usr/lib/gcc/x86_64-linux-gnu/12/include",
+		"/usr/include/x86_64-linux-gnu"
+	],
+	"MOC_MACRO_NAMES" : 
+	[
+		"Q_OBJECT",
+		"Q_GADGET",
+		"Q_GADGET_EXPORT",
+		"Q_NAMESPACE",
+		"Q_NAMESPACE_EXPORT"
+	],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/c++",
+		"-dM",
+		"-E",
+		"-c",
+		"/usr/share/cmake-3.25/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/workspace/build-test/src/app/gestor-horarios_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : [],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 2,
+	"PARSE_CACHE_FILE" : "/workspace/build-test/src/app/CMakeFiles/gestor-horarios_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/usr/lib/qt6/libexec/moc",
+	"QT_UIC_EXECUTABLE" : "",
+	"QT_VERSION_MAJOR" : 6,
+	"QT_VERSION_MINOR" : 4,
+	"SETTINGS_FILE" : "/workspace/build-test/src/app/CMakeFiles/gestor-horarios_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[ "/workspace/src/app/main.cpp", "Mu", null ],
+		[ "/workspace/src/app/src/aplicacion_backend.cpp", "Mu", null ],
+		[ "/workspace/src/app/src/aplicacion_frontend.cpp", "Mu", null ],
+		[ "/workspace/src/app/src/gestor_proceso_backend.cpp", "Mu", null ]
+	],
+	"VERBOSITY" : 0
+}

@@ -1,0 +1,117 @@
+{
+	"BUILD_DIR" : "/workspace/build-test/test/test_backend_aula_autogen",
+	"CMAKE_BINARY_DIR" : "/workspace/build-test",
+	"CMAKE_CURRENT_BINARY_DIR" : "/workspace/build-test/test",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/workspace/test",
+	"CMAKE_EXECUTABLE" : "/usr/bin/cmake",
+	"CMAKE_LIST_FILES" : 
+	[
+		"/workspace/test/CMakeLists.txt",
+		"/usr/share/cmake-3.25/Modules/FindGTest.cmake",
+		"/usr/share/cmake-3.25/Modules/GoogleTest.cmake",
+		"/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake",
+		"/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/GTest/GTestConfigVersion.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/GTest/GTestConfig.cmake",
+		"/usr/share/cmake-3.25/Modules/CMakeFindDependencyMacro.cmake",
+		"/usr/share/cmake-3.25/Modules/FindThreads.cmake",
+		"/usr/share/cmake-3.25/Modules/CheckLibraryExists.cmake",
+		"/usr/share/cmake-3.25/Modules/CheckIncludeFileCXX.cmake",
+		"/usr/share/cmake-3.25/Modules/CheckCXXSourceCompiles.cmake",
+		"/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake",
+		"/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/GTest/GTestTargets.cmake",
+		"/usr/lib/x86_64-linux-gnu/cmake/GTest/GTestTargets-none.cmake"
+	],
+	"CMAKE_SOURCE_DIR" : "/workspace",
+	"DEP_FILE" : "/workspace/build-test/test/test_backend_aula_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "test_backend_aula_autogen/timestamp",
+	"HEADERS" : [],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/workspace/build-test/test/test_backend_aula_autogen/include",
+	"MOC_COMPILATION_FILE" : "/workspace/build-test/test/test_backend_aula_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : 
+	[
+		"EIGEN_MPL2_ONLY",
+		"HAVE_CONFIG_H",
+		"OR_PROTO_DLL=",
+		"PROTOBUF_USE_DLLS",
+		"QT_CORE_LIB",
+		"QT_NO_DEBUG",
+		"QT_SQL_LIB",
+		"QT_TESTCASE_BUILDDIR=\"/workspace/build-test/test\"",
+		"QT_TESTCASE_SOURCEDIR=\"/workspace/test\"",
+		"QT_TESTLIB_LIB",
+		"USE_BOP",
+		"USE_CBC",
+		"USE_CLP",
+		"USE_GLOP",
+		"USE_HIGHS",
+		"USE_MATH_OPT",
+		"USE_PDLP",
+		"USE_SCIP"
+	],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/workspace/src/backend/include",
+		"/usr/local/include/coin",
+		"/usr/local/include/highs",
+		"/usr/local/include/eigen3",
+		"/usr/include/x86_64-linux-gnu/qt6/QtCore",
+		"/usr/include/x86_64-linux-gnu/qt6",
+		"/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++",
+		"/usr/include/x86_64-linux-gnu/qt6/QtSql",
+		"/usr/include/x86_64-linux-gnu/qt6/QtTest",
+		"/usr/local/include",
+		"/usr/include/c++/12",
+		"/usr/include/x86_64-linux-gnu/c++/12",
+		"/usr/include/c++/12/backward",
+		"/usr/lib/gcc/x86_64-linux-gnu/12/include",
+		"/usr/include/x86_64-linux-gnu",
+		"/usr/include"
+	],
+	"MOC_MACRO_NAMES" : 
+	[
+		"Q_OBJECT",
+		"Q_GADGET",
+		"Q_GADGET_EXPORT",
+		"Q_NAMESPACE",
+		"Q_NAMESPACE_EXPORT"
+	],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/c++",
+		"-dM",
+		"-E",
+		"-c",
+		"/usr/share/cmake-3.25/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/workspace/build-test/test/test_backend_aula_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : 
+	[
+		"/workspace/build-test/test/test_backend_franja_horaria_autogen/mocs_compilation.cpp"
+	],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 2,
+	"PARSE_CACHE_FILE" : "/workspace/build-test/test/CMakeFiles/test_backend_aula_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/usr/lib/qt6/libexec/moc",
+	"QT_UIC_EXECUTABLE" : "",
+	"QT_VERSION_MAJOR" : 6,
+	"QT_VERSION_MINOR" : 4,
+	"SETTINGS_FILE" : "/workspace/build-test/test/CMakeFiles/test_backend_aula_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[ "/workspace/test/backend/test_aula.cpp", "Mu", null ]
+	],
+	"VERBOSITY" : 0
+}

@@ -1,0 +1,616 @@
+Start testing: Jul 20 02:25 UTC
+----------------------------------------------------------
+1/17 Testing: test_backend_franja_horaria
+1/17 Test: test_backend_franja_horaria
+Command: "/workspace/build-test/test/test_backend_franja_horaria"
+Directory: /workspace/build-test/test
+"test_backend_franja_horaria" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestFranjaHoraria *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestFranjaHoraria::initTestCase()
+PASS   : TestFranjaHoraria::toJson_returnsCorrectFields()
+PASS   : TestFranjaHoraria::fromJson_reconstructsObject()
+PASS   : TestFranjaHoraria::roundtrip_toJsonFromJson_identity()
+PASS   : TestFranjaHoraria::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestFranjaHoraria *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_franja_horaria" end time: Jul 20 02:25 UTC
+"test_backend_franja_horaria" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/17 Testing: test_backend_aula
+2/17 Test: test_backend_aula
+Command: "/workspace/build-test/test/test_backend_aula"
+Directory: /workspace/build-test/test
+"test_backend_aula" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestAula *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestAula::initTestCase()
+PASS   : TestAula::toJson_returnsCorrectFields()
+PASS   : TestAula::fromJson_reconstructsObject()
+PASS   : TestAula::roundtrip_toJsonFromJson_identity()
+PASS   : TestAula::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestAula *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_aula" end time: Jul 20 02:25 UTC
+"test_backend_aula" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/17 Testing: test_backend_materia
+3/17 Test: test_backend_materia
+Command: "/workspace/build-test/test/test_backend_materia"
+Directory: /workspace/build-test/test
+"test_backend_materia" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestMateria *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestMateria::initTestCase()
+PASS   : TestMateria::toJson_returnsCorrectFields()
+PASS   : TestMateria::fromJson_reconstructsObject()
+PASS   : TestMateria::requirimientos_emptyWhenNotPresent()
+PASS   : TestMateria::roundtrip_toJsonFromJson_identity()
+PASS   : TestMateria::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 0ms
+********* Finished testing of TestMateria *********
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_materia" end time: Jul 20 02:25 UTC
+"test_backend_materia" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/17 Testing: test_backend_profesor
+4/17 Test: test_backend_profesor
+Command: "/workspace/build-test/test/test_backend_profesor"
+Directory: /workspace/build-test/test
+"test_backend_profesor" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestProfesor *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestProfesor::initTestCase()
+PASS   : TestProfesor::toJson_returnsCorrectFields()
+PASS   : TestProfesor::fromJson_reconstructsObject()
+PASS   : TestProfesor::disponibilidad_emptyWhenNotPresent()
+PASS   : TestProfesor::roundtrip_toJsonFromJson_identity()
+PASS   : TestProfesor::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestProfesor *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_profesor" end time: Jul 20 02:25 UTC
+"test_backend_profesor" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/17 Testing: test_backend_horario
+5/17 Test: test_backend_horario
+Command: "/workspace/build-test/test/test_backend_horario"
+Directory: /workspace/build-test/test
+"test_backend_horario" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestHorario *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestHorario::initTestCase()
+PASS   : TestHorario::asignacion_toJson_returnsCorrectFields()
+PASS   : TestHorario::asignacion_fromJson_reconstructsObject()
+PASS   : TestHorario::horario_toJson_fromJson_singleAsignacion()
+PASS   : TestHorario::horario_empty_asignaciones()
+PASS   : TestHorario::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestHorario *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_horario" end time: Jul 20 02:25 UTC
+"test_backend_horario" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/17 Testing: test_backend_plan_estudio
+6/17 Test: test_backend_plan_estudio
+Command: "/workspace/build-test/test/test_backend_plan_estudio"
+Directory: /workspace/build-test/test
+"test_backend_plan_estudio" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestPlanEstudio *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestPlanEstudio::initTestCase()
+PASS   : TestPlanEstudio::toJson_returnsCorrectFields()
+PASS   : TestPlanEstudio::fromJson_reconstructsObject()
+PASS   : TestPlanEstudio::plan_withoutSubjects()
+PASS   : TestPlanEstudio::roundtrip_toJsonFromJson_identity()
+PASS   : TestPlanEstudio::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestPlanEstudio *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_plan_estudio" end time: Jul 20 02:25 UTC
+"test_backend_plan_estudio" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/17 Testing: test_backend_output_schedule
+7/17 Test: test_backend_output_schedule
+Command: "/workspace/build-test/test/test_backend_output_schedule"
+Directory: /workspace/build-test/test
+"test_backend_output_schedule" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestOutputSchedule *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestOutputSchedule::initTestCase()
+PASS   : TestOutputSchedule::asignacion_output_round_trip()
+PASS   : TestOutputSchedule::asignacion_output_default_values()
+PASS   : TestOutputSchedule::dia_output_round_trip()
+PASS   : TestOutputSchedule::dia_output_empty_assignments()
+PASS   : TestOutputSchedule::curso_output_round_trip()
+PASS   : TestOutputSchedule::metadata_round_trip()
+PASS   : TestOutputSchedule::metadata_default_values()
+PASS   : TestOutputSchedule::horario_salida_round_trip()
+PASS   : TestOutputSchedule::horario_salida_empty_schedule()
+PASS   : TestOutputSchedule::cleanupTestCase()
+Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestOutputSchedule *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_output_schedule" end time: Jul 20 02:25 UTC
+"test_backend_output_schedule" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/17 Testing: test_backend_database
+8/17 Test: test_backend_database
+Command: "/workspace/build-test/test/test_backend_database"
+Directory: /workspace/build-test/test
+"test_backend_database" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestDatabase *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestDatabase::initTestCase()
+QWARN  : TestDatabase::initAndCheckTables() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestDatabase::initAndCheckTables()
+QWARN  : TestDatabase::doubleInitialize_isIdempotent() DatabaseManager ya inicializado, cerrando conexión previa...
+QWARN  : TestDatabase::doubleInitialize_isIdempotent() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+QWARN  : TestDatabase::doubleInitialize_isIdempotent() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestDatabase::doubleInitialize_isIdempotent()
+PASS   : TestDatabase::cleanupTestCase()
+Totals: 4 passed, 0 failed, 0 skipped, 0 blacklisted, 11160ms
+********* Finished testing of TestDatabase *********
+<end of output>
+Test time =  11.17 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_database" end time: Jul 20 02:25 UTC
+"test_backend_database" time elapsed: 00:00:11
+----------------------------------------------------------
+
+9/17 Testing: test_backend_entity_graph
+9/17 Test: test_backend_entity_graph
+Command: "/workspace/build-test/test/test_backend_entity_graph"
+Directory: /workspace/build-test/test
+"test_backend_entity_graph" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestEntityGraph *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestEntityGraph::initTestCase()
+PASS   : TestEntityGraph::fullGraphRoundTrip()
+PASS   : TestEntityGraph::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestEntityGraph *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_backend_entity_graph" end time: Jul 20 02:25 UTC
+"test_backend_entity_graph" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/17 Testing: test_middleware_health_check
+10/17 Test: test_middleware_health_check
+Command: "/workspace/build-test/test/test_middleware_health_check"
+Directory: /workspace/build-test/test
+"test_middleware_health_check" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+Servidor Middleware IPC escuchando en: "GestorHorarios_Middleware"
+Cliente: Conectando al servidor IPC para operación: "health_check"
+Cliente: Conectado al servidor. Enviando solicitud...
+"[2026-07-20 02:25:52.806] [Frontend -> Middleware] Operación: health_check"
+"[2026-07-20 02:25:52.806] [Middleware -> Frontend] Operación: health-check [ok]"
+Cliente: Respuesta recibida — ÉXITO
+
+==================================================
+ [TEST UNITARIO]: ¡ÉXITO COMPLETO!
+    -> El Health-Check funciona de extremo a extremo.
+==================================================
+
+<end of output>
+Test time =   1.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_middleware_health_check" end time: Jul 20 02:25 UTC
+"test_middleware_health_check" time elapsed: 00:00:01
+----------------------------------------------------------
+
+11/17 Testing: test_servicio_aula
+11/17 Test: test_servicio_aula
+Command: "/workspace/build-test/test/test_servicio_aula"
+Directory: /workspace/build-test/test
+"test_servicio_aula" start time: Jul 20 02:25 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioAula *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioAula::initTestCase()
+QWARN  : TestServicioAula::crearAula_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::crearAula_exitoso()
+QWARN  : TestServicioAula::crearAula_nombreVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::crearAula_nombreVacio_falla()
+QWARN  : TestServicioAula::crearAula_capacidadCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::crearAula_capacidadCero_falla()
+QWARN  : TestServicioAula::crearAula_capacidadExcesiva_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::crearAula_capacidadExcesiva_falla()
+QWARN  : TestServicioAula::crearAula_nombreDuplicado_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::crearAula_nombreDuplicado_falla()
+QWARN  : TestServicioAula::obtenerAula_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerAula_exitoso()
+QWARN  : TestServicioAula::obtenerAula_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerAula_inexistente_falla()
+QWARN  : TestServicioAula::listarAulas_vacio() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::listarAulas_vacio()
+QWARN  : TestServicioAula::listarAulas_conDatos() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::listarAulas_conDatos()
+QWARN  : TestServicioAula::actualizarAula_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::actualizarAula_exitoso()
+QWARN  : TestServicioAula::actualizarAula_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::actualizarAula_inexistente_falla()
+QWARN  : TestServicioAula::eliminarAula_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::eliminarAula_exitoso()
+QWARN  : TestServicioAula::eliminarAula_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::eliminarAula_inexistente_falla()
+QWARN  : TestServicioAula::obtenerTodasParaSolver() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerTodasParaSolver()
+QWARN  : TestServicioAula::obtenerAulaParaSolver() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerAulaParaSolver()
+QWARN  : TestServicioAula::obtenerAula_idCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerAula_idCero_falla()
+QWARN  : TestServicioAula::obtenerAula_idNegativo_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::obtenerAula_idNegativo_falla()
+QWARN  : TestServicioAula::eliminarAula_idCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::eliminarAula_idCero_falla()
+QWARN  : TestServicioAula::eliminarAula_idNegativo_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioAula::eliminarAula_idNegativo_falla()
+PASS   : TestServicioAula::cleanupTestCase()
+Totals: 21 passed, 0 failed, 0 skipped, 0 blacklisted, 81949ms
+********* Finished testing of TestServicioAula *********
+<end of output>
+Test time =  81.96 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_aula" end time: Jul 20 02:27 UTC
+"test_servicio_aula" time elapsed: 00:01:21
+----------------------------------------------------------
+
+12/17 Testing: test_servicio_materias
+12/17 Test: test_servicio_materias
+Command: "/workspace/build-test/test/test_servicio_materias"
+Directory: /workspace/build-test/test
+"test_servicio_materias" start time: Jul 20 02:27 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioMaterias *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioMaterias::initTestCase()
+QWARN  : TestServicioMaterias::crearMateria_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::crearMateria_exitoso()
+QWARN  : TestServicioMaterias::crearMateria_sinRequisitos() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::crearMateria_sinRequisitos()
+QWARN  : TestServicioMaterias::crearMateria_nombreVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::crearMateria_nombreVacio_falla()
+QWARN  : TestServicioMaterias::crearMateria_nombreDuplicado_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::crearMateria_nombreDuplicado_falla()
+QWARN  : TestServicioMaterias::obtenerMateria_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::obtenerMateria_exitoso()
+QWARN  : TestServicioMaterias::obtenerMateria_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::obtenerMateria_inexistente_falla()
+QWARN  : TestServicioMaterias::listarMaterias() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::listarMaterias()
+QWARN  : TestServicioMaterias::actualizarMateria_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::actualizarMateria_exitoso()
+QWARN  : TestServicioMaterias::actualizarMateria_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::actualizarMateria_inexistente_falla()
+QWARN  : TestServicioMaterias::eliminarMateria_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::eliminarMateria_exitoso()
+QWARN  : TestServicioMaterias::eliminarMateria_conPlanAsociado_falla() No se puede eliminar la materia porque está asociada a un plan de estudio.
+QWARN  : TestServicioMaterias::eliminarMateria_conPlanAsociado_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::eliminarMateria_conPlanAsociado_falla()
+QWARN  : TestServicioMaterias::toMateria_conRequisitos() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::toMateria_conRequisitos()
+QWARN  : TestServicioMaterias::toMateria_sinRequisitos() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::toMateria_sinRequisitos()
+QWARN  : TestServicioMaterias::obtenerMateria_idCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::obtenerMateria_idCero_falla()
+QWARN  : TestServicioMaterias::obtenerMateria_idNegativo_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::obtenerMateria_idNegativo_falla()
+QWARN  : TestServicioMaterias::eliminarMateria_idCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::eliminarMateria_idCero_falla()
+QWARN  : TestServicioMaterias::eliminarMateria_idNegativo_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioMaterias::eliminarMateria_idNegativo_falla()
+PASS   : TestServicioMaterias::cleanupTestCase()
+Totals: 19 passed, 0 failed, 0 skipped, 0 blacklisted, 88888ms
+********* Finished testing of TestServicioMaterias *********
+<end of output>
+Test time =  88.90 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_materias" end time: Jul 20 02:28 UTC
+"test_servicio_materias" time elapsed: 00:01:28
+----------------------------------------------------------
+
+13/17 Testing: test_servicio_planes_estudio
+13/17 Test: test_servicio_planes_estudio
+Command: "/workspace/build-test/test/test_servicio_planes_estudio"
+Directory: /workspace/build-test/test
+"test_servicio_planes_estudio" start time: Jul 20 02:28 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioPlanesEstudio *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioPlanesEstudio::initTestCase()
+QWARN  : TestServicioPlanesEstudio::crearPlan_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::crearPlan_exitoso()
+QWARN  : TestServicioPlanesEstudio::crearPlan_sinDescripcion() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::crearPlan_sinDescripcion()
+QWARN  : TestServicioPlanesEstudio::crearPlan_codigoVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::crearPlan_codigoVacio_falla()
+QWARN  : TestServicioPlanesEstudio::crearPlan_nombreVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::crearPlan_nombreVacio_falla()
+QWARN  : TestServicioPlanesEstudio::crearPlan_codigoDuplicado_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::crearPlan_codigoDuplicado_falla()
+QWARN  : TestServicioPlanesEstudio::obtenerPlan_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::obtenerPlan_exitoso()
+QWARN  : TestServicioPlanesEstudio::obtenerPlan_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::obtenerPlan_inexistente_falla()
+QWARN  : TestServicioPlanesEstudio::listarPlanes() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::listarPlanes()
+QWARN  : TestServicioPlanesEstudio::actualizarPlan_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::actualizarPlan_exitoso()
+QWARN  : TestServicioPlanesEstudio::actualizarPlan_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::actualizarPlan_inexistente_falla()
+QWARN  : TestServicioPlanesEstudio::eliminarPlan_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::eliminarPlan_exitoso()
+QWARN  : TestServicioPlanesEstudio::eliminarPlan_conMaterias_falla() No se puede eliminar el plan porque tiene materias asociadas.
+QWARN  : TestServicioPlanesEstudio::eliminarPlan_conMaterias_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::eliminarPlan_conMaterias_falla()
+QWARN  : TestServicioPlanesEstudio::eliminarPlan_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::eliminarPlan_inexistente_falla()
+QWARN  : TestServicioPlanesEstudio::eliminarPlan_codigoVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::eliminarPlan_codigoVacio_falla()
+QWARN  : TestServicioPlanesEstudio::obtenerPlan_codigoLargo_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioPlanesEstudio::obtenerPlan_codigoLargo_falla()
+PASS   : TestServicioPlanesEstudio::cleanupTestCase()
+Totals: 17 passed, 0 failed, 0 skipped, 0 blacklisted, 67767ms
+********* Finished testing of TestServicioPlanesEstudio *********
+<end of output>
+Test time =  67.78 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_planes_estudio" end time: Jul 20 02:29 UTC
+"test_servicio_planes_estudio" time elapsed: 00:01:07
+----------------------------------------------------------
+
+14/17 Testing: test_servicio_carga_horaria
+14/17 Test: test_servicio_carga_horaria
+Command: "/workspace/build-test/test/test_servicio_carga_horaria"
+Directory: /workspace/build-test/test
+"test_servicio_carga_horaria" start time: Jul 20 02:29 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioCargaHoraria *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioCargaHoraria::initTestCase()
+QWARN  : TestServicioCargaHoraria::asignarCarga_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_exitoso()
+QWARN  : TestServicioCargaHoraria::asignarCarga_planInexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_planInexistente_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_materiaInexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_materiaInexistente_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_cursoInvalido_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_cursoInvalido_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_horasCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_horasCero_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_duplicado_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_duplicado_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_excedeLimite_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_excedeLimite_falla()
+QWARN  : TestServicioCargaHoraria::obtenerCarga_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::obtenerCarga_exitoso()
+QWARN  : TestServicioCargaHoraria::obtenerCarga_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::obtenerCarga_inexistente_falla()
+QWARN  : TestServicioCargaHoraria::listarCargaPorPlan() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::listarCargaPorPlan()
+QWARN  : TestServicioCargaHoraria::listarCargaPorPlan_planSinMaterias() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::listarCargaPorPlan_planSinMaterias()
+QWARN  : TestServicioCargaHoraria::actualizarCarga_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::actualizarCarga_exitoso()
+QWARN  : TestServicioCargaHoraria::actualizarCarga_excedeLimite_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::actualizarCarga_excedeLimite_falla()
+QWARN  : TestServicioCargaHoraria::actualizarCarga_inexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::actualizarCarga_inexistente_falla()
+QWARN  : TestServicioCargaHoraria::eliminarCarga_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::eliminarCarga_exitoso()
+QWARN  : TestServicioCargaHoraria::totalHorasPorAnio() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::totalHorasPorAnio()
+QWARN  : TestServicioCargaHoraria::excedeLimiteHoras() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::excedeLimiteHoras()
+QWARN  : TestServicioCargaHoraria::asignarCarga_horasNegativas_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_horasNegativas_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_planVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_planVacio_falla()
+QWARN  : TestServicioCargaHoraria::asignarCarga_materiaIdCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::asignarCarga_materiaIdCero_falla()
+QWARN  : TestServicioCargaHoraria::eliminarCarga_planVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::eliminarCarga_planVacio_falla()
+QWARN  : TestServicioCargaHoraria::eliminarCarga_materiaIdCero_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioCargaHoraria::eliminarCarga_materiaIdCero_falla()
+PASS   : TestServicioCargaHoraria::cleanupTestCase()
+Totals: 24 passed, 0 failed, 0 skipped, 0 blacklisted, 165626ms
+********* Finished testing of TestServicioCargaHoraria *********
+<end of output>
+Test time = 165.63 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_carga_horaria" end time: Jul 20 02:32 UTC
+"test_servicio_carga_horaria" time elapsed: 00:02:45
+----------------------------------------------------------
+
+15/17 Testing: test_composicion_plan
+15/17 Test: test_composicion_plan
+Command: "/workspace/build-test/test/test_composicion_plan"
+Directory: /workspace/build-test/test
+"test_composicion_plan" start time: Jul 20 02:32 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioComposicionPlan *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioComposicionPlan::initTestCase()
+QWARN  : TestServicioComposicionPlan::componerPlanCompleto_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::componerPlanCompleto_exitoso()
+QWARN  : TestServicioComposicionPlan::componerPlanCompleto_codigoVacio_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::componerPlanCompleto_codigoVacio_falla()
+QWARN  : TestServicioComposicionPlan::componerPlanCompleto_planInexistente_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::componerPlanCompleto_planInexistente_falla()
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_exitoso() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::obtenerMateriasConCarga_exitoso()
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_planVacio() ServicioComposicionPlan: Código de plan vacío.
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_planVacio() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::obtenerMateriasConCarga_planVacio()
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_planInexistente() ServicioComposicionPlan: Plan no existe: "PLAN-999"
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_planInexistente() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::obtenerMateriasConCarga_planInexistente()
+QWARN  : TestServicioComposicionPlan::listarPlanesDisponibles() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::listarPlanesDisponibles()
+QWARN  : TestServicioComposicionPlan::listarPlanesDisponibles_vacio() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::listarPlanesDisponibles_vacio()
+QWARN  : TestServicioComposicionPlan::componerPlanCompleto_planSinMaterias_falla() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::componerPlanCompleto_planSinMaterias_falla()
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_codigoConEspacios() ServicioComposicionPlan: Código de plan vacío.
+QWARN  : TestServicioComposicionPlan::obtenerMateriasConCarga_codigoConEspacios() QSqlDatabasePrivate::removeDatabase: connection 'qt_sql_default_connection' is still in use, all queries will cease to work.
+PASS   : TestServicioComposicionPlan::obtenerMateriasConCarga_codigoConEspacios()
+PASS   : TestServicioComposicionPlan::cleanupTestCase()
+Totals: 12 passed, 0 failed, 0 skipped, 0 blacklisted, 57829ms
+********* Finished testing of TestServicioComposicionPlan *********
+<end of output>
+Test time =  57.84 sec
+----------------------------------------------------------
+Test Passed.
+"test_composicion_plan" end time: Jul 20 02:33 UTC
+"test_composicion_plan" time elapsed: 00:00:57
+----------------------------------------------------------
+
+16/17 Testing: test_servicio_consulta_horario
+16/17 Test: test_servicio_consulta_horario
+Command: "/workspace/build-test/test/test_servicio_consulta_horario"
+Directory: /workspace/build-test/test
+"test_servicio_consulta_horario" start time: Jul 20 02:33 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioConsultaHorario *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioConsultaHorario::initTestCase()
+PASS   : TestServicioConsultaHorario::buscar_profesor_con_asignaciones()
+PASS   : TestServicioConsultaHorario::buscar_profesor_sin_asignaciones()
+PASS   : TestServicioConsultaHorario::buscar_aula_con_asignaciones()
+PASS   : TestServicioConsultaHorario::buscar_aula_no_usada()
+PASS   : TestServicioConsultaHorario::buscar_dia_con_asignaciones()
+PASS   : TestServicioConsultaHorario::buscar_dia_sin_asignaciones()
+PASS   : TestServicioConsultaHorario::buscar_curso_existente()
+PASS   : TestServicioConsultaHorario::buscar_curso_no_existente()
+PASS   : TestServicioConsultaHorario::detectar_conflictos_profesor()
+PASS   : TestServicioConsultaHorario::detectar_conflictos_aula()
+PASS   : TestServicioConsultaHorario::detectar_conflictos_ambos()
+PASS   : TestServicioConsultaHorario::detectar_conflictos_ninguno()
+PASS   : TestServicioConsultaHorario::hay_conflicto_true()
+PASS   : TestServicioConsultaHorario::hay_conflicto_false()
+PASS   : TestServicioConsultaHorario::hay_conflicto_curso_no_existente()
+PASS   : TestServicioConsultaHorario::hay_conflicto_asignacion_no_encontrada()
+PASS   : TestServicioConsultaHorario::estadisticas_horario_completo()
+PASS   : TestServicioConsultaHorario::estadisticas_horario_vacio()
+PASS   : TestServicioConsultaHorario::cleanupTestCase()
+Totals: 20 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestServicioConsultaHorario *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_consulta_horario" end time: Jul 20 02:33 UTC
+"test_servicio_consulta_horario" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/17 Testing: test_servicio_horario_salida
+17/17 Test: test_servicio_horario_salida
+Command: "/workspace/build-test/test/test_servicio_horario_salida"
+Directory: /workspace/build-test/test
+"test_servicio_horario_salida" start time: Jul 20 02:33 UTC
+Output:
+----------------------------------------------------------
+********* Start testing of TestServicioHorarioSalida *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestServicioHorarioSalida::initTestCase()
+PASS   : TestServicioHorarioSalida::listarArchivos_directorioVacio()
+PASS   : TestServicioHorarioSalida::listarArchivos_conArchivosJson()
+PASS   : TestServicioHorarioSalida::listarArchivos_ignoraNoJson()
+PASS   : TestServicioHorarioSalida::listarArchivos_directorioInexistente()
+PASS   : TestServicioHorarioSalida::cargarHorario_archivoExistente()
+PASS   : TestServicioHorarioSalida::cargarHorario_archivoInexistente_falla()
+PASS   : TestServicioHorarioSalida::cargarHorario_jsonInvalido_falla()
+PASS   : TestServicioHorarioSalida::cargarHorario_camposFaltantes_falla()
+PASS   : TestServicioHorarioSalida::guardarHorario_roundTrip()
+PASS   : TestServicioHorarioSalida::guardarHorario_directorioNoExiste()
+PASS   : TestServicioHorarioSalida::agregarAsignacion_exitoso()
+PASS   : TestServicioHorarioSalida::agregarAsignacion_cursoInexistente_falla()
+PASS   : TestServicioHorarioSalida::agregarAsignacion_slotDuplicado_falla()
+PASS   : TestServicioHorarioSalida::agregarAsignacion_nuevoDia()
+PASS   : TestServicioHorarioSalida::eliminarAsignacion_exitoso()
+PASS   : TestServicioHorarioSalida::eliminarAsignacion_slotInexistente_falla()
+PASS   : TestServicioHorarioSalida::eliminarAsignacion_diaInexistente_falla()
+PASS   : TestServicioHorarioSalida::modificarAsignacion_exitoso()
+PASS   : TestServicioHorarioSalida::modificarAsignacion_inexistente_falla()
+PASS   : TestServicioHorarioSalida::obtenerCurso_exitoso()
+PASS   : TestServicioHorarioSalida::obtenerCurso_inexistente_falla()
+PASS   : TestServicioHorarioSalida::listarCursos_conDatos()
+PASS   : TestServicioHorarioSalida::listarCursos_vacio()
+PASS   : TestServicioHorarioSalida::cleanupTestCase()
+Totals: 25 passed, 0 failed, 0 skipped, 0 blacklisted, 12ms
+********* Finished testing of TestServicioHorarioSalida *********
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"test_servicio_horario_salida" end time: Jul 20 02:33 UTC
+"test_servicio_horario_salida" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jul 20 02:33 UTC

@@ -1,0 +1,192 @@
+/****************************************************************************
+** Meta object code from reading C++ file 'test_output_schedule.cpp'
+**
+** Created by: The Qt Meta Object Compiler version 68 (Qt 6.4.2)
+**
+** WARNING! All changes made in this file will be lost!
+*****************************************************************************/
+
+#include <memory>
+#include <QtCore/qmetatype.h>
+#if !defined(Q_MOC_OUTPUT_REVISION)
+#error "The header file 'test_output_schedule.cpp' doesn't include <QObject>."
+#elif Q_MOC_OUTPUT_REVISION != 68
+#error "This file was generated using the moc from 6.4.2. It"
+#error "cannot be used with the include files from this version of Qt."
+#error "(The moc has changed too much.)"
+#endif
+
+#ifndef Q_CONSTINIT
+#define Q_CONSTINIT
+#endif
+
+QT_BEGIN_MOC_NAMESPACE
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+namespace {
+struct qt_meta_stringdata_TestOutputSchedule_t {
+    uint offsetsAndSizes[22];
+    char stringdata0[19];
+    char stringdata1[29];
+    char stringdata2[1];
+    char stringdata3[33];
+    char stringdata4[22];
+    char stringdata5[29];
+    char stringdata6[24];
+    char stringdata7[20];
+    char stringdata8[24];
+    char stringdata9[26];
+    char stringdata10[30];
+};
+#define QT_MOC_LITERAL(ofs, len) \
+    uint(sizeof(qt_meta_stringdata_TestOutputSchedule_t::offsetsAndSizes) + ofs), len 
+Q_CONSTINIT static const qt_meta_stringdata_TestOutputSchedule_t qt_meta_stringdata_TestOutputSchedule = {
+    {
+        QT_MOC_LITERAL(0, 18),  // "TestOutputSchedule"
+        QT_MOC_LITERAL(19, 28),  // "asignacion_output_round_trip"
+        QT_MOC_LITERAL(48, 0),  // ""
+        QT_MOC_LITERAL(49, 32),  // "asignacion_output_default_values"
+        QT_MOC_LITERAL(82, 21),  // "dia_output_round_trip"
+        QT_MOC_LITERAL(104, 28),  // "dia_output_empty_assignments"
+        QT_MOC_LITERAL(133, 23),  // "curso_output_round_trip"
+        QT_MOC_LITERAL(157, 19),  // "metadata_round_trip"
+        QT_MOC_LITERAL(177, 23),  // "metadata_default_values"
+        QT_MOC_LITERAL(201, 25),  // "horario_salida_round_trip"
+        QT_MOC_LITERAL(227, 29)   // "horario_salida_empty_schedule"
+    },
+    "TestOutputSchedule",
+    "asignacion_output_round_trip",
+    "",
+    "asignacion_output_default_values",
+    "dia_output_round_trip",
+    "dia_output_empty_assignments",
+    "curso_output_round_trip",
+    "metadata_round_trip",
+    "metadata_default_values",
+    "horario_salida_round_trip",
+    "horario_salida_empty_schedule"
+};
+#undef QT_MOC_LITERAL
+} // unnamed namespace
+
+Q_CONSTINIT static const uint qt_meta_data_TestOutputSchedule[] = {
+
+ // content:
+      10,       // revision
+       0,       // classname
+       0,    0, // classinfo
+       9,   14, // methods
+       0,    0, // properties
+       0,    0, // enums/sets
+       0,    0, // constructors
+       0,       // flags
+       0,       // signalCount
+
+ // slots: name, argc, parameters, tag, flags, initial metatype offsets
+       1,    0,   68,    2, 0x08,    1 /* Private */,
+       3,    0,   69,    2, 0x08,    2 /* Private */,
+       4,    0,   70,    2, 0x08,    3 /* Private */,
+       5,    0,   71,    2, 0x08,    4 /* Private */,
+       6,    0,   72,    2, 0x08,    5 /* Private */,
+       7,    0,   73,    2, 0x08,    6 /* Private */,
+       8,    0,   74,    2, 0x08,    7 /* Private */,
+       9,    0,   75,    2, 0x08,    8 /* Private */,
+      10,    0,   76,    2, 0x08,    9 /* Private */,
+
+ // slots: parameters
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+
+       0        // eod
+};
+
+Q_CONSTINIT const QMetaObject TestOutputSchedule::staticMetaObject = { {
+    QMetaObject::SuperData::link<QObject::staticMetaObject>(),
+    qt_meta_stringdata_TestOutputSchedule.offsetsAndSizes,
+    qt_meta_data_TestOutputSchedule,
+    qt_static_metacall,
+    nullptr,
+    qt_incomplete_metaTypeArray<qt_meta_stringdata_TestOutputSchedule_t,
+        // Q_OBJECT / Q_GADGET
+        QtPrivate::TypeAndForceComplete<TestOutputSchedule, std::true_type>,
+        // method 'asignacion_output_round_trip'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'asignacion_output_default_values'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'dia_output_round_trip'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'dia_output_empty_assignments'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'curso_output_round_trip'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'metadata_round_trip'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'metadata_default_values'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'horario_salida_round_trip'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'horario_salida_empty_schedule'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>
+    >,
+    nullptr
+} };
+
+void TestOutputSchedule::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
+{
+    if (_c == QMetaObject::InvokeMetaMethod) {
+        auto *_t = static_cast<TestOutputSchedule *>(_o);
+        (void)_t;
+        switch (_id) {
+        case 0: _t->asignacion_output_round_trip(); break;
+        case 1: _t->asignacion_output_default_values(); break;
+        case 2: _t->dia_output_round_trip(); break;
+        case 3: _t->dia_output_empty_assignments(); break;
+        case 4: _t->curso_output_round_trip(); break;
+        case 5: _t->metadata_round_trip(); break;
+        case 6: _t->metadata_default_values(); break;
+        case 7: _t->horario_salida_round_trip(); break;
+        case 8: _t->horario_salida_empty_schedule(); break;
+        default: ;
+        }
+    }
+    (void)_a;
+}
+
+const QMetaObject *TestOutputSchedule::metaObject() const
+{
+    return QObject::d_ptr->metaObject ? QObject::d_ptr->dynamicMetaObject() : &staticMetaObject;
+}
+
+void *TestOutputSchedule::qt_metacast(const char *_clname)
+{
+    if (!_clname) return nullptr;
+    if (!strcmp(_clname, qt_meta_stringdata_TestOutputSchedule.stringdata0))
+        return static_cast<void*>(this);
+    return QObject::qt_metacast(_clname);
+}
+
+int TestOutputSchedule::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
+{
+    _id = QObject::qt_metacall(_c, _id, _a);
+    if (_id < 0)
+        return _id;
+    if (_c == QMetaObject::InvokeMetaMethod) {
+        if (_id < 9)
+            qt_static_metacall(this, _c, _id, _a);
+        _id -= 9;
+    } else if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
+        if (_id < 9)
+            *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
+        _id -= 9;
+    }
+    return _id;
+}
+QT_WARNING_POP
+QT_END_MOC_NAMESPACE

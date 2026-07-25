@@ -1,0 +1,18 @@
+test_backend_output_schedule 3 0.00214534
+test_servicio_consulta_horario 3 0.00314645
+test_servicio_horario_salida 3 0.00660626
+test_backend_franja_horaria 2 0.00414319
+test_backend_aula 2 0.00363831
+test_backend_materia 2 0.00245622
+test_backend_profesor 2 0.00265496
+test_backend_horario 2 0.00364079
+test_backend_plan_estudio 2 0.00344229
+test_backend_database 2 5.5836
+test_backend_entity_graph 2 0.00477204
+test_middleware_health_check 2 0.504826
+test_servicio_aula 2 40.9787
+test_servicio_materias 2 44.449
+test_servicio_planes_estudio 2 33.8894
+test_servicio_carga_horaria 2 82.8171
+test_composicion_plan 2 28.9188
+---
