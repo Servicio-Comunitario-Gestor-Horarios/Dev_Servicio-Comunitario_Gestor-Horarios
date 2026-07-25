@@ -1,4 +1,8 @@
 build/
+build-test/
+build-fe/
+build-lite/
+Testing/
 .env
 timelapse-*.mp4
 docs/timelapses/*.mp4
