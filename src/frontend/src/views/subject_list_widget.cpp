@@ -1,3 +1,8 @@
+/**
+ * @file subject_list_widget.cpp
+ * @brief Implementación del widget de gestión de asignaturas con cabecera de acciones centrada
+ */
+
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
 #include <QHBoxLayout>
@@ -5,57 +10,156 @@
 #include <QLabel>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QFrame>
+#include <QProgressBar>
 
 SubjectListWidget::SubjectListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
 }
 
 void SubjectListWidget::setupUi() {
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(30, 30, 30, 30);
-    mainLayout->setSpacing(20);
+    // Layout principal horizontal que divide la pantalla en dos columnas
+    QHBoxLayout *masterLayout = new QHBoxLayout(this);
+    masterLayout->setContentsMargins(40, 40, 40, 40);
+    masterLayout->setSpacing(24);
+
+    // ==========================================
+    // COLUMNA IZQUIERDA: CONTENIDO PRINCIPAL (Tabla)
+    // ==========================================
+    QVBoxLayout *leftContentLayout = new QVBoxLayout();
+    leftContentLayout->setSpacing(24);
 
     // Cabecera
     QHBoxLayout *headerLayout = new QHBoxLayout();
     QVBoxLayout *textLayout = new QVBoxLayout();
+    textLayout->setSpacing(4);
+
     QLabel *titulo = new QLabel("Gestión de Asignaturas", this);
-    titulo->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827;");
+    titulo->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+
     QLabel *subtitulo = new QLabel("Administra las asignaturas y su tipo de aula requerido", this);
-    subtitulo->setStyleSheet("font-size: 14px; color: #6b7280;");
+    subtitulo->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
+
     textLayout->addWidget(titulo);
     textLayout->addWidget(subtitulo);
 
     m_registerButton = new QPushButton("+ Registrar Asignatura", this);
     m_registerButton->setCursor(Qt::PointingHandCursor);
     m_registerButton->setStyleSheet(
-        "QPushButton { background-color: #1a237e; color: white; font-weight: bold; "
-        "padding: 10px 20px; border-radius: 6px; font-size: 14px; } "
-        "QPushButton:hover { background-color: #283593; }");
+        "QPushButton { background-color: #1e3a8a; color: white; font-weight: 700; "
+        "padding: 10px 20px; border-radius: 6px; font-size: 13px; } "
+        "QPushButton:hover { background-color: #162a69; }");
 
     headerLayout->addLayout(textLayout);
     headerLayout->addStretch();
     headerLayout->addWidget(m_registerButton);
+    leftContentLayout->addLayout(headerLayout);
 
-    mainLayout->addLayout(headerLayout);
-
-    // Tabla
+    // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
     m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
     m_table->setStyleSheet(
-        "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; }"
-        "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
-        "border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
-        "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }");
-    m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+        "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; }"
+        "QHeaderView::section { background-color: #f8fafc; font-weight: 700; color: #475569; "
+        "border: none; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; font-size: 13px; }"
+        "QTableWidget::item { border: none; border-bottom: 1px solid #f1f5f9; padding: 10px 20px; color: #0f172a; font-size: 13px; }");
+
+    QHeaderView *header = m_table->horizontalHeader();
+    header->setSectionResizeMode(0, QHeaderView::Stretch);
+    header->setSectionResizeMode(1, QHeaderView::Stretch);
+    header->setSectionResizeMode(2, QHeaderView::Fixed);
+    m_table->setColumnWidth(2, 260);
+
+    // Alineación inteligente: Nombre y Tipo de aula a la izquierda, Acciones centrada
+    header->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    // Forzamos específicamente que el título de la columna 3 ("Acciones") quede centrado sobre los botones
+    if (auto itemAcciones = m_table->horizontalHeaderItem(2)) {
+        itemAcciones->setTextAlignment(Qt::AlignCenter);
+    }
+
     m_table->verticalHeader()->setVisible(false);
     m_table->setShowGrid(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->verticalHeader()->setDefaultSectionSize(45);
+    m_table->verticalHeader()->setDefaultSectionSize(60);
 
-    mainLayout->addWidget(m_table);
+    leftContentLayout->addWidget(m_table);
+
+    // ==========================================
+    // COLUMNA DERECHA: PANEL LATERAL DE RESUMEN
+    // ==========================================
+    QFrame *sidePanel = new QFrame(this);
+    sidePanel->setFixedWidth(310);
+    sidePanel->setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }");
+
+    QVBoxLayout *sideLayout = new QVBoxLayout(sidePanel);
+    sideLayout->setContentsMargins(24, 28, 24, 28);
+    sideLayout->setSpacing(22);
+
+    QLabel *summaryTitle = new QLabel("Controles de Resumen", sidePanel);
+    summaryTitle->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+    sideLayout->addWidget(summaryTitle);
+
+    QHBoxLayout *occupancyLayout = new QHBoxLayout();
+    occupancyLayout->setAlignment(Qt::AlignVCenter);
+
+    QLabel *occLabel = new QLabel("Ocupación de\nAulas:", sidePanel);
+    occLabel->setStyleSheet("font-size: 13px; color: #475569; border: none; background: transparent; font-weight: 600; line-height: 1.2;");
+
+    QLabel *occVal = new QLabel("65%", sidePanel);
+    occVal->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+    occVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    occupancyLayout->addWidget(occLabel);
+    occupancyLayout->addStretch();
+    occupancyLayout->addWidget(occVal);
+    sideLayout->addLayout(occupancyLayout);
+
+    QProgressBar *progressBar = new QProgressBar(sidePanel);
+    progressBar->setValue(65);
+    progressBar->setFixedHeight(8);
+    progressBar->setTextVisible(false);
+    progressBar->setStyleSheet(
+        "QProgressBar { background-color: #e2e8f0; border-radius: 4px; border: none; }"
+        "QProgressBar::chunk { background-color: #1e3a8a; border-radius: 4px; }");
+    sideLayout->addWidget(progressBar);
+
+    QFrame *lineDiv = new QFrame(sidePanel);
+    lineDiv->setFrameShape(QFrame::HLine);
+    lineDiv->setStyleSheet("color: #f1f5f9; border: none; background-color: #f1f5f9; max-height: 1px;");
+    sideLayout->addWidget(lineDiv);
+
+    QLabel *notifTitle = new QLabel("Notificaciones Recientes", sidePanel);
+    notifTitle->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+    sideLayout->addWidget(notifTitle);
+
+    auto createNotifItem = [sidePanel](const QString& titleText, const QString& timeText) -> QWidget* {
+        QWidget *itemWidget = new QWidget(sidePanel);
+        itemWidget->setStyleSheet("background: transparent; border: none;");
+        QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
+        itemLayout->setContentsMargins(0, 6, 0, 6);
+        itemLayout->setSpacing(3);
+
+        QLabel *lblTitle = new QLabel(titleText, itemWidget);
+        lblTitle->setWordWrap(true);
+        lblTitle->setStyleSheet("font-size: 12px; font-weight: 700; color: #1e293b; border: none; background: transparent;");
+
+        QLabel *lblTime = new QLabel(timeText, itemWidget);
+        lblTime->setStyleSheet("font-size: 11px; color: #64748b; border: none; background: transparent;");
+
+        itemLayout->addWidget(lblTitle);
+        itemLayout->addWidget(lblTime);
+        return itemWidget;
+    };
+
+    sideLayout->addWidget(createNotifItem("Aula 201: Matemáticas en curso", "7 hours ago"));
+    sideLayout->addWidget(createNotifItem("Nuevo registro: Historia", "2 hours ago"));
+    sideLayout->addWidget(createNotifItem("Mantenimiento en Lab-3", "2 hours ago"));
+    sideLayout->addStretch();
+
+    masterLayout->addLayout(leftContentLayout, 3);
+    masterLayout->addWidget(sidePanel, 1);
 
     connect(m_registerButton, &QPushButton::clicked, this, &SubjectListWidget::abrirFormularioNuevo);
 }
@@ -71,32 +175,44 @@ void SubjectListWidget::agregarMateriaATabla(const QString& nombre, const QStrin
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
-    m_table->setItem(fila, 0, new QTableWidgetItem(nombre));
-    m_table->setItem(fila, 1, new QTableWidgetItem(tipoAula));
+    QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
+    QTableWidgetItem *itemTipo = new QTableWidgetItem(tipoAula);
 
-    // Acciones
+    itemNombre->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    itemTipo->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    m_table->setItem(fila, 0, itemNombre);
+    m_table->setItem(fila, 1, itemTipo);
+
+    // Contenedor de Acciones perfectamente centrado
     QWidget *panelAcciones = new QWidget();
     QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
-    layoutAcciones->setContentsMargins(0,0,0,0);
+    layoutAcciones->setContentsMargins(0, 0, 0, 0);
     layoutAcciones->setSpacing(10);
+    layoutAcciones->setAlignment(Qt::AlignCenter);
 
-    QPushButton *btnEditar = new QPushButton("✏️");
-    btnEditar->setStyleSheet("color: #2563eb; background: transparent; border: none; font-weight: bold;");
+    QPushButton *btnEditar = new QPushButton("✏️ Editar");
+    btnEditar->setFixedSize(90, 34);
+    btnEditar->setStyleSheet(
+        "QPushButton { color: #2563eb; background: #eff6ff; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
+        "QPushButton:hover { background-color: #dbeafe; }");
     btnEditar->setCursor(Qt::PointingHandCursor);
 
-    QPushButton *btnEliminar = new QPushButton("🗑️");
-    btnEliminar->setStyleSheet("color: #dc2626; background: transparent; border: none; font-weight: bold;");
+    QPushButton *btnEliminar = new QPushButton("🗑️ Eliminar");
+    btnEliminar->setFixedSize(100, 34);
+    btnEliminar->setStyleSheet(
+        "QPushButton { color: #dc2626; background: #ffeeec; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
+        "QPushButton:hover { background-color: #fee2e2; }");
     btnEliminar->setCursor(Qt::PointingHandCursor);
 
-    layoutAcciones->addStretch();
     layoutAcciones->addWidget(btnEditar);
     layoutAcciones->addWidget(btnEliminar);
-    layoutAcciones->addStretch();
 
+    // Lógica de Eliminación
     connect(btnEliminar, &QPushButton::clicked, this, [this, panelAcciones]() {
         if (QMessageBox::question(this, "Confirmar eliminación",
                                   "¿Está seguro de eliminar esta asignatura?") == QMessageBox::Yes) {
-            for (int i=0; i<m_table->rowCount(); ++i) {
+            for (int i = 0; i < m_table->rowCount(); ++i) {
                 if (m_table->cellWidget(i, 2) == panelAcciones) {
                     m_table->removeRow(i);
                     break;
@@ -105,9 +221,10 @@ void SubjectListWidget::agregarMateriaATabla(const QString& nombre, const QStrin
         }
     });
 
+    // Lógica de Edición
     connect(btnEditar, &QPushButton::clicked, this, [this, panelAcciones]() {
         int filaEditar = -1;
-        for (int i=0; i<m_table->rowCount(); ++i) {
+        for (int i = 0; i < m_table->rowCount(); ++i) {
             if (m_table->cellWidget(i, 2) == panelAcciones) {
                 filaEditar = i;
                 break;
