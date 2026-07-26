@@ -27,5 +27,6 @@ class Solver {
         CpModelBuilder model;
         
         void agregarRestricciones(const SolverConfig& config);
-        HorarioSalida extraerSolucion(const SolverConfig& config);
+        HorarioSalida extraerSolucion(const CpSolverResponse& response, const SolverConfig& config);
+        QStringList analizarFallo(const CpSolverResponse& response, const SolverConfig& config);
 };

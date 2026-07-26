@@ -481,18 +481,18 @@ agregarRestriccionesProfesores(model, config, assignment);
 | Tarea | Estado | Fecha |
 |-------|--------|-------|
 | T1.1 Config structs | [x] Completada | 2026-07-24 |
-| T1.2 Parser JSON | [ ] Pendiente | |
-| T1.3 Header | [ ] Pendiente | |
-| T1.4 Skeleton | [ ] Pendiente | |
-| T1.5 Aulas constraints | [ ] Pendiente | |
-| T1.6 Turnos constraints | [ ] Pendiente | |
-| T1.7 CMake | [ ] Pendiente | |
+| T1.2 Parser JSON | [x] Completada | 2026-07-24 |
+| T1.3 Header | [x] Completada | 2026-07-24 |
+| T1.4 Skeleton | [x] Completada | 2026-07-25 |
+| T1.5 Aulas constraints | [x] Completada | 2026-07-25 |
+| T1.6 Turnos constraints | [x] Completada | 2026-07-25 |
+| T1.7 CMake | [x] Completada | 2026-07-24 |
 | T1.8 Tests | [ ] Pendiente | |
 | T1.9 Register test | [ ] Pendiente | |
-| T2.1 Profesores constraints | [ ] Pendiente | |
-| T2.2 V13 validation | [ ] Pendiente | |
+| T2.1 Profesores constraints | [x] Completada | 2026-07-25 |
+| T2.2 V13 validation | [x] Completada | 2026-07-26 |
 | T2.3 Wire orchestrator | [ ] Pendiente | |
-| T2.4 Extract solution | [ ] Pendiente | |
-| T2.5 Feasibility | [ ] Pendiente | |
+| T2.4 Extract solution | [x] Completada | 2026-07-26 |
+| T2.5 Feasibility | [x] Completada | 2026-07-26 |
 | T2.6 Tests expanded | [ ] Pendiente | |
 | T2.7 Benchmark | [ ] Pendiente | |
