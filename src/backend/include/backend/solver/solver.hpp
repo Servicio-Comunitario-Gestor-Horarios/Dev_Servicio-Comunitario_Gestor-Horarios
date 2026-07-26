@@ -2,6 +2,13 @@
 
 #include "backend/data/horario_salida.hpp"
 #include "backend/solver/config/solver_config.hpp"
+#include "backend/solver/variables.hpp"
+#include "ortools/sat/cp_model.h"
+#include "ortools/sat/cp_model.pb.h"
+#include "ortools/sat/cp_model_solver.h"
+
+
+using namespace operations_research::sat;
 
 class Solver {
     public:
@@ -16,5 +23,5 @@ class Solver {
     
     private:
         void agregarRestricciones(const SolverConfig& config);
-        void extraerSolucion(const SolverConfig& config);
+        HorarioSalida extraerSolucion(const SolverConfig& config);
 };

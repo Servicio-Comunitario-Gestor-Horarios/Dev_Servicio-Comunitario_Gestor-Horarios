@@ -39,23 +39,46 @@ BoolVarAula 4D: aula_assignment[curso][dia][slot][aula]
 8. **Un docente por materia-curso** (sum_p <= 1)
 9. **Suplente reemplaza completo** (corolario de #8)
 
+### Arquitectura Modular del Solver
+
+```
+solver/
+├── config/
+│   ├── solver_config.hpp    ← Structs + fromJson() (12 validaciones)
+│   └── solver_config.cpp    ← Parser JSON completo
+├── variables.hpp            ← VariablesSolver struct (assignment 5D + aulaAssignment 4D)
+├── variables.cpp            ← crearVariables() con pruning (65 lineas)
+├── solver.hpp               ← Solver class (ResultadoSolver, resolver(), etc.)
+├── solver.cpp               ← Orquestador (resolver, agregarRestricciones, extraerSolucion)
+├── restricciones_aulas.cpp  ← NoOverlap aulas + capacidad + movil
+├── restricciones_turnos.cpp ← Fijar slots + sum = bloques
+└── restricciones_profesores.cpp ← Un-profesor-por-MC + horas (Sprint 5)
+```
+
+**Separacion modular**: `variables.cpp` es un archivo independiente de `solver.cpp`. La creacion de variablesBoolVar esta desacoplada del orquestador de resolucion.
+
 ### Archivos a Crear
 
-| Archivo | Descripcion |
-|---------|-------------|
-| `src/backend/include/backend/solver/solver_horarios.hpp` | Header principal |
-| `src/backend/src/solver/solver_horarios.cpp` | Orquestador + variables |
-| `src/backend/src/solver/restricciones_aulas.cpp` | NoOverlap aulas + capacidad + movil |
-| `src/backend/src/solver/restricciones_turnos.cpp` | Fijar slots + sum = bloques |
-| `src/backend/src/solver/restricciones_profesores.cpp` | Un-profesor-por-MC + horas (Sprint 5) |
-| `test/backend/test_solver_horarios.cpp` | Tests GTest |
+| Archivo | Descripcion | Estado |
+|---------|-------------|--------|
+| `src/backend/include/backend/solver/config/solver_config.hpp` | Structs de configuracion | ✅ Completado |
+| `src/backend/src/solver/config/solver_config.cpp` | Parser JSON (538 lineas, 12 validaciones) | ✅ Completado |
+| `src/backend/include/backend/solver/variables.hpp` | VariablesSolver struct | ✅ Completado |
+| `src/backend/src/solver/variables.cpp` | crearVariables() con pruning | ✅ Completado |
+| `src/backend/include/backend/solver/solver.hpp` | Solver class + ResultadoSolver | ✅ Completado |
+| `src/backend/src/solver/solver.cpp` | Orquestador (resolver, agregarRestricciones, extraerSolucion) | 🔲 Pendiente |
+| `src/backend/src/solver/restricciones_aulas.cpp` | NoOverlap aulas + capacidad + movil | 🔲 Pendiente |
+| `src/backend/src/solver/restricciones_turnos.cpp` | Fijar slots + sum = bloques | 🔲 Pendiente |
+| `src/backend/src/solver/restricciones_profesores.cpp` | Un-profesor-por-MC + horas (Sprint 5) | 🔲 Pendiente |
+| `test/backend/test_variables_cp_sat.cpp` | Tests GTest para crearVariables() | ✅ Completado (21/21) |
+| `test/backend/test_solver_horarios.cpp` | Tests GTest para solver completo | 🔲 Pendiente |
 
 ### Archivos a Modificar
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/backend/CMakeLists.txt` | Agregar 4-5 archivos fuente solver |
-| `test/CMakeLists.txt` | Registrar test_solver_horarios |
+| Archivo | Cambio | Estado |
+|---------|--------|--------|
+| `src/backend/CMakeLists.txt` | Agregar archivos fuente solver | ✅ variables.cpp agregado |
+| `test/CMakeLists.txt` | Registrar tests GTest | ✅ test_variables_cp_sat registrado |
 
 ### Convenciones
 
@@ -68,66 +91,56 @@ BoolVarAula 4D: aula_assignment[curso][dia][slot][aula]
 
 ## Sprint 4 — Issue #25
 
-### T1.1 — Config Structs
+### T1.1 — Config Structs ✅
 
 **Objetivo**: Definir las estructuras C++ que mapean el JSON de configuracion de 13 secciones.
 
-**Archivos a crear**:
-- `src/backend/include/backend/solver/config/solver_config.hpp` (o en el mismo header del solver)
+**Archivos creados**:
+- `src/backend/include/backend/solver/config/solver_config.hpp` (194 lineas)
+- `src/backend/src/solver/config/solver_config.cpp` (538 lineas, parser con 12 validaciones)
 
-**Que hay que hacer**:
-Crear structs anidados que representen cada seccion del JSON:
-- `SolverConfig` (root) con: `version`, `DimensionesConfig`, `FranjaHorariaConfig`, `TurnosConfig`, `RecesoConfig`, `QVector<CursoSolverConfig>`, `QVector<ProfesorSolverConfig>`, `QVector<MateriaSolverConfig>`, `QVector<AulaSolverConfig>`, `PlanificacionConfig`, `GeneracionConfig`, `PenalizacionesConfig`
-- `CursoSolverConfig`: nombre, turno, aula_fija, num_estudiantes, plan, materias (QVector con materia_idx + horas_semanales)
-- `ProfesorSolverConfig`: nombre, horas_requeridas, horas_aula, materias_asignadas (QVector<int>), materias_suplente (QVector con materia_idx + peso), disponibilidad (QVector con dia + slots)
+**Implementado**:
+- `SolverConfig` (root) con todas las secciones del JSON
+- `CursoSolverConfig`: nombre, turno, aula_fija, num_estudiantes, plan, materias
+- `ProfesorSolverConfig`: nombre, horas_requeridas, horas_aula, materias_asignadas, materias_suplente, disponibilidad
 - `MateriaSolverConfig`: nombre
 - `AulaSolverConfig`: nombre, capacidad
+- Parser `SolverConfig::fromJson()` con 12 validaciones (V1-V12)
 
-**Depende de**: Nada (es el primero)
-
-**Verificacion**: El header compila sin errores. Los structs tienen campos con tipos correctos.
+**Estado**: ✅ Completado (2026-07-24)
 
 ---
 
-### T1.2 — Parser JSON
+### T1.2 — Parser JSON ✅
 
 **Objetivo**: Funcion que lee un QJsonObject y produce un `SolverConfig` completo, validando cada campo.
 
-**Archivos a crear**:
-- Funcion `SolverConfig::fromJson(const QJsonObject&)` o free function `parsearSolverConfig(const QJsonObject&)`
+**Archivo creado**:
+- `src/backend/src/solver/config/solver_config.cpp` — `SolverConfig::fromJson(const QJsonObject&)`
 
-**Que hay que hacer**:
-- Parsear las 13 secciones del JSON
-- Aplicar 12+ reglas de validacion (V1-V12):
-  - JSON parseable, 13 secciones presentes, tipos correctos
-  - dimensiones coincide con longitudes de arrays
-  - Indices en rango (materias, profesores, aulas)
-  - turno en {"manana", "tarde"} o ausente
-  - aula_fija = -1, o indice valido, o ausente
-  - num_estudiantes > 0, materias/profesores no vacios
-  - Un solo plan por curso
-- Retornar errores claros con formato: `"Error de validacion: {descripcion}"`
+**Implementado**:
+- Parseo de las 13 secciones del JSON
+- 12 reglas de validacion (V1-V12) implementadas
+- Errores claros con formato: `"Error de validacion: {descripcion}"`
 
-**Depende de**: T1.1
-
-**Verificacion**: Test con JSON completo parsea sin errores. Test con JSON invalido retorna error descriptivo.
+**Estado**: ✅ Completado (2026-07-24)
 
 ---
 
-### T1.3 — Header solver_horarios.hpp
+### T1.3 — Header solver.hpp ✅
 
 **Objetivo**: Definir la interfaz publica del solver.
 
-**Archivos a crear**:
-- `src/backend/include/backend/solver/solver_horarios.hpp`
+**Archivos creados**:
+- `src/backend/include/backend/solver/solver.hpp`
 
-**Que hay que hacer**:
+**Implementado**:
 ```cpp
-class SolverHorarios {
+class Solver {
 public:
     struct ResultadoSolver {
         bool exitoso;
-        HorarioSalida horario;
+        HorarioSalida resultado;
         QStringList errores;
         double tiempo_ms;
     };
@@ -135,72 +148,110 @@ public:
     ResultadoSolver resolver(const SolverConfig& config);
 
 private:
-    void crearVariables(const SolverConfig& config);
     void agregarRestricciones(const SolverConfig& config);
-    void extraerSolucion(const SolverConfig& config, ...);
+    HorarioSalida extraerSolucion(const SolverConfig& config);
 };
 ```
 
-**Depende de**: T1.1
-
-**Verificacion**: Header compila. Clase es instanciable.
+**Estado**: ✅ Completado (2026-07-24)
 
 ---
 
-### T1.4 — Skeleton solver_horarios.cpp
+### T1.3.5 — Variables Modulares ✅
 
-**Objetivo**: Implementar la creacion de variables BoolVar 5D con pruning.
+**Objetivo**: Separar la creacion de variables del orquestador del solver en un modulo independiente.
 
-**Archivos a crear**:
-- `src/backend/src/solver/solver_horarios.cpp`
+**Archivos creados**:
+- `src/backend/include/backend/solver/variables.hpp` — `VariablesSolver` struct
+- `src/backend/src/solver/variables.cpp` — `crearVariables()` (65 lineas)
 
-**Que hay que hacer**:
-- Implementar `crearVariables()`:
-  - Recorrer cursos -> materias -> profesores
-  - Para cada (p, m, c, d, s): crear BoolVar SOLO si:
-    1. p tiene m en `materias_asignadas` O `materias_suplente`
-    2. c tiene m en `cursos[c].materias`
-    3. p esta disponible en (d, s)
-    4. (d, s) esta dentro del turno del curso
-  - Guardar variables en un mapa `QMap<QTuple<int,int,int,int,int>, operations_research::BoolVar>`
-- Implementar `resolver()` basico:
-  - Llamar crearVariables
-  - Llamar agregarRestricciones (vacio por ahora)
-  - Crear CpSolver, Solve, verificar status
-- Para aulas moviles: crear `aula_assignment[c][d][s][a]` solo si `aula_fija == -1`
-
-**Depende de**: T1.3
-
-**Verificacion**: Compila. Test con config basico crea variables sin crash.
-
----
-
-### T1.5 — restricciones_aulas.cpp
-
-**Objetivo**: Implementar NoOverlap por aula, capacidad, y BoolVarAula para cursos moviles.
-
-**Archivos a crear**:
-- `src/backend/src/solver/restricciones_aulas.cpp`
-
-**Que hay que hacer**:
-- **NoOverlap por aula**: Para cada aula, recopilar todas las BoolVars de assignment que usan esa aula, crear IntervalVars, agregar `model.AddNoOverlap()`
-- **Capacidad**: Para cada aula, si `num_estudiantes[curso] > capacidad[aula]`, impedir asignacion
-- **Aula movil**: Para cursos con `aula_fija == -1`, usar `aula_assignment[c][d][s][a]` y agregar NoOverlap sobre esas variables
-- **Aula fija**: Para cursos con `aula_fija = idx`, fijar `aula = idx` en todas sus asignaciones
-
-**Funciones esperadas**:
+**Implementado**:
 ```cpp
-void agregarRestriccionesAulas(
-    CpModel& model,
+// variables.hpp
+struct VariablesSolver {
+    // assignment[profesor][materia][curso][dia][slot] = BoolVar
+    QMap<QVector<int>, operations_research::BoolVar> assignment;
+    // aula_assignment[curso][dia][slot][aula] = BoolVar (solo aulas moviles)
+    QMap<QVector<int>, operations_research::BoolVar> aulaAssignment;
+};
+
+// variables.cpp
+VariablesSolver crearVariables(
     const SolverConfig& config,
-    QMap<...>& assignment,
-    QMap<...>& aula_assignment
+    operations_research::sat::CpModelBuilder& model
 );
 ```
 
-**Depende de**: T1.4
+**Pruning implementado**:
+1. Titular: profesor tiene materia en `materias_asignadas`
+2. Suplente: profesor tiene materia en `materias_suplente`
+3. Disponibilidad: profesor disponible en (dia, slot)
+4. Turno: slot dentro del turno del curso
 
-**Verificacion**: Test con 2 aulas, 2 cursos moviles, verificar que no se solapan.
+**Separacion modular**: `variables.cpp` es un archivo independiente de `solver.cpp`. El orquestador solo llama a `crearVariables()`.
+
+**Estado**: ✅ Completado (2026-07-24)
+
+---
+
+### T1.4 — Tests Variables ✅
+
+**Objetivo**: Tests GTest para validar crearVariables() con 21 escenarios.
+
+**Archivo creado**:
+- `test/backend/test_variables_cp_sat.cpp` — 21 tests GTest
+
+**Tests implementados**:
+1. Config vacio → 0 variables
+2. Happy path (1 prof, 1 curso, 1 materia) → 30 variables
+3. Key correctness (prof, materia, curso, dia, slot)
+4. Pruning: profesor no ensena materia
+5. Pruning: profesor no disponible
+6. Disponibilidad parcial (2 dias → 12 variables)
+7. Slot fuera de turno no creado
+8. Turno tarde crea slots 6-11
+9. Profesor suplente crea variables
+10. Dos profesores misma materia → 60 variables
+11. Dos profesores disponibilidad distinta → pruning correcto
+12. Aula fija → sin aulaAssignment
+13. Aula movil → crea aulaAssignment (1 aula → 30, 3 aulas → 90)
+14. Key correctness aulaAssignment
+15. Multiples cursos turnos distintos → 60 variables
+16. Multiples materias por curso → 60 variables
+17. Profesor ensena 1 de 2 materias → pruning funciona
+18. Mixto fija y movil → solo movil en aulaAssignment
+19. Sin aulas → sin aulaAssignment
+20. Profesor disponible en slots parciales → 10 variables
+21. Todos los tests pasan
+
+**Estado**: ✅ Completado (2026-07-24) — 21/21 pasando
+
+---
+
+### T1.4 — Skeleton solver.cpp (Proxima)
+
+**Objetivo**: Implementar la logica core del solver: resolver(), agregarRestricciones(), extraerSolucion().
+
+**Archivos a crear**:
+- `src/backend/src/solver/solver.cpp`
+
+**Que hay que hacer**:
+- Implementar `Solver::resolver()`:
+  1. Crear `CpModelBuilder model`
+  2. Llamar `crearVariables(config, model)` (ya implementado en variables.cpp)
+  3. Llamar `agregarRestricciones(config, model)` (vacio por ahora)
+  4. Crear `CpSolver`, llamar `Solve()`, verificar status
+  5. Si OPTIMAL/FEASIBLE: llamar `extraerSolucion()`
+  6. Si INFEASIBLE: retornar ResultadoSolver con exitoso=false
+- Implementar `agregarRestricciones()` basico (stub vacio por ahora)
+- Implementar `extraerSolucion()` basico (stub que retorna HorarioSalida vacio)
+
+**Archivos a modificar**:
+- `src/backend/CMakeLists.txt` — agregar `src/solver/solver.cpp` a target_sources
+
+**Depende de**: T1.3, T1.3.5
+
+**Verificacion**: Compila. Test basico puede instanciar Solver y llamar resolver() sin crash.
 
 ---
 
