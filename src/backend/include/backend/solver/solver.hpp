@@ -22,6 +22,10 @@ class Solver {
         ResultadoSolver resolver(const SolverConfig& config);
     
     private:
+
+        VariablesSolver vars;
+        CpModelBuilder model;
+        
         void agregarRestricciones(const SolverConfig& config);
         HorarioSalida extraerSolucion(const SolverConfig& config);
 };

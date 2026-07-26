@@ -8,6 +8,6 @@ using namespace operations_research::sat;
 
 void agregarRestriccionProfesores(
     CpModelBuilder& model,
-    const VariablesSolver& vars,
-    const SolverConfig& config
+    const SolverConfig& config,
+    const VariablesSolver& vars
 );

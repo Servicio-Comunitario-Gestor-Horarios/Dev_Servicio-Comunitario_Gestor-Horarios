@@ -8,3 +8,4 @@ timelapse-*.mp4
 docs/timelapses/*.mp4
 .qtcreator/
 .vendor/
+compile_commands.json
