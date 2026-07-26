@@ -445,6 +445,39 @@ static QString validarUnSoloPlanPorCurso(const SolverConfig& config) {
 }
 
 /**
+ * @brief Valida que cada materia en cada curso tenga al menos 1 profesor disponible.
+ * @param config Configuración parseada.
+ * @return Empty string si es válido, mensaje de error si no.
+ */
+static QString validarCoberturaMaterias(const SolverConfig& config) {
+    for (int i = 0; i < config.cursos.size(); ++i) {
+        const auto& c = config.cursos[i];
+        for (int j = 0; j < c.materias.size(); ++j) {
+            int materiaIDx = c.materias[j].materiaIDx;
+            bool cubierta = false;
+            for (const auto& p : config.profesores) {
+                if (p.materias_asignadas.contains(materiaIDx)) {
+                    cubierta = true;
+                    break;
+                }
+                for (const auto& ms : p.materias_suplente) {
+                    if (ms.materiaIDx == materiaIDx) {
+                        cubierta = true;
+                        break;
+                    }
+                }
+                if (cubierta) break;
+            }
+            if (!cubierta) {
+                return QString("Error de validación: materia \"%1\" en curso \"%2\" no tiene profesor disponible")
+                    .arg(config.materias[materiaIDx].nombre, c.nombre);
+            }
+        }
+    }
+    return {};
+}
+
+/**
  * @brief Valida la disponibilidad de los profesores.
  * @param config Configuración parseada.
  * @return Empty string si es válido, mensaje de error si no.
@@ -542,6 +575,10 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj) {
 
     // V12: Disponibilidad
     error = validarDisponibilidadProfesores(config);
+    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
+
+    // V13: Cobertura materias-curso
+    error = validarCoberturaMaterias(config);
     if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
 
     return Resultado<SolverConfig>::exito(config);

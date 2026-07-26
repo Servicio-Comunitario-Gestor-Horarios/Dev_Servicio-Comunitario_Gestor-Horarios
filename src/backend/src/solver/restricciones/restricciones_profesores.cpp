@@ -15,7 +15,7 @@ void restriccionDocenteNoSolapado(
                     auto [profesor, m, curso, dia, slot] = it.key();
                     if (profesor == p && dia == d && slot == s) {
                         varsProfesor.push_back(it.value());
-                    }
+                    } 
                 }
 
                 if (varsProfesor.size() > 1) {
