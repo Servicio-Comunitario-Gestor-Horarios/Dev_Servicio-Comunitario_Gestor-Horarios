@@ -154,6 +154,15 @@ add_qtest(test_edge_cases
 )
 
 # ============================================================
+# Tests de backend — solver CP-SAT
+# ============================================================
+
+add_qtest(test_solver_horarios
+    backend/test_solver_horarios.cpp
+    backend
+)
+
+# ============================================================
 # Tests de middleware — rutas CRUD IPC
 # ============================================================
 

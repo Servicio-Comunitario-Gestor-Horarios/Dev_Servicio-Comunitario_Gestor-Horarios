@@ -17,7 +17,7 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
 
         for (const auto& mc : curso.materias) {
             int m = mc.materiaIDx;
-                
+
             for (int p = 0; p < dim.num_profesores; p++) {
                 const auto& prof = config.profesores[p];
 

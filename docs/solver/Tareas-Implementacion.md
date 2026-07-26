@@ -491,7 +491,7 @@ agregarRestriccionesProfesores(model, config, assignment);
 | T1.9 Register test | [ ] Pendiente | |
 | T2.1 Profesores constraints | [x] Completada | 2026-07-25 |
 | T2.2 V13 validation | [x] Completada | 2026-07-26 |
-| T2.3 Wire orchestrator | [ ] Pendiente | |
+| T2.3 Wire orchestrator | [x] Completada | 2026-07-26 |
 | T2.4 Extract solution | [x] Completada | 2026-07-26 |
 | T2.5 Feasibility | [x] Completada | 2026-07-26 |
 | T2.6 Tests expanded | [ ] Pendiente | |
