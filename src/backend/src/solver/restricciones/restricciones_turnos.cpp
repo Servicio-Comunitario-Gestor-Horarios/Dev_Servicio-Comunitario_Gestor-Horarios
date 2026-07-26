@@ -5,11 +5,10 @@ void restriccionUnoPorTurno (
     [[maybe_unused]] const SolverConfig& config,
     [[maybe_unused]] const VariablesSolver& vars
 ) {
-
-    // Patrón: iterar por (c, d, s) y agrupar todas las BoolVar de ese grupo
     for (int c = 0; c < config.dimensiones.num_cursos; c++) {
         for (int d = 0; d < config.dimensiones.num_dias; d++) {
             for (int s = 0; s < config.dimensiones.num_slots_dia; s++) {
+                
                 std::vector<BoolVar> varsEnSlots;
 
                 for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
@@ -32,7 +31,6 @@ void restriccionBloquesRequeridos(
     [[maybe_unused]] const SolverConfig& config,
     [[maybe_unused]] const VariablesSolver& vars
 ) {
-    
     for (int c = 0; c < config.dimensiones.num_cursos; c++) {
         for (auto& mc : config.cursos[c].materias) {
             int m = mc.materiaIDx;
@@ -56,6 +54,33 @@ void restriccionBloquesRequeridos(
     }
 }
 
+void restriccionHorasSemanalesProfesor(
+    [[maybe_unused]] CpModelBuilder& model,
+    [[maybe_unused]] const SolverConfig& config,
+    [[maybe_unused]] const VariablesSolver& vars
+) {
+    int duracionSlot = config.franja_horaria.duracion_minutos;
+
+    for (int p = 0; p < config.dimensiones.num_profesores; p++) {
+        const auto& prof = config.profesores[p];
+        int totalMinutos = prof.horas_aula * 60;
+        int bloques = (totalMinutos + duracionSlot - 1) / duracionSlot;
+
+        std::vector<BoolVar> varsProfesor;
+
+        for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
+            auto [profesor, m, curso, dia, slot] = it.key();
+            if (profesor == p) {
+                varsProfesor.push_back(it.value());
+            }
+        }
+
+        if (!varsProfesor.empty()) {
+            model.AddEquality(LinearExpr::Sum(varsProfesor), bloques);
+        }
+    }
+}
+
 void agregarRestriccionesTurnos(
     [[maybe_unused]] CpModelBuilder& model,
     [[maybe_unused]] const SolverConfig& config,
@@ -63,4 +88,5 @@ void agregarRestriccionesTurnos(
 ) {
     restriccionUnoPorTurno(model, config, vars);
     restriccionBloquesRequeridos(model, config, vars);
+    restriccionHorasSemanalesProfesor(model, config, vars);
 }

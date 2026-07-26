@@ -59,7 +59,9 @@ struct CursoSolverConfig {
 struct ProfesorSolverConfig {
     QString nombre;                        ///< Nombre del profesor
     int horas_requeridas;                  ///< Horas semanales requeridas
-    int horas_planificacion = 4;           ///< Horas de planificación (default: 4)
+    int horas_aula;                        ///< Horas reales en aula (obligatorio)
+    QString turno;                         ///< Opcional: "manana", "tarde", o ""
+    QString plan;                          ///< Opcional: "Plan Ciencias", o ""
     QVector<int> materias_asignadas;       ///< Índices de materias asignadas
     QVector<MateriaSuplente> materias_suplente; ///< Materias suplentes con peso
     QVector<Disponibilidad> disponibilidad;     ///< Disponibilidad por día/slot

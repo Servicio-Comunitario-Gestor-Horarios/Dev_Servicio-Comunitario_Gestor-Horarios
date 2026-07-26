@@ -6,6 +6,18 @@
 
 using namespace operations_research::sat;
 
+void restriccionAulaNoSolapada (
+    CpModelBuilder& model,
+    const SolverConfig& config,
+    const VariablesSolver& vars
+);
+
+void restriccionMateriaUnicaPorAula (
+    CpModelBuilder& model,
+    const SolverConfig& config,
+    const VariablesSolver& vars
+);
+
 void agregarRestriccionesAulas (
     CpModelBuilder& model,
     const SolverConfig& config,

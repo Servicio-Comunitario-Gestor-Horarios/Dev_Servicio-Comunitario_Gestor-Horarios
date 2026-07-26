@@ -18,6 +18,12 @@ void restriccionBloquesRequeridos (
     const VariablesSolver& vars
 );
 
+void restriccionHorasSemanalesProfesor (
+    CpModelBuilder& model,
+    const SolverConfig& config,
+    const VariablesSolver& vars
+);
+
 void agregarRestriccionesTurnos(
     CpModelBuilder& model,
     const SolverConfig& config,

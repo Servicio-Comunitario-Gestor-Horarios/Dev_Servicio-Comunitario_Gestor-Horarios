@@ -174,7 +174,9 @@ static QVector<ProfesorSolverConfig> parsearProfesores(const QJsonArray& arr) {
         QJsonObject obj = item.toObject();
         p.nombre               = obj["nombre"].toString();
         p.horas_requeridas     = obj["horas_requeridas"].toInt();
-        p.horas_planificacion  = obj["horas_planificacion"].toInt(4);
+        p.horas_aula           = obj["horas_aula"].toInt();
+        p.turno                = obj["turno"].toString();
+        p.plan                 = obj["plan"].toString();
 
         for (const auto& m : obj["materias_asignadas"].toArray()) {
             p.materias_asignadas.append(m.toInt());
@@ -413,6 +415,14 @@ static QString validarProfesoresNoVacios(const SolverConfig& config) {
         if (p.horas_requeridas <= 0) {
             return QString("Error de validación: profesor[%1] \"%2\" horas_requeridas (%3) debe ser > 0")
                 .arg(i).arg(p.nombre).arg(p.horas_requeridas);
+        }
+        if (p.horas_aula <= 0) {
+            return QString("Error de validación: profesor[%1] \"%2\" horas_aula (%3) debe ser > 0")
+                .arg(i).arg(p.nombre).arg(p.horas_aula);
+        }
+        if (p.horas_aula > p.horas_requeridas) {
+            return QString("Error de validación: profesor[%1] \"%2\" horas_aula (%3) > horas_requeridas (%4)")
+                .arg(i).arg(p.nombre).arg(p.horas_aula).arg(p.horas_requeridas);
         }
     }
     return {};
