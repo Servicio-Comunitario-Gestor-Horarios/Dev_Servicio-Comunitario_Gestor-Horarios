@@ -487,8 +487,8 @@ agregarRestriccionesProfesores(model, config, assignment);
 | T1.5 Aulas constraints | [x] Completada | 2026-07-25 |
 | T1.6 Turnos constraints | [x] Completada | 2026-07-25 |
 | T1.7 CMake | [x] Completada | 2026-07-24 |
-| T1.8 Tests | [ ] Pendiente | |
-| T1.9 Register test | [ ] Pendiente | |
+| T1.8 Tests | [x] Completada | 2026-07-26 |
+| T1.9 Register test | [x] Completada | 2026-07-26 |
 | T2.1 Profesores constraints | [x] Completada | 2026-07-25 |
 | T2.2 V13 validation | [x] Completada | 2026-07-26 |
 | T2.3 Wire orchestrator | [x] Completada | 2026-07-26 |
