@@ -18,7 +18,7 @@
  *
  * Establece una conexión QLocalSocket con el servidor IPC del backend,
  * envía solicitudes con formato `{"op":"...", "payload":{...}}` y
- * recibe respuestas `{"status":"...", "code":N, ...}`.
+ * recibe respuestas `{"status": N, "data": ..., "code": N}`.
  *
  * ## Uso básico
  * ~~~{.cpp}
