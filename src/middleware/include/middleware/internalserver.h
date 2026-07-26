@@ -20,7 +20,7 @@ private:
     QLocalServer *m_server;
 
     void registrarConexion(const QString &direccion, const QString &operacion);
-    void sendResponse(int status, const QJsonValue &data, QLocalSocket *clienteSocket);
+    void sendResponse(int status, const QJsonValue &data, QLocalSocket *clienteSocket, const QString &op);
 
     // ─── Handlers Profesores ──────────────────────────────────────
     void handleTeacherList(QLocalSocket *clienteSocket);

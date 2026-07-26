@@ -10,6 +10,8 @@
 
 #include "classroom_list_widget.hpp"
 #include "../forms/classroom_form_dialog.hpp"
+#include <middleware/internalclient.h>
+#include <middleware/messages.h>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -19,6 +21,12 @@
 
 ClassroomListWidget::ClassroomListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
+}
+
+void ClassroomListWidget::setClient(InternalClient* client) {
+    m_client = client;
+    connect(m_client, &InternalClient::respuestaRecibida,
+            this, &ClassroomListWidget::onRespuestaRecibida);
 }
 
 void ClassroomListWidget::setupUi() {
@@ -136,14 +144,68 @@ void ClassroomListWidget::setupUi() {
     connect(m_registerButton, &QPushButton::clicked, this, &ClassroomListWidget::abrirFormularioNuevo);
 }
 
-void ClassroomListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::ClassroomFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-            this, &ClassroomListWidget::agregarAulaATabla);
-    dialogo.exec();
+void ClassroomListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
+    QString op = respuesta["op"].toString();
+    if (op != m_pendiente.op) return;
+
+    if (respuesta["status"].toString() == "ok") {
+        QJsonObject data = m_pendiente.data;
+        if (op == Middleware::OP_CREAR_AULA) {
+            insertarAulaEnTabla(data["nombre"].toString(),
+                                data["capacidad"].toInt(),
+                                data["edificio"].toString(),
+                                data["piso"].toString());
+        } else if (op == Middleware::OP_ACTUALIZAR_AULA) {
+            int f = m_pendiente.fila;
+            m_table->item(f, 0)->setText(data["nombre"].toString());
+            m_table->item(f, 1)->setText(QString::number(data["capacidad"].toInt()));
+            m_table->item(f, 2)->setText(data["edificio"].toString().isEmpty() ? "N/A" : data["edificio"].toString());
+            m_table->item(f, 3)->setText(data["piso"].toString().isEmpty() ? "N/A" : data["piso"].toString());
+        } else if (op == Middleware::OP_ELIMINAR_AULA) {
+            m_table->removeRow(m_pendiente.fila);
+        }
+    } else {
+        QMessageBox::warning(this, "Error", "No se pudo completar la operación: " + respuesta["data"].toString());
+    }
+    m_pendiente = SolicitudPendiente();
 }
 
-void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
+void ClassroomListWidget::enviarCrearAula(const QString& nombre, int capacidad,
+                                          const QString& edificio, const QString& piso) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["nombre"] = nombre;
+    payload["capacidad"] = capacidad;
+    payload["edificio"] = edificio;
+    payload["piso"] = piso;
+    m_pendiente = {Middleware::OP_CREAR_AULA, payload, -1};
+    m_client->enviarSolicitud(Middleware::OP_CREAR_AULA, payload);
+}
+
+void ClassroomListWidget::enviarActualizarAula(int fila, const QString& nombreOriginal,
+                                               const QString& nombre, int capacidad,
+                                               const QString& edificio, const QString& piso) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = nombreOriginal;
+    payload["nombre"] = nombre;
+    payload["capacidad"] = capacidad;
+    payload["edificio"] = edificio;
+    payload["piso"] = piso;
+    m_pendiente = {Middleware::OP_ACTUALIZAR_AULA, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ACTUALIZAR_AULA, payload);
+}
+
+void ClassroomListWidget::enviarEliminarAula(int fila, const QString& nombre) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = nombre;
+    m_pendiente = {Middleware::OP_ELIMINAR_AULA, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ELIMINAR_AULA, payload);
+}
+
+void ClassroomListWidget::insertarAulaEnTabla(const QString& nombre, int capacidad,
+                                              const QString& edificio, const QString& piso) {
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
@@ -188,7 +250,8 @@ void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad
         if (QMessageBox::question(this, "Confirmar eliminación", "¿Estás seguro de eliminar esta aula?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
             for (int i = 0; i < m_table->rowCount(); ++i) {
                 if (m_table->cellWidget(i, 4) == panelAcciones) {
-                    m_table->removeRow(i);
+                    QString nombre = m_table->item(i, 0)->text();
+                    enviarEliminarAula(i, nombre);
                     break;
                 }
             }
@@ -215,13 +278,19 @@ void ClassroomListWidget::agregarAulaATabla(const QString& nombre, int capacidad
             dialogo.cargarDatos(vNombre, vCapacidad, vEdificio, vPiso);
 
             connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-                    this, [this, filaEditar](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
-                        m_table->item(filaEditar, 0)->setText(nNombre);
-                        m_table->item(filaEditar, 1)->setText(QString::number(nCapacidad));
-                        m_table->item(filaEditar, 2)->setText(nEdificio.isEmpty() ? "N/A" : nEdificio);
-                        m_table->item(filaEditar, 3)->setText(nPiso.isEmpty() ? "N/A" : nPiso);
+                    this, [this, filaEditar, vNombre](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
+                        enviarActualizarAula(filaEditar, vNombre, nNombre, nCapacidad, nEdificio, nPiso);
                     });
             dialogo.exec();
         }
     });
+}
+
+void ClassroomListWidget::abrirFormularioNuevo() {
+    gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+    connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
+            this, [this](const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
+                enviarCrearAula(nombre, capacidad, edificio, piso);
+            });
+    dialogo.exec();
 }

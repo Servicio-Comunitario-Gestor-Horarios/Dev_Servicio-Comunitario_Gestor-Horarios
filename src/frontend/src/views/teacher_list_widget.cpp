@@ -1,5 +1,7 @@
 #include "teacher_list_widget.hpp"
 #include "../forms/teacher_form_dialog.hpp"
+#include <middleware/internalclient.h>
+#include <middleware/messages.h>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -8,6 +10,12 @@
 
 TeacherListWidget::TeacherListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
+}
+
+void TeacherListWidget::setClient(InternalClient* client) {
+    m_client = client;
+    connect(m_client, &InternalClient::respuestaRecibida,
+            this, &TeacherListWidget::onRespuestaRecibida);
 }
 
 void TeacherListWidget::setupUi() {
@@ -152,16 +160,74 @@ void TeacherListWidget::setupUi() {
     connect(m_registerButton, &QPushButton::clicked, this, &TeacherListWidget::abrirFormularioNuevo);
 }
 
-void TeacherListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::TeacherFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
-            this, &TeacherListWidget::agregarProfesorATabla);
-    dialogo.exec();
+void TeacherListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
+    QString op = respuesta["op"].toString();
+    if (op != m_pendiente.op) return;
+
+    if (respuesta["status"].toString() == "ok") {
+        QJsonObject data = m_pendiente.data;
+        if (op == Middleware::OP_CREAR_PROFESOR) {
+            insertarProfesorEnTabla(data["cedula"].toString(),
+                                    data["id_interno"].toString(),
+                                    data["nombre"].toString(),
+                                    data["email"].toString(),
+                                    data["telefono"].toString());
+        } else if (op == Middleware::OP_ACTUALIZAR_PROFESOR) {
+            int f = m_pendiente.fila;
+            m_table->item(f, 0)->setText(data["cedula"].toString());
+            m_table->item(f, 1)->setText(data["id_interno"].toString());
+            m_table->item(f, 2)->setText(data["nombre"].toString());
+            m_table->item(f, 3)->setText(data["email"].toString());
+            m_table->item(f, 4)->setText(data["telefono"].toString().isEmpty() ? "N/A" : data["telefono"].toString());
+        } else if (op == Middleware::OP_ELIMINAR_PROFESOR) {
+            m_table->removeRow(m_pendiente.fila);
+        }
+    } else {
+        QMessageBox::warning(this, "Error", "No se pudo completar la operación: " + respuesta["data"].toString());
+    }
+    m_pendiente = SolicitudPendiente();
 }
 
-void TeacherListWidget::agregarProfesorATabla(const QString& cedula, const QString& id,
-                                              const QString& nombre, const QString& email,
-                                              const QString& telefono) {
+void TeacherListWidget::enviarCrearProfesor(const QString& cedula, const QString& id,
+                                            const QString& nombre, const QString& email,
+                                            const QString& telefono) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["cedula"] = cedula;
+    payload["id_interno"] = id;
+    payload["nombre"] = nombre;
+    payload["email"] = email;
+    payload["telefono"] = telefono;
+    m_pendiente = {Middleware::OP_CREAR_PROFESOR, payload, -1};
+    m_client->enviarSolicitud(Middleware::OP_CREAR_PROFESOR, payload);
+}
+
+void TeacherListWidget::enviarActualizarProfesor(int fila, const QString& cedula,
+                                                 const QString& id, const QString& nombre,
+                                                 const QString& email, const QString& telefono) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = cedula;          // identificador para el middleware
+    payload["cedula"] = cedula;
+    payload["id_interno"] = id;
+    payload["nombre"] = nombre;
+    payload["email"] = email;
+    payload["telefono"] = telefono;
+    m_pendiente = {Middleware::OP_ACTUALIZAR_PROFESOR, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ACTUALIZAR_PROFESOR, payload);
+}
+
+void TeacherListWidget::enviarEliminarProfesor(int fila, const QString& cedula) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = cedula;
+    m_pendiente = {Middleware::OP_ELIMINAR_PROFESOR, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ELIMINAR_PROFESOR, payload);
+}
+
+void TeacherListWidget::insertarProfesorEnTabla(const QString& cedula, const QString& id,
+                                                const QString& nombre, const QString& email,
+                                                const QString& telefono) {
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
@@ -195,7 +261,8 @@ void TeacherListWidget::agregarProfesorATabla(const QString& cedula, const QStri
                                   "¿Está seguro de eliminar este docente?") == QMessageBox::Yes) {
             for (int i = 0; i < m_table->rowCount(); ++i) {
                 if (m_table->cellWidget(i, 5) == panelAcciones) {
-                    m_table->removeRow(i);
+                    QString cedula = m_table->item(i, 0)->text();
+                    enviarEliminarProfesor(i, cedula);
                     break;
                 }
             }
@@ -226,14 +293,21 @@ void TeacherListWidget::agregarProfesorATabla(const QString& cedula, const QStri
                 this, [this, filaEditar](const QString& nCedula, const QString& nId,
                                    const QString& nNombre, const QString& nEmail,
                                    const QString& nTelefono) {
-                    m_table->item(filaEditar, 0)->setText(nCedula);
-                    m_table->item(filaEditar, 1)->setText(nId);
-                    m_table->item(filaEditar, 2)->setText(nNombre);
-                    m_table->item(filaEditar, 3)->setText(nEmail);
-                    m_table->item(filaEditar, 4)->setText(nTelefono.isEmpty() ? "N/A" : nTelefono);
+                    enviarActualizarProfesor(filaEditar, nCedula, nId, nNombre, nEmail, nTelefono);
                 });
         dialogo.exec();
     });
 
     m_table->setCellWidget(fila, 5, panelAcciones);
+}
+
+void TeacherListWidget::abrirFormularioNuevo() {
+    gestor::frontend::forms::TeacherFormDialog dialogo(this);
+    connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
+            this, [this](const QString& cedula, const QString& id,
+                   const QString& nombre, const QString& email,
+                   const QString& telefono) {
+                enviarCrearProfesor(cedula, id, nombre, email, telefono);
+            });
+    dialogo.exec();
 }

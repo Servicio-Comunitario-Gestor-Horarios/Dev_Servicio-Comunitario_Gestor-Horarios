@@ -5,6 +5,8 @@
 
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
+#include <middleware/internalclient.h>
+#include <middleware/messages.h>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -15,6 +17,12 @@
 
 SubjectListWidget::SubjectListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
+}
+
+void SubjectListWidget::setClient(InternalClient* client) {
+    m_client = client;
+    connect(m_client, &InternalClient::respuestaRecibida,
+            this, &SubjectListWidget::onRespuestaRecibida);
 }
 
 void SubjectListWidget::setupUi() {
@@ -164,14 +172,56 @@ void SubjectListWidget::setupUi() {
     connect(m_registerButton, &QPushButton::clicked, this, &SubjectListWidget::abrirFormularioNuevo);
 }
 
-void SubjectListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::SubjectFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-            this, &SubjectListWidget::agregarMateriaATabla);
-    dialogo.exec();
+void SubjectListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
+    QString op = respuesta["op"].toString();
+    if (op != m_pendiente.op) return;
+
+    if (respuesta["status"].toString() == "ok") {
+        QJsonObject data = m_pendiente.data;
+        if (op == Middleware::OP_CREAR_MATERIA) {
+            insertarMateriaEnTabla(data["nombre"].toString(), data["tipoAula"].toString());
+        } else if (op == Middleware::OP_ACTUALIZAR_MATERIA) {
+            int f = m_pendiente.fila;
+            m_table->item(f, 0)->setText(data["nombre"].toString());
+            m_table->item(f, 1)->setText(data["tipoAula"].toString());
+        } else if (op == Middleware::OP_ELIMINAR_MATERIA) {
+            m_table->removeRow(m_pendiente.fila);
+        }
+    } else {
+        QMessageBox::warning(this, "Error", "No se pudo completar la operación: " + respuesta["data"].toString());
+    }
+    m_pendiente = SolicitudPendiente();
 }
 
-void SubjectListWidget::agregarMateriaATabla(const QString& nombre, const QString& tipoAula) {
+void SubjectListWidget::enviarCrearMateria(const QString& nombre, const QString& tipoAula) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["nombre"] = nombre;
+    payload["tipoAula"] = tipoAula;
+    m_pendiente = {Middleware::OP_CREAR_MATERIA, payload, -1};
+    m_client->enviarSolicitud(Middleware::OP_CREAR_MATERIA, payload);
+}
+
+void SubjectListWidget::enviarActualizarMateria(int fila, const QString& nombreOriginal,
+                                                const QString& nombre, const QString& tipoAula) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = nombreOriginal;
+    payload["nombre"] = nombre;
+    payload["tipoAula"] = tipoAula;
+    m_pendiente = {Middleware::OP_ACTUALIZAR_MATERIA, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ACTUALIZAR_MATERIA, payload);
+}
+
+void SubjectListWidget::enviarEliminarMateria(int fila, const QString& nombre) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = nombre;
+    m_pendiente = {Middleware::OP_ELIMINAR_MATERIA, payload, fila};
+    m_client->enviarSolicitud(Middleware::OP_ELIMINAR_MATERIA, payload);
+}
+
+void SubjectListWidget::insertarMateriaEnTabla(const QString& nombre, const QString& tipoAula) {
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
@@ -214,7 +264,8 @@ void SubjectListWidget::agregarMateriaATabla(const QString& nombre, const QStrin
                                   "¿Está seguro de eliminar esta asignatura?") == QMessageBox::Yes) {
             for (int i = 0; i < m_table->rowCount(); ++i) {
                 if (m_table->cellWidget(i, 2) == panelAcciones) {
-                    m_table->removeRow(i);
+                    QString nombre = m_table->item(i, 0)->text();
+                    enviarEliminarMateria(i, nombre);
                     break;
                 }
             }
@@ -240,12 +291,20 @@ void SubjectListWidget::agregarMateriaATabla(const QString& nombre, const QStrin
         dialogo.cargarDatos(nombre, tipo);
 
         connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-                this, [this, filaEditar](const QString& nNombre, const QString& nTipo) {
-                    m_table->item(filaEditar, 0)->setText(nNombre);
-                    m_table->item(filaEditar, 1)->setText(nTipo);
+                this, [this, filaEditar, nombre](const QString& nNombre, const QString& nTipo) {
+                    enviarActualizarMateria(filaEditar, nombre, nNombre, nTipo);
                 });
         dialogo.exec();
     });
 
     m_table->setCellWidget(fila, 2, panelAcciones);
+}
+
+void SubjectListWidget::abrirFormularioNuevo() {
+    gestor::frontend::forms::SubjectFormDialog dialogo(this);
+    connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
+            this, [this](const QString& nombre, const QString& tipoAula) {
+                enviarCrearMateria(nombre, tipoAula);
+            });
+    dialogo.exec();
 }
