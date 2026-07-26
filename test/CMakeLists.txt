@@ -106,7 +106,10 @@ add_qtest(test_middleware_health_check
 # ============================================================
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================
-# add_gtest(test_backend_solver test/backend/test_solver.cpp backend)
+add_gtest(test_backend_variables_cp_sat
+    backend/test_variables_cp_sat.cpp
+    backend
+)
 
 
 

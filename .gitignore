@@ -7,3 +7,4 @@ Testing/
 timelapse-*.mp4
 docs/timelapses/*.mp4
 .qtcreator/
+.vendor/

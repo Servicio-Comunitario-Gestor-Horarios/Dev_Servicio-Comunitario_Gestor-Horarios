@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qt6-base-dev \
     libqt6sql6-sqlite \
     libgl1-mesa-dev \
+    libgtest-dev \
     && apt-get clean
 
 # ── OR-Tools v9.15 ──

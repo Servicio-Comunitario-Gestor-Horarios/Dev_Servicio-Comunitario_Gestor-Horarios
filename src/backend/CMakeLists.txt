@@ -36,6 +36,7 @@ target_sources(backend PRIVATE
 
     # Solver - Issues #25 + #32
     src/solver/config/solver_config.cpp
+    src/solver/variables.cpp
 )
 
 target_include_directories(backend PUBLIC

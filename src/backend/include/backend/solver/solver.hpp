@@ -15,7 +15,6 @@ class Solver {
         ResultadoSolver resolver(const SolverConfig& config);
     
     private:
-        void crearVariables(const SolverConfig& config);
         void agregarRestricciones(const SolverConfig& config);
         void extraerSolucion(const SolverConfig& config);
 };
