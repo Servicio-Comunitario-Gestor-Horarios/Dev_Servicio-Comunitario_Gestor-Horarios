@@ -30,11 +30,6 @@ private:
     bool m_responded = false;
 
     void inicializarRutas();
-    /**
-     * @brief Registra una operación en el log de depuración.
-     * @param direccion "Frontend -> Middleware" o "Middleware -> Frontend".
-     * @param operacion Nombre o descripción de la operación.
-     */
     void registrarConexion(const QString &direccion, const QString &operacion);
     void sendResponse(int status, const QJsonValue &data, QLocalSocket *clienteSocket);
 

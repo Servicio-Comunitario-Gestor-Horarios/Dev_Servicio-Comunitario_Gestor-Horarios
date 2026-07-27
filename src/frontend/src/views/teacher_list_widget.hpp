@@ -1,25 +1,44 @@
-#ifndef TEACHER_LIST_WIDGET_HPP
-#define TEACHER_LIST_WIDGET_HPP
+#pragma once
 
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
+#include <QJsonObject>
 
-class TeacherListWidget : public QWidget {
+class InternalClient;
+
+class TeacherListWidget : public QWidget
+{
     Q_OBJECT
 public:
     explicit TeacherListWidget(QWidget *parent = nullptr);
+    void setClient(InternalClient* client);
 
 private slots:
+    void onRespuestaRecibida(const QJsonObject& respuesta);
     void abrirFormularioNuevo();
-    void agregarProfesorATabla(const QString& cedula, const QString& id,
-                               const QString& nombre, const QString& email,
-                               const QString& telefono);
 
 private:
-    QTableWidget *m_table;
-    QPushButton *m_registerButton;
     void setupUi();
-};
+    void insertarProfesorEnTabla(const QString& cedula, const QString& id,
+                                 const QString& nombre, const QString& email,
+                                 const QString& telefono);
 
-#endif // TEACHER_LIST_WIDGET_HPP
+    void enviarCrearProfesor(const QString& cedula, const QString& id,
+                             const QString& nombre, const QString& email,
+                             const QString& telefono);
+    void enviarActualizarProfesor(int fila, const QString& cedula,
+                                  const QString& id, const QString& nombre,
+                                  const QString& email, const QString& telefono);
+    void enviarEliminarProfesor(int fila, const QString& cedula);
+
+    struct SolicitudPendiente {
+        QString op;
+        QJsonObject data;
+        int fila = -1;
+    } m_pendiente;
+
+    QTableWidget* m_table = nullptr;
+    QPushButton* m_registerButton = nullptr;
+    InternalClient* m_client = nullptr;
+};

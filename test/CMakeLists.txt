@@ -176,3 +176,11 @@ add_qtest(test_middleware_crud_routes
     middleware
     Qt6::Network
 )
+
+# ============================================================
+# Tests de backend — exportación (Google Test)
+# ============================================================
+add_gtest(test_servicio_exportacion
+    backend/test_servicio_exportacion.cpp
+    backend
+)

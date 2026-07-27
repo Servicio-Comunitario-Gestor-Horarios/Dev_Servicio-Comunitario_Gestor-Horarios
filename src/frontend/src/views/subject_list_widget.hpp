@@ -1,23 +1,39 @@
-#ifndef SUBJECT_LIST_WIDGET_HPP
-#define SUBJECT_LIST_WIDGET_HPP
+#pragma once
 
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
+#include <QJsonObject>
 
-class SubjectListWidget : public QWidget {
+class InternalClient;
+
+class SubjectListWidget : public QWidget
+{
     Q_OBJECT
 public:
     explicit SubjectListWidget(QWidget *parent = nullptr);
+    void setClient(InternalClient* client);
 
 private slots:
+    void onRespuestaRecibida(const QJsonObject& respuesta);
     void abrirFormularioNuevo();
-    void agregarMateriaATabla(const QString& nombre, const QString& tipoAula);
 
 private:
-    QTableWidget *m_table;
-    QPushButton *m_registerButton;
     void setupUi();
-};
+    void insertarMateriaEnTabla(const QString& nombre, const QString& tipoAula);
 
-#endif // SUBJECT_LIST_WIDGET_HPP
+    void enviarCrearMateria(const QString& nombre, const QString& tipoAula);
+    void enviarActualizarMateria(int fila, const QString& nombreOriginal,
+                                 const QString& nombre, const QString& tipoAula);
+    void enviarEliminarMateria(int fila, const QString& nombre);
+
+    struct SolicitudPendiente {
+        QString op;
+        QJsonObject data;
+        int fila = -1;
+    } m_pendiente;
+
+    QTableWidget* m_table = nullptr;
+    QPushButton* m_registerButton = nullptr;
+    InternalClient* m_client = nullptr;
+};

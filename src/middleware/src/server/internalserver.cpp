@@ -186,7 +186,8 @@ void InternalServer::sendResponse(int status, const QJsonValue &data,
 {
     m_responded = true;
     QJsonObject respuesta;
-    respuesta["status"] = status;
+    respuesta["status"] = (status == Middleware::RESP_EXITO) ? "ok" : "error";
+    respuesta["code"] = status;
     respuesta["data"] = data;
     QJsonDocument doc(respuesta);
     clienteSocket->write(doc.toJson(QJsonDocument::Compact));
