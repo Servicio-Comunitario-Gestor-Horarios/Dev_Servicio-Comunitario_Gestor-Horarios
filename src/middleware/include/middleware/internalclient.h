@@ -51,6 +51,9 @@ public:
      * Construye un JSON con la operación y payload opcional,
      * conecta al servidor y envía los datos.
      *
+     * @note Soporta solo 1 solicitud concurrente. Si se envia otra antes
+     *       de recibir la respuesta, se sobreescribe.
+     *
      * @param op Código de operación (ej: "shutdown", "teacher_list").
      * @param payload Datos adicionales de la operación (opcional).
      */
