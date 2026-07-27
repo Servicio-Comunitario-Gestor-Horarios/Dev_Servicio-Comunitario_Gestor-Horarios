@@ -162,6 +162,11 @@ add_qtest(test_solver_horarios
     backend
 )
 
+add_qtest(test_solver_benchmark
+    backend/test_solver_benchmark.cpp
+    backend
+)
+
 # ============================================================
 # Tests de middleware — rutas CRUD IPC
 # ============================================================

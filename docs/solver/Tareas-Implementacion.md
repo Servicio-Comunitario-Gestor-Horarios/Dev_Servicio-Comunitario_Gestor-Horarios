@@ -494,5 +494,5 @@ agregarRestriccionesProfesores(model, config, assignment);
 | T2.3 Wire orchestrator | [x] Completada | 2026-07-26 |
 | T2.4 Extract solution | [x] Completada | 2026-07-26 |
 | T2.5 Feasibility | [x] Completada | 2026-07-26 |
-| T2.6 Tests expanded | [ ] Pendiente | |
-| T2.7 Benchmark | [ ] Pendiente | |
+| T2.6 Tests expanded | [x] Completada | 2026-07-26 |
+| T2.7 Benchmark | [x] Completada | 2026-07-26 |
