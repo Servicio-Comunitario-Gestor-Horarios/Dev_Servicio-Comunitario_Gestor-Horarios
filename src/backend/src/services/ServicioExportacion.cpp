@@ -1,7 +1,6 @@
 #include "backend/services/ServicioExportacion.hpp"
 #include <QMap>
 #include <QStringList>
-#include <QTextStream>
 
 namespace backend::services {
 
@@ -27,7 +26,6 @@ Resultado<QString> ServicioExportacion::exportarCsvCursos(
     const SolverConfig& config) 
 {
     QString resultadoStr;
-    QTextStream stream(&resultadoStr);
 
     bool primerCurso = true;
 
@@ -36,12 +34,12 @@ Resultado<QString> ServicioExportacion::exportarCsvCursos(
         const CursoOutput& curso = itCurso.value();
 
         if (!primerCurso) {
-            stream << "\n";
+            resultadoStr += "\n";
         }
         primerCurso = false;
 
         // Encabezado de la sección del curso
-        stream << escaparCsv(QString("Curso: %1 (Turno: %2)").arg(nombreCurso, curso.turno)) << "\n";
+        resultadoStr += escaparCsv(QString("Curso: %1 (Turno: %2)").arg(nombreCurso, curso.turno)) + "\n";
 
         // Determinar slots visibles según turno
         int inicioSlot = 0;
@@ -57,7 +55,7 @@ Resultado<QString> ServicioExportacion::exportarCsvCursos(
         for (int slot = inicioSlot; slot <= finSlot; ++slot) {
             headers << QString("Slot %1").arg(slot);
         }
-        stream << headers.join(',') << "\n";
+        resultadoStr += headers.join(',') + "\n";
 
         // Mapear asignaciones rápidamente: mapa[dia][slot] = AsignacionOutput
         QMap<int, QMap<int, AsignacionOutput>> asignacionesMapa;
@@ -76,7 +74,6 @@ Resultado<QString> ServicioExportacion::exportarCsvCursos(
                 if (asignacionesMapa.contains(dia) && asignacionesMapa[dia].contains(slot)) {
                     const AsignacionOutput& asig = asignacionesMapa[dia][slot];
 
-                    // Validar límites de los arreglos en SolverConfig
                     if (asig.materia < 0 || asig.materia >= config.materias.size()) {
                         return Resultado<QString>::error(QString("Índice de materia fuera de rango: %1").arg(asig.materia));
                     }
@@ -94,10 +91,10 @@ Resultado<QString> ServicioExportacion::exportarCsvCursos(
                     QString celda = QString("%1 (%2 / %3)").arg(nombreMat, nombreProf, nombreAula);
                     fila << escaparCsv(celda);
                 } else {
-                    fila << ""; // Slot vacío
+                    fila << "";
                 }
             }
-            stream << fila.join(',') << "\n";
+            resultadoStr += fila.join(',') + "\n";
         }
     }
 
@@ -134,18 +131,17 @@ Resultado<QString> ServicioExportacion::exportarCsvProfesores(
     }
 
     QString resultadoStr;
-    QTextStream stream(&resultadoStr);
     bool primerProfesor = true;
 
     // Se iteran todos los profesores declarados en la configuración
     for (int profIdx = 0; profIdx < config.profesores.size(); ++profIdx) {
         if (!primerProfesor) {
-            stream << "\n";
+            resultadoStr += "\n";
         }
         primerProfesor = false;
 
         const QString& nombreProfesor = config.profesores[profIdx].nombre;
-        stream << escaparCsv(QString("Profesor: %1").arg(nombreProfesor)) << "\n";
+        resultadoStr += escaparCsv(QString("Profesor: %1").arg(nombreProfesor)) + "\n";
 
         // Los profesores cubren el rango completo de slots (0 al 11)
         QStringList headers;
@@ -153,7 +149,7 @@ Resultado<QString> ServicioExportacion::exportarCsvProfesores(
         for (int slot = 0; slot <= 11; ++slot) {
             headers << QString("Slot %1").arg(slot);
         }
-        stream << headers.join(',') << "\n";
+        resultadoStr += headers.join(',') + "\n";
 
         const auto& mapaDias = mapaProfesorAsignaciones[profIdx];
 
@@ -168,7 +164,7 @@ Resultado<QString> ServicioExportacion::exportarCsvProfesores(
                     fila << "";
                 }
             }
-            stream << fila.join(',') << "\n";
+            resultadoStr += fila.join(',') + "\n";
         }
     }
 

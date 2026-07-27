@@ -3,12 +3,11 @@
  * @brief Declaración del servicio de exportación de horarios a formatos CSV y JSON.
  */
 
-#ifndef SERVICIO_EXPORTACION_HPP
-#define SERVICIO_EXPORTACION_HPP
+#pragma once
 
 #include <QJsonObject>
 #include <QString>
-#include "backend/data/horario_salida.hpp"
+#include "backend/data/output_schedule.hpp"
 #include "backend/resultado.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
@@ -63,5 +62,3 @@ private:
 };
 
 } // namespace backend::services
-
-#endif // SERVICIO_EXPORTACION_HPP

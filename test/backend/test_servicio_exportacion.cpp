@@ -11,15 +11,15 @@ protected:
 
     void SetUp() override {
         // Configurar entidades ficticias en SolverConfig
-        MateriaConfig mat0; mat0.nombre = "Matematica";
-        MateriaConfig mat1; mat1.nombre = "Fisica, Avanzada"; // Con coma para probar escape
+        MateriaSolverConfig mat0; mat0.nombre = "Matematica";
+        MateriaSolverConfig mat1; mat1.nombre = "Fisica, Avanzada"; // Con coma para probar escape
         config.materias = {mat0, mat1};
 
-        ProfesorConfig prof0; prof0.nombre = "Prof. Garcia";
-        ProfesorConfig prof1; prof1.nombre = "Prof. Martinez";
+        ProfesorSolverConfig prof0; prof0.nombre = "Prof. Garcia";
+        ProfesorSolverConfig prof1; prof1.nombre = "Prof. Martinez";
         config.profesores = {prof0, prof1};
 
-        AulaConfig aula0; aula0.nombre = "Aula 101";
+        AulaSolverConfig aula0; aula0.nombre = "Aula 101";
         config.aulas = {aula0};
 
         // Configurar HorarioSalida ficticio

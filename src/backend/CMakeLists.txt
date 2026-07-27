@@ -33,6 +33,7 @@ target_sources(backend PRIVATE
     src/services/ServicioPlanesEstudio.cpp
     src/services/ServicioCargaHoraria.cpp
     src/services/ServicioComposicionPlan.cpp
+    src/services/ServicioExportacion.cpp
 )
 
 target_include_directories(backend PUBLIC
