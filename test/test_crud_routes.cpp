@@ -59,7 +59,8 @@ void TestMiddlewareCrudRoutes::healthCheck()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QCOMPARE(respuesta["data"].toString(), QString("ok"));
 }
 
@@ -73,7 +74,8 @@ void TestMiddlewareCrudRoutes::ready()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QCOMPARE(respuesta["data"].toString(), QString("ok"));
 }
 
@@ -87,7 +89,8 @@ void TestMiddlewareCrudRoutes::shutdown()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QCOMPARE(respuesta["data"].toString(), QString("ok"));
 }
 
@@ -101,7 +104,8 @@ void TestMiddlewareCrudRoutes::teacherList()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QVERIFY(respuesta["data"].isArray());
 }
 
@@ -115,7 +119,8 @@ void TestMiddlewareCrudRoutes::subjectList()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QVERIFY(respuesta["data"].isArray());
 }
 
@@ -129,7 +134,8 @@ void TestMiddlewareCrudRoutes::classroomList()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     QVERIFY(respuesta["data"].isArray());
 }
 
@@ -145,7 +151,8 @@ void TestMiddlewareCrudRoutes::classroomGet()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_NO_ENCONTRADO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_NO_ENCONTRADO);
 }
 
 void TestMiddlewareCrudRoutes::classroomGetMissingId()
@@ -159,7 +166,8 @@ void TestMiddlewareCrudRoutes::classroomGetMissingId()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_INVALIDO);
 }
 
 void TestMiddlewareCrudRoutes::invalidOp()
@@ -172,7 +180,8 @@ void TestMiddlewareCrudRoutes::invalidOp()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_INVALIDO);
 }
 
 void TestMiddlewareCrudRoutes::teacherCreateValid()
@@ -188,7 +197,8 @@ void TestMiddlewareCrudRoutes::teacherCreateValid()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
 }
 
 void TestMiddlewareCrudRoutes::teacherCreateMissingFields()
@@ -203,7 +213,8 @@ void TestMiddlewareCrudRoutes::teacherCreateMissingFields()
     QVERIFY(spy.wait(3000));
 
     QJsonObject respuesta = spy.at(0).at(0).toJsonObject();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_INVALIDO);
 }
 
 void TestMiddlewareCrudRoutes::malformedJson()
@@ -221,7 +232,8 @@ void TestMiddlewareCrudRoutes::malformedJson()
     QByteArray data = socket.readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     QJsonObject respuesta = doc.object();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_INVALIDO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_INVALIDO);
     socket.disconnectFromServer();
 }
 
@@ -245,7 +257,8 @@ void TestMiddlewareCrudRoutes::legacyDataKey()
     QByteArray data = socket.readAll();
     QJsonDocument respuestaDoc = QJsonDocument::fromJson(data);
     QJsonObject respuesta = respuestaDoc.object();
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_EXITO);
+    QCOMPARE(respuesta["status"].toString(), QString("ok"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_EXITO);
     socket.disconnectFromServer();
 }
 
@@ -256,7 +269,8 @@ void TestMiddlewareCrudRoutes::timeout()
     m_server->registerRoute("slow_op", [](const QJsonObject &, QLocalSocket *s) {
         QTimer::singleShot(5000, s, [s]() {
             QJsonObject r;
-            r["status"] = Middleware::RESP_EXITO;
+            r["status"] = "ok";
+            r["code"] = Middleware::RESP_EXITO;
             r["data"] = "slow response";
             QJsonDocument d(r);
             s->write(d.toJson(QJsonDocument::Compact));
@@ -275,7 +289,8 @@ void TestMiddlewareCrudRoutes::timeout()
 
     m_server->setTimeoutMs(5000);
 
-    QCOMPARE(respuesta["status"].toInt(), Middleware::RESP_TIEMPO_AGOTADO);
+    QCOMPARE(respuesta["status"].toString(), QString("error"));
+    QCOMPARE(respuesta["code"].toInt(), Middleware::RESP_TIEMPO_AGOTADO);
 }
 
 QTEST_MAIN(TestMiddlewareCrudRoutes)

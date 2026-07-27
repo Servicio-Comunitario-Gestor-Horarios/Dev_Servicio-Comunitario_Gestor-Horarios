@@ -18,7 +18,7 @@
  *
  * Establece una conexión QLocalSocket con el servidor IPC del backend,
  * envía solicitudes con formato `{"op":"...", "payload":{...}}` y
- * recibe respuestas `{"status": N, "data": ..., "code": N}`.
+ * recibe respuestas `{"status": "ok"/"error", "code": N, "data": ...}`.
  *
  * ## Uso básico
  * ~~~{.cpp}
@@ -50,6 +50,9 @@ public:
      *
      * Construye un JSON con la operación y payload opcional,
      * conecta al servidor y envía los datos.
+     *
+     * @note Soporta solo 1 solicitud concurrente. Si se envia otra antes
+     *       de recibir la respuesta, se sobreescribe.
      *
      * @param op Código de operación (ej: "shutdown", "teacher_list").
      * @param payload Datos adicionales de la operación (opcional).
