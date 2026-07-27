@@ -56,6 +56,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoEmail->setValidator(new QRegularExpressionValidator(regexEmail, this));
     QRegularExpression regexTelefono("^[0-9+()\\- ]+$");
     campoTelefono->setValidator(new QRegularExpressionValidator(regexTelefono, this));
+    campoCedula->setValidator(new QRegularExpressionValidator(regexTelefono, this));
 
     QFormLayout *formLayout = new QFormLayout();
     formLayout->setSpacing(15);

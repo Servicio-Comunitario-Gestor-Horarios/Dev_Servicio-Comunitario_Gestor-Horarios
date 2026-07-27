@@ -1,16 +1,19 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QStackedWidget>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QFrame>
 
-class MainWindow : public QMainWindow {
-    Q_OBJECT
+class TeacherListWidget;
+class ClassroomListWidget;
+class SubjectListWidget;
 
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow() override = default;
 
 private slots:
     void mostrarInicio();
@@ -21,17 +24,22 @@ private slots:
     void mostrarVisualizacion();
 
 private:
-    void configurarEstilosMenu();
     void setupSidebar();
     void setupCentralArea();
+    void configurarEstilosMenu();
 
-    QStackedWidget *m_contenedorVistas;
-    QPushButton *m_btnInicio;
-    QPushButton *m_btnDocentes;
-    QPushButton *m_btnAulas;
-    QPushButton *m_btnAsignaturas;
-    QPushButton *m_btnGeneracion;
-    QPushButton *m_btnVisualizacion;
-    QFrame *m_sidebar;
-    QWidget *m_rightContainer;
+    QFrame *m_sidebar = nullptr;
+    QStackedWidget *m_contenedorVistas = nullptr;
+    QWidget *m_rightContainer = nullptr;
+
+    QPushButton *m_btnInicio = nullptr;
+    QPushButton *m_btnDocentes = nullptr;
+    QPushButton *m_btnAulas = nullptr;
+    QPushButton *m_btnAsignaturas = nullptr;
+    QPushButton *m_btnGeneracion = nullptr;
+    QPushButton *m_btnVisualizacion = nullptr;
+
+    TeacherListWidget* m_teacherListWidget = nullptr;
+    ClassroomListWidget* m_classroomListWidget = nullptr;
+    SubjectListWidget* m_subjectListWidget = nullptr;
 };

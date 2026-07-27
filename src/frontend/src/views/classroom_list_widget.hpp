@@ -3,36 +3,40 @@
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
+#include <QJsonObject>
 
-/**
- * @brief Widget para visualizar y gestionar la lista de aulas.
- *
- * Este componente muestra una tabla con las aulas registradas,
- * un panel de resumen lateral y permite abrir el formulario para
- * agregar o editar aulas.
- */
-class ClassroomListWidget : public QWidget {
+class InternalClient;
+
+class ClassroomListWidget : public QWidget
+{
     Q_OBJECT
-
 public:
     explicit ClassroomListWidget(QWidget *parent = nullptr);
-    ~ClassroomListWidget() override = default;
+    void setClient(InternalClient* client);
 
 private slots:
-    /** @brief Abre el diálogo para registrar una nueva aula. */
+    void onRespuestaRecibida(const QJsonObject& respuesta);
     void abrirFormularioNuevo();
-
-    /**
-     * @brief Agrega una nueva fila a la tabla con los datos del aula.
-     * @param nombre Nombre del aula.
-     * @param capacidad Capacidad máxima de estudiantes.
-     * @param edificio Edificio donde se encuentra.
-     * @param piso Piso donde se ubica.
-     */
-    void agregarAulaATabla(const QString& nombre, int capacidad, const QString& edificio, const QString& piso);
 
 private:
     void setupUi();
-    QTableWidget *m_table;
-    QPushButton *m_registerButton;
+    void insertarAulaEnTabla(const QString& nombre, int capacidad,
+                             const QString& edificio, const QString& piso);
+
+    void enviarCrearAula(const QString& nombre, int capacidad,
+                         const QString& edificio, const QString& piso);
+    void enviarActualizarAula(int fila, const QString& nombreOriginal,
+                              const QString& nombre, int capacidad,
+                              const QString& edificio, const QString& piso);
+    void enviarEliminarAula(int fila, const QString& nombre);
+
+    struct SolicitudPendiente {
+        QString op;
+        QJsonObject data;
+        int fila = -1;
+    } m_pendiente;
+
+    QTableWidget* m_table = nullptr;
+    QPushButton* m_registerButton = nullptr;
+    InternalClient* m_client = nullptr;
 };

@@ -14,11 +14,12 @@
 #include "subject_list_widget.hpp"
 #include "dashboard_widget.hpp"
 #include "view_placeholder.hpp"
+#include "classroom_list_widget.hpp"
+#include <middleware/internalclient.h>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QFrame>
-#include "classroom_list_widget.hpp"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Liceo Nacional Robert Serra - Gestión");
@@ -39,6 +40,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     mainLayout->addWidget(m_rightContainer);
 
     setCentralWidget(centralWidget);
+
+    // Crear cliente y pasar a los widgets
+    InternalClient* client = new InternalClient(this);
+    if (m_teacherListWidget) m_teacherListWidget->setClient(client);
+    if (m_classroomListWidget) m_classroomListWidget->setClient(client);
+    if (m_subjectListWidget) m_subjectListWidget->setClient(client);
 
     // Conectar botones
     connect(m_btnInicio, &QPushButton::clicked, this, &MainWindow::mostrarInicio);
@@ -124,13 +131,16 @@ void MainWindow::setupCentralArea() {
     m_contenedorVistas->addWidget(new DashboardWidget(this));
 
     // Índice 1: Docentes
-    m_contenedorVistas->addWidget(new TeacherListWidget(this));
+    m_teacherListWidget = new TeacherListWidget(this);
+    m_contenedorVistas->addWidget(m_teacherListWidget);
 
     // Índice 2: Aulas
-    m_contenedorVistas->addWidget(new ClassroomListWidget(this));
+    m_classroomListWidget = new ClassroomListWidget(this);
+    m_contenedorVistas->addWidget(m_classroomListWidget);
 
     // Índice 3: Asignaturas
-    m_contenedorVistas->addWidget(new SubjectListWidget(this));
+    m_subjectListWidget = new SubjectListWidget(this);
+    m_contenedorVistas->addWidget(m_subjectListWidget);
 
     // Índice 4: Generación de horarios
     m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
