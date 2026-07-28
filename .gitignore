@@ -1,5 +1,11 @@
 build/
+build-test/
+build-fe/
+build-lite/
+Testing/
 .env
 timelapse-*.mp4
 docs/timelapses/*.mp4
 .qtcreator/
+.vendor/
+compile_commands.json

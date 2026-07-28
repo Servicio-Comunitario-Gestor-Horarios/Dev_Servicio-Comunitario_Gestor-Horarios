@@ -1,0 +1,13 @@
+{
+    "Franja_Horaria": 40,   
+    
+    "Turnos": {     
+        "Manaña": {"inicio": "07:00", "fin": "12:30"},
+        "Tarde": {"inicio": "12:35", "fin": "18:10"}
+    },
+
+    "Receso": {     
+        "Manaña": {"inicio": "08:20", "fin": "08:30"},
+        "Tarde": {"inicio": "14:00", "fin": "14:10"}
+    }
+}

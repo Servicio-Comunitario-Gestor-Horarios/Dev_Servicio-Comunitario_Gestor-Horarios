@@ -34,6 +34,14 @@ target_sources(backend PRIVATE
     src/services/ServicioCargaHoraria.cpp
     src/services/ServicioComposicionPlan.cpp
     src/services/ServicioExportacion.cpp
+
+    # Solver - Issues #25 + #32
+    src/solver/config/solver_config.cpp
+    src/solver/variables.cpp
+    src/solver/solver.cpp
+    src/solver/restricciones/restricciones_turnos.cpp
+    src/solver/restricciones/restricciones_aulas.cpp
+    src/solver/restricciones/restricciones_profesores.cpp
 )
 
 target_include_directories(backend PUBLIC

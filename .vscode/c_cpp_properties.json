@@ -4,28 +4,38 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/src/**",
-                "/usr/include/qt6",
-                "/usr/include/qt6/QtCore",
-                "/usr/include/qt6/QtSql",
-                "/usr/include/qt6/QtWidgets",
-                "/usr/lib/x86_64-linux-gnu/glib-2.0/include",
-                "/usr/include/glib-2.0",
-                "${workspaceFolder}/src/backend/include/backend/data",
                 "${workspaceFolder}/src/backend/include",
+                "${workspaceFolder}/src/backend/src",
                 "${workspaceFolder}/src/frontend/include",
-                "/usr/include/qt6/QtTest"
+                "${workspaceFolder}/.vendor/usr/local/include",
+                "${workspaceFolder}/.vendor/usr/include/qt6",
+                "${workspaceFolder}/.vendor/usr/include/qt6/QtCore",
+                "${workspaceFolder}/.vendor/usr/include/qt6/QtSql",
+                "${workspaceFolder}/.vendor/usr/include/qt6/QtWidgets",
+                "${workspaceFolder}/.vendor/usr/include/qt6/QtTest"
             ],
             "defines": [
                 "QT_CORE_LIB",
                 "QT_SQL_LIB",
                 "QT_WIDGETS_LIB",
-                "QT_NO_DEBUG"
+                "QT_NO_DEBUG",
+                "EIGEN_MPL2_ONLY",
+                "HAVE_CONFIG_H",
+                "OR_PROTO_DLL=\"\"",
+                "PROTOBUF_USE_DLLS",
+                "USE_BOP",
+                "USE_CBC",
+                "USE_CLP",
+                "USE_GLOP",
+                "USE_HIGHS",
+                "USE_MATH_OPT",
+                "USE_PDLP",
+                "USE_SCIP"
             ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-x64",
-            "configurationProvider": "ms-vscode.cmake-tools"
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4

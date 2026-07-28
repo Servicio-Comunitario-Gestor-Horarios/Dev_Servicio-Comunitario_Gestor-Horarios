@@ -7,7 +7,7 @@
 
 #include <QJsonObject>
 #include <QString>
-#include "backend/data/output_schedule.hpp"
+#include "backend/data/horario_salida.hpp"
 #include "backend/resultado.hpp"
 #include "backend/solver/config/solver_config.hpp"
 

@@ -106,7 +106,12 @@ add_qtest(test_middleware_health_check
 # ============================================================
 # Tests de backend — lógica (Google Test, cuando existan)
 # ============================================================
-# add_gtest(test_backend_solver test/backend/test_solver.cpp backend)
+add_gtest(test_backend_variables_cp_sat
+    backend/test_variables_cp_sat.cpp
+    backend
+)
+
+
 
 # Tests para servicios del backend
 add_qtest(test_servicio_aula
@@ -145,6 +150,20 @@ add_qtest(test_composicion_plan
 
 add_qtest(test_edge_cases
     backend/test_edge_cases.cpp
+    backend
+)
+
+# ============================================================
+# Tests de backend — solver CP-SAT
+# ============================================================
+
+add_qtest(test_solver_horarios
+    backend/test_solver_horarios.cpp
+    backend
+)
+
+add_qtest(test_solver_benchmark
+    backend/test_solver_benchmark.cpp
     backend
 )
 

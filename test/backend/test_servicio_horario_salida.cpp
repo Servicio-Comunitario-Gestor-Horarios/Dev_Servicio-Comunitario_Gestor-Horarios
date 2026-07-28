@@ -7,7 +7,7 @@
 #include <QJsonArray>
 
 #include <backend/services/ServicioHorarioSalida.hpp>
-#include <backend/data/output_schedule.hpp>
+#include <backend/data/horario_salida.hpp>
 
 class TestServicioHorarioSalida : public QObject {
     Q_OBJECT
