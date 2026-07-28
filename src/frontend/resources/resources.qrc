@@ -1,6 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <file>flecha.png</file>
         <file>logo.png</file>
     </qresource>
 </RCC>
