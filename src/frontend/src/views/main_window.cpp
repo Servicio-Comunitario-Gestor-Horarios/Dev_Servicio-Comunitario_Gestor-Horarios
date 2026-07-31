@@ -15,7 +15,7 @@
 #include "dashboard_widget.hpp"
 #include "view_placeholder.hpp"
 #include "classroom_list_widget.hpp"
-#include <middleware/internalclient.h>
+#include "../../../middleware/include/middleware/internalclient.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>

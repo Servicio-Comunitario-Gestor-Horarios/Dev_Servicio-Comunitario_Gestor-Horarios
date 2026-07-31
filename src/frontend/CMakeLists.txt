@@ -23,6 +23,7 @@ set(FRONTEND_SOURCES
     src/views/classroom_list_widget.cpp
     src/forms/subject_form_dialog.cpp
     src/views/subject_list_widget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../middleware/src/client/internalclient.cpp
 )
 
 set(FRONTEND_HEADERS
@@ -37,6 +38,7 @@ set(FRONTEND_HEADERS
     src/views/classroom_list_widget.hpp
     src/forms/subject_form_dialog.hpp
     src/views/subject_list_widget.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../middleware/include/middleware/internalclient.h
 )
 
 if(FRONTEND_STANDALONE)
@@ -52,6 +54,7 @@ if(FRONTEND_STANDALONE)
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+
     )
     target_link_libraries(gestor-horarios-frontend PRIVATE
         Qt6::Core

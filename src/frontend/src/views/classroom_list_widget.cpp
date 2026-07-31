@@ -10,8 +10,8 @@
 
 #include "classroom_list_widget.hpp"
 #include "../forms/classroom_form_dialog.hpp"
-#include <middleware/internalclient.h>
-#include <middleware/messages.h>
+#include "../../../middleware/include/middleware/internalclient.h"
+#include "../../../middleware/include/middleware/messages.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>

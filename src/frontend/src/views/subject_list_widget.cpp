@@ -5,8 +5,8 @@
 
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
-#include <middleware/internalclient.h>
-#include <middleware/messages.h>
+#include "../../../middleware/include/middleware/internalclient.h"
+#include "../../../middleware/include/middleware/messages.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>

@@ -1,6 +1,7 @@
-#include <middleware/internalclient.h>
-#include <middleware/messages.h>
+#include "../../include/middleware/internalclient.h"
+#include "../../include/middleware/messages.h"
 
+#include <QLocalSocket>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>
