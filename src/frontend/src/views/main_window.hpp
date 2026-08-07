@@ -22,11 +22,14 @@ private slots:
     void mostrarAsignaturas();
     void mostrarGeneracion();
     void mostrarVisualizacion();
+    void abrirConfiguracion();
+    void aplicarTemaGlobal(bool modoOscuro); // <--- Declaración añadida
 
 private:
     void setupSidebar();
     void setupCentralArea();
     void configurarEstilosMenu();
+    void activarBoton(QPushButton* btn); // <--- Declaración añadida que soluciona tu error
 
     QFrame *m_sidebar = nullptr;
     QStackedWidget *m_contenedorVistas = nullptr;

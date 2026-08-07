@@ -24,6 +24,7 @@ set(FRONTEND_SOURCES
     src/forms/subject_form_dialog.cpp
     src/views/subject_list_widget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../middleware/src/client/internalclient.cpp
+    src/forms/settings_dialog.cpp
 )
 
 set(FRONTEND_HEADERS
@@ -39,6 +40,8 @@ set(FRONTEND_HEADERS
     src/forms/subject_form_dialog.hpp
     src/views/subject_list_widget.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../middleware/include/middleware/internalclient.h
+    include/frontend/toggle_switch.hpp
+    src/forms/settings_dialog.hpp
 )
 
 if(FRONTEND_STANDALONE)
@@ -50,6 +53,9 @@ if(FRONTEND_STANDALONE)
         ${FRONTEND_HEADERS}
         src/main.cpp
         resources/resources.qrc
+        include/frontend/toggle_switch.hpp
+        src/forms/settings_dialog.hpp
+        src/forms/settings_dialog.cpp
     )
     target_include_directories(gestor-horarios-frontend PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
