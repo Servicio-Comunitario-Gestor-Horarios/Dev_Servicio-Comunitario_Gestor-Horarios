@@ -1,0 +1,56 @@
+=== PROBE [health_check] 2026-08-24T15:37:18+00:00 ===
+REQ: {"op":"health_check"}
+RESP: {"code":0,"data":"ok","status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [ready] 2026-08-24T15:37:18+00:00 ===
+REQ: {"op":"ready"}
+RESP: {"code":0,"data":"ok","status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [teacher_list] 2026-08-24T15:37:18+00:00 ===
+REQ: {"op":"teacher_list"}
+RESP: {"code":0,"data":[],"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [teacher_create] 2026-08-24T15:37:19+00:00 ===
+REQ: {"op":"teacher_create","payload":{"nombre":"Probe Teacher","correo":"probe@test.local"}}
+RESP: {"code":0,"data":{"correo":"probe@test.local","nombre":"Probe Teacher"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [teacher_update] 2026-08-24T15:37:19+00:00 ===
+REQ: {"op":"teacher_update","payload":{"id":"t-1","nombre":"Probe Teacher Editada"}}
+RESP: {"code":0,"data":{"id":"t-1","nombre":"Probe Teacher Editada"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [classroom_list] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"classroom_list"}
+RESP: {"code":0,"data":[],"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [classroom_create] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"classroom_create","payload":{"nombre":"Aula Probe","capacidad":30}}
+RESP: {"code":0,"data":{"capacidad":30,"nombre":"Aula Probe"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [classroom_update] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"classroom_update","payload":{"id":"c-1","capacidad":45}}
+RESP: {"code":0,"data":{"capacidad":45,"id":"c-1"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [subject_list] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"subject_list"}
+RESP: {"code":0,"data":[],"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [subject_create] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"subject_create","payload":{"nombre":"Materia Probe","tipoAula":"Laboratorio"}}
+RESP: {"code":0,"data":{"nombre":"Materia Probe","tipoAula":"Laboratorio"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [subject_update] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"subject_update","payload":{"id":"s-1","nombre":"Materia Editada"}}
+RESP: {"code":0,"data":{"id":"s-1","nombre":"Materia Editada"},"status":"ok"}
+SOCAT_EXIT: 0
+=== PROBE [teacher_get_no_id] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"teacher_get","payload":{}}
+RESP: {"code":-4,"data":"Falta campo id","status":"error"}
+SOCAT_EXIT: 0
+=== PROBE [unknown_op] 2026-08-24T15:37:31+00:00 ===
+REQ: {"op":"nonexistent_op"}
+RESP: {"code":-4,"data":"Operación desconocida: nonexistent_op","status":"error"}
+SOCAT_EXIT: 0
+=== PROBE [malformed_json] 2026-08-24T15:37:49+00:00 ===
+REQ: <<<not-json{{{
+RESP: {"code":-4,"data":"JSON malformado","status":"error"}
+SOCAT_EXIT: 0

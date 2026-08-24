@@ -1,0 +1,21 @@
+[1/17] Automatic MOC and UIC for target gestor-horarios-frontend
+[2/17] Automatic RCC for resources/resources.qrc
+[3/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/src/views/teacher_list_widget.cpp.o
+FAILED: CMakeFiles/gestor-horarios-frontend.dir/src/views/teacher_list_widget.cpp.o 
+/usr/bin/c++ -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB -I/workspace/build-ui/gestor-horarios-frontend_autogen/include -I/workspace/src/frontend/include -I/workspace/src/frontend/src -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtWidgets -isystem /usr/include/x86_64-linux-gnu/qt6/QtGui -isystem /usr/include/x86_64-linux-gnu/qt6/QtNetwork -fPIC -MD -MT CMakeFiles/gestor-horarios-frontend.dir/src/views/teacher_list_widget.cpp.o -MF CMakeFiles/gestor-horarios-frontend.dir/src/views/teacher_list_widget.cpp.o.d -o CMakeFiles/gestor-horarios-frontend.dir/src/views/teacher_list_widget.cpp.o -c /workspace/src/frontend/src/views/teacher_list_widget.cpp
+/workspace/src/frontend/src/views/teacher_list_widget.cpp:3:10: fatal error: middleware/internalclient.h: No such file or directory
+    3 | #include <middleware/internalclient.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+[4/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/src/views/main_window.cpp.o
+FAILED: CMakeFiles/gestor-horarios-frontend.dir/src/views/main_window.cpp.o 
+/usr/bin/c++ -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NETWORK_LIB -DQT_NO_DEBUG -DQT_WIDGETS_LIB -I/workspace/build-ui/gestor-horarios-frontend_autogen/include -I/workspace/src/frontend/include -I/workspace/src/frontend/src -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtWidgets -isystem /usr/include/x86_64-linux-gnu/qt6/QtGui -isystem /usr/include/x86_64-linux-gnu/qt6/QtNetwork -fPIC -MD -MT CMakeFiles/gestor-horarios-frontend.dir/src/views/main_window.cpp.o -MF CMakeFiles/gestor-horarios-frontend.dir/src/views/main_window.cpp.o.d -o CMakeFiles/gestor-horarios-frontend.dir/src/views/main_window.cpp.o -c /workspace/src/frontend/src/views/main_window.cpp
+/workspace/src/frontend/src/views/main_window.cpp:18:10: fatal error: middleware/internalclient.h: No such file or directory
+   18 | #include <middleware/internalclient.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+[5/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/src/aplicacion_frontend.cpp.o
+[6/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/src/logindialog.cpp.o
+[7/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/src/forms/teacher_form_dialog.cpp.o
+[8/17] Building CXX object CMakeFiles/gestor-horarios-frontend.dir/gestor-horarios-frontend_autogen/mocs_compilation.cpp.o
+ninja: build stopped: subcommand failed.

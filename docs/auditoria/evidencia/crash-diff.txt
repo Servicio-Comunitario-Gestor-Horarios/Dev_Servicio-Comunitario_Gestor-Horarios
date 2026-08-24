@@ -1,0 +1,6 @@
+# Crash repro determinism check 2026-08-24T15:45:56+00:00
+cmd A: QT_QPA_PLATFORM=offscreen timeout 25 /workspace/build/src/app/gestor-horarios -> exit 124 (timeout kill)
+cmd B: identical, fresh process tree -> exit 124
+diff crash-runA.log crash-runB.log:
+TRACES_IDENTICAL=yes (byte-for-byte, 137 lines each)
+grep -ci fatal|abort in both logs: 0 / 0

@@ -1,0 +1,28 @@
+Internal ctest changing into directory: /workspace/build
+Test project /workspace/build
+    Start 18: test_solver_benchmark
+1/1 Test #18: test_solver_benchmark ............***Failed    0.20 sec
+********* Start testing of TestSolverBenchmark *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestSolverBenchmark::initTestCase()
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() === BENCHMARK ===
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Dimensiones: 10 prof, 15 materias, 5 aulas, 8 cursos, 5 dias, 6 slots
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Tiempo total: 83 ms
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Status: FALLO
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Errores: QList("El modelo no tiene solucion factible (INFEASIBLE)", "Causas posibles:", "- Restricciones de horas semanales imposibles de cumplir", "- Solapamiento de docentes sin suficiente disponibilidad", "- Materias sin cupo en aulas disponibles", "- Profesores: 10, Cursos: 8, Materias: 15", "- Variables: 0 booleans, 0 integers, Conflicto: 0")
+FAIL!  : TestSolverBenchmark::benchmark_solverGrandeResuelve() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_benchmark.cpp(103)]
+FAIL!  : TestSolverBenchmark::benchmark_verificaConsistencia() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_benchmark.cpp(111)]
+PASS   : TestSolverBenchmark::cleanupTestCase()
+Totals: 2 passed, 2 failed, 0 skipped, 0 blacklisted, 169ms
+********* Finished testing of TestSolverBenchmark *********
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.20 sec
+
+The following tests FAILED:
+	 18 - test_solver_benchmark (Failed)
+Errors while running CTest
