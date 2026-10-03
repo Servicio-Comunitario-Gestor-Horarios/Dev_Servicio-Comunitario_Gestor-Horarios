@@ -37,7 +37,13 @@ option(BUILD_TESTING "Build tests" ON)
 # ── Dependencias externas ──
 # Qt6: framework de interfaz gráfica, base de datos e IPC
 # Core (eventos/hilos), Sql (SQLite), Widgets (UI), Network (IPC/QLocalServer)
-find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets Network Test)
+# Test solo se pide si se compilan los tests. Sql es obligatorio siempre:
+# con D2 el frontend accede a la base de datos directamente.
+set(GESTOR_QT_COMPONENTS Core Sql Widgets Network)
+if(BUILD_TESTING)
+    list(APPEND GESTOR_QT_COMPONENTS Test)
+endif()
+find_package(Qt6 REQUIRED COMPONENTS ${GESTOR_QT_COMPONENTS})
 
 if(BUILD_BACKEND)
     # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
@@ -56,7 +62,8 @@ include(cmake/CompilerWarnings.cmake)
 add_subdirectory(src)
 
 # ── Tests ──
-if(BUILD_TESTING)
+# Los tests enlazan `backend` / `backend_solver`, que no existen sin BUILD_BACKEND.
+if(BUILD_TESTING AND BUILD_BACKEND)
     enable_testing()
     add_subdirectory(test)
 endif()

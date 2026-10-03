@@ -44,9 +44,9 @@ TEST_F(ServicioExportacionTest, ExportarJsonExitoso) {
 
 TEST_F(ServicioExportacionTest, ExportarCsvCursosValido) {
     auto res = ServicioExportacion::exportarCsvCursos(horario, config);
-    ASSERT_TRUE(res.esExitoso());
+    ASSERT_TRUE(res.ok);
 
-    QString csv = res.obtenerValor();
+    QString csv = res.valor;
     EXPECT_TRUE(csv.contains("Curso: 1A (Turno: manana)"));
     EXPECT_TRUE(csv.contains("Dia,Slot 0,Slot 1,Slot 2,Slot 3,Slot 4,Slot 5"));
     EXPECT_TRUE(csv.contains("Matematica (Prof. Garcia / Aula 101)"));
@@ -56,13 +56,13 @@ TEST_F(ServicioExportacionTest, ExportarCsvCursosValido) {
 
 TEST_F(ServicioExportacionTest, ExportarCsvProfesoresValido) {
     auto res = ServicioExportacion::exportarCsvProfesores(horario, config);
-    ASSERT_TRUE(res.esExitoso());
+    ASSERT_TRUE(res.ok);
 
-    QString csv = res.obtenerValor();
+    QString csv = res.valor;
     EXPECT_TRUE(csv.contains("Profesor: Prof. Garcia"));
     EXPECT_TRUE(csv.contains("Profesor: Prof. Martinez"));
     EXPECT_TRUE(csv.contains("1A - Matematica"));
-    EXPECT_TRUE(csv.contains("1A - \"Fisica, Avanzada\""));
+    EXPECT_TRUE(csv.contains("\"1A - Fisica, Avanzada\""));
 }
 
 TEST_F(ServicioExportacionTest, ErrorIndiceFueraDeRango) {
@@ -70,10 +70,10 @@ TEST_F(ServicioExportacionTest, ErrorIndiceFueraDeRango) {
     horario.horarios["1A"].dias[0].asignaciones.push_back({2, 99, 0, 0}); // Materia 99 no existe
 
     auto resCurso = ServicioExportacion::exportarCsvCursos(horario, config);
-    EXPECT_FALSE(resCurso.esExitoso());
-    EXPECT_TRUE(resCurso.obtenerError().contains("out-of-bounds") || 
-                resCurso.obtenerError().contains("fuera de rango"));
+    EXPECT_FALSE(resCurso.ok);
+    EXPECT_TRUE(resCurso.mensajeError.contains("out-of-bounds") || 
+                resCurso.mensajeError.contains("fuera de rango"));
 
     auto resProf = ServicioExportacion::exportarCsvProfesores(horario, config);
-    EXPECT_FALSE(resProf.esExitoso());
+    EXPECT_FALSE(resProf.ok);
 }

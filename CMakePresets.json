@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "dev-frontend",
+      "displayName": "Dev Frontend (sin OR-Tools)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-fe",
+      "cacheVariables": { "BUILD_BACKEND": "OFF", "BUILD_TESTING": "OFF" }
+    },
+    {
+      "name": "full",
+      "displayName": "Build completo (Docker, con OR-Tools)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": { "BUILD_BACKEND": "ON", "BUILD_TESTING": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev-frontend", "configurePreset": "dev-frontend" },
+    { "name": "full", "configurePreset": "full" }
+  ],
+  "testPresets": [
+    { "name": "full", "configurePreset": "full", "output": { "outputOnFailure": true } }
+  ]
+}

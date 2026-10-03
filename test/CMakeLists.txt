@@ -108,7 +108,7 @@ add_qtest(test_middleware_health_check
 # ============================================================
 add_gtest(test_backend_variables_cp_sat
     backend/test_variables_cp_sat.cpp
-    backend
+    backend_solver
 )
 
 
@@ -159,12 +159,12 @@ add_qtest(test_edge_cases
 
 add_qtest(test_solver_horarios
     backend/test_solver_horarios.cpp
-    backend
+    backend_solver
 )
 
 add_qtest(test_solver_benchmark
     backend/test_solver_benchmark.cpp
-    backend
+    backend_solver
 )
 
 # ============================================================
