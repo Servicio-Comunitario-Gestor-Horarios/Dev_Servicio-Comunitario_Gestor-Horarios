@@ -20,11 +20,11 @@ private slots:
     void onLoginClicked();
 
 private:
-    QLineEdit *usernameEdit;
     QLineEdit *passwordEdit;
     QPushButton *loginButton;
-    QPushButton *cancelButton;
     QLabel *statusLabel;
+
+    static constexpr const char *CORRECT_PASSWORD = "123456";
 };
 
 #endif // LOGINDIALOG_H

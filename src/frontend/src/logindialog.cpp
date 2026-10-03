@@ -79,7 +79,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     bodyLayout->setContentsMargins(0, 0, 0, 0);
 
     QFrame *loginCard = new QFrame(bodyFrame);
-    loginCard->setFixedSize(420, 520);
+    loginCard->setFixedSize(420, 480);
     loginCard->setObjectName("LoginCard");
 
     QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect(this);
@@ -92,7 +92,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     cardLayout->setContentsMargins(45, 40, 45, 40);
     cardLayout->setSpacing(8);
 
-    QLabel *iconLabel = new QLabel("🛡️", loginCard);
+    QLabel *iconLabel = new QLabel("🔐", loginCard);
     iconLabel->setAlignment(Qt::AlignCenter);
     iconLabel->setFixedSize(64, 64);
     iconLabel->setStyleSheet("font-size: 26px; background-color: #eff6ff; border-radius: 32px; border: none;");
@@ -110,7 +110,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     titleLabel->setStyleSheet("font-size: 28px; font-weight: 700; color: #0f172a; border: none; background: transparent; line-height: 1.1;");
     cardLayout->addWidget(titleLabel);
 
-    QLabel *subtitleLabel = new QLabel("Ingresa tus credenciales para acceder", loginCard);
+    QLabel *subtitleLabel = new QLabel("Ingresa la contraseña de acceso", loginCard);
     subtitleLabel->setAlignment(Qt::AlignCenter);
     subtitleLabel->setStyleSheet("font-size: 16px; color: #64748b; border: none; background: transparent;");
     cardLayout->addWidget(subtitleLabel);
@@ -129,13 +129,7 @@ LoginDialog::LoginDialog(QWidget *parent)
         p.setPen(QPen(QColor("#94a3b8"), 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         p.setBrush(Qt::NoBrush);
 
-        if (tipo == "user") {
-            p.drawEllipse(QRectF(6, 2, 12, 12));
-            QPainterPath path;
-            path.moveTo(3, 22);
-            path.quadTo(12, 12, 21, 22);
-            p.drawPath(path);
-        } else if (tipo == "lock") {
+        if (tipo == "lock") {
             p.drawRoundedRect(4, 11, 15, 11, 2, 2);
             QPainterPath path;
             path.moveTo(7, 11);
@@ -164,20 +158,8 @@ LoginDialog::LoginDialog(QWidget *parent)
     };
 
     // ==========================================
-    // FORMULARIOS CON ÍCONOS INTEGRADOS
+    // FORMULARIO SOLO CONTRASEÑA
     // ==========================================
-    QLabel *userLabel = new QLabel("Usuario", loginCard);
-    userLabel->setStyleSheet("font-size: 12px; font-weight: 600; color: #475569; border: none; background: transparent;");
-    cardLayout->addWidget(userLabel);
-
-    usernameEdit = new QLineEdit(loginCard);
-    usernameEdit->setPlaceholderText("Ej: admin123");
-    usernameEdit->setFixedHeight(44);
-    usernameEdit->addAction(crearIcono("user"), QLineEdit::LeadingPosition);
-    cardLayout->addWidget(usernameEdit);
-
-    cardLayout->addSpacing(6);
-
     QLabel *passLabel = new QLabel("Contraseña", loginCard);
     passLabel->setStyleSheet("font-size: 12px; font-weight: 600; color: #475569; border: none; background: transparent;");
     cardLayout->addWidget(passLabel);
@@ -206,7 +188,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     statusLabel->setStyleSheet("font-size: 12px; border: none; background: transparent;");
     cardLayout->addWidget(statusLabel);
 
-    loginButton = new QPushButton("Iniciar Sesión  →]", loginCard);
+    loginButton = new QPushButton("Acceder  →]", loginCard);
     loginButton->setFixedHeight(44);
     loginButton->setCursor(Qt::PointingHandCursor);
     cardLayout->addWidget(loginButton);
@@ -288,7 +270,6 @@ LoginDialog::LoginDialog(QWidget *parent)
     )");
 
     connect(loginButton, &QPushButton::clicked, this, &LoginDialog::onLoginClicked);
-    connect(usernameEdit, &QLineEdit::returnPressed, this, &LoginDialog::onLoginClicked);
     connect(passwordEdit, &QLineEdit::returnPressed, this, &LoginDialog::onLoginClicked);
     this->setFocus();
 }
@@ -297,23 +278,28 @@ LoginDialog::~LoginDialog() {}
 
 void LoginDialog::onLoginClicked()
 {
-    QString user = usernameEdit->text().trimmed();
     QString pass = passwordEdit->text().trimmed();
-
-    usernameEdit->setProperty("error", user.isEmpty());
-    usernameEdit->style()->unpolish(usernameEdit);
-    usernameEdit->style()->polish(usernameEdit);
 
     passwordEdit->setProperty("error", pass.isEmpty());
     passwordEdit->style()->unpolish(passwordEdit);
     passwordEdit->style()->polish(passwordEdit);
 
-    if (!user.isEmpty() && !pass.isEmpty()) {
-        statusLabel->setStyleSheet("color: #10b981; font-weight: 600; border: none; background: transparent;");
-        statusLabel->setText("✓ Acceso concedido");
-        QTimer::singleShot(300, this, &QDialog::accept);
+    if (!pass.isEmpty()) {
+        if (pass == CORRECT_PASSWORD) {
+            statusLabel->setStyleSheet("color: #10b981; font-weight: 600; border: none; background: transparent;");
+            statusLabel->setText("✓ Acceso concedido");
+            QTimer::singleShot(300, this, &QDialog::accept);
+        } else {
+            statusLabel->setStyleSheet("color: #ef4444; font-weight: 600; border: none; background: transparent;");
+            statusLabel->setText("✗ Contraseña incorrecta");
+            passwordEdit->setProperty("error", true);
+            passwordEdit->style()->unpolish(passwordEdit);
+            passwordEdit->style()->polish(passwordEdit);
+            passwordEdit->clear();
+            passwordEdit->setFocus();
+        }
     } else {
         statusLabel->setStyleSheet("color: #ef4444; font-weight: 600; border: none; background: transparent;");
-        statusLabel->setText("✗ Por favor, completa todos los campos");
+        statusLabel->setText("✗ Por favor, ingresa la contraseña");
     }
 }
