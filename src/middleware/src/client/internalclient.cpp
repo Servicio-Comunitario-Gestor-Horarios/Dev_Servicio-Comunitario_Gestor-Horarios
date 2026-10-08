@@ -1,7 +1,10 @@
+#include "../../include/middleware/internalclient.h"
+#include "../../include/middleware/messages.h"
 #include <middleware/internalclient.h>
 #include <middleware/messages.h>
 #include <middleware/ipc_framing.hpp>
 
+#include <QLocalSocket>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDebug>

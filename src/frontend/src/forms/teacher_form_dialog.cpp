@@ -3,19 +3,32 @@
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QMessageBox>
+#include <QApplication>
 
 namespace gestor::frontend::forms {
 
 TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Docente");
     resize(450, 350);
-    setStyleSheet("QDialog { background-color: white; }");
 
-    QString inputStyle =
-        "QLineEdit { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px; "
-        "background-color: white; color: #374151; font-size: 13px; }"
-        "QLineEdit::placeholder { color: #9ca3af; }"
-        "QLineEdit.error { border: 2px solid #dc2626; }";
+    // Detectar si el modo oscuro está activo
+    bool isDark = qApp->property("isDarkMode").toBool();
+
+    QString bgColor = isDark ? "#1e1e1e" : "white";
+    QString textColor = isDark ? "#ffffff" : "#374151";
+    QString inputBg = isDark ? "#2a2a2a" : "white";
+    QString inputBorder = isDark ? "#444444" : "#d1d5db";
+    QString placeholderColor = isDark ? "#888888" : "#9ca3af";
+    QString labelColor = isDark ? "#ffffff" : "#111827";
+
+    setStyleSheet(QString("QDialog { background-color: %1; color: %2; }").arg(bgColor, textColor));
+
+    QString inputStyle = QString(
+                             "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
+                             "background-color: %2; color: %3; font-size: 13px; }"
+                             "QLineEdit::placeholder { color: %4; }"
+                             "QLineEdit.error { border: 2px solid #dc2626; }"
+                             ).arg(inputBorder, inputBg, textColor, placeholderColor);
 
     campoCedula = new QLineEdit(this);
     campoCedula->setStyleSheet(inputStyle);
@@ -38,17 +51,17 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoTelefono->setPlaceholderText("Opcional: 0412-1234567");
 
     botonCancelar = new QPushButton("Cancelar", this);
-    botonCancelar->setStyleSheet(
-        "QPushButton { background-color: white; border: 1px solid #d1d5db; "
-        "border-radius: 6px; padding: 10px 20px; color: #374151; font-weight: bold; } "
-        "QPushButton:hover { background-color: #f3f4f6; }");
+    botonCancelar->setStyleSheet(isDark ?
+                                     "QPushButton { background-color: #2a2a2a; border: 1px solid #444444; border-radius: 6px; padding: 10px 20px; color: #ffffff; font-weight: bold; } QPushButton:hover { background-color: #333333; }" :
+                                     "QPushButton { background-color: white; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px 20px; color: #374151; font-weight: bold; } QPushButton:hover { background-color: #f3f4f6; }"
+                                 );
     botonCancelar->setCursor(Qt::PointingHandCursor);
 
     botonGuardar = new QPushButton("Guardar", this);
-    botonGuardar->setStyleSheet(
-        "QPushButton { background-color: #1a237e; border: none; border-radius: 6px; "
-        "padding: 10px 20px; color: white; font-weight: bold; } "
-        "QPushButton:hover { background-color: #283593; }");
+    botonGuardar->setStyleSheet(isDark ?
+                                    "QPushButton { background-color: #3b82f6; border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: bold; } QPushButton:hover { background-color: #2563eb; }" :
+                                    "QPushButton { background-color: #1a237e; border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: bold; } QPushButton:hover { background-color: #283593; }"
+                                );
     botonGuardar->setCursor(Qt::PointingHandCursor);
 
     // Validadores
@@ -61,7 +74,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     QFormLayout *formLayout = new QFormLayout();
     formLayout->setSpacing(15);
 
-    QString labelStyle = "<span style='font-weight:bold; color:#111827; font-size: 13px;'>";
+    QString labelStyle = QString("<span style='font-weight:bold; color:%1; font-size: 13px;'>").arg(labelColor);
     formLayout->addRow(labelStyle + "Cédula:</span>", campoCedula);
     formLayout->addRow(labelStyle + "ID:</span>", campoId);
     formLayout->addRow(labelStyle + "Nombre:</span>", campoNombre);
@@ -87,40 +100,46 @@ bool TeacherFormDialog::validarCampos() {
     bool ok = true;
     QString errores;
 
-    // Restaurar estilos
-    campoCedula->setStyleSheet(campoCedula->styleSheet().replace("error", ""));
-    campoId->setStyleSheet(campoId->styleSheet().replace("error", ""));
-    campoNombre->setStyleSheet(campoNombre->styleSheet().replace("error", ""));
-    campoEmail->setStyleSheet(campoEmail->styleSheet().replace("error", ""));
-    campoTelefono->setStyleSheet(campoTelefono->styleSheet().replace("error", ""));
+    // Restaurar estilos (manteniendo el color base según el tema)
+    bool isDark = qApp->property("isDarkMode").toBool();
+    QString baseInputStyle = QString(
+                                 "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
+                                 "background-color: %2; color: %3; font-size: 13px; }"
+                                 ).arg(isDark ? "#444444" : "#d1d5db", isDark ? "#2a2a2a" : "white", isDark ? "#ffffff" : "#374151");
+
+    campoCedula->setStyleSheet(baseInputStyle);
+    campoId->setStyleSheet(baseInputStyle);
+    campoNombre->setStyleSheet(baseInputStyle);
+    campoEmail->setStyleSheet(baseInputStyle);
+    campoTelefono->setStyleSheet(baseInputStyle);
 
     if (campoCedula->text().trimmed().isEmpty()) {
         errores += "• Cédula es obligatoria.\n";
-        campoCedula->setStyleSheet(campoCedula->styleSheet() + "border: 2px solid #dc2626;");
+        campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
     if (campoId->text().trimmed().isEmpty()) {
         errores += "• ID es obligatorio.\n";
-        campoId->setStyleSheet(campoId->styleSheet() + "border: 2px solid #dc2626;");
+        campoId->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
     if (campoNombre->text().trimmed().isEmpty()) {
         errores += "• Nombre es obligatorio.\n";
-        campoNombre->setStyleSheet(campoNombre->styleSheet() + "border: 2px solid #dc2626;");
+        campoNombre->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
     if (campoEmail->text().trimmed().isEmpty()) {
         errores += "• Email es obligatorio.\n";
-        campoEmail->setStyleSheet(campoEmail->styleSheet() + "border: 2px solid #dc2626;");
+        campoEmail->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     } else if (!campoEmail->hasAcceptableInput()) {
         errores += "• Formato de email inválido.\n";
-        campoEmail->setStyleSheet(campoEmail->styleSheet() + "border: 2px solid #dc2626;");
+        campoEmail->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
     if (!campoTelefono->text().trimmed().isEmpty() && !campoTelefono->hasAcceptableInput()) {
         errores += "• Formato de teléfono inválido (use solo dígitos, espacios, +, -, (, )).\n";
-        campoTelefono->setStyleSheet(campoTelefono->styleSheet() + "border: 2px solid #dc2626;");
+        campoTelefono->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
 
@@ -134,14 +153,6 @@ bool TeacherFormDialog::validarCampos() {
 void TeacherFormDialog::guardarProfesor() {
     if (!validarCampos())
         return;
-
-    // Stub para middleware
-    // bool servidorDisponible = false;
-    // if (!servidorDisponible) {
-    //     QMessageBox::critical(this, "Error de Conexión",
-    //                           "El servidor (InternalClient) no está disponible.");
-    //     return;
-    // }
 
     emit profesorGuardado(
         campoCedula->text().trimmed(),

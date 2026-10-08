@@ -8,6 +8,7 @@
 class TeacherListWidget;
 class ClassroomListWidget;
 class SubjectListWidget;
+class ScheduleVisualizationWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -22,11 +23,14 @@ private slots:
     void mostrarAsignaturas();
     void mostrarGeneracion();
     void mostrarVisualizacion();
+    void abrirConfiguracion();
+    void aplicarTemaGlobal(bool modoOscuro); // <--- Declaración añadida
 
 private:
     void setupSidebar();
     void setupCentralArea();
     void configurarEstilosMenu();
+    void activarBoton(QPushButton* btn); // <--- Declaración añadida que soluciona tu error
 
     QFrame *m_sidebar = nullptr;
     QStackedWidget *m_contenedorVistas = nullptr;
@@ -42,4 +46,5 @@ private:
     TeacherListWidget* m_teacherListWidget = nullptr;
     ClassroomListWidget* m_classroomListWidget = nullptr;
     SubjectListWidget* m_subjectListWidget = nullptr;
+    ScheduleVisualizationWidget* m_scheduleVisualizationWidget = nullptr;
 };
