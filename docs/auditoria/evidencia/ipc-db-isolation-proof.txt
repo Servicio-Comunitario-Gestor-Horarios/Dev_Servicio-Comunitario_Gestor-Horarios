@@ -1,0 +1,9 @@
+# DB isolation proof 2026-08-24T15:38:23+00:00
+== BEFORE ==
+# db-before snapshot 2026-08-24T15:36:28+00:00
+== AFTER ==
+# db-after snapshot 2026-08-24T15:37:49+00:00
+== DIFF (ignoring header timestamp) ==
+EMPTY_DIFF=yes
+== new .db/.sqlite created during probes ==
+none-found

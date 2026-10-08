@@ -23,6 +23,8 @@
 #include <QWidgetAction>
 #include "../forms/settings_dialog.hpp"
 
+#include "schedule_visualization_widget.hpp"
+#include <middleware/internalclient.h>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -53,6 +55,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     if (m_teacherListWidget) m_teacherListWidget->setClient(client);
     if (m_classroomListWidget) m_classroomListWidget->setClient(client);
     if (m_subjectListWidget) m_subjectListWidget->setClient(client);
+    if (m_scheduleVisualizationWidget) m_scheduleVisualizationWidget->setClient(client);
 
     // Conectar botones
     connect(m_btnInicio, &QPushButton::clicked, this, &MainWindow::mostrarInicio);
@@ -192,6 +195,10 @@ void MainWindow::setupCentralArea() {
 
     m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
     m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
+
+    // Índice 5: Visualización de horarios
+    m_scheduleVisualizationWidget = new ScheduleVisualizationWidget(this);
+    m_contenedorVistas->addWidget(m_scheduleVisualizationWidget);
 
     rightLayout->addWidget(topHeader);
     rightLayout->addWidget(m_contenedorVistas);

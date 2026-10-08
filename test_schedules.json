@@ -1,0 +1,108 @@
+{
+  "teachers": [
+    {
+      "name": "Prof. Juan Pérez",
+      "schedule": {
+        "1": { "0": "Matemáticas", "1": "Matemáticas", "2": "Física", "3": "Física" },
+        "2": { "0": "Química", "1": "Química", "4": "Matemáticas", "5": "Matemáticas" },
+        "3": { "2": "Física", "3": "Física", "4": "Química", "5": "Química" },
+        "4": { "0": "Biología", "1": "Biología", "2": "Historia", "3": "Historia" },
+        "5": { "4": "Geografía", "5": "Geografía", "6": "Literatura", "7": "Literatura" }
+      }
+    },
+    {
+      "name": "Prof. María González",
+      "schedule": {
+        "1": { "4": "Historia", "5": "Historia", "6": "Geografía", "7": "Geografía" },
+        "2": { "0": "Literatura", "1": "Literatura", "2": "Inglés", "3": "Inglés" },
+        "3": { "4": "Educación Física", "5": "Educación Física", "6": "Arte", "7": "Arte" },
+        "4": { "0": "Música", "1": "Música", "2": "Tecnología", "3": "Tecnología" },
+        "5": { "4": "Filosofía", "5": "Filosofía", "6": "Ciudadanía", "7": "Ciudadanía" }
+      }
+    },
+    {
+      "name": "Prof. Carlos Rodríguez",
+      "schedule": {
+        "1": { "6": "Matemáticas", "7": "Matemáticas", "8": "Física", "9": "Física" },
+        "2": { "6": "Química", "7": "Química", "8": "Biología", "9": "Biología" },
+        "3": { "0": "Historia", "1": "Historia", "2": "Geografía", "3": "Geografía" },
+        "4": { "8": "Literatura", "9": "Literatura", "10": "Inglés", "11": "Inglés" },
+        "5": { "0": "Educación Física", "1": "Educación Física", "2": "Arte", "3": "Arte" }
+      }
+    }
+  ],
+  "years": [
+    {
+      "year": 1,
+      "name": "1° Año",
+      "sections": [
+        {
+          "name": "1°A",
+          "schedule": {
+            "1": { "0": "Matemáticas", "1": "Matemáticas", "2": "Lengua", "3": "Lengua", "4": "Historia", "5": "Geografía" },
+            "2": { "0": "Ciencias", "1": "Ciencias", "2": "Inglés", "3": "Inglés", "4": "Educación Física", "5": "Arte" },
+            "3": { "0": "Matemáticas", "1": "Matemáticas", "2": "Historia", "3": "Historia", "4": "Ciencias", "5": "Ciencias" },
+            "4": { "0": "Lengua", "1": "Lengua", "2": "Geografía", "3": "Ciudadanía", "4": "Música", "5": "Tecnología" },
+            "5": { "0": "Inglés", "1": "Inglés", "2": "Educación Física", "3": "Arte", "4": "Matemáticas", "5": "Lengua" }
+          }
+        },
+        {
+          "name": "1°B",
+          "schedule": {
+            "1": { "0": "Lengua", "1": "Lengua", "2": "Matemáticas", "3": "Matemáticas", "4": "Ciencias", "5": "Historia" },
+            "2": { "0": "Geografía", "1": "Ciudadanía", "2": "Inglés", "3": "Inglés", "4": "Arte", "5": "Música" },
+            "3": { "0": "Ciencias", "1": "Ciencias", "2": "Historia", "3": "Historia", "4": "Matemáticas", "5": "Lengua" },
+            "4": { "0": "Educación Física", "1": "Arte", "2": "Música", "3": "Tecnología", "4": "Inglés", "5": "Geografía" },
+            "5": { "0": "Historia", "1": "Ciudadanía", "2": "Ciencias", "3": "Matemáticas", "4": "Lengua", "5": "Inglés" }
+          }
+        },
+        {
+          "name": "1°C",
+          "schedule": {
+            "1": { "0": "Historia", "1": "Geografía", "2": "Lengua", "3": "Matemáticas", "4": "Ciencias", "5": "Inglés" },
+            "2": { "0": "Arte", "1": "Música", "2": "Educación Física", "3": "Tecnología", "4": "Ciudadanía", "5": "Historia" },
+            "3": { "0": "Matemáticas", "1": "Lengua", "2": "Ciencias", "3": "Inglés", "4": "Geografía", "5": "Arte" },
+            "4": { "0": "Ciudadanía", "1": "Historia", "2": "Matemáticas", "3": "Lengua", "4": "Música", "5": "Educación Física" },
+            "5": { "0": "Inglés", "1": "Ciencias", "2": "Geografía", "3": "Historia", "4": "Lengua", "5": "Matemáticas" }
+          }
+        }
+      ]
+    },
+    {
+      "year": 2,
+      "name": "2° Año",
+      "sections": [
+        {
+          "name": "2°A",
+          "schedule": {
+            "1": { "0": "Física", "1": "Física", "2": "Química", "3": "Química", "4": "Matemáticas", "5": "Matemáticas" },
+            "2": { "0": "Biología", "1": "Biología", "2": "Historia", "3": "Historia", "4": "Literatura", "5": "Literatura" },
+            "3": { "0": "Inglés", "1": "Inglés", "2": "Física", "3": "Química", "4": "Biología", "5": "Matemáticas" },
+            "4": { "0": "Geografía", "1": "Ciudadanía", "2": "Educación Física", "3": "Arte", "4": "Música", "5": "Tecnología" },
+            "5": { "0": "Filosofía", "1": "Filosofía", "2": "Historia", "3": "Literatura", "4": "Inglés", "5": "Física" }
+          }
+        },
+        {
+          "name": "2°B",
+          "schedule": {
+            "1": { "0": "Química", "1": "Biología", "2": "Física", "3": "Matemáticas", "4": "Historia", "5": "Literatura" },
+            "2": { "0": "Inglés", "1": "Geografía", "2": "Ciudadanía", "3": "Educación Física", "4": "Arte", "5": "Música" },
+            "3": { "0": "Física", "1": "Química", "2": "Biología", "3": "Historia", "4": "Literatura", "5": "Inglés" },
+            "4": { "0": "Matemáticas", "1": "Tecnología", "2": "Filosofía", "3": "Geografía", "4": "Ciudadanía", "5": "Educación Física" },
+            "5": { "0": "Arte", "1": "Música", "2": "Física", "3": "Química", "4": "Matemáticas", "5": "Historia" }
+          }
+        },
+        {
+          "name": "2°C",
+          "schedule": {
+            "1": { "0": "Historia", "1": "Literatura", "2": "Inglés", "3": "Física", "4": "Química", "5": "Biología" },
+            "2": { "0": "Matemáticas", "1": "Geografía", "2": "Ciudadanía", "3": "Educación Física", "4": "Arte", "5": "Música" },
+            "3": { "0": "Filosofía", "1": "Tecnología", "2": "Física", "3": "Química", "4": "Historia", "5": "Literatura" },
+            "4": { "0": "Inglés", "1": "Matemáticas", "2": "Biología", "3": "Geografía", "4": "Ciudadanía", "5": "Educación Física" },
+            "5": { "0": "Arte", "1": "Música", "2": "Filosofía", "3": "Tecnología", "4": "Inglés", "5": "Física" }
+          }
+        }
+      ]
+    }
+  ]
+}

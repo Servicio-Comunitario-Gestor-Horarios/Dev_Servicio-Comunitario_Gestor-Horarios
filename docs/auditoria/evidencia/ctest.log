@@ -1,0 +1,251 @@
+Internal ctest changing into directory: /workspace/build
+Test project /workspace/build
+      Start  1: test_backend_franja_horaria
+ 1/23 Test  #1: test_backend_franja_horaria ......   Passed    1.96 sec
+      Start  2: test_backend_aula
+ 2/23 Test  #2: test_backend_aula ................   Passed    0.01 sec
+      Start  3: test_backend_materia
+ 3/23 Test  #3: test_backend_materia .............   Passed    0.01 sec
+      Start  4: test_backend_profesor
+ 4/23 Test  #4: test_backend_profesor ............   Passed    0.01 sec
+      Start  5: test_backend_horario
+ 5/23 Test  #5: test_backend_horario .............   Passed    0.01 sec
+      Start  6: test_backend_plan_estudio
+ 6/23 Test  #6: test_backend_plan_estudio ........   Passed    0.01 sec
+      Start  7: test_backend_database
+ 7/23 Test  #7: test_backend_database ............   Passed   10.52 sec
+      Start  8: test_backend_entity_graph
+ 8/23 Test  #8: test_backend_entity_graph ........   Passed    0.01 sec
+      Start  9: test_middleware_health_check
+ 9/23 Test  #9: test_middleware_health_check .....   Passed    1.30 sec
+      Start 10: test_backend_variables_cp_sat
+Could not find executable /workspace/build/test/test_backend_variables_cp_sat
+Looked in the following places:
+/workspace/build/test/test_backend_variables_cp_sat
+/workspace/build/test/test_backend_variables_cp_sat
+/workspace/build/test/Release/test_backend_variables_cp_sat
+/workspace/build/test/Release/test_backend_variables_cp_sat
+/workspace/build/test/Debug/test_backend_variables_cp_sat
+/workspace/build/test/Debug/test_backend_variables_cp_sat
+/workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+/workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+/workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+/workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+/workspace/build/test/Deployment/test_backend_variables_cp_sat
+/workspace/build/test/Deployment/test_backend_variables_cp_sat
+/workspace/build/test/Development/test_backend_variables_cp_sat
+/workspace/build/test/Development/test_backend_variables_cp_sat
+workspace/build/test/test_backend_variables_cp_sat
+workspace/build/test/test_backend_variables_cp_sat
+workspace/build/test/Release/test_backend_variables_cp_sat
+workspace/build/test/Release/test_backend_variables_cp_sat
+workspace/build/test/Debug/test_backend_variables_cp_sat
+workspace/build/test/Debug/test_backend_variables_cp_sat
+workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+workspace/build/test/Deployment/test_backend_variables_cp_sat
+workspace/build/test/Deployment/test_backend_variables_cp_sat
+workspace/build/test/Development/test_backend_variables_cp_sat
+workspace/build/test/Development/test_backend_variables_cp_sat
+Unable to find executable: /workspace/build/test/test_backend_variables_cp_sat
+10/23 Test #10: test_backend_variables_cp_sat ....***Not Run   0.00 sec
+      Start 11: test_servicio_aula
+11/23 Test #11: test_servicio_aula ...............   Passed   89.71 sec
+      Start 12: test_servicio_materias
+12/23 Test #12: test_servicio_materias ...........   Passed   81.19 sec
+      Start 13: test_servicio_planes_estudio
+13/23 Test #13: test_servicio_planes_estudio .....   Passed   83.34 sec
+      Start 14: test_servicio_carga_horaria
+14/23 Test #14: test_servicio_carga_horaria ......   Passed  131.24 sec
+      Start 15: test_composicion_plan
+15/23 Test #15: test_composicion_plan ............   Passed   67.02 sec
+      Start 16: test_edge_cases
+16/23 Test #16: test_edge_cases ..................   Passed    0.01 sec
+      Start 17: test_solver_horarios
+17/23 Test #17: test_solver_horarios .............***Failed    0.18 sec
+********* Start testing of TestSolverHorarios *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestSolverHorarios::initTestCase()
+PASS   : TestSolverHorarios::configValida_noTieneErrores()
+PASS   : TestSolverHorarios::solver_encuentraSolucion()
+PASS   : TestSolverHorarios::solver_respetaTurnoManana()
+PASS   : TestSolverHorarios::solver_docenteNoSolapado()
+PASS   : TestSolverHorarios::solver_aulasNoSolapadas()
+PASS   : TestSolverHorarios::solver_infeasible_retornaError()
+FAIL!  : TestSolverHorarios::solver_xorUnDocentePorMateria() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_horarios.cpp(158)]
+PASS   : TestSolverHorarios::solver_distribucionHorasMultiplesDias()
+FAIL!  : TestSolverHorarios::solver_suplenteReemplaza() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_horarios.cpp(253)]
+PASS   : TestSolverHorarios::cleanupTestCase()
+Totals: 9 passed, 2 failed, 0 skipped, 0 blacklisted, 92ms
+********* Finished testing of TestSolverHorarios *********
+
+      Start 18: test_solver_benchmark
+18/23 Test #18: test_solver_benchmark ............***Failed    0.21 sec
+********* Start testing of TestSolverBenchmark *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 12.2.0), debian 12
+PASS   : TestSolverBenchmark::initTestCase()
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() === BENCHMARK ===
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Dimensiones: 10 prof, 15 materias, 5 aulas, 8 cursos, 5 dias, 6 slots
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Tiempo total: 89 ms
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Status: FALLO
+QDEBUG : TestSolverBenchmark::benchmark_solverGrandeResuelve() Errores: QList("El modelo no tiene solucion factible (INFEASIBLE)", "Causas posibles:", "- Restricciones de horas semanales imposibles de cumplir", "- Solapamiento de docentes sin suficiente disponibilidad", "- Materias sin cupo en aulas disponibles", "- Profesores: 10, Cursos: 8, Materias: 15", "- Variables: 0 booleans, 0 integers, Conflicto: 0")
+FAIL!  : TestSolverBenchmark::benchmark_solverGrandeResuelve() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_benchmark.cpp(103)]
+FAIL!  : TestSolverBenchmark::benchmark_verificaConsistencia() 'resultado.exito' returned FALSE. ()
+   Loc: [/workspace/test/backend/test_solver_benchmark.cpp(111)]
+PASS   : TestSolverBenchmark::cleanupTestCase()
+Totals: 2 passed, 2 failed, 0 skipped, 0 blacklisted, 176ms
+********* Finished testing of TestSolverBenchmark *********
+
+      Start 19: test_middleware_crud_routes
+19/23 Test #19: test_middleware_crud_routes ......   Passed    0.11 sec
+      Start 20: test_servicio_exportacion
+Could not find executable /workspace/build/test/test_servicio_exportacion
+Looked in the following places:
+/workspace/build/test/test_servicio_exportacion
+/workspace/build/test/test_servicio_exportacion
+/workspace/build/test/Release/test_servicio_exportacion
+/workspace/build/test/Release/test_servicio_exportacion
+/workspace/build/test/Debug/test_servicio_exportacion
+/workspace/build/test/Debug/test_servicio_exportacion
+/workspace/build/test/MinSizeRel/test_servicio_exportacion
+/workspace/build/test/MinSizeRel/test_servicio_exportacion
+/workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+/workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+/workspace/build/test/Deployment/test_servicio_exportacion
+/workspace/build/test/Deployment/test_servicio_exportacion
+/workspace/build/test/Development/test_servicio_exportacion
+/workspace/build/test/Development/test_servicio_exportacion
+workspace/build/test/test_servicio_exportacion
+workspace/build/test/test_servicio_exportacion
+workspace/build/test/Release/test_servicio_exportacion
+workspace/build/test/Release/test_servicio_exportacion
+workspace/build/test/Debug/test_servicio_exportacion
+workspace/build/test/Debug/test_servicio_exportacion
+workspace/build/test/MinSizeRel/test_servicio_exportacion
+workspace/build/test/MinSizeRel/test_servicio_exportacion
+workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+workspace/build/test/Deployment/test_servicio_exportacion
+workspace/build/test/Deployment/test_servicio_exportacion
+workspace/build/test/Development/test_servicio_exportacion
+workspace/build/test/Development/test_servicio_exportacion
+Unable to find executable: /workspace/build/test/test_servicio_exportacion
+20/23 Test #20: test_servicio_exportacion ........***Not Run   0.00 sec
+      Start 21: test_horario_salida
+Could not find executable /workspace/build/test/test_horario_salida
+Looked in the following places:
+/workspace/build/test/test_horario_salida
+/workspace/build/test/test_horario_salida
+/workspace/build/test/Release/test_horario_salida
+/workspace/build/test/Release/test_horario_salida
+/workspace/build/test/Debug/test_horario_salida
+/workspace/build/test/Debug/test_horario_salida
+/workspace/build/test/MinSizeRel/test_horario_salida
+/workspace/build/test/MinSizeRel/test_horario_salida
+/workspace/build/test/RelWithDebInfo/test_horario_salida
+/workspace/build/test/RelWithDebInfo/test_horario_salida
+/workspace/build/test/Deployment/test_horario_salida
+/workspace/build/test/Deployment/test_horario_salida
+/workspace/build/test/Development/test_horario_salida
+/workspace/build/test/Development/test_horario_salida
+workspace/build/test/test_horario_salida
+workspace/build/test/test_horario_salida
+workspace/build/test/Release/test_horario_salida
+workspace/build/test/Release/test_horario_salida
+workspace/build/test/Debug/test_horario_salida
+workspace/build/test/Debug/test_horario_salida
+workspace/build/test/MinSizeRel/test_horario_salida
+workspace/build/test/MinSizeRel/test_horario_salida
+workspace/build/test/RelWithDebInfo/test_horario_salida
+workspace/build/test/RelWithDebInfo/test_horario_salida
+workspace/build/test/Deployment/test_horario_salida
+workspace/build/test/Deployment/test_horario_salida
+workspace/build/test/Development/test_horario_salida
+workspace/build/test/Development/test_horario_salida
+Unable to find executable: /workspace/build/test/test_horario_salida
+21/23 Test #21: test_horario_salida ..............***Not Run   0.00 sec
+      Start 22: test_servicio_consulta_horario
+Could not find executable /workspace/build/test/test_servicio_consulta_horario
+Looked in the following places:
+/workspace/build/test/test_servicio_consulta_horario
+/workspace/build/test/test_servicio_consulta_horario
+/workspace/build/test/Release/test_servicio_consulta_horario
+/workspace/build/test/Release/test_servicio_consulta_horario
+/workspace/build/test/Debug/test_servicio_consulta_horario
+/workspace/build/test/Debug/test_servicio_consulta_horario
+/workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+/workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+/workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+/workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+/workspace/build/test/Deployment/test_servicio_consulta_horario
+/workspace/build/test/Deployment/test_servicio_consulta_horario
+/workspace/build/test/Development/test_servicio_consulta_horario
+/workspace/build/test/Development/test_servicio_consulta_horario
+workspace/build/test/test_servicio_consulta_horario
+workspace/build/test/test_servicio_consulta_horario
+workspace/build/test/Release/test_servicio_consulta_horario
+workspace/build/test/Release/test_servicio_consulta_horario
+workspace/build/test/Debug/test_servicio_consulta_horario
+workspace/build/test/Debug/test_servicio_consulta_horario
+workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+workspace/build/test/Deployment/test_servicio_consulta_horario
+workspace/build/test/Deployment/test_servicio_consulta_horario
+workspace/build/test/Development/test_servicio_consulta_horario
+workspace/build/test/Development/test_servicio_consulta_horario
+Unable to find executable: /workspace/build/test/test_servicio_consulta_horario
+22/23 Test #22: test_servicio_consulta_horario ...***Not Run   0.00 sec
+      Start 23: test_servicio_horario_salida
+Could not find executable /workspace/build/test/test_servicio_horario_salida
+Looked in the following places:
+/workspace/build/test/test_servicio_horario_salida
+/workspace/build/test/test_servicio_horario_salida
+/workspace/build/test/Release/test_servicio_horario_salida
+/workspace/build/test/Release/test_servicio_horario_salida
+/workspace/build/test/Debug/test_servicio_horario_salida
+/workspace/build/test/Debug/test_servicio_horario_salida
+/workspace/build/test/MinSizeRel/test_servicio_horario_salida
+/workspace/build/test/MinSizeRel/test_servicio_horario_salida
+/workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+/workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+/workspace/build/test/Deployment/test_servicio_horario_salida
+/workspace/build/test/Deployment/test_servicio_horario_salida
+/workspace/build/test/Development/test_servicio_horario_salida
+/workspace/build/test/Development/test_servicio_horario_salida
+workspace/build/test/test_servicio_horario_salida
+workspace/build/test/test_servicio_horario_salida
+workspace/build/test/Release/test_servicio_horario_salida
+workspace/build/test/Release/test_servicio_horario_salida
+workspace/build/test/Debug/test_servicio_horario_salida
+workspace/build/test/Debug/test_servicio_horario_salida
+workspace/build/test/MinSizeRel/test_servicio_horario_salida
+workspace/build/test/MinSizeRel/test_servicio_horario_salida
+workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+workspace/build/test/Deployment/test_servicio_horario_salida
+workspace/build/test/Deployment/test_servicio_horario_salida
+workspace/build/test/Development/test_servicio_horario_salida
+workspace/build/test/Development/test_servicio_horario_salida
+Unable to find executable: /workspace/build/test/test_servicio_horario_salida
+23/23 Test #23: test_servicio_horario_salida .....***Not Run   0.00 sec
+
+70% tests passed, 7 tests failed out of 23
+
+Total Test time (real) = 466.88 sec
+
+The following tests FAILED:
+	 10 - test_backend_variables_cp_sat (Not Run)
+	 17 - test_solver_horarios (Failed)
+	 18 - test_solver_benchmark (Failed)
+	 20 - test_servicio_exportacion (Not Run)
+	 21 - test_horario_salida (Not Run)
+	 22 - test_servicio_consulta_horario (Not Run)
+	 23 - test_servicio_horario_salida (Not Run)
+Errors while running CTest

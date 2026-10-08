@@ -1,6 +1,6 @@
 <RCC>
     <qresource prefix="/">
-        <file>flecha.png</file>
         <file>logo.png</file>
+        <file>test_data/test_schedules.json</file>
     </qresource>
 </RCC>

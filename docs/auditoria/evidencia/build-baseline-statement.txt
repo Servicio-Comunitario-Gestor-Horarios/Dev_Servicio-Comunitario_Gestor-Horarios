@@ -1,0 +1,36 @@
+ZERO-WARNING BASELINE STATEMENT
+================================
+Pin: develop @ e3a7a737f9aa19a6a4d33cfed1cbb79a16eeda54
+Fresh configure+build inside gestor-dev container as root (empty root-owned /workspace/build volume).
+
+BASELINE: REFUTED — the build emits exactly 1 compiler warning:
+
+    /workspace/src/backend/src/solver/config/solver_config.cpp:486:15: warning: unused variable 'totalSlots' [-Wunused-variable]
+
+Full verbatim logs: configure.log, build-full.log (same directory).
+Verbatim error inventory: build-errors.log (5 failed edges, unrelated to warnings).
+
+BUILD OUTCOME SUMMARY (evidence-first, not retried-to-pass)
+-----------------------------------------------------------
+Configure: exit 0 (OR-Tools 9.15 found; GTest enabled).
+Build pass 1 (default ninja): exit 1 after first failures.
+Build pass 2 (-k 0 keep-going, to surface ALL outcomes): exit 1 with 5 FAILED edges:
+
+  PRE-EXISTING GTest suites — API drift vs current headers (compile errors):
+    test_servicio_exportacion      — Resultado<QString> has no esExitoso/obtenerValor/obtenerError (8 errors)
+    test_backend_variables_cp_sat  — ProfesorSolverConfig has no horas_planificacion (3 errors)
+
+  NEWLY REGISTERED orphan suites (this change's sole edit) — link failures, root cause below:
+    test_horario_salida            — undefined: AsignacionOutput/DiaOutput/CursoOutput::toJson/fromJson
+    test_servicio_consulta_horario — undefined: ServicioConsultaHorario::<ctor>/buscarPorProfesor/buscarPorAula
+    test_servicio_horario_salida   — undefined: ServicioHorarioSalida::<ctor>/listarArchivos
+
+ROOT CAUSE (F-BUILD2): implementations EXIST in tree but are NOT compiled into any target:
+    src/backend/src/data/horario_salida.cpp        (absent from src/backend/CMakeLists.txt sources)
+    src/backend/src/services/ServicioConsultaHorario.cpp   (absent)
+    src/backend/src/services/ServicioHorarioSalida.cpp     (absent)
+Proof: nm -C build/src/backend/libbackend.a → 0 'T' definitions of the missing methods;
+       only 18 weak (W) compiler-invented implicit ctor/dtor symbols from the headers.
+This explains WHY the 3 test files were orphaned: registering them exposes the missing linkage.
+Fixing requires adding the 3 .cpp files to src/backend/CMakeLists.txt — OUTSIDE the sole-edit
+sanction (test/CMakeLists.txt only) → deferred to hotfix plan (D3 input).

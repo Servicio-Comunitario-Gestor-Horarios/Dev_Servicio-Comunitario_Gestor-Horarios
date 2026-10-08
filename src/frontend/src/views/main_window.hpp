@@ -8,6 +8,7 @@
 class TeacherListWidget;
 class ClassroomListWidget;
 class SubjectListWidget;
+class ScheduleVisualizationWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -45,4 +46,5 @@ private:
     TeacherListWidget* m_teacherListWidget = nullptr;
     ClassroomListWidget* m_classroomListWidget = nullptr;
     SubjectListWidget* m_subjectListWidget = nullptr;
+    ScheduleVisualizationWidget* m_scheduleVisualizationWidget = nullptr;
 };

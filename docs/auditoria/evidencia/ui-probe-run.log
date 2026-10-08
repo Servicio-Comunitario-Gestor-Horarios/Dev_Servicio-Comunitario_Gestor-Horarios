@@ -1,0 +1,30 @@
+QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-root'
+This plugin does not support propagateSizeHints()
+PROBE_SHOT login-dialog | title= Liceo Nacional Robert Serra - Acceso | pixmap= 1280 x 800 | saved= true
+LOGIN lineedits found: 2
+LOGIN clicked= true accepted= true
+This plugin does not support propagateSizeHints()
+PROBE_SHOT view0-dashboard-inicio | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+NAV invoke mostrarDocentes ok= true currentIndex= 1
+PROBE_SHOT view1-docentes | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+NAV invoke mostrarAulas ok= true currentIndex= 2
+PROBE_SHOT view2-aulas | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+NAV invoke mostrarAsignaturas ok= true currentIndex= 3
+PROBE_SHOT view3-asignaturas | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+NAV invoke mostrarGeneracion ok= true currentIndex= 4
+PROBE_SHOT view4-generacion | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+NAV invoke mostrarVisualizacion ok= true currentIndex= 5
+PROBE_SHOT view5-visualizacion | title= Liceo Nacional Robert Serra - Gestión | pixmap= 1280 x 720 | saved= true
+SIDEBAR_BUTTONS 🏠 Inicio || 🎓 Docentes || 🏫 Aulas || 📚 Asignaturas || 📅 Generación de horario || 👁️ Visualización de horario || Ver Detalles || Resolver Conflictos || + Registrar Docente || Gestionar Disponibilidad || + Agregar Aulas || + Registrar Asignatura
+TABLES count: 4
+TABLE[0] rows=0 cols=6
+TABLE[1] rows=12 cols=5
+TABLE[2] rows=0 cols=5
+TABLE[3] rows=0 cols=3
+This plugin does not support propagateSizeHints()
+PROBE_SHOT dialog-teacher-form | title= Registrar Docente | pixmap= 450 x 350 | saved= true
+This plugin does not support propagateSizeHints()
+PROBE_SHOT dialog-classroom-form | title= Registrar Aula | pixmap= 400 x 277 | saved= true
+This plugin does not support propagateSizeHints()
+PROBE_SHOT dialog-subject-form | title= Registrar Asignatura | pixmap= 400 x 200 | saved= true
+PROBE_SUMMARY login_accepted= true views_probed= 6 dialogs_probed=3

@@ -1,0 +1,177 @@
+Internal ctest changing into directory: /workspace/build
+Test project /workspace/build
+  Test  #1: test_backend_franja_horaria
+  Test  #2: test_backend_aula
+  Test  #3: test_backend_materia
+  Test  #4: test_backend_profesor
+  Test  #5: test_backend_horario
+  Test  #6: test_backend_plan_estudio
+  Test  #7: test_backend_database
+  Test  #8: test_backend_entity_graph
+  Test  #9: test_middleware_health_check
+Could not find executable /workspace/build/test/test_backend_variables_cp_sat
+Looked in the following places:
+/workspace/build/test/test_backend_variables_cp_sat
+/workspace/build/test/test_backend_variables_cp_sat
+/workspace/build/test/Release/test_backend_variables_cp_sat
+/workspace/build/test/Release/test_backend_variables_cp_sat
+/workspace/build/test/Debug/test_backend_variables_cp_sat
+/workspace/build/test/Debug/test_backend_variables_cp_sat
+/workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+/workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+/workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+/workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+/workspace/build/test/Deployment/test_backend_variables_cp_sat
+/workspace/build/test/Deployment/test_backend_variables_cp_sat
+/workspace/build/test/Development/test_backend_variables_cp_sat
+/workspace/build/test/Development/test_backend_variables_cp_sat
+workspace/build/test/test_backend_variables_cp_sat
+workspace/build/test/test_backend_variables_cp_sat
+workspace/build/test/Release/test_backend_variables_cp_sat
+workspace/build/test/Release/test_backend_variables_cp_sat
+workspace/build/test/Debug/test_backend_variables_cp_sat
+workspace/build/test/Debug/test_backend_variables_cp_sat
+workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+workspace/build/test/MinSizeRel/test_backend_variables_cp_sat
+workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+workspace/build/test/RelWithDebInfo/test_backend_variables_cp_sat
+workspace/build/test/Deployment/test_backend_variables_cp_sat
+workspace/build/test/Deployment/test_backend_variables_cp_sat
+workspace/build/test/Development/test_backend_variables_cp_sat
+workspace/build/test/Development/test_backend_variables_cp_sat
+  Test #10: test_backend_variables_cp_sat
+  Test #11: test_servicio_aula
+  Test #12: test_servicio_materias
+  Test #13: test_servicio_planes_estudio
+  Test #14: test_servicio_carga_horaria
+  Test #15: test_composicion_plan
+  Test #16: test_edge_cases
+  Test #17: test_solver_horarios
+  Test #18: test_solver_benchmark
+  Test #19: test_middleware_crud_routes
+Could not find executable /workspace/build/test/test_servicio_exportacion
+Looked in the following places:
+/workspace/build/test/test_servicio_exportacion
+/workspace/build/test/test_servicio_exportacion
+/workspace/build/test/Release/test_servicio_exportacion
+/workspace/build/test/Release/test_servicio_exportacion
+/workspace/build/test/Debug/test_servicio_exportacion
+/workspace/build/test/Debug/test_servicio_exportacion
+/workspace/build/test/MinSizeRel/test_servicio_exportacion
+/workspace/build/test/MinSizeRel/test_servicio_exportacion
+/workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+/workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+/workspace/build/test/Deployment/test_servicio_exportacion
+/workspace/build/test/Deployment/test_servicio_exportacion
+/workspace/build/test/Development/test_servicio_exportacion
+/workspace/build/test/Development/test_servicio_exportacion
+workspace/build/test/test_servicio_exportacion
+workspace/build/test/test_servicio_exportacion
+workspace/build/test/Release/test_servicio_exportacion
+workspace/build/test/Release/test_servicio_exportacion
+workspace/build/test/Debug/test_servicio_exportacion
+workspace/build/test/Debug/test_servicio_exportacion
+workspace/build/test/MinSizeRel/test_servicio_exportacion
+workspace/build/test/MinSizeRel/test_servicio_exportacion
+workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+workspace/build/test/RelWithDebInfo/test_servicio_exportacion
+workspace/build/test/Deployment/test_servicio_exportacion
+workspace/build/test/Deployment/test_servicio_exportacion
+workspace/build/test/Development/test_servicio_exportacion
+workspace/build/test/Development/test_servicio_exportacion
+  Test #20: test_servicio_exportacion
+Could not find executable /workspace/build/test/test_horario_salida
+Looked in the following places:
+/workspace/build/test/test_horario_salida
+/workspace/build/test/test_horario_salida
+/workspace/build/test/Release/test_horario_salida
+/workspace/build/test/Release/test_horario_salida
+/workspace/build/test/Debug/test_horario_salida
+/workspace/build/test/Debug/test_horario_salida
+/workspace/build/test/MinSizeRel/test_horario_salida
+/workspace/build/test/MinSizeRel/test_horario_salida
+/workspace/build/test/RelWithDebInfo/test_horario_salida
+/workspace/build/test/RelWithDebInfo/test_horario_salida
+/workspace/build/test/Deployment/test_horario_salida
+/workspace/build/test/Deployment/test_horario_salida
+/workspace/build/test/Development/test_horario_salida
+/workspace/build/test/Development/test_horario_salida
+workspace/build/test/test_horario_salida
+workspace/build/test/test_horario_salida
+workspace/build/test/Release/test_horario_salida
+workspace/build/test/Release/test_horario_salida
+workspace/build/test/Debug/test_horario_salida
+workspace/build/test/Debug/test_horario_salida
+workspace/build/test/MinSizeRel/test_horario_salida
+workspace/build/test/MinSizeRel/test_horario_salida
+workspace/build/test/RelWithDebInfo/test_horario_salida
+workspace/build/test/RelWithDebInfo/test_horario_salida
+workspace/build/test/Deployment/test_horario_salida
+workspace/build/test/Deployment/test_horario_salida
+workspace/build/test/Development/test_horario_salida
+workspace/build/test/Development/test_horario_salida
+  Test #21: test_horario_salida
+Could not find executable /workspace/build/test/test_servicio_consulta_horario
+Looked in the following places:
+/workspace/build/test/test_servicio_consulta_horario
+/workspace/build/test/test_servicio_consulta_horario
+/workspace/build/test/Release/test_servicio_consulta_horario
+/workspace/build/test/Release/test_servicio_consulta_horario
+/workspace/build/test/Debug/test_servicio_consulta_horario
+/workspace/build/test/Debug/test_servicio_consulta_horario
+/workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+/workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+/workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+/workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+/workspace/build/test/Deployment/test_servicio_consulta_horario
+/workspace/build/test/Deployment/test_servicio_consulta_horario
+/workspace/build/test/Development/test_servicio_consulta_horario
+/workspace/build/test/Development/test_servicio_consulta_horario
+workspace/build/test/test_servicio_consulta_horario
+workspace/build/test/test_servicio_consulta_horario
+workspace/build/test/Release/test_servicio_consulta_horario
+workspace/build/test/Release/test_servicio_consulta_horario
+workspace/build/test/Debug/test_servicio_consulta_horario
+workspace/build/test/Debug/test_servicio_consulta_horario
+workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+workspace/build/test/MinSizeRel/test_servicio_consulta_horario
+workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+workspace/build/test/RelWithDebInfo/test_servicio_consulta_horario
+workspace/build/test/Deployment/test_servicio_consulta_horario
+workspace/build/test/Deployment/test_servicio_consulta_horario
+workspace/build/test/Development/test_servicio_consulta_horario
+workspace/build/test/Development/test_servicio_consulta_horario
+  Test #22: test_servicio_consulta_horario
+Could not find executable /workspace/build/test/test_servicio_horario_salida
+Looked in the following places:
+/workspace/build/test/test_servicio_horario_salida
+/workspace/build/test/test_servicio_horario_salida
+/workspace/build/test/Release/test_servicio_horario_salida
+/workspace/build/test/Release/test_servicio_horario_salida
+/workspace/build/test/Debug/test_servicio_horario_salida
+/workspace/build/test/Debug/test_servicio_horario_salida
+/workspace/build/test/MinSizeRel/test_servicio_horario_salida
+/workspace/build/test/MinSizeRel/test_servicio_horario_salida
+/workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+/workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+/workspace/build/test/Deployment/test_servicio_horario_salida
+/workspace/build/test/Deployment/test_servicio_horario_salida
+/workspace/build/test/Development/test_servicio_horario_salida
+/workspace/build/test/Development/test_servicio_horario_salida
+workspace/build/test/test_servicio_horario_salida
+workspace/build/test/test_servicio_horario_salida
+workspace/build/test/Release/test_servicio_horario_salida
+workspace/build/test/Release/test_servicio_horario_salida
+workspace/build/test/Debug/test_servicio_horario_salida
+workspace/build/test/Debug/test_servicio_horario_salida
+workspace/build/test/MinSizeRel/test_servicio_horario_salida
+workspace/build/test/MinSizeRel/test_servicio_horario_salida
+workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+workspace/build/test/RelWithDebInfo/test_servicio_horario_salida
+workspace/build/test/Deployment/test_servicio_horario_salida
+workspace/build/test/Deployment/test_servicio_horario_salida
+workspace/build/test/Development/test_servicio_horario_salida
+workspace/build/test/Development/test_servicio_horario_salida
+  Test #23: test_servicio_horario_salida
+
+Total Tests: 23

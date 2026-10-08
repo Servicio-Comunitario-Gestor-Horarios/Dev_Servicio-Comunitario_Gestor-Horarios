@@ -1,0 +1,16 @@
+QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-root'
+GestorProcesoBackend: lanzando "/workspace/build/src/app/gestor-horarios" QList("--backend")
+GestorProcesoBackend: proceso iniciado, verificando salud...
+Cliente: Conectando al servidor IPC para operación: "health_check"
+Cliente: Conectado al servidor. Enviando solicitud...
+Cliente: Respuesta recibida — ÉXITO
+GestorProcesoBackend: backend listo (verificación OK)
+Frontend: backend listo
+Login exitoso
+GestorProcesoBackend: deteniendo backend...
+GestorProcesoBackend: error en QProcess: QProcess::Crashed
+Frontend: backend no disponible
+GestorProcesoBackend: backend COLAPSÓ con código 15
+Frontend: backend no disponible
+GestorProcesoBackend: reintento 1 de 3 en 2000 ms
+QObject::startTimer: Timers can only be used with threads started with QThread

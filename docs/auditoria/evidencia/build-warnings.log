@@ -1,0 +1,8 @@
+# Build Warning Inventory — fresh build @ develop e3a7a73
+# Command: cmake -S /workspace -B /workspace/build -G Ninja && cmake --build /workspace/build -- -k 0
+# Context: inside gestor-dev container as root; flags include -Wall -Wextra -Wpedantic per project defaults.
+# Sources: /tmp/build.log (first pass) + /tmp/build-k0.log (keep-going pass), mirrored verbatim in build-full.log
+
+TOTAL WARNINGS: 1
+
+/workspace/src/backend/src/solver/config/solver_config.cpp:486:15: warning: unused variable 'totalSlots' [-Wunused-variable]

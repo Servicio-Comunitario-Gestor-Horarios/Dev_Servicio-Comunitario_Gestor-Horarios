@@ -1,0 +1,407 @@
+[1/137] Automatic MOC for target middleware
+[2/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/aula.cpp.o
+[3/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/materia.cpp.o
+[4/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/franja_horaria.cpp.o
+[5/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/horario.cpp.o
+[6/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/plan_estudio.cpp.o
+[7/137] Building CXX object src/middleware/CMakeFiles/middleware.dir/middleware_autogen/mocs_compilation.cpp.o
+[8/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/database/DatabaseManager.cpp.o
+[9/137] Building CXX object src/middleware/CMakeFiles/middleware.dir/src/client/internalclient.cpp.o
+[10/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/database/migracion.cpp.o
+[11/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/data/profesor.cpp.o
+[12/137] Building CXX object src/middleware/CMakeFiles/middleware.dir/src/server/internalserver.cpp.o
+[13/137] Linking CXX static library src/middleware/libmiddleware.a
+[14/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioAula.cpp.o
+[15/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioCargaHoraria.cpp.o
+[16/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioPlanesEstudio.cpp.o
+[17/137] Automatic MOC and UIC for target frontend
+[18/137] Automatic RCC for resources/resources.qrc
+[19/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioMaterias.cpp.o
+[20/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioComposicionPlan.cpp.o
+[21/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/services/ServicioExportacion.cpp.o
+[22/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/frontend_autogen/mocs_compilation.cpp.o
+[23/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/aplicacion_frontend.cpp.o
+[24/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/logindialog.cpp.o
+[25/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/config/solver_config.cpp.o
+/workspace/src/backend/src/solver/config/solver_config.cpp: In function 'QString validarDisponibilidadProfesores(const SolverConfig&)':
+/workspace/src/backend/src/solver/config/solver_config.cpp:486:15: warning: unused variable 'totalSlots' [-Wunused-variable]
+  486 |     const int totalSlots = config.dimensiones.num_dias * config.dimensiones.num_slots_dia;
+      |               ^~~~~~~~~~
+[26/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/main_window.cpp.o
+[27/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/forms/teacher_form_dialog.cpp.o
+[28/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/variables.cpp.o
+[29/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/view_placeholder.cpp.o
+[30/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/teacher_list_widget.cpp.o
+[31/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/frontend_autogen/3YJK5W5UP7/qrc_resources.cpp.o
+[32/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/dashboard_widget.cpp.o
+[33/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/forms/classroom_form_dialog.cpp.o
+[34/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/forms/subject_form_dialog.cpp.o
+[35/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/classroom_list_widget.cpp.o
+[36/137] Building CXX object src/frontend/CMakeFiles/frontend.dir/src/views/subject_list_widget.cpp.o
+[37/137] Linking CXX static library src/frontend/libfrontend.a
+[38/137] Building CXX object test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o
+FAILED: test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o 
+/usr/bin/c++ -DEIGEN_MPL2_ONLY -DHAVE_CONFIG_H -DOR_PROTO_DLL="" -DPROTOBUF_USE_DLLS -DQT_CORE_LIB -DQT_NO_DEBUG -DQT_SQL_LIB -DUSE_BOP -DUSE_CBC -DUSE_CLP -DUSE_GLOP -DUSE_HIGHS -DUSE_MATH_OPT -DUSE_PDLP -DUSE_SCIP -I/workspace/src/backend/include -isystem /usr/local/include/coin -isystem /usr/local/include/highs -isystem /usr/local/include/eigen3 -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtSql -fPIE -fwrapv -Wno-range-loop-construct -Wno-sign-compare -Wno-invalid-offsetof -fPIC -DGTEST_HAS_PTHREAD=1 -std=gnu++17 -MD -MT test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o -MF test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o.d -o test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o -c /workspace/test/backend/test_servicio_exportacion.cpp
+In file included from /usr/include/gtest/gtest-printers.h:114,
+                 from /usr/include/gtest/gtest-matchers.h:48,
+                 from /usr/include/gtest/internal/gtest-death-test-internal.h:46,
+                 from /usr/include/gtest/gtest-death-test.h:43,
+                 from /usr/include/gtest/gtest.h:60,
+                 from /workspace/test/backend/test_servicio_exportacion.cpp:1:
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ExportarCsvCursosValido_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:47:21: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   47 |     ASSERT_TRUE(res.esExitoso());
+      |                     ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:49:23: error: 'struct Resultado<QString>' has no member named 'obtenerValor'
+   49 |     QString csv = res.obtenerValor();
+      |                       ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ExportarCsvProfesoresValido_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:59:21: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   59 |     ASSERT_TRUE(res.esExitoso());
+      |                     ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:61:23: error: 'struct Resultado<QString>' has no member named 'obtenerValor'
+   61 |     QString csv = res.obtenerValor();
+      |                       ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ErrorIndiceFueraDeRango_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:73:27: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   73 |     EXPECT_FALSE(resCurso.esExitoso());
+      |                           ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:74:26: error: 'struct Resultado<QString>' has no member named 'obtenerError'
+   74 |     EXPECT_TRUE(resCurso.obtenerError().contains("out-of-bounds") ||
+      |                          ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:75:26: error: 'struct Resultado<QString>' has no member named 'obtenerError'
+   75 |                 resCurso.obtenerError().contains("fuera de rango"));
+      |                          ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:78:26: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   78 |     EXPECT_FALSE(resProf.esExitoso());
+      |                          ^~~~~~~~~
+[39/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/restricciones/restricciones_turnos.cpp.o
+[40/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/restricciones/restricciones_aulas.cpp.o
+[41/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/solver.cpp.o
+[42/137] Building CXX object src/backend/CMakeFiles/backend.dir/src/solver/restricciones/restricciones_profesores.cpp.o
+[43/137] Building CXX object test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o
+FAILED: test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o 
+/usr/bin/c++ -DEIGEN_MPL2_ONLY -DHAVE_CONFIG_H -DOR_PROTO_DLL="" -DPROTOBUF_USE_DLLS -DQT_CORE_LIB -DQT_NO_DEBUG -DQT_SQL_LIB -DUSE_BOP -DUSE_CBC -DUSE_CLP -DUSE_GLOP -DUSE_HIGHS -DUSE_MATH_OPT -DUSE_PDLP -DUSE_SCIP -I/workspace/src/backend/include -isystem /usr/local/include/coin -isystem /usr/local/include/highs -isystem /usr/local/include/eigen3 -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtSql -fPIE -fwrapv -Wno-range-loop-construct -Wno-sign-compare -Wno-invalid-offsetof -fPIC -DGTEST_HAS_PTHREAD=1 -std=gnu++17 -MD -MT test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o -MF test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o.d -o test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o -c /workspace/test/backend/test_variables_cp_sat.cpp
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'SolverConfig VariablesTest::makeBaseConfig()':
+/workspace/test/backend/test_variables_cp_sat.cpp:64:14: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+   64 |         prof.horas_planificacion = 4;
+      |              ^~~~~~~~~~~~~~~~~~~
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'virtual void VariablesTest_TwoProfessorsSameSubject_BothCreateVariables_Test::TestBody()':
+/workspace/test/backend/test_variables_cp_sat.cpp:265:9: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+  265 |     bob.horas_planificacion = 4;
+      |         ^~~~~~~~~~~~~~~~~~~
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'virtual void VariablesTest_TwoProfessorsDifferentAvailability_CorrectPruning_Test::TestBody()':
+/workspace/test/backend/test_variables_cp_sat.cpp:290:9: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+  290 |     bob.horas_planificacion = 4;
+      |         ^~~~~~~~~~~~~~~~~~~
+ninja: build stopped: subcommand failed.
+[1/96] Automatic MOC for target test_middleware_health_check
+[2/96] Building CXX object test/CMakeFiles/test_middleware_health_check.dir/test_middleware_health_check_autogen/mocs_compilation.cpp.o
+[3/96] Linking CXX static library src/backend/libbackend.a
+[4/96] Automatic MOC for target gestor-horarios
+[5/96] Automatic MOC for target test_backend_franja_horaria
+[6/96] Automatic MOC for target test_middleware_crud_routes
+[7/96] Building CXX object test/CMakeFiles/test_middleware_health_check.dir/test_health_check.cpp.o
+[8/96] Building CXX object src/app/CMakeFiles/gestor-horarios.dir/gestor-horarios_autogen/mocs_compilation.cpp.o
+[9/96] Building CXX object src/app/CMakeFiles/gestor-horarios.dir/src/aplicacion_frontend.cpp.o
+[10/96] Building CXX object src/app/CMakeFiles/gestor-horarios.dir/main.cpp.o
+[11/96] Building CXX object test/CMakeFiles/test_backend_franja_horaria.dir/test_backend_franja_horaria_autogen/mocs_compilation.cpp.o
+[12/96] Building CXX object test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o
+FAILED: test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o 
+/usr/bin/c++ -DEIGEN_MPL2_ONLY -DHAVE_CONFIG_H -DOR_PROTO_DLL="" -DPROTOBUF_USE_DLLS -DQT_CORE_LIB -DQT_NO_DEBUG -DQT_SQL_LIB -DUSE_BOP -DUSE_CBC -DUSE_CLP -DUSE_GLOP -DUSE_HIGHS -DUSE_MATH_OPT -DUSE_PDLP -DUSE_SCIP -I/workspace/src/backend/include -isystem /usr/local/include/coin -isystem /usr/local/include/highs -isystem /usr/local/include/eigen3 -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtSql -fPIE -fwrapv -Wno-range-loop-construct -Wno-sign-compare -Wno-invalid-offsetof -fPIC -DGTEST_HAS_PTHREAD=1 -std=gnu++17 -MD -MT test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o -MF test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o.d -o test/CMakeFiles/test_servicio_exportacion.dir/backend/test_servicio_exportacion.cpp.o -c /workspace/test/backend/test_servicio_exportacion.cpp
+In file included from /usr/include/gtest/gtest-printers.h:114,
+                 from /usr/include/gtest/gtest-matchers.h:48,
+                 from /usr/include/gtest/internal/gtest-death-test-internal.h:46,
+                 from /usr/include/gtest/gtest-death-test.h:43,
+                 from /usr/include/gtest/gtest.h:60,
+                 from /workspace/test/backend/test_servicio_exportacion.cpp:1:
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ExportarCsvCursosValido_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:47:21: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   47 |     ASSERT_TRUE(res.esExitoso());
+      |                     ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:49:23: error: 'struct Resultado<QString>' has no member named 'obtenerValor'
+   49 |     QString csv = res.obtenerValor();
+      |                       ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ExportarCsvProfesoresValido_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:59:21: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   59 |     ASSERT_TRUE(res.esExitoso());
+      |                     ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:61:23: error: 'struct Resultado<QString>' has no member named 'obtenerValor'
+   61 |     QString csv = res.obtenerValor();
+      |                       ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp: In member function 'virtual void ServicioExportacionTest_ErrorIndiceFueraDeRango_Test::TestBody()':
+/workspace/test/backend/test_servicio_exportacion.cpp:73:27: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   73 |     EXPECT_FALSE(resCurso.esExitoso());
+      |                           ^~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:74:26: error: 'struct Resultado<QString>' has no member named 'obtenerError'
+   74 |     EXPECT_TRUE(resCurso.obtenerError().contains("out-of-bounds") ||
+      |                          ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:75:26: error: 'struct Resultado<QString>' has no member named 'obtenerError'
+   75 |                 resCurso.obtenerError().contains("fuera de rango"));
+      |                          ^~~~~~~~~~~~
+/workspace/test/backend/test_servicio_exportacion.cpp:78:26: error: 'struct Resultado<QString>' has no member named 'esExitoso'
+   78 |     EXPECT_FALSE(resProf.esExitoso());
+      |                          ^~~~~~~~~
+[13/96] Automatic MOC for target test_backend_aula
+[14/96] Building CXX object test/CMakeFiles/test_backend_aula.dir/test_backend_aula_autogen/mocs_compilation.cpp.o
+[15/96] Linking CXX executable test/test_middleware_health_check
+[16/96] Building CXX object src/app/CMakeFiles/gestor-horarios.dir/src/aplicacion_backend.cpp.o
+[17/96] Automatic MOC for target test_backend_materia
+[18/96] Building CXX object test/CMakeFiles/test_backend_materia.dir/test_backend_materia_autogen/mocs_compilation.cpp.o
+[19/96] Automatic MOC for target test_backend_profesor
+[20/96] Building CXX object test/CMakeFiles/test_backend_profesor.dir/test_backend_profesor_autogen/mocs_compilation.cpp.o
+[21/96] Building CXX object test/CMakeFiles/test_backend_franja_horaria.dir/backend/test_franja_horaria.cpp.o
+[22/96] Linking CXX executable test/test_backend_franja_horaria
+[23/96] Building CXX object src/app/CMakeFiles/gestor-horarios.dir/src/gestor_proceso_backend.cpp.o
+[24/96] Automatic MOC for target test_backend_horario
+[25/96] Building CXX object test/CMakeFiles/test_backend_horario.dir/test_backend_horario_autogen/mocs_compilation.cpp.o
+[26/96] Building CXX object test/CMakeFiles/test_backend_aula.dir/backend/test_aula.cpp.o
+[27/96] Linking CXX executable test/test_backend_aula
+[28/96] Automatic MOC for target test_backend_plan_estudio
+[29/96] Building CXX object test/CMakeFiles/test_backend_plan_estudio.dir/test_backend_plan_estudio_autogen/mocs_compilation.cpp.o
+[30/96] Building CXX object test/CMakeFiles/test_backend_materia.dir/backend/test_materia.cpp.o
+[31/96] Building CXX object test/CMakeFiles/test_backend_profesor.dir/backend/test_profesor.cpp.o
+[32/96] Linking CXX executable test/test_backend_materia
+[33/96] Linking CXX executable test/test_backend_profesor
+[34/96] Building CXX object test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o
+FAILED: test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o 
+/usr/bin/c++ -DEIGEN_MPL2_ONLY -DHAVE_CONFIG_H -DOR_PROTO_DLL="" -DPROTOBUF_USE_DLLS -DQT_CORE_LIB -DQT_NO_DEBUG -DQT_SQL_LIB -DUSE_BOP -DUSE_CBC -DUSE_CLP -DUSE_GLOP -DUSE_HIGHS -DUSE_MATH_OPT -DUSE_PDLP -DUSE_SCIP -I/workspace/src/backend/include -isystem /usr/local/include/coin -isystem /usr/local/include/highs -isystem /usr/local/include/eigen3 -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtSql -fPIE -fwrapv -Wno-range-loop-construct -Wno-sign-compare -Wno-invalid-offsetof -fPIC -DGTEST_HAS_PTHREAD=1 -std=gnu++17 -MD -MT test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o -MF test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o.d -o test/CMakeFiles/test_backend_variables_cp_sat.dir/backend/test_variables_cp_sat.cpp.o -c /workspace/test/backend/test_variables_cp_sat.cpp
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'SolverConfig VariablesTest::makeBaseConfig()':
+/workspace/test/backend/test_variables_cp_sat.cpp:64:14: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+   64 |         prof.horas_planificacion = 4;
+      |              ^~~~~~~~~~~~~~~~~~~
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'virtual void VariablesTest_TwoProfessorsSameSubject_BothCreateVariables_Test::TestBody()':
+/workspace/test/backend/test_variables_cp_sat.cpp:265:9: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+  265 |     bob.horas_planificacion = 4;
+      |         ^~~~~~~~~~~~~~~~~~~
+/workspace/test/backend/test_variables_cp_sat.cpp: In member function 'virtual void VariablesTest_TwoProfessorsDifferentAvailability_CorrectPruning_Test::TestBody()':
+/workspace/test/backend/test_variables_cp_sat.cpp:290:9: error: 'struct ProfesorSolverConfig' has no member named 'horas_planificacion'
+  290 |     bob.horas_planificacion = 4;
+      |         ^~~~~~~~~~~~~~~~~~~
+[35/96] Linking CXX executable src/app/gestor-horarios
+[36/96] Automatic MOC for target test_backend_entity_graph
+[37/96] Building CXX object test/CMakeFiles/test_backend_entity_graph.dir/test_backend_entity_graph_autogen/mocs_compilation.cpp.o
+[38/96] Building CXX object test/CMakeFiles/test_backend_horario.dir/backend/test_horario.cpp.o
+[39/96] Automatic MOC for target test_backend_database
+[40/96] Automatic MOC for target test_servicio_aula
+[41/96] Building CXX object test/CMakeFiles/test_backend_database.dir/test_backend_database_autogen/mocs_compilation.cpp.o
+[42/96] Building CXX object test/CMakeFiles/test_servicio_aula.dir/test_servicio_aula_autogen/mocs_compilation.cpp.o
+[43/96] Automatic MOC for target test_servicio_materias
+[44/96] Building CXX object test/CMakeFiles/test_servicio_materias.dir/test_servicio_materias_autogen/mocs_compilation.cpp.o
+[45/96] Linking CXX executable test/test_backend_horario
+[46/96] Automatic MOC for target test_servicio_planes_estudio
+[47/96] Building CXX object test/CMakeFiles/test_servicio_planes_estudio.dir/test_servicio_planes_estudio_autogen/mocs_compilation.cpp.o
+[48/96] Building CXX object test/CMakeFiles/test_backend_plan_estudio.dir/backend/test_plan_estudio.cpp.o
+[49/96] Linking CXX executable test/test_backend_plan_estudio
+[50/96] Automatic MOC for target test_servicio_carga_horaria
+[51/96] Building CXX object test/CMakeFiles/test_servicio_carga_horaria.dir/test_servicio_carga_horaria_autogen/mocs_compilation.cpp.o
+[52/96] Building CXX object test/CMakeFiles/test_servicio_materias.dir/backend/test_servicio_materias.cpp.o
+[53/96] Building CXX object test/CMakeFiles/test_backend_entity_graph.dir/backend/test_entity_graph.cpp.o
+[54/96] Linking CXX executable test/test_backend_entity_graph
+[55/96] Automatic MOC for target test_composicion_plan
+[56/96] Building CXX object test/CMakeFiles/test_composicion_plan.dir/test_composicion_plan_autogen/mocs_compilation.cpp.o
+[57/96] Linking CXX executable test/test_servicio_materias
+[58/96] Building CXX object test/CMakeFiles/test_backend_database.dir/backend/test_database.cpp.o
+[59/96] Building CXX object test/CMakeFiles/test_servicio_aula.dir/backend/test_servicio_aula.cpp.o
+[60/96] Automatic MOC for target test_edge_cases
+[61/96] Building CXX object test/CMakeFiles/test_edge_cases.dir/test_edge_cases_autogen/mocs_compilation.cpp.o
+[62/96] Building CXX object test/CMakeFiles/test_servicio_planes_estudio.dir/backend/test_servicio_planes_estudio.cpp.o
+[63/96] Linking CXX executable test/test_backend_database
+[64/96] Linking CXX executable test/test_servicio_planes_estudio
+[65/96] Linking CXX executable test/test_servicio_aula
+[66/96] Building CXX object test/CMakeFiles/test_middleware_crud_routes.dir/test_middleware_crud_routes_autogen/mocs_compilation.cpp.o
+[67/96] Automatic MOC for target test_solver_horarios
+[68/96] Building CXX object test/CMakeFiles/test_solver_horarios.dir/test_solver_horarios_autogen/mocs_compilation.cpp.o
+[69/96] Automatic MOC for target test_solver_benchmark
+[70/96] Building CXX object test/CMakeFiles/test_solver_benchmark.dir/test_solver_benchmark_autogen/mocs_compilation.cpp.o
+[71/96] Building CXX object test/CMakeFiles/test_servicio_carga_horaria.dir/backend/test_servicio_carga_horaria.cpp.o
+[72/96] Linking CXX executable test/test_servicio_carga_horaria
+[73/96] Automatic MOC for target test_horario_salida
+[74/96] Building CXX object test/CMakeFiles/test_horario_salida.dir/test_horario_salida_autogen/mocs_compilation.cpp.o
+[75/96] Building CXX object test/CMakeFiles/test_edge_cases.dir/backend/test_edge_cases.cpp.o
+[76/96] Linking CXX executable test/test_edge_cases
+[77/96] Building CXX object test/CMakeFiles/test_composicion_plan.dir/backend/test_composicion_plan.cpp.o
+[78/96] Automatic MOC for target test_servicio_consulta_horario
+[79/96] Building CXX object test/CMakeFiles/test_servicio_consulta_horario.dir/test_servicio_consulta_horario_autogen/mocs_compilation.cpp.o
+[80/96] Linking CXX executable test/test_composicion_plan
+[81/96] Automatic MOC for target test_servicio_horario_salida
+[82/96] Building CXX object test/CMakeFiles/test_servicio_horario_salida.dir/test_servicio_horario_salida_autogen/mocs_compilation.cpp.o
+[83/96] Building CXX object test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o
+[84/96] Building CXX object test/CMakeFiles/test_middleware_crud_routes.dir/test_crud_routes.cpp.o
+[85/96] Linking CXX executable test/test_horario_salida
+FAILED: test/test_horario_salida 
+: && /usr/bin/c++   test/CMakeFiles/test_horario_salida.dir/test_horario_salida_autogen/mocs_compilation.cpp.o test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o -o test/test_horario_salida  -Wl,-rpath,/usr/local/lib  src/backend/libbackend.a  /usr/lib/x86_64-linux-gnu/libQt6Test.so.6.4.2  /usr/local/lib/libortools.so.9.15.6755  -ldl  /usr/local/lib/libbz2.so  /usr/local/lib/libabsl_flags_parse.so.2508.0.0  /usr/local/lib/libabsl_flags_usage.so.2508.0.0  /usr/local/lib/libabsl_flags_usage_internal.so.2508.0.0  /usr/local/lib/libabsl_log_flags.so.2508.0.0  /usr/local/lib/libprotobuf.so.33.1.0  /usr/local/lib/libabsl_die_if_null.so.2508.0.0  /usr/local/lib/libabsl_log_initialize.so.2508.0.0  /usr/local/lib/libabsl_random_seed_sequences.so.2508.0.0  /usr/local/lib/libabsl_random_internal_entropy_pool.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes_impl.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_slow.so.2508.0.0  /usr/local/lib/libabsl_random_internal_platform.so.2508.0.0  /usr/local/lib/libabsl_random_internal_seed_material.so.2508.0.0  /usr/local/lib/libabsl_random_seed_gen_exception.so.2508.0.0  /usr/local/lib/libabsl_statusor.so.2508.0.0  /usr/local/lib/libabsl_status.so.2508.0.0  /usr/local/lib/libabsl_random_distributions.so.2508.0.0  /usr/local/lib/libutf8_validity.so.33.1.0  /usr/local/lib/libre2.so.11.0.0  /usr/local/lib/libabsl_log_internal_check_op.so.2508.0.0  /usr/local/lib/libabsl_leak_check.so.2508.0.0  /usr/local/lib/libabsl_log_internal_conditions.so.2508.0.0  /usr/local/lib/libabsl_log_internal_message.so.2508.0.0  /usr/local/lib/libabsl_examine_stack.so.2508.0.0  /usr/local/lib/libabsl_log_internal_format.so.2508.0.0  /usr/local/lib/libabsl_log_internal_nullguard.so.2508.0.0  /usr/local/lib/libabsl_log_internal_structured_proto.so.2508.0.0  /usr/local/lib/libabsl_log_internal_log_sink_set.so.2508.0.0  /usr/local/lib/libabsl_log_globals.so.2508.0.0  /usr/local/lib/libabsl_log_internal_globals.so.2508.0.0  /usr/local/lib/libabsl_log_sink.so.2508.0.0  /usr/local/lib/libabsl_log_entry.so.2508.0.0  /usr/local/lib/libabsl_log_internal_proto.so.2508.0.0  /usr/local/lib/libabsl_strerror.so.2508.0.0  /usr/local/lib/libabsl_vlog_config_internal.so.2508.0.0  /usr/local/lib/libabsl_log_internal_fnmatch.so.2508.0.0  /usr/local/lib/libabsl_flags_reflection.so.2508.0.0  /usr/local/lib/libabsl_flags_private_handle_accessor.so.2508.0.0  /usr/local/lib/libabsl_flags_internal.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag.so.2508.0.0  /usr/local/lib/libabsl_flags_marshalling.so.2508.0.0  /usr/local/lib/libabsl_flags_config.so.2508.0.0  /usr/local/lib/libabsl_flags_program_name.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag_internal.so.2508.0.0  /usr/local/lib/libabsl_raw_hash_set.so.2508.0.0  /usr/local/lib/libabsl_hashtablez_sampler.so.2508.0.0  /usr/local/lib/libabsl_cord.so.2508.0.0  /usr/local/lib/libabsl_cordz_info.so.2508.0.0  /usr/local/lib/libabsl_cord_internal.so.2508.0.0  /usr/local/lib/libabsl_cordz_functions.so.2508.0.0  /usr/local/lib/libabsl_exponential_biased.so.2508.0.0  /usr/local/lib/libabsl_cordz_handle.so.2508.0.0  /usr/local/lib/libabsl_synchronization.so.2508.0.0  /usr/local/lib/libabsl_stacktrace.so.2508.0.0  /usr/local/lib/libabsl_symbolize.so.2508.0.0  /usr/local/lib/libabsl_debugging_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_rust.so.2508.0.0  /usr/local/lib/libabsl_decode_rust_punycode.so.2508.0.0  /usr/local/lib/libabsl_utf8_for_code_point.so.2508.0.0  /usr/local/lib/libabsl_graphcycles_internal.so.2508.0.0  /usr/local/lib/libabsl_malloc_internal.so.2508.0.0  /usr/local/lib/libabsl_kernel_timeout_internal.so.2508.0.0  /usr/local/lib/libabsl_time.so.2508.0.0  /usr/local/lib/libabsl_civil_time.so.2508.0.0  /usr/local/lib/libabsl_time_zone.so.2508.0.0  /usr/local/lib/libabsl_tracing_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cord_state.so.2508.0.0  /usr/local/lib/libabsl_crc32c.so.2508.0.0  /usr/local/lib/libabsl_str_format_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cpu_detect.so.2508.0.0  /usr/local/lib/libabsl_hash.so.2508.0.0  /usr/local/lib/libabsl_city.so.2508.0.0  /usr/local/lib/libabsl_strings.so.2508.0.0  /usr/local/lib/libabsl_int128.so.2508.0.0  /usr/local/lib/libabsl_strings_internal.so.2508.0.0  /usr/local/lib/libabsl_string_view.so.2508.0.0  /usr/local/lib/libabsl_base.so.2508.0.0  /usr/local/lib/libabsl_spinlock_wait.so.2508.0.0  /usr/local/lib/libabsl_throw_delegate.so.2508.0.0  /usr/local/lib/libabsl_raw_logging_internal.so.2508.0.0  /usr/local/lib/libabsl_log_severity.so.2508.0.0  /usr/local/lib/libCbcSolver.so.2.10.12  /usr/local/lib/libOsiCbc.so.2.10.12  /usr/local/lib/libCbc.so.2.10.12  /usr/local/lib/libCgl.so.0.60.9  /usr/local/lib/libClpSolver.so.1.17.10  /usr/local/lib/libOsiClp.so.1.17.10  /usr/local/lib/libClp.so.1.17.10  /usr/local/lib/libOsi.so.0.108.11  /usr/local/lib/libCoinUtils.so.2.11.12  /usr/local/lib/libz.so  /usr/local/lib/libhighs.so.1.12.0  /usr/local/lib/libscip.so.10.0.0  /usr/lib/x86_64-linux-gnu/libQt6Sql.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 && :
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::asignacion_output_round_trip()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule28asignacion_output_round_tripEv[_ZN18TestOutputSchedule28asignacion_output_round_tripEv]+0x78): undefined reference to `AsignacionOutput::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule28asignacion_output_round_tripEv[_ZN18TestOutputSchedule28asignacion_output_round_tripEv]+0x2ef): undefined reference to `AsignacionOutput::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::dia_output_round_trip()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule21dia_output_round_tripEv[_ZN18TestOutputSchedule21dia_output_round_tripEv]+0xdb): undefined reference to `DiaOutput::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule21dia_output_round_tripEv[_ZN18TestOutputSchedule21dia_output_round_tripEv]+0x245): undefined reference to `DiaOutput::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::dia_output_empty_assignments()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule28dia_output_empty_assignmentsEv[_ZN18TestOutputSchedule28dia_output_empty_assignmentsEv]+0x36): undefined reference to `DiaOutput::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule28dia_output_empty_assignmentsEv[_ZN18TestOutputSchedule28dia_output_empty_assignmentsEv]+0x49): undefined reference to `DiaOutput::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::curso_output_round_trip()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule23curso_output_round_tripEv[_ZN18TestOutputSchedule23curso_output_round_tripEv]+0x103): undefined reference to `CursoOutput::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule23curso_output_round_tripEv[_ZN18TestOutputSchedule23curso_output_round_tripEv]+0x2fc): undefined reference to `CursoOutput::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::metadata_round_trip()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule19metadata_round_tripEv[_ZN18TestOutputSchedule19metadata_round_tripEv]+0xa0): undefined reference to `MetadataSalida::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule19metadata_round_tripEv[_ZN18TestOutputSchedule19metadata_round_tripEv]+0xb9): undefined reference to `MetadataSalida::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::horario_salida_round_trip()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule25horario_salida_round_tripEv[_ZN18TestOutputSchedule25horario_salida_round_tripEv]+0x459): undefined reference to `HorarioSalida::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule25horario_salida_round_tripEv[_ZN18TestOutputSchedule25horario_salida_round_tripEv]+0x648): undefined reference to `HorarioSalida::fromJson(QJsonObject const&)'
+/usr/bin/ld: test/CMakeFiles/test_horario_salida.dir/backend/test_horario_salida.cpp.o: in function `TestOutputSchedule::horario_salida_empty_schedule()':
+test_horario_salida.cpp:(.text._ZN18TestOutputSchedule29horario_salida_empty_scheduleEv[_ZN18TestOutputSchedule29horario_salida_empty_scheduleEv]+0x3a): undefined reference to `HorarioSalida::toJson() const'
+/usr/bin/ld: test_horario_salida.cpp:(.text._ZN18TestOutputSchedule29horario_salida_empty_scheduleEv[_ZN18TestOutputSchedule29horario_salida_empty_scheduleEv]+0x50): undefined reference to `HorarioSalida::fromJson(QJsonObject const&)'
+collect2: error: ld returned 1 exit status
+[86/96] Linking CXX executable test/test_middleware_crud_routes
+[87/96] Building CXX object test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o
+[88/96] Building CXX object test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o
+[89/96] Linking CXX executable test/test_servicio_consulta_horario
+FAILED: test/test_servicio_consulta_horario 
+: && /usr/bin/c++   test/CMakeFiles/test_servicio_consulta_horario.dir/test_servicio_consulta_horario_autogen/mocs_compilation.cpp.o test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o -o test/test_servicio_consulta_horario  -Wl,-rpath,/usr/local/lib  src/backend/libbackend.a  /usr/lib/x86_64-linux-gnu/libQt6Sql.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Test.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2  /usr/local/lib/libortools.so.9.15.6755  -ldl  /usr/local/lib/libbz2.so  /usr/local/lib/libabsl_flags_parse.so.2508.0.0  /usr/local/lib/libabsl_flags_usage.so.2508.0.0  /usr/local/lib/libabsl_flags_usage_internal.so.2508.0.0  /usr/local/lib/libabsl_log_flags.so.2508.0.0  /usr/local/lib/libprotobuf.so.33.1.0  /usr/local/lib/libabsl_die_if_null.so.2508.0.0  /usr/local/lib/libabsl_log_initialize.so.2508.0.0  /usr/local/lib/libabsl_random_seed_sequences.so.2508.0.0  /usr/local/lib/libabsl_random_internal_entropy_pool.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes_impl.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_slow.so.2508.0.0  /usr/local/lib/libabsl_random_internal_platform.so.2508.0.0  /usr/local/lib/libabsl_random_internal_seed_material.so.2508.0.0  /usr/local/lib/libabsl_random_seed_gen_exception.so.2508.0.0  /usr/local/lib/libabsl_statusor.so.2508.0.0  /usr/local/lib/libabsl_status.so.2508.0.0  /usr/local/lib/libabsl_random_distributions.so.2508.0.0  /usr/local/lib/libutf8_validity.so.33.1.0  /usr/local/lib/libre2.so.11.0.0  /usr/local/lib/libabsl_log_internal_check_op.so.2508.0.0  /usr/local/lib/libabsl_leak_check.so.2508.0.0  /usr/local/lib/libabsl_log_internal_conditions.so.2508.0.0  /usr/local/lib/libabsl_log_internal_message.so.2508.0.0  /usr/local/lib/libabsl_examine_stack.so.2508.0.0  /usr/local/lib/libabsl_log_internal_format.so.2508.0.0  /usr/local/lib/libabsl_log_internal_nullguard.so.2508.0.0  /usr/local/lib/libabsl_log_internal_structured_proto.so.2508.0.0  /usr/local/lib/libabsl_log_internal_log_sink_set.so.2508.0.0  /usr/local/lib/libabsl_log_globals.so.2508.0.0  /usr/local/lib/libabsl_log_internal_globals.so.2508.0.0  /usr/local/lib/libabsl_log_sink.so.2508.0.0  /usr/local/lib/libabsl_log_entry.so.2508.0.0  /usr/local/lib/libabsl_log_internal_proto.so.2508.0.0  /usr/local/lib/libabsl_strerror.so.2508.0.0  /usr/local/lib/libabsl_vlog_config_internal.so.2508.0.0  /usr/local/lib/libabsl_log_internal_fnmatch.so.2508.0.0  /usr/local/lib/libabsl_flags_reflection.so.2508.0.0  /usr/local/lib/libabsl_flags_private_handle_accessor.so.2508.0.0  /usr/local/lib/libabsl_flags_internal.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag.so.2508.0.0  /usr/local/lib/libabsl_flags_marshalling.so.2508.0.0  /usr/local/lib/libabsl_flags_config.so.2508.0.0  /usr/local/lib/libabsl_flags_program_name.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag_internal.so.2508.0.0  /usr/local/lib/libabsl_raw_hash_set.so.2508.0.0  /usr/local/lib/libabsl_hashtablez_sampler.so.2508.0.0  /usr/local/lib/libabsl_cord.so.2508.0.0  /usr/local/lib/libabsl_cordz_info.so.2508.0.0  /usr/local/lib/libabsl_cord_internal.so.2508.0.0  /usr/local/lib/libabsl_cordz_functions.so.2508.0.0  /usr/local/lib/libabsl_exponential_biased.so.2508.0.0  /usr/local/lib/libabsl_cordz_handle.so.2508.0.0  /usr/local/lib/libabsl_synchronization.so.2508.0.0  /usr/local/lib/libabsl_stacktrace.so.2508.0.0  /usr/local/lib/libabsl_symbolize.so.2508.0.0  /usr/local/lib/libabsl_debugging_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_rust.so.2508.0.0  /usr/local/lib/libabsl_decode_rust_punycode.so.2508.0.0  /usr/local/lib/libabsl_utf8_for_code_point.so.2508.0.0  /usr/local/lib/libabsl_graphcycles_internal.so.2508.0.0  /usr/local/lib/libabsl_malloc_internal.so.2508.0.0  /usr/local/lib/libabsl_kernel_timeout_internal.so.2508.0.0  /usr/local/lib/libabsl_time.so.2508.0.0  /usr/local/lib/libabsl_civil_time.so.2508.0.0  /usr/local/lib/libabsl_time_zone.so.2508.0.0  /usr/local/lib/libabsl_tracing_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cord_state.so.2508.0.0  /usr/local/lib/libabsl_crc32c.so.2508.0.0  /usr/local/lib/libabsl_str_format_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cpu_detect.so.2508.0.0  /usr/local/lib/libabsl_hash.so.2508.0.0  /usr/local/lib/libabsl_city.so.2508.0.0  /usr/local/lib/libabsl_strings.so.2508.0.0  /usr/local/lib/libabsl_int128.so.2508.0.0  /usr/local/lib/libabsl_strings_internal.so.2508.0.0  /usr/local/lib/libabsl_string_view.so.2508.0.0  /usr/local/lib/libabsl_base.so.2508.0.0  /usr/local/lib/libabsl_spinlock_wait.so.2508.0.0  /usr/local/lib/libabsl_throw_delegate.so.2508.0.0  /usr/local/lib/libabsl_raw_logging_internal.so.2508.0.0  /usr/local/lib/libabsl_log_severity.so.2508.0.0  /usr/local/lib/libCbcSolver.so.2.10.12  /usr/local/lib/libOsiCbc.so.2.10.12  /usr/local/lib/libCbc.so.2.10.12  /usr/local/lib/libCgl.so.0.60.9  /usr/local/lib/libClpSolver.so.1.17.10  /usr/local/lib/libOsiClp.so.1.17.10  /usr/local/lib/libClp.so.1.17.10  /usr/local/lib/libOsi.so.0.108.11  /usr/local/lib/libCoinUtils.so.2.11.12  /usr/local/lib/libz.so  /usr/local/lib/libhighs.so.1.12.0  /usr/local/lib/libscip.so.10.0.0 && :
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_profesor_con_asignaciones()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32buscar_profesor_con_asignacionesEv[_ZN27TestServicioConsultaHorario32buscar_profesor_con_asignacionesEv]+0x41): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32buscar_profesor_con_asignacionesEv[_ZN27TestServicioConsultaHorario32buscar_profesor_con_asignacionesEv]+0x5f): undefined reference to `ServicioConsultaHorario::buscarPorProfesor(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_profesor_sin_asignaciones()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32buscar_profesor_sin_asignacionesEv[_ZN27TestServicioConsultaHorario32buscar_profesor_sin_asignacionesEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32buscar_profesor_sin_asignacionesEv[_ZN27TestServicioConsultaHorario32buscar_profesor_sin_asignacionesEv]+0x53): undefined reference to `ServicioConsultaHorario::buscarPorProfesor(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_aula_con_asignaciones()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario28buscar_aula_con_asignacionesEv[_ZN27TestServicioConsultaHorario28buscar_aula_con_asignacionesEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario28buscar_aula_con_asignacionesEv[_ZN27TestServicioConsultaHorario28buscar_aula_con_asignacionesEv]+0x53): undefined reference to `ServicioConsultaHorario::buscarPorAula(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_aula_no_usada()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario20buscar_aula_no_usadaEv[_ZN27TestServicioConsultaHorario20buscar_aula_no_usadaEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario20buscar_aula_no_usadaEv[_ZN27TestServicioConsultaHorario20buscar_aula_no_usadaEv]+0x53): undefined reference to `ServicioConsultaHorario::buscarPorAula(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_dia_con_asignaciones()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27buscar_dia_con_asignacionesEv[_ZN27TestServicioConsultaHorario27buscar_dia_con_asignacionesEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27buscar_dia_con_asignacionesEv[_ZN27TestServicioConsultaHorario27buscar_dia_con_asignacionesEv]+0x53): undefined reference to `ServicioConsultaHorario::buscarPorDia(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_dia_sin_asignaciones()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27buscar_dia_sin_asignacionesEv[_ZN27TestServicioConsultaHorario27buscar_dia_sin_asignacionesEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27buscar_dia_sin_asignacionesEv[_ZN27TestServicioConsultaHorario27buscar_dia_sin_asignacionesEv]+0x53): undefined reference to `ServicioConsultaHorario::buscarPorDia(int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_curso_existente()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario22buscar_curso_existenteEv[_ZN27TestServicioConsultaHorario22buscar_curso_existenteEv]+0x41): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario22buscar_curso_existenteEv[_ZN27TestServicioConsultaHorario22buscar_curso_existenteEv]+0x74): undefined reference to `ServicioConsultaHorario::buscarPorCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::buscar_curso_no_existente()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario25buscar_curso_no_existenteEv[_ZN27TestServicioConsultaHorario25buscar_curso_no_existenteEv]+0x41): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario25buscar_curso_no_existenteEv[_ZN27TestServicioConsultaHorario25buscar_curso_no_existenteEv]+0x74): undefined reference to `ServicioConsultaHorario::buscarPorCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::detectar_conflictos_profesor()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario28detectar_conflictos_profesorEv[_ZN27TestServicioConsultaHorario28detectar_conflictos_profesorEv]+0x2b5): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario28detectar_conflictos_profesorEv[_ZN27TestServicioConsultaHorario28detectar_conflictos_profesorEv]+0x2ce): undefined reference to `ServicioConsultaHorario::detectarConflictos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::detectar_conflictos_aula()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario24detectar_conflictos_aulaEv[_ZN27TestServicioConsultaHorario24detectar_conflictos_aulaEv]+0x2b5): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario24detectar_conflictos_aulaEv[_ZN27TestServicioConsultaHorario24detectar_conflictos_aulaEv]+0x2ce): undefined reference to `ServicioConsultaHorario::detectarConflictos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::detectar_conflictos_ambos()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario25detectar_conflictos_ambosEv[_ZN27TestServicioConsultaHorario25detectar_conflictos_ambosEv]+0x2af): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario25detectar_conflictos_ambosEv[_ZN27TestServicioConsultaHorario25detectar_conflictos_ambosEv]+0x2c8): undefined reference to `ServicioConsultaHorario::detectarConflictos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::detectar_conflictos_ninguno()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27detectar_conflictos_ningunoEv[_ZN27TestServicioConsultaHorario27detectar_conflictos_ningunoEv]+0x38): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario27detectar_conflictos_ningunoEv[_ZN27TestServicioConsultaHorario27detectar_conflictos_ningunoEv]+0x4e): undefined reference to `ServicioConsultaHorario::detectarConflictos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::hay_conflicto_true()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario18hay_conflicto_trueEv[_ZN27TestServicioConsultaHorario18hay_conflicto_trueEv]+0x2b2): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario18hay_conflicto_trueEv[_ZN27TestServicioConsultaHorario18hay_conflicto_trueEv]+0x2ed): undefined reference to `ServicioConsultaHorario::hayConflicto(QString const&, int, int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::hay_conflicto_false()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario19hay_conflicto_falseEv[_ZN27TestServicioConsultaHorario19hay_conflicto_falseEv]+0x3b): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario19hay_conflicto_falseEv[_ZN27TestServicioConsultaHorario19hay_conflicto_falseEv]+0x76): undefined reference to `ServicioConsultaHorario::hayConflicto(QString const&, int, int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::hay_conflicto_curso_no_existente()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32hay_conflicto_curso_no_existenteEv[_ZN27TestServicioConsultaHorario32hay_conflicto_curso_no_existenteEv]+0x3b): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario32hay_conflicto_curso_no_existenteEv[_ZN27TestServicioConsultaHorario32hay_conflicto_curso_no_existenteEv]+0x76): undefined reference to `ServicioConsultaHorario::hayConflicto(QString const&, int, int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::hay_conflicto_asignacion_no_encontrada()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario38hay_conflicto_asignacion_no_encontradaEv[_ZN27TestServicioConsultaHorario38hay_conflicto_asignacion_no_encontradaEv]+0x3b): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario38hay_conflicto_asignacion_no_encontradaEv[_ZN27TestServicioConsultaHorario38hay_conflicto_asignacion_no_encontradaEv]+0x76): undefined reference to `ServicioConsultaHorario::hayConflicto(QString const&, int, int) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::estadisticas_horario_completo()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario29estadisticas_horario_completoEv[_ZN27TestServicioConsultaHorario29estadisticas_horario_completoEv]+0x41): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario29estadisticas_horario_completoEv[_ZN27TestServicioConsultaHorario29estadisticas_horario_completoEv]+0x5a): undefined reference to `ServicioConsultaHorario::obtenerEstadisticas() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_consulta_horario.dir/backend/test_servicio_consulta_horario.cpp.o: in function `TestServicioConsultaHorario::estadisticas_horario_vacio()':
+test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario26estadisticas_horario_vacioEv[_ZN27TestServicioConsultaHorario26estadisticas_horario_vacioEv]+0x3a): undefined reference to `ServicioConsultaHorario::ServicioConsultaHorario(HorarioSalida const&)'
+/usr/bin/ld: test_servicio_consulta_horario.cpp:(.text._ZN27TestServicioConsultaHorario26estadisticas_horario_vacioEv[_ZN27TestServicioConsultaHorario26estadisticas_horario_vacioEv]+0x50): undefined reference to `ServicioConsultaHorario::obtenerEstadisticas() const'
+collect2: error: ld returned 1 exit status
+[90/96] Linking CXX executable test/test_servicio_horario_salida
+FAILED: test/test_servicio_horario_salida 
+: && /usr/bin/c++   test/CMakeFiles/test_servicio_horario_salida.dir/test_servicio_horario_salida_autogen/mocs_compilation.cpp.o test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o -o test/test_servicio_horario_salida  -Wl,-rpath,/usr/local/lib  src/backend/libbackend.a  /usr/lib/x86_64-linux-gnu/libQt6Sql.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Test.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2  /usr/local/lib/libortools.so.9.15.6755  -ldl  /usr/local/lib/libbz2.so  /usr/local/lib/libabsl_flags_parse.so.2508.0.0  /usr/local/lib/libabsl_flags_usage.so.2508.0.0  /usr/local/lib/libabsl_flags_usage_internal.so.2508.0.0  /usr/local/lib/libabsl_log_flags.so.2508.0.0  /usr/local/lib/libprotobuf.so.33.1.0  /usr/local/lib/libabsl_die_if_null.so.2508.0.0  /usr/local/lib/libabsl_log_initialize.so.2508.0.0  /usr/local/lib/libabsl_random_seed_sequences.so.2508.0.0  /usr/local/lib/libabsl_random_internal_entropy_pool.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_hwaes_impl.so.2508.0.0  /usr/local/lib/libabsl_random_internal_randen_slow.so.2508.0.0  /usr/local/lib/libabsl_random_internal_platform.so.2508.0.0  /usr/local/lib/libabsl_random_internal_seed_material.so.2508.0.0  /usr/local/lib/libabsl_random_seed_gen_exception.so.2508.0.0  /usr/local/lib/libabsl_statusor.so.2508.0.0  /usr/local/lib/libabsl_status.so.2508.0.0  /usr/local/lib/libabsl_random_distributions.so.2508.0.0  /usr/local/lib/libutf8_validity.so.33.1.0  /usr/local/lib/libre2.so.11.0.0  /usr/local/lib/libabsl_log_internal_check_op.so.2508.0.0  /usr/local/lib/libabsl_leak_check.so.2508.0.0  /usr/local/lib/libabsl_log_internal_conditions.so.2508.0.0  /usr/local/lib/libabsl_log_internal_message.so.2508.0.0  /usr/local/lib/libabsl_examine_stack.so.2508.0.0  /usr/local/lib/libabsl_log_internal_format.so.2508.0.0  /usr/local/lib/libabsl_log_internal_nullguard.so.2508.0.0  /usr/local/lib/libabsl_log_internal_structured_proto.so.2508.0.0  /usr/local/lib/libabsl_log_internal_log_sink_set.so.2508.0.0  /usr/local/lib/libabsl_log_globals.so.2508.0.0  /usr/local/lib/libabsl_log_internal_globals.so.2508.0.0  /usr/local/lib/libabsl_log_sink.so.2508.0.0  /usr/local/lib/libabsl_log_entry.so.2508.0.0  /usr/local/lib/libabsl_log_internal_proto.so.2508.0.0  /usr/local/lib/libabsl_strerror.so.2508.0.0  /usr/local/lib/libabsl_vlog_config_internal.so.2508.0.0  /usr/local/lib/libabsl_log_internal_fnmatch.so.2508.0.0  /usr/local/lib/libabsl_flags_reflection.so.2508.0.0  /usr/local/lib/libabsl_flags_private_handle_accessor.so.2508.0.0  /usr/local/lib/libabsl_flags_internal.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag.so.2508.0.0  /usr/local/lib/libabsl_flags_marshalling.so.2508.0.0  /usr/local/lib/libabsl_flags_config.so.2508.0.0  /usr/local/lib/libabsl_flags_program_name.so.2508.0.0  /usr/local/lib/libabsl_flags_commandlineflag_internal.so.2508.0.0  /usr/local/lib/libabsl_raw_hash_set.so.2508.0.0  /usr/local/lib/libabsl_hashtablez_sampler.so.2508.0.0  /usr/local/lib/libabsl_cord.so.2508.0.0  /usr/local/lib/libabsl_cordz_info.so.2508.0.0  /usr/local/lib/libabsl_cord_internal.so.2508.0.0  /usr/local/lib/libabsl_cordz_functions.so.2508.0.0  /usr/local/lib/libabsl_exponential_biased.so.2508.0.0  /usr/local/lib/libabsl_cordz_handle.so.2508.0.0  /usr/local/lib/libabsl_synchronization.so.2508.0.0  /usr/local/lib/libabsl_stacktrace.so.2508.0.0  /usr/local/lib/libabsl_symbolize.so.2508.0.0  /usr/local/lib/libabsl_debugging_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_internal.so.2508.0.0  /usr/local/lib/libabsl_demangle_rust.so.2508.0.0  /usr/local/lib/libabsl_decode_rust_punycode.so.2508.0.0  /usr/local/lib/libabsl_utf8_for_code_point.so.2508.0.0  /usr/local/lib/libabsl_graphcycles_internal.so.2508.0.0  /usr/local/lib/libabsl_malloc_internal.so.2508.0.0  /usr/local/lib/libabsl_kernel_timeout_internal.so.2508.0.0  /usr/local/lib/libabsl_time.so.2508.0.0  /usr/local/lib/libabsl_civil_time.so.2508.0.0  /usr/local/lib/libabsl_time_zone.so.2508.0.0  /usr/local/lib/libabsl_tracing_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cord_state.so.2508.0.0  /usr/local/lib/libabsl_crc32c.so.2508.0.0  /usr/local/lib/libabsl_str_format_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_internal.so.2508.0.0  /usr/local/lib/libabsl_crc_cpu_detect.so.2508.0.0  /usr/local/lib/libabsl_hash.so.2508.0.0  /usr/local/lib/libabsl_city.so.2508.0.0  /usr/local/lib/libabsl_strings.so.2508.0.0  /usr/local/lib/libabsl_int128.so.2508.0.0  /usr/local/lib/libabsl_strings_internal.so.2508.0.0  /usr/local/lib/libabsl_string_view.so.2508.0.0  /usr/local/lib/libabsl_base.so.2508.0.0  /usr/local/lib/libabsl_spinlock_wait.so.2508.0.0  /usr/local/lib/libabsl_throw_delegate.so.2508.0.0  /usr/local/lib/libabsl_raw_logging_internal.so.2508.0.0  /usr/local/lib/libabsl_log_severity.so.2508.0.0  /usr/local/lib/libCbcSolver.so.2.10.12  /usr/local/lib/libOsiCbc.so.2.10.12  /usr/local/lib/libCbc.so.2.10.12  /usr/local/lib/libCgl.so.0.60.9  /usr/local/lib/libClpSolver.so.1.17.10  /usr/local/lib/libOsiClp.so.1.17.10  /usr/local/lib/libClp.so.1.17.10  /usr/local/lib/libOsi.so.0.108.11  /usr/local/lib/libCoinUtils.so.2.11.12  /usr/local/lib/libz.so  /usr/local/lib/libhighs.so.1.12.0  /usr/local/lib/libscip.so.10.0.0 && :
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::init()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida4initEv[_ZN25TestServicioHorarioSalida4initEv]+0xd7): undefined reference to `ServicioHorarioSalida::ServicioHorarioSalida(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarArchivos_directorioVacio()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30listarArchivos_directorioVacioEv[_ZN25TestServicioHorarioSalida30listarArchivos_directorioVacioEv]+0x2b): undefined reference to `ServicioHorarioSalida::listarArchivos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarArchivos_conArchivosJson()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30listarArchivos_conArchivosJsonEv[_ZN25TestServicioHorarioSalida30listarArchivos_conArchivosJsonEv]+0x11c): undefined reference to `ServicioHorarioSalida::listarArchivos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarArchivos_ignoraNoJson()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida27listarArchivos_ignoraNoJsonEv[_ZN25TestServicioHorarioSalida27listarArchivos_ignoraNoJsonEv]+0x16b): undefined reference to `ServicioHorarioSalida::listarArchivos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarArchivos_directorioInexistente()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida36listarArchivos_directorioInexistenteEv[_ZN25TestServicioHorarioSalida36listarArchivos_directorioInexistenteEv]+0x64): undefined reference to `ServicioHorarioSalida::ServicioHorarioSalida(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida36listarArchivos_directorioInexistenteEv[_ZN25TestServicioHorarioSalida36listarArchivos_directorioInexistenteEv]+0x95): undefined reference to `ServicioHorarioSalida::listarArchivos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::cargarHorario_archivoExistente()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30cargarHorario_archivoExistenteEv[_ZN25TestServicioHorarioSalida30cargarHorario_archivoExistenteEv]+0xb2): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::cargarHorario_archivoInexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida38cargarHorario_archivoInexistente_fallaEv[_ZN25TestServicioHorarioSalida38cargarHorario_archivoInexistente_fallaEv]+0x51): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::cargarHorario_jsonInvalido_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida32cargarHorario_jsonInvalido_fallaEv[_ZN25TestServicioHorarioSalida32cargarHorario_jsonInvalido_fallaEv]+0x105): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::cargarHorario_camposFaltantes_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida35cargarHorario_camposFaltantes_fallaEv[_ZN25TestServicioHorarioSalida35cargarHorario_camposFaltantes_fallaEv]+0x12c): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::guardarHorario_roundTrip()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida24guardarHorario_roundTripEv[_ZN25TestServicioHorarioSalida24guardarHorario_roundTripEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida24guardarHorario_roundTripEv[_ZN25TestServicioHorarioSalida24guardarHorario_roundTripEv]+0x10e): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::guardarHorario_directorioNoExiste()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv[_ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv]+0x6a): undefined reference to `ServicioHorarioSalida::ServicioHorarioSalida(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv[_ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv]+0xd5): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv[_ZN25TestServicioHorarioSalida33guardarHorario_directorioNoExisteEv]+0x154): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::agregarAsignacion_exitoso()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv]+0x19c): undefined reference to `ServicioHorarioSalida::agregarAsignacion(QString const&, int, AsignacionOutput const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida25agregarAsignacion_exitosoEv]+0x2ac): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::agregarAsignacion_cursoInexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv[_ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv[_ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv[_ZN25TestServicioHorarioSalida40agregarAsignacion_cursoInexistente_fallaEv]+0x16b): undefined reference to `ServicioHorarioSalida::agregarAsignacion(QString const&, int, AsignacionOutput const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::agregarAsignacion_slotDuplicado_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv[_ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv[_ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv[_ZN25TestServicioHorarioSalida37agregarAsignacion_slotDuplicado_fallaEv]+0x16b): undefined reference to `ServicioHorarioSalida::agregarAsignacion(QString const&, int, AsignacionOutput const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::agregarAsignacion_nuevoDia()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv[_ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv[_ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv[_ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv]+0x16b): undefined reference to `ServicioHorarioSalida::agregarAsignacion(QString const&, int, AsignacionOutput const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv[_ZN25TestServicioHorarioSalida26agregarAsignacion_nuevoDiaEv]+0x1f9): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::eliminarAsignacion_exitoso()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv]+0x13f): undefined reference to `ServicioHorarioSalida::eliminarAsignacion(QString const&, int, int)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida26eliminarAsignacion_exitosoEv]+0x1cd): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::eliminarAsignacion_slotInexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv[_ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv[_ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv[_ZN25TestServicioHorarioSalida40eliminarAsignacion_slotInexistente_fallaEv]+0x13f): undefined reference to `ServicioHorarioSalida::eliminarAsignacion(QString const&, int, int)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::eliminarAsignacion_diaInexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv[_ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv[_ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv[_ZN25TestServicioHorarioSalida39eliminarAsignacion_diaInexistente_fallaEv]+0x13f): undefined reference to `ServicioHorarioSalida::eliminarAsignacion(QString const&, int, int)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::modificarAsignacion_exitoso()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv]+0x171): undefined reference to `ServicioHorarioSalida::modificarAsignacion(QString const&, int, int, AsignacionOutput const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv[_ZN25TestServicioHorarioSalida27modificarAsignacion_exitosoEv]+0x2c2): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::modificarAsignacion_inexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv[_ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv[_ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv[_ZN25TestServicioHorarioSalida37modificarAsignacion_inexistente_fallaEv]+0x171): undefined reference to `ServicioHorarioSalida::modificarAsignacion(QString const&, int, int, AsignacionOutput const&)'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::obtenerCurso_exitoso()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv[_ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv[_ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv[_ZN25TestServicioHorarioSalida20obtenerCurso_exitosoEv]+0x134): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::obtenerCurso_inexistente_falla()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv[_ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv]+0x77): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv[_ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv]+0xd7): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv[_ZN25TestServicioHorarioSalida30obtenerCurso_inexistente_fallaEv]+0x134): undefined reference to `ServicioHorarioSalida::obtenerCurso(QString const&) const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarCursos_conDatos()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida21listarCursos_conDatosEv[_ZN25TestServicioHorarioSalida21listarCursos_conDatosEv]+0x103): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida21listarCursos_conDatosEv[_ZN25TestServicioHorarioSalida21listarCursos_conDatosEv]+0x163): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida21listarCursos_conDatosEv[_ZN25TestServicioHorarioSalida21listarCursos_conDatosEv]+0x1a6): undefined reference to `ServicioHorarioSalida::listarCursos() const'
+/usr/bin/ld: test/CMakeFiles/test_servicio_horario_salida.dir/backend/test_servicio_horario_salida.cpp.o: in function `TestServicioHorarioSalida::listarCursos_vacio()':
+test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida18listarCursos_vacioEv[_ZN25TestServicioHorarioSalida18listarCursos_vacioEv]+0x8a): undefined reference to `ServicioHorarioSalida::guardarHorario(HorarioSalida const&, QString const&) const'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida18listarCursos_vacioEv[_ZN25TestServicioHorarioSalida18listarCursos_vacioEv]+0xea): undefined reference to `ServicioHorarioSalida::cargarHorario(QString const&)'
+/usr/bin/ld: test_servicio_horario_salida.cpp:(.text._ZN25TestServicioHorarioSalida18listarCursos_vacioEv[_ZN25TestServicioHorarioSalida18listarCursos_vacioEv]+0x12d): undefined reference to `ServicioHorarioSalida::listarCursos() const'
+collect2: error: ld returned 1 exit status
+[91/96] Building CXX object test/CMakeFiles/test_solver_benchmark.dir/backend/test_solver_benchmark.cpp.o
+[92/96] Linking CXX executable test/test_solver_benchmark
+[93/96] Building CXX object test/CMakeFiles/test_solver_horarios.dir/backend/test_solver_horarios.cpp.o
+[94/96] Linking CXX executable test/test_solver_horarios
+ninja: build stopped: cannot make progress due to previous errors.

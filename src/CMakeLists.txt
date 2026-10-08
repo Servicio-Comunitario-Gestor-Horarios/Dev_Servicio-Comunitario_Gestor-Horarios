@@ -17,8 +17,8 @@
 #   4. Si otro módulo lo necesita, linkearlo desde su CMakeLists.txt
 
 add_subdirectory(common)
-add_subdirectory(frontend)
 add_subdirectory(middleware)
+add_subdirectory(frontend)
 
 if(BUILD_BACKEND)
     add_subdirectory(backend)
