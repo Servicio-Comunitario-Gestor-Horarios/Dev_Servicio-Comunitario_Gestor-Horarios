@@ -1,5 +1,13 @@
 #pragma once
 
+/**
+ * @file ipc_framing.hpp
+ * @brief Framing NDJSON para el transporte IPC.
+ *
+ * Cada mensaje JSON se serializa en una línea terminada en '\n'.
+ * El receptor acumula bytes y extrae frames completos por delimitador.
+ */
+
 #include <QByteArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -10,6 +18,7 @@ namespace Middleware {
 inline constexpr char FRAME_DELIMITER = '\n';
 inline constexpr int  MAX_FRAME_BYTES = 4 * 1024 * 1024;
 
+/// Serializa `mensaje` a JSON compacto + delimitador.
 inline QByteArray encodeFrame(const QJsonObject& mensaje)
 {
     QByteArray frame = QJsonDocument(mensaje).toJson(QJsonDocument::Compact);
@@ -17,9 +26,12 @@ inline QByteArray encodeFrame(const QJsonObject& mensaje)
     return frame;
 }
 
+/// Extrae frames completos del buffer; deja el resto (sin delimitador) en `buffer`.
+/// Si no hay delimitador y se supera MAX_FRAME_BYTES, marca `overflow` y vacía el buffer.
 inline QVector<QByteArray> takeCompleteFrames(QByteArray& buffer, bool* overflow = nullptr)
 {
     if (overflow) *overflow = false;
+
     QVector<QByteArray> frames;
     int inicio = 0;
     while (true) {
@@ -31,9 +43,12 @@ inline QVector<QByteArray> takeCompleteFrames(QByteArray& buffer, bool* overflow
         if (!frame.trimmed().isEmpty()) frames.append(frame);
     }
     buffer.remove(0, inicio);
-    if (overflow && buffer.size() > MAX_FRAME_BYTES) { *overflow = true; buffer.clear(); }
+
+    if (overflow && buffer.size() > MAX_FRAME_BYTES) {
+        *overflow = true;
+        buffer.clear();
+    }
     return frames;
 }
 
 } // namespace Middleware
-```

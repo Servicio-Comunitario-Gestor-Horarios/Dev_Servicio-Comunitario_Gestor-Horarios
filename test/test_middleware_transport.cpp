@@ -1,4 +1,3 @@
-8 · test/test_middleware_transport.cpp (NUEVO)
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QJsonArray>
@@ -25,13 +24,15 @@ private:
         return QJsonDocument(obj).toJson(QJsonDocument::Compact) + '\n';
     }
 
+    // El servidor IPC corre en el mismo hilo, así que hay que procesar eventos
+    // (QTest::qWait) para que atienda la petición. Un waitForReadyRead bloqueante
+    // sobre el socket crudo no atiende al servidor y termina sin respuestas.
     static QVector<QJsonObject> leerRespuestas(QLocalSocket& socket, int esperadas,
                                                int timeoutMs = 3000) {
         QVector<QJsonObject> out;
         QByteArray buffer;
-        QElapsedTimer t; t.start();
-        while (out.size() < esperadas && t.elapsed() < timeoutMs) {
-            if (!socket.waitForReadyRead(50)) continue;
+
+        auto pump = [&]() {
             buffer.append(socket.readAll());
             int idx = -1;
             while ((idx = buffer.indexOf('\n')) >= 0) {
@@ -41,7 +42,14 @@ private:
                 const QJsonDocument doc = QJsonDocument::fromJson(line);
                 if (doc.isObject()) out.append(doc.object());
             }
+        };
+
+        QElapsedTimer t; t.start();
+        while (out.size() < esperadas && t.elapsed() < timeoutMs) {
+            QTest::qWait(10);
+            pump();
         }
+        pump();
         return out;
     }
 
