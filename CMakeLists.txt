@@ -62,8 +62,9 @@ include(cmake/CompilerWarnings.cmake)
 add_subdirectory(src)
 
 # ── Tests ──
-# Los tests enlazan `backend` / `backend_solver`, que no existen sin BUILD_BACKEND.
-if(BUILD_TESTING AND BUILD_BACKEND)
+# Los tests de middleware no dependen de OR-Tools. Los de backend/backend_solver
+# se guardan dentro de test/CMakeLists.txt con if(TARGET ...).
+if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(test)
 endif()
