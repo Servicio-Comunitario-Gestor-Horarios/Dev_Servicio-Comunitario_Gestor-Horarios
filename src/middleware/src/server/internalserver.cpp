@@ -1,6 +1,6 @@
 #include <middleware/internalserver.h>
 #include <middleware/messages.h>
-#include "ipc_framing.hpp"
+#include <middleware/ipc_framing.hpp>
 
 #include <QCoreApplication>
 #include <QJsonDocument>

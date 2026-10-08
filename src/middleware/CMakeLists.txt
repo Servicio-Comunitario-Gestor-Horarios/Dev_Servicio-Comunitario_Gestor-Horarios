@@ -18,25 +18,25 @@
 add_library(middleware STATIC)
 
 target_sources(middleware PRIVATE
-    src/server/internalserver.cpp
-    src/client/internalclient.cpp
-    src/ipc_framing.hpp
-    include/middleware/internalserver.h
-    include/middleware/internalclient.h
-    include/middleware/messages.h
+				src/server/internalserver.cpp
+				src/client/internalclient.cpp
+				include/middleware/ipc_framing.hpp
+				include/middleware/internalserver.h
+				include/middleware/internalclient.h
+				include/middleware/messages.h
 )
 
 target_include_directories(middleware PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+				${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_include_directories(middleware PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+				${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(middleware PUBLIC
-    Qt6::Core
-    Qt6::Network
+				Qt6::Core
+				Qt6::Network
 )
 
 set_target_properties(middleware PROPERTIES AUTOMOC ON)
