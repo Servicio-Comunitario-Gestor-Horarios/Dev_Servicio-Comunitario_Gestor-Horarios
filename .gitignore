@@ -9,3 +9,19 @@ docs/timelapses/*.mp4
 .qtcreator/
 .vendor/
 compile_commands.json
+
+# Editors / IDE
+.vscode/
+.idea/
+*.user
+
+# Tooling de agentes
+.agents/
+.claude/
+.atl/
+.codegraph/
+
+# Generados / basura
+__pycache__/
+repomix-output.xml
+Registro.txt
