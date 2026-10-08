@@ -5,8 +5,8 @@
 
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
-#include <middleware/internalclient.h>
-#include <middleware/messages.h>
+#include "../../../middleware/include/middleware/internalclient.h"
+#include "../../../middleware/include/middleware/messages.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -43,15 +43,18 @@ void SubjectListWidget::setupUi() {
     textLayout->setSpacing(4);
 
     QLabel *titulo = new QLabel("Gestión de Asignaturas", this);
+    titulo->setObjectName("SubjectTitle");
     titulo->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
 
     QLabel *subtitulo = new QLabel("Administra las asignaturas y su tipo de aula requerido", this);
+    subtitulo->setObjectName("SubjectSub");
     subtitulo->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
 
     textLayout->addWidget(titulo);
     textLayout->addWidget(subtitulo);
 
     m_registerButton = new QPushButton("+ Registrar Asignatura", this);
+    m_registerButton->setObjectName("SubjectRegBtn");
     m_registerButton->setCursor(Qt::PointingHandCursor);
     m_registerButton->setStyleSheet(
         "QPushButton { background-color: #1e3a8a; color: white; font-weight: 700; "
@@ -65,9 +68,10 @@ void SubjectListWidget::setupUi() {
 
     // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
+    m_table->setObjectName("SubjectTable");
     m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
     m_table->setStyleSheet(
-        "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; }"
+        "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; color: #0f172a; }"
         "QHeaderView::section { background-color: #f8fafc; font-weight: 700; color: #475569; "
         "border: none; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; font-size: 13px; }"
         "QTableWidget::item { border: none; border-bottom: 1px solid #f1f5f9; padding: 10px 20px; color: #0f172a; font-size: 13px; }");
@@ -78,10 +82,8 @@ void SubjectListWidget::setupUi() {
     header->setSectionResizeMode(2, QHeaderView::Fixed);
     m_table->setColumnWidth(2, 260);
 
-    // Alineación inteligente: Nombre y Tipo de aula a la izquierda, Acciones centrada
     header->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
-    // Forzamos específicamente que el título de la columna 3 ("Acciones") quede centrado sobre los botones
     if (auto itemAcciones = m_table->horizontalHeaderItem(2)) {
         itemAcciones->setTextAlignment(Qt::AlignCenter);
     }
@@ -98,6 +100,7 @@ void SubjectListWidget::setupUi() {
     // COLUMNA DERECHA: PANEL LATERAL DE RESUMEN
     // ==========================================
     QFrame *sidePanel = new QFrame(this);
+    sidePanel->setObjectName("SubjectSidePanel");
     sidePanel->setFixedWidth(310);
     sidePanel->setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }");
 
@@ -106,6 +109,7 @@ void SubjectListWidget::setupUi() {
     sideLayout->setSpacing(22);
 
     QLabel *summaryTitle = new QLabel("Controles de Resumen", sidePanel);
+    summaryTitle->setObjectName("SummaryTitle");
     summaryTitle->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
     sideLayout->addWidget(summaryTitle);
 
@@ -113,9 +117,11 @@ void SubjectListWidget::setupUi() {
     occupancyLayout->setAlignment(Qt::AlignVCenter);
 
     QLabel *occLabel = new QLabel("Ocupación de\nAulas:", sidePanel);
+    occLabel->setObjectName("OccLabel");
     occLabel->setStyleSheet("font-size: 13px; color: #475569; border: none; background: transparent; font-weight: 600; line-height: 1.2;");
 
     QLabel *occVal = new QLabel("65%", sidePanel);
+    occVal->setObjectName("OccVal");
     occVal->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
     occVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -125,6 +131,7 @@ void SubjectListWidget::setupUi() {
     sideLayout->addLayout(occupancyLayout);
 
     QProgressBar *progressBar = new QProgressBar(sidePanel);
+    progressBar->setObjectName("SubjectProgressBar");
     progressBar->setValue(65);
     progressBar->setFixedHeight(8);
     progressBar->setTextVisible(false);
@@ -134,26 +141,31 @@ void SubjectListWidget::setupUi() {
     sideLayout->addWidget(progressBar);
 
     QFrame *lineDiv = new QFrame(sidePanel);
+    lineDiv->setObjectName("SubjectLineDiv");
     lineDiv->setFrameShape(QFrame::HLine);
     lineDiv->setStyleSheet("color: #f1f5f9; border: none; background-color: #f1f5f9; max-height: 1px;");
     sideLayout->addWidget(lineDiv);
 
     QLabel *notifTitle = new QLabel("Notificaciones Recientes", sidePanel);
+    notifTitle->setObjectName("NotifTitle");
     notifTitle->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
     sideLayout->addWidget(notifTitle);
 
     auto createNotifItem = [sidePanel](const QString& titleText, const QString& timeText) -> QWidget* {
         QWidget *itemWidget = new QWidget(sidePanel);
+        itemWidget->setObjectName("NotifItemWidget");
         itemWidget->setStyleSheet("background: transparent; border: none;");
         QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
         itemLayout->setContentsMargins(0, 6, 0, 6);
         itemLayout->setSpacing(3);
 
         QLabel *lblTitle = new QLabel(titleText, itemWidget);
+        lblTitle->setObjectName("NotifItemTitle");
         lblTitle->setWordWrap(true);
         lblTitle->setStyleSheet("font-size: 12px; font-weight: 700; color: #1e293b; border: none; background: transparent;");
 
         QLabel *lblTime = new QLabel(timeText, itemWidget);
+        lblTime->setObjectName("NotifItemTime");
         lblTime->setStyleSheet("font-size: 11px; color: #64748b; border: none; background: transparent;");
 
         itemLayout->addWidget(lblTitle);
@@ -172,6 +184,81 @@ void SubjectListWidget::setupUi() {
     connect(m_registerButton, &QPushButton::clicked, this, &SubjectListWidget::abrirFormularioNuevo);
 }
 
+// ==========================================
+// FUNCIÓN PARA ACTUALIZAR EL TEMA EN TIEMPO REAL
+// ==========================================
+void SubjectListWidget::actualizarTema(bool modoOscuro) {
+    if (modoOscuro) {
+        if (auto t = findChild<QLabel*>("SubjectTitle")) t->setStyleSheet("font-size: 24px; font-weight: 800; color: #ffffff; border: none; background: transparent;");
+        if (auto s = findChild<QLabel*>("SubjectSub")) s->setStyleSheet("font-size: 14px; color: #aaaaaa; border: none; background: transparent;");
+        if (auto st = findChild<QLabel*>("SummaryTitle")) st->setStyleSheet("font-size: 15px; font-weight: 800; color: #ffffff; border: none; background: transparent;");
+        if (auto ol = findChild<QLabel*>("OccLabel")) ol->setStyleSheet("font-size: 13px; color: #aaaaaa; border: none; background: transparent; font-weight: 600; line-height: 1.2;");
+        if (auto ov = findChild<QLabel*>("OccVal")) ov->setStyleSheet("font-size: 16px; font-weight: 800; color: #ffffff; border: none; background: transparent;");
+        if (auto nt = findChild<QLabel*>("NotifTitle")) nt->setStyleSheet("font-size: 15px; font-weight: 800; color: #ffffff; border: none; background: transparent;");
+
+        for (QLabel *lbl : findChildren<QLabel*>("NotifItemTitle")) {
+            lbl->setStyleSheet("font-size: 12px; font-weight: 700; color: #ffffff; border: none; background: transparent;");
+        }
+        for (QLabel *lbl : findChildren<QLabel*>("NotifItemTime")) {
+            lbl->setStyleSheet("font-size: 11px; color: #aaaaaa; border: none; background: transparent;");
+        }
+
+        if (auto panel = findChild<QFrame*>("SubjectSidePanel")) {
+            panel->setStyleSheet("QFrame { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; color: white; }");
+        }
+        if (auto line = findChild<QFrame*>("SubjectLineDiv")) {
+            line->setStyleSheet("color: #333333; border: none; background-color: #333333; max-height: 1px;");
+        }
+        if (auto bar = findChild<QProgressBar*>("SubjectProgressBar")) {
+            bar->setStyleSheet("QProgressBar { background-color: #333333; border-radius: 4px; border: none; } QProgressBar::chunk { background-color: #3b82f6; border-radius: 4px; }");
+        }
+
+        if (m_table) {
+            m_table->setStyleSheet(
+                "QTableWidget { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; gridline-color: transparent; outline: none; color: #ffffff; }"
+                "QHeaderView::section { background-color: #252525; font-weight: 700; color: #ffffff; "
+                "border: none; border-bottom: 1px solid #333333; padding: 14px 20px; font-size: 13px; }"
+                "QTableWidget::item { border: none; border-bottom: 1px solid #2a2a2a; padding: 10px 20px; color: #ffffff; font-size: 13px; }");
+        }
+    } else {
+        // Restaurar Tema Claro
+        if (auto t = findChild<QLabel*>("SubjectTitle")) t->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+        if (auto s = findChild<QLabel*>("SubjectSub")) s->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
+        if (auto st = findChild<QLabel*>("SummaryTitle")) st->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+        if (auto ol = findChild<QLabel*>("OccLabel")) ol->setStyleSheet("font-size: 13px; color: #475569; border: none; background: transparent; font-weight: 600; line-height: 1.2;");
+        if (auto ov = findChild<QLabel*>("OccVal")) ov->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+        if (auto nt = findChild<QLabel*>("NotifTitle")) nt->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+
+        for (QLabel *lbl : findChildren<QLabel*>("NotifItemTitle")) {
+            lbl->setStyleSheet("font-size: 12px; font-weight: 700; color: #1e293b; border: none; background: transparent;");
+        }
+        for (QLabel *lbl : findChildren<QLabel*>("NotifItemTime")) {
+            lbl->setStyleSheet("font-size: 11px; color: #64748b; border: none; background: transparent;");
+        }
+
+        if (auto panel = findChild<QFrame*>("SubjectSidePanel")) {
+            panel->setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }");
+        }
+        if (auto line = findChild<QFrame*>("SubjectLineDiv")) {
+            line->setStyleSheet("color: #f1f5f9; border: none; background-color: #f1f5f9; max-height: 1px;");
+        }
+        if (auto bar = findChild<QProgressBar*>("SubjectProgressBar")) {
+            bar->setStyleSheet("QProgressBar { background-color: #e2e8f0; border-radius: 4px; border: none; } QProgressBar::chunk { background-color: #1e3a8a; border-radius: 4px; }");
+        }
+
+        if (m_table) {
+            m_table->setStyleSheet(
+                "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; color: #0f172a; }"
+                "QHeaderView::section { background-color: #f8fafc; font-weight: 700; color: #475569; "
+                "border: none; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; font-size: 13px; }"
+                "QTableWidget::item { border: none; border-bottom: 1px solid #f1f5f9; padding: 10px 20px; color: #0f172a; font-size: 13px; }");
+        }
+    }
+}
+
+// ==========================================
+// RESTO DE MÉTODOS CRUD (Sin cambios)
+// ==========================================
 void SubjectListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
     QString op = respuesta["op"].toString();
     if (op != m_pendiente.op) return;

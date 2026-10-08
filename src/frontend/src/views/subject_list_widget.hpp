@@ -14,6 +14,8 @@ public:
     explicit SubjectListWidget(QWidget *parent = nullptr);
     void setClient(InternalClient* client);
 
+    void actualizarTema(bool modoOscuro); // <--- FUNCIÓN AÑADIDA PARA EL MODO OSCURO
+
 private slots:
     void onRespuestaRecibida(const QJsonObject& respuesta);
     void abrirFormularioNuevo();
