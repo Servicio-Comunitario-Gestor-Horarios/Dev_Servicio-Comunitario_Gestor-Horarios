@@ -61,7 +61,6 @@ struct VariablesTest : public ::testing::Test {
         ProfesorSolverConfig prof;
         prof.nombre = "Ana";
         prof.horas_requeridas = 4;
-        prof.horas_planificacion = 4;
         prof.materias_asignadas = {0};
         prof.materias_suplente = {};
         // Disponibilidad: lunes a viernes, slots 0-5 (mañana)
@@ -262,7 +261,6 @@ TEST_F(VariablesTest, TwoProfessorsSameSubject_BothCreateVariables) {
     ProfesorSolverConfig bob;
     bob.nombre = "Bob";
     bob.horas_requeridas = 4;
-    bob.horas_planificacion = 4;
     bob.materias_asignadas = {0};
     bob.materias_suplente = {};
     for (int d = 0; d < 5; ++d) {
@@ -287,7 +285,6 @@ TEST_F(VariablesTest, TwoProfessorsDifferentAvailability_CorrectPruning) {
     ProfesorSolverConfig bob;
     bob.nombre = "Bob";
     bob.horas_requeridas = 4;
-    bob.horas_planificacion = 4;
     bob.materias_asignadas = {0};
     bob.materias_suplente = {};
     bob.disponibilidad = {{0, {0, 1, 2, 3, 4, 5}}};  // solo lunes

@@ -26,8 +26,10 @@ target_link_libraries(gestor-horarios PRIVATE
     frontend
 )
 
-if(TARGET backend)
-    target_link_libraries(gestor-horarios PRIVATE backend)
+# El solver es lo unico que exige OR-Tools. `backend` (persistencia) llega
+# transitivamente via `frontend` -> `backend`.
+if(TARGET backend_solver)
+    target_link_libraries(gestor-horarios PRIVATE backend_solver)
 endif()
 if(TARGET middleware)
     target_link_libraries(gestor-horarios PRIVATE middleware)

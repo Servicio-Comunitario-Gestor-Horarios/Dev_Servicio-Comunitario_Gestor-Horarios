@@ -20,6 +20,7 @@ target_sources(backend PRIVATE
     src/data/materia.cpp
     src/data/plan_estudio.cpp
     src/data/profesor.cpp
+    src/data/horario_salida.cpp
 
     # Database
     src/database/DatabaseManager.cpp
@@ -34,14 +35,8 @@ target_sources(backend PRIVATE
     src/services/ServicioCargaHoraria.cpp
     src/services/ServicioComposicionPlan.cpp
     src/services/ServicioExportacion.cpp
-
-    # Solver - Issues #25 + #32
-    src/solver/config/solver_config.cpp
-    src/solver/variables.cpp
-    src/solver/solver.cpp
-    src/solver/restricciones/restricciones_turnos.cpp
-    src/solver/restricciones/restricciones_aulas.cpp
-    src/solver/restricciones/restricciones_profesores.cpp
+    src/services/ServicioHorarioSalida.cpp
+    src/services/ServicioConsultaHorario.cpp
 )
 
 target_include_directories(backend PUBLIC
@@ -53,9 +48,35 @@ target_include_directories(backend PRIVATE
 )
 
 target_link_libraries(backend PUBLIC
-    ortools::ortools
     Qt6::Core
     Qt6::Sql
 )
 
 set_project_warnings(backend)
+
+# -- backend_solver: motor CP-SAT --
+add_library(backend_solver STATIC)
+
+target_sources(backend_solver PRIVATE
+    src/solver/config/solver_config.cpp
+    src/solver/variables.cpp
+    src/solver/solver.cpp
+    src/solver/restricciones/restricciones_turnos.cpp
+    src/solver/restricciones/restricciones_aulas.cpp
+    src/solver/restricciones/restricciones_profesores.cpp
+)
+
+target_include_directories(backend_solver PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_include_directories(backend_solver PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(backend_solver PUBLIC
+    ortools::ortools
+    backend
+)
+
+set_project_warnings(backend_solver)
