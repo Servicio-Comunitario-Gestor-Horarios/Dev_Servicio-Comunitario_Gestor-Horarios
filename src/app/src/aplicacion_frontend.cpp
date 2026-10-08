@@ -1,32 +1,39 @@
 #include "app/aplicacion_frontend.hpp"
 #include "app/gestor_proceso_backend.hpp"
-#include <frontend/aplicacion_frontend.hpp>
+#include "logindialog.h"
+#include "views/main_window.hpp"
+#include <QApplication>
 #include <QDebug>
+#include <QMessageBox>
 
-/**
- * @brief Implementación del ciclo de vida del frontend.
- *
- * 1. Crea GestorProcesoBackend que lanza el backend como QProcess.
- * 2. Conecta señales para monitorear estado del backend.
- * 3. Delega en la librería frontend para la UI (login, ventanas).
- * 4. Detiene el backend al salir.
- */
 int ejecutarAplicacionFrontend(int argc, char *argv[])
 {
-    // QApplication ya fue creada en main.cpp
+    Q_UNUSED(argc);
+    Q_UNUSED(argv);
 
+    // 1. Backend como proceso hijo. Arranque asíncrono: los errores
+    //    se manejan por señales, no por valor de retorno.
     GestorProcesoBackend gestor;
-    gestor.iniciar();
 
     QObject::connect(&gestor, &GestorProcesoBackend::backendListo, []() {
-        qDebug() << "Frontend: backend listo";
+        qDebug() << "[frontend] Backend listo";
     });
     QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado, []() {
-        qWarning() << "Frontend: backend no disponible";
+        QMessageBox::critical(nullptr, "Backend",
+                              "El backend dejó de responder.");
     });
 
-    int resultado = ejecutarAplicacionFrontendImpl(argc, argv);
+    gestor.iniciar();
 
-    gestor.detener();
-    return resultado;
+    // 2. Login modal
+    LoginDialog login;
+    if (login.exec() != QDialog::Accepted) {
+        return 1;
+    }
+
+    // 3. Ventana principal
+    MainWindow ventana;
+    ventana.show();
+
+    return QApplication::exec();
 }
