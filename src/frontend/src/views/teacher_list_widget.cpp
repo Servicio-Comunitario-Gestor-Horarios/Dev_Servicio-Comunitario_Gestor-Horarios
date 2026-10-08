@@ -25,19 +25,26 @@ void TeacherListWidget::setupUi() {
 
     // Lado izquierdo: controles y tabla
     QWidget *leftWidget = new QWidget(this);
+    leftWidget->setObjectName("TeacherLeftWidget");
     QVBoxLayout *leftLayout = new QVBoxLayout(leftWidget);
     leftLayout->setContentsMargins(0, 0, 0, 0);
 
     QHBoxLayout *topSectionLayout = new QHBoxLayout();
     QVBoxLayout *textLayout = new QVBoxLayout();
+
     QLabel *titulo = new QLabel("Gestión de Docentes", leftWidget);
+    titulo->setObjectName("TeacherTitle");
     titulo->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827;");
+
     QLabel *subtitulo = new QLabel("Administra la información del personal académico", leftWidget);
+    subtitulo->setObjectName("TeacherSub");
     subtitulo->setStyleSheet("font-size: 14px; color: #6b7280;");
+
     textLayout->addWidget(titulo);
     textLayout->addWidget(subtitulo);
 
     m_registerButton = new QPushButton("+ Registrar Docente", leftWidget);
+    m_registerButton->setObjectName("TeacherRegBtn");
     m_registerButton->setCursor(Qt::PointingHandCursor);
     m_registerButton->setStyleSheet(
         "QPushButton { background-color: #1a237e; color: white; font-weight: bold; "
@@ -49,9 +56,10 @@ void TeacherListWidget::setupUi() {
     topSectionLayout->addWidget(m_registerButton, 0, Qt::AlignVCenter);
 
     m_table = new QTableWidget(0, 6, leftWidget);
+    m_table->setObjectName("TeacherTable");
     m_table->setHorizontalHeaderLabels({"Cédula", "ID", "Nombre", "Email", "Teléfono", "Acciones"});
     m_table->setStyleSheet(
-        "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; }"
+        "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
         "border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
         "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }");
@@ -71,8 +79,9 @@ void TeacherListWidget::setupUi() {
     leftLayout->addSpacing(20);
     leftLayout->addWidget(m_table);
 
-    // Lado derecho: panel de detalles (se mantiene igual que antes)
+    // Lado derecho: panel de detalles
     QFrame *rightPanel = new QFrame(this);
+    rightPanel->setObjectName("TeacherRightPanel");
     rightPanel->setMinimumWidth(320);
     rightPanel->setMaximumWidth(400);
     rightPanel->setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
@@ -82,17 +91,23 @@ void TeacherListWidget::setupUi() {
     rightLayout->setSpacing(15);
 
     QLabel *detalleTitulo = new QLabel("Detalles del Docente", rightPanel);
+    detalleTitulo->setObjectName("DetailTitle");
     detalleTitulo->setStyleSheet("font-size: 18px; font-weight: bold; color: #111827;");
     rightLayout->addWidget(detalleTitulo, 0, Qt::AlignHCenter);
 
     QHBoxLayout *tabsLayout = new QHBoxLayout();
     QLabel *tab1 = new QLabel("Disponibilidad\nHoraria", rightPanel);
+    tab1->setObjectName("TabActive");
     tab1->setAlignment(Qt::AlignCenter);
     tab1->setStyleSheet("font-weight: bold; color: #111827; border-bottom: 3px solid #111827; padding-bottom: 5px;");
+
     QLabel *tab2 = new QLabel("Horas\nPreferidas", rightPanel);
+    tab2->setObjectName("TabInact1");
     tab2->setAlignment(Qt::AlignCenter);
     tab2->setStyleSheet("color: #6b7280;");
+
     QLabel *tab3 = new QLabel("Asignaturas", rightPanel);
+    tab3->setObjectName("TabInact2");
     tab3->setAlignment(Qt::AlignCenter);
     tab3->setStyleSheet("color: #6b7280;");
 
@@ -102,11 +117,12 @@ void TeacherListWidget::setupUi() {
     rightLayout->addLayout(tabsLayout);
 
     QTableWidget *grid = new QTableWidget(12, 5, rightPanel);
+    grid->setObjectName("AvailabilityGrid");
     grid->setHorizontalHeaderLabels({"Lunes", "Martes", "Mierc.", "Jueves", "Viernes"});
     grid->setVerticalHeaderLabels({"7am", "8am", "9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5pm", "6pm"});
     grid->setStyleSheet(
-        "QTableWidget { border: none; gridline-color: white; }"
-        "QHeaderView::section { background-color: white; border: none; font-size: 10px; color: #6b7280; }");
+        "QTableWidget { border: none; gridline-color: white; background-color: transparent; }"
+        "QHeaderView::section { background-color: transparent; border: none; font-size: 10px; color: #6b7280; }");
     grid->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     grid->verticalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     grid->setSelectionMode(QAbstractItemView::NoSelection);
@@ -134,11 +150,14 @@ void TeacherListWidget::setupUi() {
     legendGreen->setFixedSize(16, 10);
     legendGreen->setStyleSheet("background-color: #a7f3d0; border-radius: 2px;");
     QLabel *legendGreenTxt = new QLabel("Available", rightPanel);
+    legendGreenTxt->setObjectName("LegendTxt1");
     legendGreenTxt->setStyleSheet("color: #374151; font-size: 11px;");
+
     QLabel *legendRed = new QLabel(rightPanel);
     legendRed->setFixedSize(16, 10);
     legendRed->setStyleSheet("background-color: #fecaca; border-radius: 2px;");
     QLabel *legendRedTxt = new QLabel("Not Available", rightPanel);
+    legendRedTxt->setObjectName("LegendTxt2");
     legendRedTxt->setStyleSheet("color: #374151; font-size: 11px;");
 
     legendLayout->addStretch();
@@ -151,6 +170,7 @@ void TeacherListWidget::setupUi() {
     rightLayout->addLayout(legendLayout);
 
     QPushButton *manageBtn = new QPushButton("Gestionar Disponibilidad", rightPanel);
+    manageBtn->setObjectName("ManageBtn");
     manageBtn->setStyleSheet("background-color: #111827; color: white; padding: 12px; border-radius: 6px; font-weight: bold;");
     rightLayout->addWidget(manageBtn);
 
@@ -160,6 +180,81 @@ void TeacherListWidget::setupUi() {
     connect(m_registerButton, &QPushButton::clicked, this, &TeacherListWidget::abrirFormularioNuevo);
 }
 
+// ==========================================
+// FUNCIÓN PARA ACTUALIZAR EL TEMA EN TIEMPO REAL
+// ==========================================
+void TeacherListWidget::actualizarTema(bool modoOscuro) {
+    if (modoOscuro) {
+        if (auto t = findChild<QLabel*>("TeacherTitle")) t->setStyleSheet("font-size: 24px; font-weight: bold; color: #ffffff;");
+        if (auto s = findChild<QLabel*>("TeacherSub")) s->setStyleSheet("font-size: 14px; color: #aaaaaa;");
+        if (auto dt = findChild<QLabel*>("DetailTitle")) dt->setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;");
+
+        if (auto t1 = findChild<QLabel*>("TabActive")) t1->setStyleSheet("font-weight: bold; color: #ffffff; border-bottom: 3px solid #ffffff; padding-bottom: 5px;");
+        if (auto t2 = findChild<QLabel*>("TabInact1")) t2->setStyleSheet("color: #aaaaaa;");
+        if (auto t3 = findChild<QLabel*>("TabInact2")) t3->setStyleSheet("color: #aaaaaa;");
+        if (auto l1 = findChild<QLabel*>("LegendTxt1")) l1->setStyleSheet("color: #dddddd; font-size: 11px;");
+        if (auto l2 = findChild<QLabel*>("LegendTxt2")) l2->setStyleSheet("color: #dddddd; font-size: 11px;");
+
+        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) {
+            panel->setStyleSheet("QFrame { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; color: white; }");
+        }
+
+        if (m_table) {
+            m_table->setStyleSheet(
+                "QTableWidget { background-color: #1e1e1e; border-radius: 8px; border: 1px solid #333333; color: #ffffff; }"
+                "QHeaderView::section { background-color: #252525; font-weight: bold; color: #ffffff; "
+                "border: none; border-bottom: 1px solid #333333; padding: 12px; }"
+                "QTableWidget::item { border-bottom: 1px solid #2a2a2a; padding: 5px; color: #ffffff; }");
+        }
+
+        if (auto grid = findChild<QTableWidget*>("AvailabilityGrid")) {
+            grid->setStyleSheet(
+                "QTableWidget { border: none; gridline-color: #333333; background-color: #1e1e1e; color: white; }"
+                "QHeaderView::section { background-color: #252525; border: none; font-size: 10px; color: #aaaaaa; }");
+        }
+
+        if (auto btn = findChild<QPushButton*>("ManageBtn")) {
+            btn->setStyleSheet("background-color: #333333; color: white; padding: 12px; border-radius: 6px; font-weight: bold; border: 1px solid #444444;");
+        }
+    } else {
+        // Restaurar Tema Claro
+        if (auto t = findChild<QLabel*>("TeacherTitle")) t->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827;");
+        if (auto s = findChild<QLabel*>("TeacherSub")) s->setStyleSheet("font-size: 14px; color: #6b7280;");
+        if (auto dt = findChild<QLabel*>("DetailTitle")) dt->setStyleSheet("font-size: 18px; font-weight: bold; color: #111827;");
+
+        if (auto t1 = findChild<QLabel*>("TabActive")) t1->setStyleSheet("font-weight: bold; color: #111827; border-bottom: 3px solid #111827; padding-bottom: 5px;");
+        if (auto t2 = findChild<QLabel*>("TabInact1")) t2->setStyleSheet("color: #6b7280;");
+        if (auto t3 = findChild<QLabel*>("TabInact2")) t3->setStyleSheet("color: #6b7280;");
+        if (auto l1 = findChild<QLabel*>("LegendTxt1")) l1->setStyleSheet("color: #374151; font-size: 11px;");
+        if (auto l2 = findChild<QLabel*>("LegendTxt2")) l2->setStyleSheet("color: #374151; font-size: 11px;");
+
+        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) {
+            panel->setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
+        }
+
+        if (m_table) {
+            m_table->setStyleSheet(
+                "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
+                "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
+                "border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
+                "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }");
+        }
+
+        if (auto grid = findChild<QTableWidget*>("AvailabilityGrid")) {
+            grid->setStyleSheet(
+                "QTableWidget { border: none; gridline-color: white; background-color: transparent; }"
+                "QHeaderView::section { background-color: white; border: none; font-size: 10px; color: #6b7280; }");
+        }
+
+        if (auto btn = findChild<QPushButton*>("ManageBtn")) {
+            btn->setStyleSheet("background-color: #111827; color: white; padding: 12px; border-radius: 6px; font-weight: bold;");
+        }
+    }
+}
+
+// ==========================================
+// RESTO DE MÉTODOS DE LA CLASE (Sin cambios)
+// ==========================================
 void TeacherListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
     QString op = respuesta["op"].toString();
     if (op != m_pendiente.op) return;
@@ -207,7 +302,7 @@ void TeacherListWidget::enviarActualizarProfesor(int fila, const QString& cedula
                                                  const QString& email, const QString& telefono) {
     if (!m_client) return;
     QJsonObject payload;
-    payload["id"] = cedula;          // identificador para el middleware
+    payload["id"] = cedula;
     payload["cedula"] = cedula;
     payload["id_interno"] = id;
     payload["nombre"] = nombre;
@@ -237,7 +332,6 @@ void TeacherListWidget::insertarProfesorEnTabla(const QString& cedula, const QSt
     m_table->setItem(fila, 3, new QTableWidgetItem(email));
     m_table->setItem(fila, 4, new QTableWidgetItem(telefono.isEmpty() ? "N/A" : telefono));
 
-    // Acciones
     QWidget *panelAcciones = new QWidget();
     QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
     layoutAcciones->setContentsMargins(0, 0, 0, 0);

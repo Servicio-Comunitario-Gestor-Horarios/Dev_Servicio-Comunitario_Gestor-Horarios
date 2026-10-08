@@ -43,8 +43,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 
     m_darkModeSwitch = new ToggleSwitch(this);
 
-    // Guardar el estado inicial y configurar el switch
-    m_temaInicial = qApp->styleSheet().contains("background-color: #0f172a");
+    // USAR LA PROPIEDAD GLOBAL REAL EN VEZ DE BUSCAR EN EL STYLESHEET
+    m_temaInicial = qApp->property("isDarkMode").toBool();
     m_darkModeSwitch->setChecked(m_temaInicial);
 
     // CONEXIÓN CLAVE: Al mover el switch, emite la señal al instante
@@ -84,7 +84,10 @@ bool SettingsDialog::isDarkMode() const {
 }
 
 void SettingsDialog::cancelarCambios() {
-    // Si descarta, revertimos el tema al estado original que tenía al abrir la ventana
+    // Si descarta, revertimos el tema al estado original y actualizamos visualmente el switch
     emit themeChanged(m_temaInicial);
+    m_darkModeSwitch->blockSignals(true);
+    m_darkModeSwitch->setChecked(m_temaInicial);
+    m_darkModeSwitch->blockSignals(false);
     reject();
 }

@@ -253,13 +253,17 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     qApp->setProperty("isDarkMode", modoOscuro);
 
     if (modoOscuro) {
-        // === TEMA OSCURO (NEGRO PURO #121212 Y PANELES GRISES #1e1e1e) ===
+        // === TEMA OSCURO GLOBAL (Incluyendo modales y formularios) ===
         qApp->setStyleSheet(
-            // Fondo general negro absoluto
+            // Fondo general y textos
             "QWidget { background-color: #121212; color: #ffffff; }"
 
-            // FORZAR TODOS LOS PANELES, TARJETAS Y TABLAS A GRIS OSCURO (#1e1e1e)
-            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea { background-color: #1e1e1e; border: 1px solid #333333; border-radius: 8px; }"
+            // Paneles, tarjetas, tablas y DIÁLOGOS EMERGENTES en gris oscuro (#1e1e1e)
+            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: #1e1e1e; color: #ffffff; border: 1px solid #333333; border-radius: 8px; }"
+
+            // Cajas de texto y selects en los formularios de registro
+            "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; border-radius: 6px; padding: 6px; }"
+            "QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }"
 
             // Excepciones estructurales de la ventana principal
             "#FondoPrincipal { background-color: #121212; border: none; }"
@@ -267,63 +271,48 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             "#TopHeader { background-color: #121212; border-bottom: 1px solid #333333; border-radius: 0px; }"
             "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
 
-            // Textos legibles en blanco y gris claro
+            // Textos legibles en blanco
             "QLabel { background: transparent; color: #ffffff; border: none; }"
-            "#TituloAcademico, #TituloHorarios, #UserProfileText, #LblEmailMenu { color: #aaaaaa; }"
-            "#LogoLiceo, #LblRoleMenu { color: #ffffff; }"
+            "QHeaderView::section { background-color: #252525; color: #ffffff; border: none; border-bottom: 1px solid #333333; padding: 12px; }"
 
-            // Elementos internos y sub-paneles dentro de las tarjetas
-            "QFrame QWidget { background-color: transparent; color: #ffffff; }"
-
-            // Iconos y Menú desplegable
+            // Menú desplegable
             "#MenuIcono { background: transparent; color: #ffffff; border: none; }"
             "QMenu::item { background-color: transparent; padding: 8px 40px 8px 20px; color: #ffffff; }"
             "QMenu::item:selected { background-color: #333333; }"
             "QMenu::separator { background: #333333; height: 1px; margin: 4px 0px; }"
 
-            // Pestañas (Settings Dialog)
+            // Pestañas
             "QTabWidget::pane { background-color: #1e1e1e; border: 1px solid #333333; border-radius: 4px; }"
             "QTabBar::tab { background: #121212; color: #aaaaaa; border: 1px solid #333333; padding: 8px 16px; }"
             "QTabBar::tab:selected { background: #1e1e1e; color: #ffffff; font-weight: bold; border-bottom: 2px solid #ffffff; }"
             );
     } else {
-        // === TEMA CLARO (BLANCO Y GRIS CLARO ORIGINAL) ===
+        // === TEMA CLARO ORIGINAL ===
         qApp->setStyleSheet(
-            // Fondo general claro
             "QWidget { background-color: #f4f5f7; color: #334155; }"
+            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
+            "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }"
 
-            // PANELES, TARJETAS Y TABLAS EN BLANCO
-            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea { background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; }"
-
-            // Excepciones estructurales
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"
             "#Sidebar { background-color: white; border: none; border-right: 1px solid #e0e0e0; border-radius: 0px; }"
             "#TopHeader { background-color: white; border: none; border-bottom: 1px solid #e0e0e0; border-radius: 0px; }"
             "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
 
-            // Textos legibles
             "QLabel { background: transparent; color: #334155; border: none; }"
-            "#TituloAcademico, #TituloHorarios, #UserProfileText, #LblEmailMenu { color: #6b7280; }"
-            "#LogoLiceo { color: #1a237e; }"
-            "#LblRoleMenu { color: #0f172a; }"
+            "QHeaderView::section { background-color: white; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
 
-            // Elementos internos
-            "QFrame QWidget { background-color: transparent; color: #334155; }"
-
-            // Iconos y Menú
             "#MenuIcono { background: transparent; color: #334155; border: none; }"
             "QMenu::item { background-color: transparent; padding: 8px 40px 8px 20px; color: #1e293b; }"
             "QMenu::item:selected { background-color: #f1f5f9; }"
             "QMenu::separator { background: #e2e8f0; height: 1px; margin: 4px 0px; }"
 
-            // Pestañas
             "QTabWidget::pane { background-color: white; border-top: 1px solid #e2e8f0; border-radius: 0px; }"
             "QTabBar::tab { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 8px 16px; }"
             "QTabBar::tab:selected { background: white; color: #0f172a; font-weight: bold; border-bottom: 2px solid #243c8a; }"
             );
     }
 
-    // Refrescar vista actual
+    // Refrescar vistas
     int index = m_contenedorVistas->currentIndex();
     if (index == 0) mostrarInicio();
     else if (index == 1) mostrarDocentes();
@@ -331,6 +320,19 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     else if (index == 3) mostrarAsignaturas();
     else if (index == 4) mostrarGeneracion();
     else if (index == 5) mostrarVisualizacion();
+
+    if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
+        dashboard->actualizarTema(modoOscuro);
+    }
+    if (auto teachers = qobject_cast<TeacherListWidget*>(m_contenedorVistas->widget(1))) {
+        teachers->actualizarTema(modoOscuro);
+    }
+    if (auto classrooms = qobject_cast<ClassroomListWidget*>(m_contenedorVistas->widget(2))) {
+        classrooms->actualizarTema(modoOscuro);
+    }
+    if (auto subjects = qobject_cast<SubjectListWidget*>(m_contenedorVistas->widget(3))) {
+        subjects->actualizarTema(modoOscuro);
+    }
 }
 
 void MainWindow::abrirConfiguracion() {

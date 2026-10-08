@@ -12,12 +12,16 @@
 #include <QHBoxLayout>
 #include <QGridLayout>
 
+class GaugeWidget; // Declaración adelantada
+
 class DashboardWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit DashboardWidget(QWidget *parent = nullptr);
     ~DashboardWidget();
+
+    void actualizarTema(bool modoOscuro); // <--- FUNCIÓN AÑADIDA PARA CAMBIAR EL TEMA
 
 private slots:
     void mostrarDetalles();
@@ -31,4 +35,5 @@ private:
 
     QPushButton *m_btnVerDetalles;
     QPushButton *m_btnResolverConflictos;
+    GaugeWidget *m_gaugeWidget = nullptr; // <--- Referencia añadida para el medidor
 };
