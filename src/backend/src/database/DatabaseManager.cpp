@@ -1,7 +1,8 @@
 #include "backend/database/DatabaseManager.hpp"
-#include "backend/database/migracion.hpp"
+#include "backend/database/version_esquema.hpp"
 
 #include <QDebug>
+#include <QFile>
 #include <QSqlError>
 #include <QSqlQuery>
 
@@ -22,6 +23,9 @@ bool DatabaseManager::initialize(const QString& dbPath)
 
     m_db.setDatabaseName(dbPath);
 
+    // Se comprueba antes de abrir porque SQLite crea el archivo al abrirlo.
+    const bool existia = QFile::exists(dbPath);
+
     if (!m_db.open())
     {
         qCritical() << "Error abriendo la base de datos:"
@@ -33,7 +37,7 @@ bool DatabaseManager::initialize(const QString& dbPath)
     QSqlQuery pragma(m_db);
     pragma.exec("PRAGMA foreign_keys = ON");
 
-    if (!runMigrations())
+    if (!runMigrations(existia))
     {
         qCritical() << "Error ejecutando migraciones.";
 
@@ -78,7 +82,35 @@ const QSqlDatabase& DatabaseManager::database() const
     return m_db;
 }
 
-bool DatabaseManager::runMigrations()
+bool DatabaseManager::runMigrations(bool existia)
 {
-    return Migracion::runAll(m_db);
+    const int versionArchivo = VersionEsquema::leerVersionEsquema(m_db);
+
+    const VersionEsquema::EstadoApertura decision =
+        VersionEsquema::decidirApertura(existia,
+                                        versionArchivo,
+                                        VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+    switch (decision)
+    {
+        case VersionEsquema::EstadoApertura::Crear:
+        case VersionEsquema::EstadoApertura::Migrar:
+            return VersionEsquema::aplicarHasta(m_db, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+        case VersionEsquema::EstadoApertura::Abrir:
+            return true;
+
+        case VersionEsquema::EstadoApertura::FalloAusente:
+            qCritical() << "La base de datos existe pero su version de esquema esta"
+                           " ausente o no es interpretable (no se migra).";
+            return false;
+
+        case VersionEsquema::EstadoApertura::FalloPosterior:
+            qCritical() << "La base de datos tiene una version de esquema posterior"
+                           " a la esperada:"
+                        << versionArchivo << ">" << VersionEsquema::VERSION_ESQUEMA_ACTUAL;
+            return false;
+    }
+
+    return false;
 }

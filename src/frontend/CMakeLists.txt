@@ -4,7 +4,6 @@ set(CMAKE_AUTORCC ON)
 
 # === FUENTES DEL FRONTEND ===
 set(FRONTEND_SOURCES
-				src/aplicacion_frontend.cpp
 				src/logindialog.cpp
 				src/views/main_window.cpp
 				src/views/teacher_list_widget.cpp
@@ -23,7 +22,6 @@ set(FRONTEND_SOURCES
 
 # === CABECERAS DEL FRONTEND ===
 set(FRONTEND_HEADERS
-				include/frontend/aplicacion_frontend.hpp
 				include/frontend/toggle_switch.hpp
 				src/logindialog.h
 				src/views/main_window.hpp
