@@ -4,16 +4,17 @@
 
 ## Fase actual
 
-- **Fase:** specs + planes + tareas redactados; siguiente fase: implementación
+- **Fase:** implementación en curso — T1 y T2 de 001 hechas
 - **Fecha:** 2026-10-08
-- **Specs en curso:** `specs/001-base-datos-local`, `specs/002-generacion-horarios-ipc`
-- **Siguiente paso:** implementar T1 de `specs/001-base-datos-local` (tests primero)
+- **Rama:** `sdd/001-base-datos-local`
+- **Specs en curso:** `specs/001-base-datos-local` (implementando), `specs/002-generacion-horarios-ipc` (pendiente)
+- **Siguiente paso:** implementar T3 de `specs/001-base-datos-local` (apertura con migración y respaldo obligatorio)
 
 ## Specs activas
 
 | Spec | Estado | Fase |
 |---|---|---|
-| 001-base-datos-local | aprobada | tareas redactadas → implementación |
+| 001-base-datos-local | aprobada | implementando (T1–T2 hechas; siguiente T3) |
 | 002-generacion-horarios-ipc | aprobada | tareas redactadas (depende de 001) |
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
@@ -39,8 +40,15 @@
   - Timeout del proceso de cálculo: **60 s**; salud y apagado: 5 s.
   - Borrado **en cascada con confirmación**, atómico.
   - **`docs/constitution.md` §5 enmendada**: se quitaron "horarios guardados en SQLite" del listado de datos; presets/horarios se gestionan como archivos JSON.
+  - Limpieza de restos de frontend: eliminados `src/frontend/src/main.cpp`, `src/frontend/src/aplicacion_frontend.cpp` y su `.hpp` huérfano, más sus entradas del CMake (rompían `cmake --preset full`); el ejecutable real vive en `src/app`.
 
 ## Siguiente paso
 
-1. Implementar `specs/001-base-datos-local/tasks.md` tarea a tarea (T1 primero): tests rojo → código → tests verde → marcar → parar.
+1. Implementar T3 de `specs/001-base-datos-local` (apertura con migración y respaldo obligatorio), y seguir T4–T10.
 2. Después, `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001).
+
+## Progreso de implementación
+
+- 001: T1 (esquema versionado) ✅, T2 (respaldo) ✅. Tests rojo→verde por tarea.
+- Tests ajenos que fallan (no tocar): `test_servicio_profesor` (trabajo sin commitear), `test_solver_horarios`, `test_solver_benchmark` (solver).
+- Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

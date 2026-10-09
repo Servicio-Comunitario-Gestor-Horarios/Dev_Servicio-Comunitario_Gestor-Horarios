@@ -12,7 +12,7 @@
     - Código: `version_esquema.{hpp,cpp}`; `migracion.cpp` versionado y transaccional (baseline v1 = esquema actual).
     - Hecho cuando: `ctest` pasa el test y una base v1 migra a v2 sin cambios parciales ante fallo simulado.
 
-- [ ] **T2. Respaldo de la base.** RF-1, RF-6
+- [x] **T2. Respaldo de la base.** RF-1, RF-6
     - Tests (rojo): `test/backend/test_respaldo.cpp` — `construirNombreRespaldo` determinista con `ahora`; `crearRespaldo`/`validarRespaldo`/`restaurarRespaldo`; respaldo imposible se reporta como tal.
     - Código: `respaldo.{hpp,cpp}` (`VACUUM INTO`, `integrity_check` + versión).
     - Hecho cuando: `ctest` pasa; un respaldo creado y restaurado reproduce la base y uno corrupto se rechaza.
