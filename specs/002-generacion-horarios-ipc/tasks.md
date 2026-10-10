@@ -16,7 +16,7 @@
     - Código: `CargadorConfiguracionSolver.{hpp,cpp}` (sin base de datos); lectura/escritura de presets.
     - Hecho cuando: `ctest` pasa; la configuración y un preset se guardan y se vuelven a leer como JSON sin tocar la base.
 
-- [ ] **T2. Constructor del JSON de entrada (13 secciones).** RF-1
+- [x] **T2. Constructor del JSON de entrada (13 secciones).** RF-1
     - Tests (rojo): `test/backend/test_constructor_entrada.cpp` — JSON con 13 secciones; `dimensiones` derivadas; `meta.fecha_modificacion` desde `ahora` inyectado.
     - Código: `ConstructorEntradaSolver.{hpp,cpp}` + `construirJsonEntrada` (pura).
     - Hecho cuando: `ctest` pasa; con datos de los 8 dominios y una config JSON se genera un JSON estructuralmente completo.

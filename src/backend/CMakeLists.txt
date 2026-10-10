@@ -52,6 +52,7 @@ target_sources(backend PRIVATE
 				# Configuracion del solver (JSON, sin OR-Tools)
 				src/solver/config/solver_config.cpp
 				src/services/CargadorConfiguracionSolver.cpp
+				src/services/ConstructorEntradaSolver.cpp
 )
 
 target_include_directories(backend PUBLIC
