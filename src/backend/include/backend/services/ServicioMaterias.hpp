@@ -40,8 +40,8 @@ public:
     /** @brief Obtiene una materia por ID. */
     Resultado<MateriaDTO> obtenerMateria(int id) const;
 
-    /** @brief Lista todas las materias. */
-    QVector<MateriaDTO> listarMaterias() const;
+    /** @brief Lista todas las materias. Error y vacío se distinguen. */
+    Resultado<QVector<MateriaDTO>> listarMaterias() const;
 
     /** @brief Actualiza los datos de una materia. */
     Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre, const QString& requisitos = QString());

@@ -84,7 +84,7 @@ private slots:
         m_servicio->crearMateria("Agronomía");
         m_servicio->crearMateria("Botánica");
 
-        auto lista = m_servicio->listarMaterias();
+        auto lista = m_servicio->listarMaterias().valor;
         QCOMPARE(lista.size(), 3);
 
         // Ordenado por nombre

@@ -31,6 +31,11 @@
 #include <QFrame>
 #include <QVariant>
 
+void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
+{
+    m_nucleo = nucleo;
+}
+
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Liceo Nacional Robert Serra - Gestión");
     resize(1280, 720);

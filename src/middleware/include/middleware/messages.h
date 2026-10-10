@@ -52,4 +52,5 @@ inline constexpr int RESP_TIEMPO_AGOTADO = -3;
 inline constexpr int RESP_INVALIDO       = -4;
 inline constexpr int RESP_NO_IMPLEMENTADO = -5;  ///< Reservado
 inline constexpr int RESP_VERSION_INCOMPATIBLE = -6;  ///< 'v' del mensaje no soportada
+inline constexpr int RESP_SIN_SOLUCION   = -7;   ///< El solver no encontró solución factible
 } // namespace Middleware

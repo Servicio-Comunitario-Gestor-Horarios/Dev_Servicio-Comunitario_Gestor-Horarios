@@ -2,8 +2,12 @@
 
 #include <QSqlDatabase>
 
-namespace Migracion {
-    /// Ejecuta todas las migraciones CREATE TABLE IF NOT EXISTS.
-    /// Retorna false si alguna falla, true si todas fueron exitosas.
-    bool runAll(QSqlDatabase& db);
+namespace Migracion
+{
+    /// Aplica el paso de migración correspondiente a `versionDestino`.
+    ///
+    /// Retorna false si esa versión no está implementada o si alguna sentencia
+    /// falla. No gestiona transacciones: las abre y cierra
+    /// `VersionEsquema::aplicarHasta` una por cada versión.
+    bool aplicarPaso(QSqlDatabase& db, int versionDestino);
 }

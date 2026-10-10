@@ -9,12 +9,18 @@ class TeacherListWidget;
 class ClassroomListWidget;
 class SubjectListWidget;
 class ScheduleVisualizationWidget;
+class NucleoDatos;
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+
+    /// Inyecta el núcleo de datos (dominios) del lado cliente. El arranque lo
+    /// construye y lo entrega aquí; la ventana no lo posee. Puede ser `nullptr`
+    /// si el backend de persistencia no está disponible en esta configuración.
+    void setNucleoDatos(NucleoDatos* nucleo);
 
 private slots:
     void mostrarInicio();
@@ -47,4 +53,7 @@ private:
     ClassroomListWidget* m_classroomListWidget = nullptr;
     SubjectListWidget* m_subjectListWidget = nullptr;
     ScheduleVisualizationWidget* m_scheduleVisualizationWidget = nullptr;
+
+    /// Núcleo de datos del cliente, inyectado por el arranque (no lo posee).
+    NucleoDatos* m_nucleo = nullptr;
 };

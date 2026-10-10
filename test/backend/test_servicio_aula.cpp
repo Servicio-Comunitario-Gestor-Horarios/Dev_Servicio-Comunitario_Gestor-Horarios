@@ -91,7 +91,7 @@ private slots:
     }
 
     void listarAulas_vacio() {
-        auto lista = m_servicio->listarAulas();
+        auto lista = m_servicio->listarAulas().valor;
         QVERIFY(lista.isEmpty());
     }
 
@@ -100,7 +100,7 @@ private slots:
         m_servicio->crearAula("Aula A", 25);
         m_servicio->crearAula("Aula M", 30);
 
-        auto lista = m_servicio->listarAulas();
+        auto lista = m_servicio->listarAulas().valor;
         QCOMPARE(lista.size(), 3);
 
         // Debe estar ordenado por nombre

@@ -34,8 +34,9 @@ public:
 
 private:
 
-    /// Ejecuta las migraciones CREATE TABLE IF NOT EXISTS.
-    bool runMigrations();
+    /// Aplica las migraciones versionadas hasta la versión de esquema actual.
+    /// `existia` indica si el archivo ya existía antes de abrir la conexión.
+    bool runMigrations(bool existia);
 
 private:
 

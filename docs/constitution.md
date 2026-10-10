@@ -31,7 +31,8 @@
 
 ## 5. Protección de los datos del usuario
 
-- Los datos del usuario (planes de estudio, docentes, aulas, horarios guardados en SQLite) nunca se borran ni se sobrescriben sin confirmación explícita.
+- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, asignaturas, cursos, turnos, recesos y configuración del solver) nunca se borran ni se sobrescriben sin confirmación explícita.
+- Los presets y los horarios guardados se gestionan como archivos JSON, no como datos de la base de datos; el usuario es dueño de esos archivos.
 - Toda operación destructiva o migración de esquema debe ser reversible o ir acompañada de respaldo.
 - La información sensible no se incluye en logs, dumps ni specs; los fixtures de test usan datos ficticios.
 

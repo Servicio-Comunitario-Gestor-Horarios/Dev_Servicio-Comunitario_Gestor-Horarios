@@ -10,21 +10,10 @@ class InternalClient;
 /**
  * @brief Gestiona el ciclo de vida del proceso backend.
  *
- * Lanza el backend como QProcess hijo (`gestor-horarios --backend`),
- * monitorea su salud mediante health-check periódico por QLocalSocket,
- * y lo reinicia automáticamente en caso de crash con backoff exponencial.
- *
- * ## Flujo de inicio
- * 1. `iniciar()` → lanza QProcess con argumento `--backend`
- * 2. Espera 1.5s a que el backend abra el socket IPC
- * 3. Envía health-check → si responde OK, inicia timer periódico
- * 4. Si no responde, reintenta cada 1.5s
- *
- * ## Flujo de crash recovery
- * 1. QProcess emite `finished(CrashExit)` o health-check timeout
- * 2. Se incrementa contador de reintentos
- * 3. Espera backoff (2s, 4s, 6s) y relanza
- * 4. Si fallan 3 intentos, emite `backendColapsado` definitivo
+ * Lanza el backend como QProcess hijo (`gestor-horarios --backend`), monitorea
+ * su salud mediante health-check periódico por QLocalSocket, y lo detiene de
+ * forma ordenada al cerrar. No reinicia automáticamente tras una caída (fuera de
+ * alcance de la spec 002): un crash se reporta con `backendColapsado`.
  */
 class GestorProcesoBackend : public QObject
 {
@@ -102,14 +91,11 @@ private:
     void lanzarProceso();
 
     // Constantes de configuración
-    static constexpr int MAX_INTENTOS_REINICIO = 3;        ///< Máximo de reintentos tras crash
     static constexpr int INTERVALO_VERIFICACION_MS = 5000; ///< Cada 5s se verifica salud
     static constexpr int ESPERA_INICIAL_MS = 1500;         ///< Espera inicial tras lanzar backend
-    static constexpr int BASE_ESPERA_REINTENTO_MS = 2000;  ///< Backoff base: 2s, 4s, 6s
 
     QProcess *m_proceso = nullptr;                    ///< Proceso backend hijo
     QTimer *m_timerVerificacion = nullptr;              ///< Timer periódico de salud
     InternalClient *m_clienteVerificacion = nullptr;    ///< Cliente IPC para health-check
-    int m_intentosReinicio = 0;                         ///< Contador de reintentos
     QString m_ejecutableBackend;                        ///< Ruta al propio binario
 };
