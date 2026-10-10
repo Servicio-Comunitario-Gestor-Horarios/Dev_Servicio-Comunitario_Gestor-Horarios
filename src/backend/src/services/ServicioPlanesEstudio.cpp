@@ -1,8 +1,12 @@
 #include "backend/services/ServicioPlanesEstudio.hpp"
+#include "backend/services/ordenacion.hpp"
+
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QDebug>
+
+#include <algorithm>
 
 ServicioPlanesEstudio::ServicioPlanesEstudio(QSqlDatabase& db) : m_db(db) {}
 
@@ -101,6 +105,11 @@ Resultado<QVector<PlanDTO>> ServicioPlanesEstudio::listarPlanes() const {
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
+
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const PlanDTO& a, const PlanDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
 
     return Resultado<QVector<PlanDTO>>::exito(resultados);
 }

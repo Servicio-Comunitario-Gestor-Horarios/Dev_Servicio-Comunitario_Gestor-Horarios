@@ -1,4 +1,5 @@
 #include "backend/services/ServicioProfesor.hpp"
+#include "backend/services/ordenacion.hpp"
 
 #include <algorithm>
 #include <QDebug>
@@ -242,11 +243,11 @@ Resultado<QVector<ProfesorDTO>> ServicioProfesor::listarProfesores() const {
         resultados.append(dto);
     }
 
-    // Ordenar en C++ respetando el locale (á, é, í, ñ, ü...)
-    std::sort(resultados.begin(), resultados.end(),
-              [](const ProfesorDTO& a, const ProfesorDTO& b) {
-                  return QString::localeAwareCompare(a.nombre, b.nombre) < 0;
-              });
+    // Orden en español (acentos, ñ y mayúsculas) con QCollator (ver ordenacion.hpp).
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const ProfesorDTO& a, const ProfesorDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
 
     return Resultado<QVector<ProfesorDTO>>::exito(resultados);
 }

@@ -1,8 +1,12 @@
 #include "backend/services/ServicioAula.hpp"
+#include "backend/services/ordenacion.hpp"
+
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QDebug>
+
+#include <algorithm>
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 static constexpr int CAPACIDAD_MINIMA = 1;
@@ -127,6 +131,11 @@ Resultado<QVector<AulaDTO>> ServicioAula::listarAulas() const {
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
+
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const AulaDTO& a, const AulaDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
 
     return Resultado<QVector<AulaDTO>>::exito(resultados);
 }

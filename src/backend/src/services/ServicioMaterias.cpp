@@ -1,8 +1,12 @@
 #include "backend/services/ServicioMaterias.hpp"
+#include "backend/services/ordenacion.hpp"
+
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QDebug>
+
+#include <algorithm>
 
 // ─── MateriaDTO ────────────────────────────────────────────────────────────
 
@@ -124,6 +128,11 @@ Resultado<QVector<MateriaDTO>> ServicioMaterias::listarMaterias() const {
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
+
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const MateriaDTO& a, const MateriaDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
 
     return Resultado<QVector<MateriaDTO>>::exito(resultados);
 }

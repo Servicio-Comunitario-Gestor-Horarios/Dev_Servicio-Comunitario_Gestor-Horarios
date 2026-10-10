@@ -46,11 +46,11 @@
 - **Alcance (2026-10-09):** NO implementamos `src/frontend` (interfaz Qt: vistas, listas, diálogos e indicadores): lo hace **otro equipo**. Nuestros entregables: `src/backend`, `src/app` y `src/middleware`. Exponemos la lógica y el **contrato de consumo** documentado en `docs/interfaz-frontend.md`. Las specs 001/002 y sus planes/tareas se reajustaron (fuera las tareas de frontend; nueva tarea de documentar la interfaz).
 - **Refactor de la base del cliente (2026-10-10):** se extrajo el ciclo de vida de la BD del arranque de la interfaz al módulo nuevo **`src/datos`** (`ContextoBaseDatos`), que abre/migra/respalda y construye el `NucleoDatos`. `src/app` lo crea y lo **inyecta** en `MainWindow` (`setNucleoDatos`); se eliminó el singleton global `nucleoDatosActivo()`. La UI no abre ni instancia la base (RF-2 intacto; el proceso de cálculo sigue sin tocarla). Documentado en `docs/interfaz-frontend.md` §2.7. Nuevo test `test_datos_contexto_base_datos`. Verificado en Docker: 30/33 (mismos 3 rojos conocidos) y `dev-frontend` compila.
 - **Cierre de los huecos de la 001 (spec 003, 2026-10-10):** implementados T1–T5. T1: `Respaldo::descartarBaseYCrearNueva` (respaldo obligatorio antes de descartar la base) + `ResultadoDescarte`. T2: los `listar*` de los seis servicios de dominio y de `NucleoDatos` devuelven `Resultado<QVector<Dto>>` (error ≠ vacío), con call sites de tests actualizados. T3: `AperturaBaseDatos::Opciones::progreso` (callback por paso de migración). T4: el arranque conecta `InstanciaUnica::activarSolicitada()` al enfoque de `MainWindow`. T5: mensajes de respaldo/apertura en español con causa y acciones (sin texto crudo de Qt). Contrato actualizado en `docs/interfaz-frontend.md` §2.1/§2.3/§2.4/§2.6. Verificado en Docker: 30/33 (mismos 3 rojos ajenos).
+- **Ordenamiento con acentos (2026-10-10):** los `listar*` de dominio ordenan con `QCollator` (`QLocale(es_ES)`, `CaseInsensitive`) vía el helper `backend/services/ordenacion.hpp`, en vez del orden binario de SQLite o `QString::localeAwareCompare` (que con locale POSIX degradaba a codepoint: «Á» tras «Z»). Sin dependencia nueva: `QCollator` ∈ Qt6Core (ya enlazado por el ejecutable; `ldd` sin cambios). `test_servicio_profesor` en verde, con el nuevo caso `listarProfesores_ordenConAcentosYMayusculas`.
 
 ## Siguiente paso
 
-1. **Deuda técnica pendiente (ajena a las specs 001–003):** arreglar el ordenamiento de
-   `ServicioProfesor` (`test_servicio_profesor` en rojo por acentos) y los 2 tests del solver
+1. **Deuda técnica pendiente (ajena a las specs 001–003):** los 2 tests del solver
    (`test_solver_horarios`, `test_solver_benchmark`).
 2. **Cableado de `ServicioGeneracion` con el cliente IPC real** (adaptador `PuertoSolver`) en
    `src/app`/`src/frontend`: la lógica está lista y testeada; el consumo UI↔IPC lo hace el equipo de
@@ -75,5 +75,5 @@
   - **T7 completa** ✅ (`servicio_solver`/`resolverEntradaSolver` en `backend_solver`; `aplicacion_backend` registra `solver_resolve`; `GestorProcesoBackend` sin reinicio automático). Test `test_ipc_aislamiento_bd` (no abre BD, rechaza ops de negocio).
   - **T8 completa** ✅ (contrato de `ServicioHorarioSalida` fijado con `test_archivos_horario`: round-trip JSON y fallo de escritura sin perder el contenido).
   - **T9 completa** ✅ (`docs/interfaz-frontend.md` §3 completa: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, proceso `--backend`/salud) + `test_contrato_generacion`. **Spec 002 implementada.**
-- Tests ajenos que fallan (no tocar): `test_servicio_profesor` (ordenamiento pendiente), `test_solver_horarios`, `test_solver_benchmark` (solver).
+- Tests ajenos que fallan (no tocar): `test_solver_horarios`, `test_solver_benchmark` (solver). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

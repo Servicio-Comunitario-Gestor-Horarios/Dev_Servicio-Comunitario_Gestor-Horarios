@@ -171,6 +171,26 @@ private slots:
         QVERIFY(lista.isEmpty());
     }
 
+    void listarProfesores_ordenConAcentosYMayusculas() {
+        QVERIFY(m_servicio->crearProfesor("P-1", "Zapata", "z@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-2", QString::fromUtf8("Álvarez"), "a@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-3", QString::fromUtf8("Martínez"), "m@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-4", QString::fromUtf8("Muñoz"), "n@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-5", "Muro", "r@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-6", "ana", "x@uni.edu").ok);
+
+        const auto lista = m_servicio->listarProfesores();
+        QVERIFY(lista.ok);
+        QCOMPARE(lista.valor.size(), 6);
+        // Orden español: acentos, mayúsculas y ñ (Muñoz antes que Muro).
+        QCOMPARE(lista.valor[0].nombre, QString::fromUtf8("Álvarez"));
+        QCOMPARE(lista.valor[1].nombre, QString("ana"));
+        QCOMPARE(lista.valor[2].nombre, QString::fromUtf8("Martínez"));
+        QCOMPARE(lista.valor[3].nombre, QString::fromUtf8("Muñoz"));
+        QCOMPARE(lista.valor[4].nombre, QString("Muro"));
+        QCOMPARE(lista.valor[5].nombre, QString("Zapata"));
+    }
+
     // ─── actualizarProfesor ─────────────────────────────────────────────────
 
     void actualizarProfesor_exitoso() {

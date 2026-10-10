@@ -1,9 +1,12 @@
 #include "backend/services/ServicioCursos.hpp"
+#include "backend/services/ordenacion.hpp"
 
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariant>
+
+#include <algorithm>
 
 ServicioCursos::ServicioCursos(QSqlDatabase& db) : m_db(db) {}
 
@@ -156,6 +159,11 @@ Resultado<QVector<CursoDTO>> ServicioCursos::listarCursos() const {
         cargarMaterias(dto);
         resultados.append(dto);
     }
+
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const CursoDTO& a, const CursoDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
 
     return Resultado<QVector<CursoDTO>>::exito(resultados);
 }
