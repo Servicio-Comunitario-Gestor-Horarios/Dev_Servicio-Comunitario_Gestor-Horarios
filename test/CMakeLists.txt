@@ -65,6 +65,7 @@ if(TARGET backend)
 	add_qtest(test_backend_entity_graph backend/test_entity_graph.cpp backend)
 	add_qtest(test_cargador_configuracion backend/test_cargador_configuracion.cpp backend)
 	add_qtest(test_constructor_entrada backend/test_constructor_entrada.cpp backend)
+	add_qtest(test_validador_entrada backend/test_validador_entrada.cpp backend)
 
 	add_qtest(test_servicio_aula backend/test_servicio_aula.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_materias backend/test_servicio_materias.cpp backend Qt6::Sql)

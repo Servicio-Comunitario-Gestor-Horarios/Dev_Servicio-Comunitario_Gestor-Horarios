@@ -21,7 +21,7 @@
     - Código: `ConstructorEntradaSolver.{hpp,cpp}` + `construirJsonEntrada` (pura).
     - Hecho cuando: `ctest` pasa; con datos de los 8 dominios y una config JSON se genera un JSON estructuralmente completo.
 
-- [ ] **T3. Validación previa V1–V12.** RF-1
+- [x] **T3. Validación previa V1–V12.** RF-1
     - Tests (rojo): `test/backend/test_validador_entrada.cpp` — sin materias/profesores o curso con 0 estudiantes → error y no envía; JSON válido → pasa.
     - Código: `validarEntradaSolver` sobre `SolverConfig::fromJson`.
     - Hecho cuando: `ctest` pasa; cada regla V1–V12 tiene su caso y el fallo muestra el motivo.

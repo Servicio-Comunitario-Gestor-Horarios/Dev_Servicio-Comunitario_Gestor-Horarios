@@ -65,5 +65,6 @@
     `estadoPendienteDe` (verde).
 - 002: **T1 completa** ✅ (`CargadorConfiguracionSolver` + `SolverConfig::toJson`); `solver_config` movido al target `backend` (sin OR-Tools). Test `test_cargador_configuracion` (verde).
   - **T2 completa** ✅ (`ConstructorEntradaSolver`/`construirJsonEntrada` + `DatosDominio`). Decisión de contrato: el JSON de entrada sigue el `SolverConfig` **implementado** (12 secciones) + `meta` (extra que `fromJson` ignora); la BD aporta entidades y el preset los parámetros del solver (horas por docente casadas por nombre). Test `test_constructor_entrada`. Divergencia con `docs/solver/Motor-Solver-Plan-Completo.md` §3 anotada.
+  - **T3 completa** ✅ (`ValidadorEntradaSolver`/`validarEntradaSolver`, envoltura de `SolverConfig::fromJson` con V1–V13). Test `test_validador_entrada` (un caso por regla).
 - Tests ajenos que fallan (no tocar): `test_servicio_profesor` (ordenamiento pendiente), `test_solver_horarios`, `test_solver_benchmark` (solver).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

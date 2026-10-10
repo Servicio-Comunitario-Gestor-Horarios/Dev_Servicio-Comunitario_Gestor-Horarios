@@ -53,6 +53,7 @@ target_sources(backend PRIVATE
 				src/solver/config/solver_config.cpp
 				src/services/CargadorConfiguracionSolver.cpp
 				src/services/ConstructorEntradaSolver.cpp
+				src/services/ValidadorEntradaSolver.cpp
 )
 
 target_include_directories(backend PUBLIC
