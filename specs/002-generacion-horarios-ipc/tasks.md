@@ -41,7 +41,7 @@
     - Código: `internalclient.cpp` (estado del socket), `messages.h`, `internalserver.cpp`.
     - Hecho cuando: `ctest` pasa; dos operaciones seguidas no disparan reconexiones espurias.
 
-- [ ] **T7. Modo `--backend`: resolver sin base de datos.** RF-1, RF-2
+- [x] **T7. Modo `--backend`: resolver sin base de datos.** RF-1, RF-2
     - Tests (rojo): `test/test_ipc_aislamiento_bd.cpp` — el proceso de cálculo arranca y resuelve sin crear ni abrir archivo de base; rechaza operaciones de negocio.
     - Código: `aplicacion_backend.cpp` (ruta `solver_resolve`), `gestor_proceso_backend.cpp` (salud 5 s y apagado ordenado).
     - Hecho cuando: `ctest --preset full` (Docker, OR-Tools) pasa; no se abre ningún archivo de base en el proceso de cálculo.

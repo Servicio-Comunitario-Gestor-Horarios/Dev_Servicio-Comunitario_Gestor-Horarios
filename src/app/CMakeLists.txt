@@ -57,6 +57,7 @@ target_link_libraries(gestor-horarios PRIVATE
 # transitivamente vía `frontend` -> `backend`.
 if(TARGET backend_solver)
 	target_link_libraries(gestor-horarios PRIVATE backend_solver)
+	target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_SOLVER=1)
 endif()
 if(TARGET middleware)
 	target_link_libraries(gestor-horarios PRIVATE middleware)

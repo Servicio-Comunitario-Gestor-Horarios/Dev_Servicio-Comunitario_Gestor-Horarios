@@ -48,7 +48,6 @@ void GestorProcesoBackend::iniciar()
         qDebug() << "GestorProcesoBackend: backend ya está en ejecución";
         return;
     }
-    m_intentosReinicio = 0;
     lanzarProceso();
 }
 
@@ -132,10 +131,8 @@ void GestorProcesoBackend::alIniciarProceso()
 /**
  * @brief Callback cuando el proceso backend termina.
  *
- * Si la terminación fue por crash (CrashExit), intenta reiniciar
- * con backoff exponencial (2s, 4s, 6s) hasta MAX_INTENTOS_REINICIO.
- *
- * Si la terminación fue normal, solo registra el evento.
+ * No se reinicia automáticamente (fuera de alcance de la spec 002). Un crash
+ * se reporta con `backendColapsado`; una terminación normal solo se registra.
  */
 void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus estado)
 {
@@ -144,17 +141,6 @@ void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus e
     if (estado == QProcess::CrashExit) {
         qWarning() << "GestorProcesoBackend: backend COLAPSÓ con código" << codigo;
         emit backendColapsado();
-
-        if (m_intentosReinicio < MAX_INTENTOS_REINICIO) {
-            m_intentosReinicio++;
-            int espera = BASE_ESPERA_REINTENTO_MS * m_intentosReinicio;
-            qDebug() << "GestorProcesoBackend: reintento" << m_intentosReinicio
-                     << "de" << MAX_INTENTOS_REINICIO << "en" << espera << "ms";
-            emit backendReiniciando(m_intentosReinicio);
-            QTimer::singleShot(espera, this, &GestorProcesoBackend::lanzarProceso);
-        } else {
-            qCritical() << "GestorProcesoBackend: máximo de reintentos alcanzado";
-        }
     } else {
         qDebug() << "GestorProcesoBackend: backend terminó normalmente, código" << codigo;
     }

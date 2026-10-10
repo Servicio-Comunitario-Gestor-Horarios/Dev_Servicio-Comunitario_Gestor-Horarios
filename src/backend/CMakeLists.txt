@@ -83,6 +83,7 @@ add_library(backend_solver STATIC)
 target_sources(backend_solver PRIVATE
 				src/solver/variables.cpp
 				src/solver/solver.cpp
+				src/solver/servicio_solver.cpp
 				src/solver/restricciones/restricciones_turnos.cpp
 				src/solver/restricciones/restricciones_aulas.cpp
 				src/solver/restricciones/restricciones_profesores.cpp
