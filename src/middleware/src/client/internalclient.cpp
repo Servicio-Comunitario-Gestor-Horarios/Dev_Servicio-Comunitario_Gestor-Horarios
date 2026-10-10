@@ -36,6 +36,7 @@ void InternalClient::enviarSolicitud(const QString &op, const QJsonObject &paylo
         return;
 
     qDebug() << "Cliente: Conectando al servidor IPC para operación:" << op;
+    ++m_intentosConexion;
     m_socket->connectToServer(Middleware::SERVER_NAME);
 }
 

@@ -30,6 +30,14 @@ public:
     Q_INVOKABLE void enviarSolicitud(const QString &op,
                                      const QJsonObject &payload = QJsonObject());
 
+    /**
+     * @brief Nº de veces que el cliente intentó (re)conectar el socket.
+     *
+     * Permite verificar que operaciones seguidas reutilizan la conexión y no
+     * disparan una tormenta de reconexiones (F-CRASH1).
+     */
+    int intentosConexion() const { return m_intentosConexion; }
+
 signals:
     void healthCheckResponseReceived(bool exitoso);
     void respuestaRecibida(const QJsonObject &respuesta);
@@ -45,6 +53,7 @@ private:
     QQueue<QPair<QString, QJsonObject>> m_cola;  ///< peticiones pendientes (FIFO)
     QString    m_operacionEnVuelo;               ///< op esperando respuesta
     QByteArray m_buffer;                         ///< resto sin frame completo
+    int        m_intentosConexion = 0;           ///< (re)conexiones intentadas
 
     void enviarSiguiente();
 };

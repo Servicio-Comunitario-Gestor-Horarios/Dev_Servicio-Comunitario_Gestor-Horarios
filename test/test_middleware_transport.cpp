@@ -70,6 +70,8 @@ private slots:
     void clienteEncola();
     void servidorSerializa();
     void timeout();
+    void solverResolveRoute();
+    void dosOperacionesReutilizanLaConexion();
 };
 
 void TestMiddlewareTransport::initTestCase()
@@ -337,6 +339,45 @@ void TestMiddlewareTransport::timeout()
     QCOMPARE(spy.count(), 1);
 
     m_server->setTimeoutMs(5000);
+}
+
+void TestMiddlewareTransport::solverResolveRoute()
+{
+    // La ruta del solver la registra `app`; aquí se verifica que el transporte la
+    // soporta de extremo a extremo (RF-1, RF-2).
+    m_server->registerRoute(Middleware::OP_RESOLVER_HORARIO,
+        [this](const QJsonObject& p, QLocalSocket* s) {
+            m_server->responder(s, Middleware::RESP_EXITO, p);
+        });
+
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+
+    QJsonObject entrada;
+    entrada["version"] = QStringLiteral("1.0");
+    client.enviarSolicitud(Middleware::OP_RESOLVER_HORARIO, entrada);
+    QVERIFY(spy.wait(3000));
+
+    const QJsonObject r = spy.at(0).at(0).toJsonObject();
+    QCOMPARE(r["op"].toString(), Middleware::OP_RESOLVER_HORARIO);
+    QCOMPARE(r["status"].toString(), QString("ok"));
+    QCOMPARE(r["data"].toObject()["version"].toString(), QStringLiteral("1.0"));
+}
+
+void TestMiddlewareTransport::dosOperacionesReutilizanLaConexion()
+{
+    // F-CRASH1: dos operaciones seguidas no deben disparar reconexiones.
+    InternalClient client;
+    QSignalSpy spy(&client, &InternalClient::respuestaRecibida);
+
+    client.enviarSolicitud(Middleware::OP_HEALTH_CHECK);
+    QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 3000);
+
+    client.enviarSolicitud(Middleware::OP_LISTO);
+    QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 2, 3000);
+
+    // Una sola conexión para las dos operaciones.
+    QCOMPARE(client.intentosConexion(), 1);
 }
 
 QTEST_MAIN(TestMiddlewareTransport)

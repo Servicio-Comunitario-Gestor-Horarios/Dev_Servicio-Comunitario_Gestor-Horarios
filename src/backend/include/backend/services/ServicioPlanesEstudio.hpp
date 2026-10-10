@@ -34,8 +34,8 @@ public:
     /** @brief Obtiene un plan por su código. */
     Resultado<PlanDTO> obtenerPlan(const QString& codigo) const;
 
-    /** @brief Lista todos los planes de estudio. */
-    QVector<PlanDTO> listarPlanes() const;
+    /** @brief Lista todos los planes de estudio. Error y vacío se distinguen. */
+    Resultado<QVector<PlanDTO>> listarPlanes() const;
 
     /** @brief Actualiza los datos de un plan. */
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,

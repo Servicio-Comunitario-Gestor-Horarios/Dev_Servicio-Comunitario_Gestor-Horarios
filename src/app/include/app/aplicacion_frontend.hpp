@@ -7,15 +7,25 @@
  * Inicializa la interfaz gráfica y el gestor de proceso backend.
  */
 
+class InstanciaUnica;
+
 /**
  * @brief Ejecuta la aplicación en modo frontend.
  *
- * Crea el GestorProcesoBackend para lanzar el backend como proceso hijo,
- * conecta las señales de monitoreo y delega en la librería frontend
- * para mostrar la interfaz gráfica (LoginDialog, MainWindow).
+ * Compone el arranque del cliente: crea el contexto de base de datos
+ * (`ContextoBaseDatos`, que abre/migra/respalda y construye el `NucleoDatos`),
+ * inyecta el núcleo de datos en la ventana principal, lanza el backend como
+ * proceso hijo y muestra la interfaz gráfica (LoginDialog, MainWindow).
+ *
+ * El ciclo de vida de la base ya no vive aquí: lo encapsula el módulo `datos`,
+ * y la interfaz lo recibe por inyección (sin singleton global).
+ *
+ * La instancia única se comprueba antes, en `main.cpp`.
  *
  * @param argc Número de argumentos de línea de comandos.
  * @param argv Arreglo de argumentos de línea de comandos.
+ * @param instanciaUnica Detector de instancia única ya iniciado (RF-5). Si no es
+ *        nulo, se conecta su señal `activarSolicitada()` al enfoque de la ventana.
  * @return Código de salida de la aplicación (0 = éxito).
  */
-int ejecutarAplicacionFrontend(int argc, char *argv[]);
+int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica = nullptr);

@@ -1,10 +1,14 @@
 #include <QCoreApplication>
 #include <QApplication>
+#include <QMessageBox>
 #include <cstring>
 #include <cstdio>
 
+#include "app/instancia_unica.hpp"
+
 // Declaraciones de los módulos de aplicación
-int ejecutarAplicacionFrontend(int argc, char *argv[]);
+class InstanciaUnica;
+int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica);
 int ejecutarAplicacionBackend(int argc, char *argv[]);
 
 /**
@@ -44,5 +48,31 @@ int main(int argc, char *argv[])
 
     // Modo frontend (default): UI + lanzamiento automático del backend
     QApplication app(argc, argv);
-    return ejecutarAplicacionFrontend(argc, argv);
+
+    // Instancia única (RF-5): la detección se activa antes de abrir la base de
+    // datos y permanece viva durante todo el arranque (migración y diálogos).
+    InstanciaUnica instanciaUnica;
+    const InstanciaUnica::Resultado arranque = instanciaUnica.iniciar();
+
+    if (arranque == InstanciaUnica::Resultado::Secundaria)
+    {
+        // Ya se enfocó la instancia existente: no se abre una segunda sesión.
+        return 0;
+    }
+
+    if (arranque == InstanciaUnica::Resultado::SinAcuse)
+    {
+        QMessageBox::warning(
+            nullptr, QObject::tr("Instancia ya en ejecución"),
+            instanciaUnica.detalle().isEmpty()
+                ? QObject::tr("No se pudo enfocar la instancia existente; no se"
+                              " iniciará una segunda sesión.")
+                : instanciaUnica.detalle());
+        return 2;
+    }
+
+    // Somos la instancia principal: continuar el arranque del cliente (base de
+    // datos y núcleo de datos), delegado en `ejecutarAplicacionFrontend`, al que
+    // se le pasa el detector para enfocar la ventana si otra instancia lo pide.
+    return ejecutarAplicacionFrontend(argc, argv, &instanciaUnica);
 }

@@ -1,8 +1,12 @@
 #include "backend/services/ServicioMaterias.hpp"
+#include "backend/services/ordenacion.hpp"
+
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QDebug>
+
+#include <algorithm>
 
 // ─── MateriaDTO ────────────────────────────────────────────────────────────
 
@@ -108,7 +112,7 @@ Resultado<MateriaDTO> ServicioMaterias::obtenerMateria(int id) const {
     return Resultado<MateriaDTO>::exito(mapearARecord(query.record()));
 }
 
-QVector<MateriaDTO> ServicioMaterias::listarMaterias() const {
+Resultado<QVector<MateriaDTO>> ServicioMaterias::listarMaterias() const {
     QVector<MateriaDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -116,14 +120,21 @@ QVector<MateriaDTO> ServicioMaterias::listarMaterias() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar materias:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<MateriaDTO>>::error(
+            QStringLiteral("No se pudieron leer las materias registradas. Compruebe que la base de"
+                           " datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
 
-    return resultados;
+    std::stable_sort(resultados.begin(), resultados.end(),
+                     [](const MateriaDTO& a, const MateriaDTO& b) {
+                         return nombreAntes(a.nombre, b.nombre);
+                     });
+
+    return Resultado<QVector<MateriaDTO>>::exito(resultados);
 }
 
 Resultado<MateriaDTO> ServicioMaterias::actualizarMateria(int id, const QString& nombre, const QString& requisitos) {
@@ -198,9 +209,15 @@ bool ServicioMaterias::eliminarMateria(int id) {
 
 QVector<Materia> ServicioMaterias::obtenerTodasParaSolver() const {
     QVector<Materia> materias;
-    auto dtoList = listarMaterias();
+    const auto dtoResultado = listarMaterias();
 
-    for (const auto& dto : dtoList) {
+    if (!dtoResultado.ok) {
+        qCritical() << "No se pudieron leer las materias para el solver:"
+                    << dtoResultado.mensajeError;
+        return materias;
+    }
+
+    for (const auto& dto : dtoResultado.valor) {
         materias.append(dto.toMateria(0));
     }
 
