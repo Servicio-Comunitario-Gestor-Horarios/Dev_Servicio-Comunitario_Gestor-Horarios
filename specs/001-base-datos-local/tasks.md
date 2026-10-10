@@ -17,7 +17,7 @@
     - Código: `respaldo.{hpp,cpp}` (`VACUUM INTO`, `integrity_check` + versión).
     - Hecho cuando: `ctest` pasa; un respaldo creado y restaurado reproduce la base y uno corrupto se rechaza.
 
-- [ ] **T3. Apertura con migración y respaldo obligatorio.** RF-1, RF-4
+- [x] **T3. Apertura con migración y respaldo obligatorio.** RF-1, RF-4
     - Tests (rojo): `test/backend/test_apertura_base_datos.cpp` — inexistente → crea; ausente/posterior → fallo; migración exige respaldo; sin respaldo → fallo; migración fallida → estado conocido.
     - Código: `apertura_base_datos.{hpp,cpp}`; `DatabaseManager` delega versión/migración.
     - Hecho cuando: `ctest` pasa y ninguna rama aplica cambios parciales.

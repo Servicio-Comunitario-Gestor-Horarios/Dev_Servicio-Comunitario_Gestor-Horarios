@@ -27,6 +27,7 @@ target_sources(backend PRIVATE
 				src/database/migracion.cpp
 				src/database/version_esquema.cpp
 				src/database/respaldo.cpp
+				src/database/apertura_base_datos.cpp
 
 				# Services - Issue #23 (Aulas)
 				src/services/ServicioAula.cpp
