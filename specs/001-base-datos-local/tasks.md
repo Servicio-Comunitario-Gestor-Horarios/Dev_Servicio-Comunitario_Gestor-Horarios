@@ -35,7 +35,7 @@
     - Código: consulta de dependientes en `ServicioMaterias/Profesor/PlanesEstudio/Aula` + `eliminarConCascada` en `NucleoDatos`.
     - Hecho cuando: `ctest` pasa; un fallo a mitad de cascada no deja ninguna parte aplicada.
 
-- [ ] **T6. Cambios pendientes y reintento.** RF-3, RNF-3, RNF-4
+- [x] **T6. Cambios pendientes y reintento.** RF-3, RNF-3, RNF-4
     - Tests (rojo): `test/backend/test_gestor_pendientes.cpp` — estado guardado/pendiente-guardar/pendiente-eliminar; reintento con éxito y sin éxito; sin perder de pantalla.
     - Código: `GestorPendientes.{hpp,cpp}` + `estadoPendienteDe` (pura); consulta de pendientes que consumirá la guardia de cierre.
     - Hecho cuando: `ctest` pasa; tras fallo de escritura el registro queda pendiente y el reintento lo guarda.

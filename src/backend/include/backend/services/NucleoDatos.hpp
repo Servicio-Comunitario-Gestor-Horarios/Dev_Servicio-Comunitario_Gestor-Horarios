@@ -16,6 +16,7 @@
 #include <QVector>
 
 #include "backend/resultado.hpp"
+#include "backend/services/GestorPendientes.hpp"
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
@@ -115,6 +116,22 @@ public:
      */
     bool eliminarConCascada(const QString& dominio, const QString& id);
 
+    // ─── Cambios pendientes y reintento (RF-3, RNF-3, RNF-4) ──────────────
+
+    /// Gestor de cambios pendientes: estado por registro y guardia de cierre.
+    GestorPendientes& gestorPendientes();
+    const GestorPendientes& gestorPendientes() const;
+
+    /// Indica si hay cambios pendientes de reintento (guardia de cierre, RF-6).
+    bool hayPendientes() const;
+
+    /**
+     * @brief Reintenta el cambio pendiente `id`.
+     *
+     * Si tiene éxito, deja de estar pendiente; si vuelve a fallar, se conserva.
+     */
+    Resultado<bool> reintentarPendiente(qint64 id);
+
 private:
     QSqlDatabase& m_db;
 
@@ -131,4 +148,7 @@ private:
     ServicioPlanesEstudio m_planes;
     ServicioCursos m_cursos;
     ServicioTurnosRecesos m_turnos;
+
+    /// Estado en memoria de las escrituras fallidas pendientes de reintento.
+    GestorPendientes m_pendientes;
 };
