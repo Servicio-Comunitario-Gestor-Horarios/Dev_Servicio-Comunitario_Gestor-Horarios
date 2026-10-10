@@ -108,6 +108,62 @@ namespace
 
         return true;
     }
+
+    /// Migración v2: dominios de curso, turnos y recesos (RF-2).
+    bool aplicarV2(QSqlDatabase& db)
+    {
+        QSqlQuery query(db);
+
+        // ── Turnos ──
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Turnos ("
+            "nombre TEXT PRIMARY KEY,"
+            "inicio TEXT NOT NULL,"
+            "fin TEXT NOT NULL,"
+            "slots INTEGER NOT NULL CHECK(slots > 0),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        // ── Recesos (un receso pertenece a un turno) ──
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Recesos ("
+            "turno TEXT NOT NULL REFERENCES Turnos(nombre),"
+            "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 0),"
+            "duracion INTEGER NOT NULL CHECK(duracion > 0),"
+            "inicio TEXT,"
+            "fin TEXT,"
+            "PRIMARY KEY (turno, despues_de_slot)"
+            ")"
+        )) return false;
+
+        // ── Cursos ──
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Cursos ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "nombre TEXT NOT NULL UNIQUE,"
+            "turno TEXT,"
+            "aula_fija INTEGER,"
+            "num_estudiantes INTEGER NOT NULL DEFAULT 0 CHECK(num_estudiantes >= 0),"
+            "codigo_plan TEXT REFERENCES PlanEstudio(codigo),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        // ── Curso-Materia (N:M con horas semanales) ──
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Curso_Materia ("
+            "id_Curso INTEGER NOT NULL REFERENCES Cursos(id),"
+            "id_Materia INTEGER NOT NULL REFERENCES Materias(id),"
+            "horas_semanales INTEGER NOT NULL DEFAULT 0 CHECK(horas_semanales >= 0),"
+            "PRIMARY KEY (id_Curso, id_Materia)"
+            ")"
+        )) return false;
+
+        return true;
+    }
 } // namespace
 
 bool Migracion::aplicarPaso(QSqlDatabase& db, int versionDestino)
@@ -116,6 +172,9 @@ bool Migracion::aplicarPaso(QSqlDatabase& db, int versionDestino)
     {
         case 1:
             return aplicarV1(db);
+
+        case 2:
+            return aplicarV2(db);
 
         default:
             qCritical() << "Migracion no implementada para la version" << versionDestino;

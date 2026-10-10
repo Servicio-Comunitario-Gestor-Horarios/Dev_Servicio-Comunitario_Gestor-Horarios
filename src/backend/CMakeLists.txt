@@ -41,6 +41,11 @@ target_sources(backend PRIVATE
 				src/services/ServicioHorarioSalida.cpp
 				src/services/ServicioConsultaHorario.cpp
 				src/services/ServicioProfesor.cpp
+
+				# Services - Nucleo de datos (Cursos, Turnos/Recesos y fachada)
+				src/services/ServicioCursos.cpp
+				src/services/ServicioTurnosRecesos.cpp
+				src/services/NucleoDatos.cpp
 )
 
 target_include_directories(backend PUBLIC

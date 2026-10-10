@@ -8,12 +8,13 @@
 ///
 /// La versión de esquema se guarda en `PRAGMA user_version` de SQLite.
 /// `0` significa versión ausente o no interpretable y se trata como fallo de
-/// apertura (no se migra). El esquema actual corresponde a la versión 1.
+/// apertura (no se migra). El esquema actual corresponde a la versión 2.
 namespace VersionEsquema
 {
     /// Versión de esquema que espera esta compilación de la aplicación.
-    /// El esquema actual es la v1; la v2 se añadirá en tareas posteriores.
-    constexpr int VERSION_ESQUEMA_ACTUAL = 1;
+    /// v1 = esquema base (aulas, profesores, materias, planes de estudio);
+    /// v2 = dominios de curso, turnos y recesos.
+    constexpr int VERSION_ESQUEMA_ACTUAL = 2;
 
     /// Resultado de decidir qué hacer al abrir una base de datos.
     enum class EstadoApertura

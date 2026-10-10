@@ -25,7 +25,7 @@
     - Código: `apertura_base_datos.{hpp,cpp}`; `DatabaseManager` delega versión/migración.
     - Hecho cuando: `ctest` pasa y ninguna rama aplica cambios parciales.
 
-- [ ] **T4. Núcleo de datos: CRUD de dominios.** RF-2
+- [x] **T4. Núcleo de datos: CRUD de dominios.** RF-2
     - Tests (rojo): `test/backend/test_nucleo_datos.cpp` — alta/modificación/baja persisten y se recuperan tras reapertura; CRUD de Cursos y Turnos/Recesos.
     - Código: `NucleoDatos.{hpp,cpp}`; `ServicioCursos`, `ServicioTurnosRecesos` nuevos; migración v2 con las tablas de dominio.
     - Hecho cuando: `ctest` pasa; los datos de todos los dominios se recuperan tras cerrar y reabrir la base.
