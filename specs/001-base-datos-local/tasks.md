@@ -45,7 +45,7 @@
     - Código: `instancia_unica.{hpp,cpp}` + enganche en `main.cpp` y `aplicacion_frontend.cpp` (instancia única → apertura con `AperturaBaseDatos` → construcción de `NucleoDatos`; la interfaz la toma el frontend).
     - Hecho cuando: `ctest` pasa; dos arranques simultáneos resultan en una sola instancia y el arranque deja la base abierta y el núcleo de datos disponible para el frontend.
 
-- [ ] **T8. Documentar la interfaz expuesta al frontend (base de datos y núcleo de datos).** RF-2, RF-3, RF-4
+- [x] **T8. Documentar la interfaz expuesta al frontend (base de datos y núcleo de datos).** RF-2, RF-3, RF-4
     - Tests (rojo): `test/backend/test_contrato_interfaz.cpp` — la semántica que consume el frontend: `AperturaBaseDatos::Resultado::ok()`/`estado`/`rutaRespaldo`, `Resultado<T>::exito/error` con código y `estadoPendienteDe`.
     - Código: ninguno de producto; se documenta `docs/interfaz-frontend.md` (sección «Base de datos local»: `VersionEsquema`, `Respaldo`, `AperturaBaseDatos`, `NucleoDatos`, dominios y estado por registro).
     - Hecho cuando: `ctest` pasa el test de contrato y `docs/interfaz-frontend.md` describe, para cada elemento expuesto, qué expone, su firma/contrato, sus estados/errores y cómo debe tratarlo el frontend.

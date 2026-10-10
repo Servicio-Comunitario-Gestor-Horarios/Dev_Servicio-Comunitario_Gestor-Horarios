@@ -4,17 +4,18 @@
 
 ## Fase actual
 
-- **Fase:** implementación en curso — T1–T3 de 001 hechas; alcance reajustado (sin frontend)
+- **Fase:** spec 001 **implementada** (T1–T8 completas) — pendiente arreglar el ordenamiento de
+  `ServicioProfesor`; siguiente spec 002
 - **Fecha:** 2026-10-09
 - **Rama:** `sdd/001-base-datos-local`
-- **Specs en curso:** `specs/001-base-datos-local` (implementando), `specs/002-generacion-horarios-ipc` (pendiente)
-- **Siguiente paso:** implementar T4 de `specs/001-base-datos-local` (Núcleo de datos: CRUD de dominios)
+- **Specs en curso:** `specs/001-base-datos-local` (implementada), `specs/002-generacion-horarios-ipc` (pendiente)
+- **Siguiente paso:** implementar `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001)
 
 ## Specs activas
 
 | Spec | Estado | Fase |
 |---|---|---|
-| 001-base-datos-local | aprobada | implementando (T1–T3 hechas; siguiente T4) |
+| 001-base-datos-local | aprobada | **implementada** (T1–T8) |
 | 002-generacion-horarios-ipc | aprobada | tareas redactadas (depende de 001) |
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
@@ -45,11 +46,19 @@
 
 ## Siguiente paso
 
-1. Implementar T4 de `specs/001-base-datos-local` (Núcleo de datos: CRUD de dominios), y seguir T5–T8.
-2. Después, `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001).
+1. `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001).
+2. **Deuda técnica pendiente:** arreglar el ordenamiento de `ServicioProfesor` (test
+   `test_servicio_profesor` en rojo por ese motivo; es trabajo ajeno a 001, no se tocó).
 
 ## Progreso de implementación
 
-- 001: T1 (esquema versionado) ✅, T2 (respaldo) ✅, T3 (apertura con migración y respaldo obligatorio) ✅. Tests rojo→verde por tarea.
-- Tests ajenos que fallan (no tocar): `test_servicio_profesor` (trabajo sin commitear), `test_solver_horarios`, `test_solver_benchmark` (solver).
+- 001: **T1–T8 completas** ✅. Tests rojo→verde por tarea.
+  - T1 esquema versionado (`VERSION_ESQUEMA_ACTUAL = 2`), T2 respaldo, T3 apertura con migración y
+    respaldo obligatorio, T4 núcleo de datos (CRUD de dominios) y migración v2, T5 cascada atómica,
+    T6 cambios pendientes y reintento, T7 instancia única y arranque del cliente, T8 documentación
+    del contrato para el frontend (`docs/interfaz-frontend.md` §2) + `test_backend_contrato_interfaz`.
+  - `docs/interfaz-frontend.md` documenta el contrato real (implementado vs planificado); el test de
+    contrato fija `Resultado<T>`, `AperturaBaseDatos::Resultado::ok()/detalle/rutaRespaldo` y
+    `estadoPendienteDe` (verde).
+- Tests ajenos que fallan (no tocar): `test_servicio_profesor` (ordenamiento pendiente), `test_solver_horarios`, `test_solver_benchmark` (solver).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

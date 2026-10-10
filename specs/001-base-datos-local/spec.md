@@ -1,6 +1,6 @@
 # Spec 001 - Base de datos local: arranque, persistencia de dominios e instancia única
 
-Estado: aprobada
+Estado: implementada
 
 ## Contexto y objetivo
 
