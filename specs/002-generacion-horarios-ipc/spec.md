@@ -1,6 +1,6 @@
 # Spec 002 - Generación de horarios y comunicación con el proceso de cálculo
 
-Estado: aprobada
+Estado: implementada
 
 ## Contexto y objetivo
 

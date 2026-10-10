@@ -16,7 +16,7 @@
 | Spec | Estado | Fase |
 |---|---|---|
 | 001-base-datos-local | aprobada | **implementada** (T1–T8) |
-| 002-generacion-horarios-ipc | aprobada | tareas redactadas (depende de 001) |
+| 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
@@ -49,9 +49,12 @@
 
 ## Siguiente paso
 
-1. `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001): **T1 implementada**; siguiente **T2** (`ConstructorEntradaSolver`, JSON de 13 secciones).
-2. **Deuda técnica pendiente:** arreglar el ordenamiento de `ServicioProfesor` (test
-   `test_servicio_profesor` en rojo por ese motivo; es trabajo ajeno a 001, no se tocó).
+1. **Deuda técnica pendiente (ajena a las specs 001–003):** arreglar el ordenamiento de
+   `ServicioProfesor` (`test_servicio_profesor` en rojo por acentos) y los 2 tests del solver
+   (`test_solver_horarios`, `test_solver_benchmark`).
+2. **Cableado de `ServicioGeneracion` con el cliente IPC real** (adaptador `PuertoSolver`) en
+   `src/app`/`src/frontend`: la lógica está lista y testeada; el consumo UI↔IPC lo hace el equipo de
+   frontend según `docs/interfaz-frontend.md` §3.
 
 ## Progreso de implementación
 
@@ -71,5 +74,6 @@
   - **T6 completa** ✅ (`messages.h`: código `RESP_SIN_SOLUCION`, ops de negocio marcadas obsoletas; `InternalClient::intentosConexion()` para verificar reutilización de socket). Test `test_middleware_transport` extendido con ruta `solver_resolve` y «sin tormenta de reconexiones».
   - **T7 completa** ✅ (`servicio_solver`/`resolverEntradaSolver` en `backend_solver`; `aplicacion_backend` registra `solver_resolve`; `GestorProcesoBackend` sin reinicio automático). Test `test_ipc_aislamiento_bd` (no abre BD, rechaza ops de negocio).
   - **T8 completa** ✅ (contrato de `ServicioHorarioSalida` fijado con `test_archivos_horario`: round-trip JSON y fallo de escritura sin perder el contenido).
+  - **T9 completa** ✅ (`docs/interfaz-frontend.md` §3 completa: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, proceso `--backend`/salud) + `test_contrato_generacion`. **Spec 002 implementada.**
 - Tests ajenos que fallan (no tocar): `test_servicio_profesor` (ordenamiento pendiente), `test_solver_horarios`, `test_solver_benchmark` (solver).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

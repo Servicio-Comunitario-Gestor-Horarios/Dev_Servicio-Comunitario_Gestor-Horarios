@@ -431,14 +431,50 @@ El contexto vive durante toda la sesión (RAII) y se destruye al cerrar. El proc
 
 ## 3. Generación de horarios (spec 002)
 
-### 3.1 `ServicioGeneracion` — orquestar una generación (planificado)
+### 3.1 `ServicioGeneracion` — orquestar una generación (implementado)
 
-Instantánea de dominios → construir/validar JSON de entrada → enviar por IPC → esperar 60 s →
-validar salida → marcar «datos anteriores». Estados/desenlaces: **en curso**, **listo**
-(+`AnalisisSalida`), **no factible**, **contrato inválido**, **tiempo agotado/desconexión** y
-**datos anteriores**. **Cómo lo trata el frontend:** botón «Generar» deshabilitado si hay una en
-curso; mostrar estado/avisos; confirmación antes de guardar si son «datos anteriores»; no ofrecer
-guardar si no es factible o el contrato es inválido.
+`src/backend/include/backend/services/ServicioGeneracion.hpp`. UI-free (QObject con señal
+`finalizada()`). Recibe un `PuertoSolver` (el arranque inyecta el cliente IPC real; los tests, un
+doble) y un plazo (60 s por defecto).
+
+```cpp
+struct ResultadoGeneracion {
+    enum class Estado { Inactivo, Calculando, Listo, DatosAnteriores, NoFactible,
+                        ContratoInvalido, CalculoFallido, TiempoAgotado, EntradaInvalida };
+    Estado        estado = Estado::Inactivo;
+    QString       mensaje;
+    bool          datosAnteriores = false;
+    HorarioSalida horario;      // válido si presentable
+    AnalisisSalida analisis;    // avisos P1–P3 y conflictos P4
+    bool          presentable = false;
+};
+
+class ServicioGeneracion : public QObject {
+    Q_OBJECT
+public:
+    ServicioGeneracion(PuertoSolver& puerto, int plazoMs = 60000,
+                       std::function<QString()> huellaActual = {},
+                       std::function<QDateTime()> reloj = {}, QObject* padre = nullptr);
+    void generar(const QJsonObject& entrada, const QString& huella);
+    bool enCurso() const;
+    const ResultadoGeneracion& ultimoResultado() const;
+signals:
+    void finalizada();
+};
+```
+
+**Cómo lo trata el frontend:**
+- «Generar» deshabilitado mientras `enCurso()`; al terminar se emite `finalizada()` y se lee
+  `ultimoResultado()`.
+- `Listo` → mostrar `horario` + `analisis.avisos`.
+- `DatosAnteriores` → aviso destacado + confirmación obligatoria antes de guardar.
+- `NoFactible` / `ContratoInvalido` / `CalculoFallido` → informar; **no** ofrecer guardar.
+- `TiempoAgotado` → informar; la app sigue operando (la respuesta tardía se ignora).
+- `EntradaInvalida` → mostrar `mensaje` (motivo de la validación previa); no se envió nada.
+
+La entrada la construye `ConstructorEntradaSolver` (`construirJsonEntrada`, `src/backend`) a partir
+de `DatosDominio` (dominios) + preset; se valida con `validarEntradaSolver` (V1–V13). La huella
+(`huellaDatos`) detecta «datos anteriores».
 
 ### 3.2 `CargadorConfiguracionSolver` — config y presets en JSON (implementado)
 
@@ -467,16 +503,19 @@ Un «preset» es un archivo JSON con el mismo formato (las 13 secciones) que la 
 **Frontend:** pintar el horario (curso × día/slot) + avisos; guardar solo si el usuario lo pide
 (diálogo de archivo del frontend); ante fallo de escritura, mantener el contenido y reintentar.
 
-### 3.4 `AnalisisSalida` — validaciones posteriores (planificado)
+### 3.4 `AnalisisSalida` — validaciones posteriores (implementado)
 
-`ValidadorSalidaSolver` / `analizarSalidaSolver`: P1–P3 (avisos de horas y capacidad) y P4
-(solapamiento → no presentable). **Frontend:** panel de avisos; nunca mostrar como válido un
-resultado con conflicto de solapamiento.
+`ValidadorSalidaSolver` / `analizarSalidaSolver` (pura): P1 horas no cubiertas, P2 exceso de horas
+de docente y P3 exceso de capacidad de aula → `avisos`; P4 solapamiento (docente/aula/curso) →
+`conflictos` y `presentable() == false`. **Frontend:** panel de avisos junto al horario; nunca
+mostrar como válido un resultado con `hayConflictoSolapamiento()`.
 
-### 3.5 Salud del proceso de cálculo (implementado/en consolidación)
+### 3.5 Proceso de cálculo y salud (implementado)
 
-Comprobación al arrancar con plazo de 5 s y apagado ordenado al cerrar (5 s). **Frontend:** aviso
-no bloqueante al arrancar; el cierre continúa aunque no responda (RF-2).
+El modo `--backend` resuelve por la ruta `solver_resolve` (JSON de entrada → `HorarioSalida` JSON, o
+`RESP_SIN_SOLUCION`) y **nunca abre la base de datos** (RF-2). Al arrancar se comprueba su salud y
+al cerrar se solicita apagado ordenado; el cierre continúa aunque no responda. **Frontend:** aviso
+no bloqueante al arrancar.
 
 ---
 
@@ -497,5 +536,6 @@ no bloqueante al arrancar; el cierre continúa aunque no responda (RF-2).
 | `CargadorConfiguracionSolver` | Cargar/guardar config y presets JSON | RF-1, RF-4 |
 | Salud del proceso de cálculo | Aviso no bloqueante al arrancar; cierre continúa | RF-2 |
 
-> Las filas desde `ServicioGeneracion` son **planificadas** (spec 002, generación); las anteriores
-> son de la **spec 001** y están implementadas.
+> Todas las filas están implementadas. La sección 2 corresponde a la spec 001; las filas de
+> `ServicioGeneracion`, `AnalisisSalida`, `CargadorConfiguracionSolver` y el guardado de horarios
+> corresponden a la spec 002.

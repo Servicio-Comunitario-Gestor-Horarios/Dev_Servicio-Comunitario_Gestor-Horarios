@@ -51,7 +51,7 @@
     - Código: `ServicioHorarioSalida` (escritura/lectura del archivo). El diálogo de elección de destino es del frontend.
     - Hecho cuando: `ctest` pasa; un horario guardado se recupera idéntico y un fallo de escritura devuelve error sin retirar el contenido.
 
-- [ ] **T9. Documentar el contrato de generación para el frontend.** RF-1, RF-3, RF-5
+- [x] **T9. Documentar el contrato de generación para el frontend.** RF-1, RF-3, RF-5
     - Tests (rojo): `test/backend/test_contrato_generacion.cpp` — estados de `ServicioGeneracion` (calculando/no-factible/inválido/timeout/«datos anteriores») y `Resultado<T>` con código de error.
     - Código: ninguno de producto; se amplía `docs/interfaz-frontend.md` (sección «Generación de horarios»: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, salud del proceso).
     - Hecho cuando: `ctest` pasa el test de contrato y `docs/interfaz-frontend.md` describe, para cada elemento, qué expone, su firma/contrato, sus estados/errores y cómo debe tratarlo el frontend.
