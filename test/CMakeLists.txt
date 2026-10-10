@@ -78,6 +78,7 @@ if(TARGET backend)
 	add_qtest(test_horario_salida backend/test_horario_salida.cpp backend)
 	add_qtest(test_servicio_consulta_horario backend/test_servicio_consulta_horario.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_horario_salida backend/test_servicio_horario_salida.cpp backend Qt6::Sql)
+	add_qtest(test_archivos_horario backend/test_archivos_horario.cpp backend)
 	add_qtest(test_servicio_profesor backend/test_servicio_profesor.cpp backend Qt6::Sql)
 
 	add_gtest(test_servicio_exportacion backend/test_servicio_exportacion.cpp backend)

@@ -46,7 +46,7 @@
     - Código: `aplicacion_backend.cpp` (ruta `solver_resolve`), `gestor_proceso_backend.cpp` (salud 5 s y apagado ordenado).
     - Hecho cuando: `ctest --preset full` (Docker, OR-Tools) pasa; no se abre ningún archivo de base en el proceso de cálculo.
 
-- [ ] **T8. Horario generado como archivo JSON (backend).** RF-4
+- [x] **T8. Horario generado como archivo JSON (backend).** RF-4
     - Tests (rojo): `test/backend/test_archivos_horario.cpp` — se escribe y se vuelve a leer un `HorarioSalida` como JSON en el destino elegido; fallo de escritura simulado → `Resultado` con error, sin perder el contenido en memoria.
     - Código: `ServicioHorarioSalida` (escritura/lectura del archivo). El diálogo de elección de destino es del frontend.
     - Hecho cuando: `ctest` pasa; un horario guardado se recupera idéntico y un fallo de escritura devuelve error sin retirar el contenido.
