@@ -30,7 +30,7 @@
     - Código: `NucleoDatos.{hpp,cpp}`; `ServicioCursos`, `ServicioTurnosRecesos` nuevos; migración v2 con las tablas de dominio.
     - Hecho cuando: `ctest` pasa; los datos de todos los dominios se recuperan tras cerrar y reabrir la base.
 
-- [ ] **T5. Eliminación en cascada atómica.** RF-2
+- [x] **T5. Eliminación en cascada atómica.** RF-2
     - Tests (rojo): `test/backend/test_cascada.cpp` — `dependenciasDe` lista dependientes; borrado con cascada es atómico (fallo → nada aplicado); cancelación no toca datos.
     - Código: consulta de dependientes en `ServicioMaterias/Profesor/PlanesEstudio/Aula` + `eliminarConCascada` en `NucleoDatos`.
     - Hecho cuando: `ctest` pasa; un fallo a mitad de cascada no deja ninguna parte aplicada.

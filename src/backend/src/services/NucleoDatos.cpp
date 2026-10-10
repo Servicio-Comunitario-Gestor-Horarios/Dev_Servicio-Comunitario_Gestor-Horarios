@@ -1,5 +1,10 @@
 #include "backend/services/NucleoDatos.hpp"
 
+#include <QDebug>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QVariant>
+
 NucleoDatos::NucleoDatos(QSqlDatabase& db)
     : m_db(db),
       m_profesor(db),
@@ -159,4 +164,150 @@ Resultado<RecesoDTO> NucleoDatos::agregarReceso(const QString& turno, int despue
 
 bool NucleoDatos::eliminarReceso(const QString& turno, int despuesDeSlot) {
     return m_turnos.eliminarReceso(turno, despuesDeSlot);
+}
+
+// ─── Eliminación en cascada (RF-2) ────────────────────────────────────────
+
+QVector<Dependencia> NucleoDatos::recolectarDependientes(const QString& dominio,
+                                                         const QString& id) const {
+    QVector<Dependencia> dependientes;
+
+    const QVector<RelacionCascada> relaciones = dependenciasDe(dominio);
+    for (const RelacionCascada& rel : relaciones) {
+        const QString columnaId =
+            rel.columnaId.isEmpty() ? QStringLiteral("rowid") : rel.columnaId;
+
+        QString sql = QStringLiteral("SELECT %1 AS id").arg(columnaId);
+        if (!rel.etiqueta.isEmpty()) {
+            sql += QStringLiteral(", %1 AS etiqueta").arg(rel.etiqueta);
+        }
+        sql += QStringLiteral(" FROM %1 WHERE %2 = :padre").arg(rel.tabla, rel.columna);
+
+        QSqlQuery query(m_db);
+        query.prepare(sql);
+        query.bindValue(":padre", id);
+        if (!query.exec()) {
+            qCritical() << "Error al consultar dependientes de" << dominio << ":"
+                        << query.lastError().text();
+            continue;
+        }
+
+        while (query.next()) {
+            Dependencia dep;
+            dep.dominio = rel.dominio;
+            dep.id = query.value("id").toLongLong();
+
+            const QString etiqueta =
+                rel.etiqueta.isEmpty() ? QString() : query.value("etiqueta").toString();
+            dep.descripcion = etiqueta.isEmpty()
+                                  ? rel.descripcion
+                                  : QStringLiteral("%1: %2").arg(rel.descripcion, etiqueta);
+            dependientes.append(dep);
+
+            // La cascada es recursiva: un curso dependiente arrastra sus materias.
+            if (rel.esDominio) {
+                dependientes += recolectarDependientes(rel.dominio, QString::number(dep.id));
+            }
+        }
+    }
+
+    return dependientes;
+}
+
+QVector<Dependencia> NucleoDatos::dependientesDe(const QString& dominio,
+                                                 const QString& id) const {
+    if (!dominioValido(dominio) || id.isEmpty()) {
+        return {};
+    }
+    return recolectarDependientes(dominio, id);
+}
+
+bool NucleoDatos::borrarRecursivo(const QString& dominio, const QString& id) {
+    const QVector<RelacionCascada> relaciones = dependenciasDe(dominio);
+    for (const RelacionCascada& rel : relaciones) {
+        if (rel.esDominio) {
+            // Recoge los ids de los hijos y los borra (con sus dependencias) antes
+            // de borrar el padre, respetando las claves foráneas.
+            const QString columnaId =
+                rel.columnaId.isEmpty() ? QStringLiteral("rowid") : rel.columnaId;
+
+            QSqlQuery seleccion(m_db);
+            seleccion.prepare(QStringLiteral("SELECT %1 FROM %2 WHERE %3 = :padre")
+                                  .arg(columnaId, rel.tabla, rel.columna));
+            seleccion.bindValue(":padre", id);
+            if (!seleccion.exec()) {
+                qCritical() << "Error al listar dependientes de" << dominio << ":"
+                            << seleccion.lastError().text();
+                return false;
+            }
+
+            QVector<QString> idsHijos;
+            while (seleccion.next()) {
+                idsHijos.append(seleccion.value(0).toString());
+            }
+            for (const QString& idHijo : idsHijos) {
+                if (!borrarRecursivo(rel.dominio, idHijo)) {
+                    return false;
+                }
+            }
+            continue;
+        }
+
+        QSqlQuery borrado(m_db);
+        borrado.prepare(QStringLiteral("DELETE FROM %1 WHERE %2 = :padre")
+                            .arg(rel.tabla, rel.columna));
+        borrado.bindValue(":padre", id);
+        if (!borrado.exec()) {
+            qCritical() << "Error al borrar dependientes de" << dominio << ":"
+                        << borrado.lastError().text();
+            return false;
+        }
+    }
+
+    const ClaveDominio clave = claveDeDominio(dominio);
+    if (clave.tabla.isEmpty()) {
+        return false;
+    }
+
+    QSqlQuery borradoRaiz(m_db);
+    borradoRaiz.prepare(QStringLiteral("DELETE FROM %1 WHERE %2 = :clave")
+                            .arg(clave.tabla, clave.columna));
+    borradoRaiz.bindValue(":clave", id);
+    if (!borradoRaiz.exec()) {
+        qCritical() << "Error al borrar" << dominio << ":" << borradoRaiz.lastError().text();
+        return false;
+    }
+
+    if (borradoRaiz.numRowsAffected() == 0) {
+        qWarning() << "No se encontró" << dominio << "con clave" << id;
+        return false;
+    }
+
+    return true;
+}
+
+bool NucleoDatos::eliminarConCascada(const QString& dominio, const QString& id) {
+    if (!dominioValido(dominio) || id.isEmpty()) {
+        qWarning() << "Dominio o id inválido para la cascada:" << dominio << id;
+        return false;
+    }
+
+    if (!m_db.transaction()) {
+        qCritical() << "No se pudo iniciar la transacción para la cascada de" << dominio;
+        return false;
+    }
+
+    if (!borrarRecursivo(dominio, id)) {
+        m_db.rollback();
+        return false;
+    }
+
+    if (!m_db.commit()) {
+        qCritical() << "No se pudo confirmar la cascada de" << dominio << ":"
+                    << m_db.lastError().text();
+        m_db.rollback();
+        return false;
+    }
+
+    return true;
 }

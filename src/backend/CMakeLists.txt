@@ -46,6 +46,7 @@ target_sources(backend PRIVATE
 				src/services/ServicioCursos.cpp
 				src/services/ServicioTurnosRecesos.cpp
 				src/services/NucleoDatos.cpp
+				src/services/cascada.cpp
 )
 
 target_include_directories(backend PUBLIC

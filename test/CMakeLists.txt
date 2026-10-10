@@ -52,6 +52,7 @@ if(TARGET backend)
 	add_qtest(test_backend_respaldo backend/test_respaldo.cpp backend Qt6::Sql)
 	add_qtest(test_backend_apertura_base_datos backend/test_apertura_base_datos.cpp backend Qt6::Sql)
 	add_qtest(test_backend_nucleo_datos backend/test_nucleo_datos.cpp backend Qt6::Sql)
+	add_qtest(test_backend_cascada backend/test_cascada.cpp backend Qt6::Sql)
 	add_qtest(test_backend_entity_graph backend/test_entity_graph.cpp backend)
 
 	add_qtest(test_servicio_aula backend/test_servicio_aula.cpp backend Qt6::Sql)

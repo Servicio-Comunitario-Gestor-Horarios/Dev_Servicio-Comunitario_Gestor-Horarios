@@ -22,6 +22,7 @@
 #include "backend/services/ServicioPlanesEstudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
 #include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/cascada.hpp"
 
 class NucleoDatos {
 public:
@@ -96,8 +97,33 @@ public:
                                        const QTime& fin = QTime());
     bool eliminarReceso(const QString& turno, int despuesDeSlot);
 
+    // ─── Eliminación en cascada (RF-2) ────────────────────────────────────
+
+    /**
+     * @brief Lista los registros que se eliminarían en cascada.
+     *
+     * El frontend la usa para mostrar los dependientes y pedir confirmación
+     * explícita antes de continuar. No modifica ningún dato.
+     */
+    QVector<Dependencia> dependientesDe(const QString& dominio, const QString& id) const;
+
+    /**
+     * @brief Elimina `dominio`/`id` y sus dependientes de forma atómica.
+     *
+     * Todo ocurre en una sola transacción: si cualquier borrado falla, se
+     * revierte y no queda ninguna parte aplicada (RF-2).
+     */
+    bool eliminarConCascada(const QString& dominio, const QString& id);
+
 private:
     QSqlDatabase& m_db;
+
+    /// Consulta recursiva de los dependientes de `dominio`/`id`.
+    QVector<Dependencia> recolectarDependientes(const QString& dominio,
+                                                const QString& id) const;
+
+    /// Borra `dominio`/`id` y sus dependientes dentro de la transacción activa.
+    bool borrarRecursivo(const QString& dominio, const QString& id);
 
     ServicioProfesor m_profesor;
     ServicioAula m_aula;
