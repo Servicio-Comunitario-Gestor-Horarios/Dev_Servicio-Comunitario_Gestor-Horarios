@@ -440,10 +440,23 @@ validar salida → marcar «datos anteriores». Estados/desenlaces: **en curso**
 curso; mostrar estado/avisos; confirmación antes de guardar si son «datos anteriores»; no ofrecer
 guardar si no es factible o el contrato es inválido.
 
-### 3.2 `CargadorConfiguracionSolver` — config y presets en JSON (planificado)
+### 3.2 `CargadorConfiguracionSolver` — config y presets en JSON (implementado)
 
-Carga/guarda configuración y presets como archivos JSON (no base de datos), con `Resultado<T>`.
-**Frontend:** cargar/guardar presets como archivos; ante fallo, avisar y permitir reintentar.
+`src/backend/include/backend/services/CargadorConfiguracionSolver.hpp`. Sin base de datos ni
+OR-Tools (lógica del lado cliente).
+
+```cpp
+class CargadorConfiguracionSolver {
+public:
+    static Resultado<SolverConfig> cargar(const QString& ruta);           // + validación fromJson
+    static Resultado<bool>        guardar(const QString& ruta, const SolverConfig& config);
+    static Resultado<QStringList> listarPresets(const QString& directorio); // *.json ordenados
+};
+```
+
+Un «preset» es un archivo JSON con el mismo formato (las 13 secciones) que la configuración.
+**Frontend:** cargar/guardar presets como archivos; ante fallo (`!ok`), mostrar `mensajeError`
+(causa + acciones) y permitir reintentar.
 
 ### 3.3 `HorarioSalida` y guardado como archivo (implementado/en consolidación)
 

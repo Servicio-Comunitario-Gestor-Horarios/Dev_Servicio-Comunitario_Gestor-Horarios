@@ -48,6 +48,10 @@ target_sources(backend PRIVATE
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
 				src/services/cascada.cpp
+
+				# Configuracion del solver (JSON, sin OR-Tools)
+				src/solver/config/solver_config.cpp
+				src/services/CargadorConfiguracionSolver.cpp
 )
 
 target_include_directories(backend PUBLIC
@@ -69,7 +73,6 @@ set_project_warnings(backend)
 add_library(backend_solver STATIC)
 
 target_sources(backend_solver PRIVATE
-				src/solver/config/solver_config.cpp
 				src/solver/variables.cpp
 				src/solver/solver.cpp
 				src/solver/restricciones/restricciones_turnos.cpp

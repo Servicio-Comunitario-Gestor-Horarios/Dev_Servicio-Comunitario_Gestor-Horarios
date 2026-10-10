@@ -49,7 +49,7 @@
 
 ## Siguiente paso
 
-1. `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001).
+1. `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001): **T1 implementada**; siguiente **T2** (`ConstructorEntradaSolver`, JSON de 13 secciones).
 2. **Deuda técnica pendiente:** arreglar el ordenamiento de `ServicioProfesor` (test
    `test_servicio_profesor` en rojo por ese motivo; es trabajo ajeno a 001, no se tocó).
 
@@ -63,5 +63,6 @@
   - `docs/interfaz-frontend.md` documenta el contrato real (implementado vs planificado); el test de
     contrato fija `Resultado<T>`, `AperturaBaseDatos::Resultado::ok()/detalle/rutaRespaldo` y
     `estadoPendienteDe` (verde).
+- 002: **T1 completa** ✅ (`CargadorConfiguracionSolver` + `SolverConfig::toJson`); `solver_config` movido al target `backend` (sin OR-Tools). Test `test_cargador_configuracion` (verde).
 - Tests ajenos que fallan (no tocar): `test_servicio_profesor` (ordenamiento pendiente), `test_solver_horarios`, `test_solver_benchmark` (solver).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

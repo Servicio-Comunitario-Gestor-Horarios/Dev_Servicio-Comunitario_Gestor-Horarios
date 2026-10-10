@@ -11,7 +11,7 @@
 
 ---
 
-- [ ] **T1. Configuración del solver y presets como archivo JSON (backend).** RF-1, RF-4
+- [x] **T1. Configuración del solver y presets como archivo JSON (backend).** RF-1, RF-4
     - Tests (rojo): `test/backend/test_cargador_configuracion.cpp` — lee/escribe config y presets como JSON; archivo inexistente/corrupto → error informado.
     - Código: `CargadorConfiguracionSolver.{hpp,cpp}` (sin base de datos); lectura/escritura de presets.
     - Hecho cuando: `ctest` pasa; la configuración y un preset se guardan y se vuelven a leer como JSON sin tocar la base.

@@ -583,3 +583,166 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj) {
 
     return Resultado<SolverConfig>::exito(config);
 }
+
+/* --- Serialización (inversa de fromJson) --- */
+
+namespace {
+
+QJsonArray intArray(const QVector<int>& valores) {
+    QJsonArray arr;
+    for (int v : valores) arr.append(v);
+    return arr;
+}
+
+QJsonObject serializarDimensiones(const DimensionesConfig& d) {
+    QJsonObject obj;
+    obj["num_profesores"] = d.num_profesores;
+    obj["num_materias"]   = d.num_materias;
+    obj["num_aulas"]      = d.num_aulas;
+    obj["num_cursos"]     = d.num_cursos;
+    obj["num_dias"]       = d.num_dias;
+    obj["num_slots_dia"]  = d.num_slots_dia;
+    return obj;
+}
+
+QJsonObject serializarFranja(const FranjaHorariaConfig& f) {
+    QJsonObject obj;
+    obj["duracion_minutos"] = f.duracion_minutos;
+    obj["slots_por_turno"]  = f.slots_por_turno;
+    return obj;
+}
+
+QJsonObject serializarTurnos(const TurnosConfig& t) {
+    QJsonArray arr;
+    for (const auto& turno : t.turnos) {
+        QJsonObject o;
+        o["nombre"] = turno.nombre;
+        o["slot"]   = intArray(turno.slot);
+        arr.append(o);
+    }
+    QJsonObject obj;
+    obj["turnos"] = arr;
+    return obj;
+}
+
+QJsonArray serializarRecesos(const QVector<RecesoConfig>& recesos) {
+    QJsonArray arr;
+    for (const auto& r : recesos) {
+        QJsonObject o;
+        o["turno"]           = r.turno;
+        o["despues_de_slot"] = r.despues_de_slot;
+        o["duracion"]        = r.duracion;
+        o["inicio"]          = r.inicio;
+        o["fin"]             = r.fin;
+        arr.append(o);
+    }
+    return arr;
+}
+
+QJsonArray serializarCursos(const QVector<CursoSolverConfig>& cursos) {
+    QJsonArray arr;
+    for (const auto& c : cursos) {
+        QJsonObject o;
+        o["nombre"]          = c.nombre;
+        o["turno"]           = c.turno;
+        o["aula_fija"]       = c.aula_fija;
+        o["num_estudiantes"] = c.num_estudiantes;
+        o["plan"]            = c.plan;
+
+        QJsonArray materias;
+        for (const auto& m : c.materias) {
+            QJsonObject mo;
+            mo["materia_idx"]      = m.materiaIDx;
+            mo["horas_semanales"]  = m.horasSemanales;
+            materias.append(mo);
+        }
+        o["materias"] = materias;
+        arr.append(o);
+    }
+    return arr;
+}
+
+QJsonArray serializarProfesores(const QVector<ProfesorSolverConfig>& profesores) {
+    QJsonArray arr;
+    for (const auto& p : profesores) {
+        QJsonObject o;
+        o["nombre"]           = p.nombre;
+        o["horas_requeridas"] = p.horas_requeridas;
+        o["horas_aula"]       = p.horas_aula;
+        o["turno"]            = p.turno;
+        o["plan"]             = p.plan;
+        o["materias_asignadas"] = intArray(p.materias_asignadas);
+
+        QJsonArray suplentes;
+        for (const auto& ms : p.materias_suplente) {
+            QJsonObject mo;
+            mo["materia_idx"] = ms.materiaIDx;
+            mo["peso"]        = ms.peso;
+            suplentes.append(mo);
+        }
+        o["materias_suplente"] = suplentes;
+
+        QJsonArray disponibilidad;
+        for (const auto& d : p.disponibilidad) {
+            QJsonObject dobj;
+            dobj["dia"]  = d.dia;
+            dobj["slot"] = intArray(d.slot);
+            disponibilidad.append(dobj);
+        }
+        o["disponibilidad"] = disponibilidad;
+        arr.append(o);
+    }
+    return arr;
+}
+
+QJsonArray serializarMaterias(const QVector<MateriaSolverConfig>& materias) {
+    QJsonArray arr;
+    for (const auto& m : materias) {
+        QJsonObject o;
+        o["nombre"] = m.nombre;
+        arr.append(o);
+    }
+    return arr;
+}
+
+QJsonArray serializarAulas(const QVector<AulaSolverConfig>& aulas) {
+    QJsonArray arr;
+    for (const auto& a : aulas) {
+        QJsonObject o;
+        o["nombre"]    = a.nombre;
+        o["tipo"]      = a.tipo;
+        o["capacidad"] = a.capacidad;
+        arr.append(o);
+    }
+    return arr;
+}
+
+} // namespace
+
+QJsonObject SolverConfig::toJson() const {
+    QJsonObject obj;
+    obj["version"]        = version;
+    obj["dimensiones"]    = serializarDimensiones(dimensiones);
+    obj["franja_horaria"] = serializarFranja(franja_horaria);
+    obj["turnos"]         = serializarTurnos(turnos);
+    obj["recesos"]        = serializarRecesos(recesos);
+    obj["cursos"]         = serializarCursos(cursos);
+    obj["profesores"]     = serializarProfesores(profesores);
+    obj["materias"]       = serializarMaterias(materias);
+    obj["aulas"]          = serializarAulas(aulas);
+
+    QJsonObject planificacion;
+    planificacion["activa"] = this->planificacion.activa;
+    obj["planificacion"] = planificacion;
+
+    QJsonObject generacion;
+    generacion["cursos_a_generar"] = intArray(this->generacion.cursos_a_generar);
+    obj["generacion"] = generacion;
+
+    QJsonObject penalizaciones;
+    penalizaciones["capacidad_aula"]      = this->penalizaciones.capacidad_aula;
+    penalizaciones["emergencia_profesor"] = this->penalizaciones.emergencia_profesor;
+    obj["penalizaciones"] = penalizaciones;
+
+    return obj;
+}

@@ -193,4 +193,13 @@ struct SolverConfig {
      * - V12: Disponibilidad en rango de slots
      */
     static Resultado<SolverConfig> fromJson(const QJsonObject& obj);
+
+    /**
+     * @brief Serializa la configuración completa a un QJsonObject.
+     *
+     * Inverso de `fromJson`: produce las 13 secciones con los mismos nombres de
+     * campo, de modo que `fromJson(toJson())` reproduce la configuración. No
+     * valida (la validación vive en `fromJson`).
+     */
+    QJsonObject toJson() const;
 };
