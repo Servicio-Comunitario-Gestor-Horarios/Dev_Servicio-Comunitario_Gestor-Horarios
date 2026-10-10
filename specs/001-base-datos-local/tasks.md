@@ -40,7 +40,7 @@
     - Código: `GestorPendientes.{hpp,cpp}` + `estadoPendienteDe` (pura); consulta de pendientes que consumirá la guardia de cierre.
     - Hecho cuando: `ctest` pasa; tras fallo de escritura el registro queda pendiente y el reintento lo guarda.
 
-- [ ] **T7. Instancia única y arranque del cliente.** RF-5, RF-2
+- [x] **T7. Instancia única y arranque del cliente.** RF-5, RF-2
     - Tests (rojo): `test/test_instancia_unica.cpp` — segundo arranque enfoca al primero; sin acuse en 10 s → avisa y no arranca; detección activa durante la migración.
     - Código: `instancia_unica.{hpp,cpp}` + enganche en `main.cpp` y `aplicacion_frontend.cpp` (instancia única → apertura con `AperturaBaseDatos` → construcción de `NucleoDatos`; la interfaz la toma el frontend).
     - Hecho cuando: `ctest` pasa; dos arranques simultáneos resultan en una sola instancia y el arranque deja la base abierta y el núcleo de datos disponible para el frontend.

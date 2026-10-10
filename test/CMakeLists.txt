@@ -38,6 +38,13 @@ add_qtest(test_middleware_transport
 )
 
 # ============================================================
+# App (arranque e instancia única) — no depende de OR-Tools
+# ============================================================
+# `app_core` es la librería de arranque sin UI donde vive `instancia_unica`,
+# de modo que el ejecutable y el test enlazan la misma implementación.
+add_qtest(test_instancia_unica test_instancia_unica.cpp app_core Qt6::Network)
+
+# ============================================================
 # Backend (persistencia) — requiere el target `backend`
 # ============================================================
 if(TARGET backend)
