@@ -7,15 +7,16 @@
  * Inicializa la interfaz gráfica y el gestor de proceso backend.
  */
 
-/// Núcleo de datos que consume la interfaz (declaración adelantada).
-class NucleoDatos;
-
 /**
  * @brief Ejecuta la aplicación en modo frontend.
  *
- * Abre la base de datos local (con migración y respaldo), deja el núcleo de
- * datos disponible para la interfaz (`nucleoDatosActivo()`), lanza el backend
- * como proceso hijo y muestra la interfaz gráfica (LoginDialog, MainWindow).
+ * Compone el arranque del cliente: crea el contexto de base de datos
+ * (`ContextoBaseDatos`, que abre/migra/respalda y construye el `NucleoDatos`),
+ * inyecta el núcleo de datos en la ventana principal, lanza el backend como
+ * proceso hijo y muestra la interfaz gráfica (LoginDialog, MainWindow).
+ *
+ * El ciclo de vida de la base ya no vive aquí: lo encapsula el módulo `datos`,
+ * y la interfaz lo recibe por inyección (sin singleton global).
  *
  * La instancia única se comprueba antes, en `main.cpp`.
  *
@@ -24,14 +25,3 @@ class NucleoDatos;
  * @return Código de salida de la aplicación (0 = éxito).
  */
 int ejecutarAplicacionFrontend(int argc, char *argv[]);
-
-/**
- * @brief Punto de entrada para la interfaz: núcleo de datos abierto al arrancar.
- *
- * Devuelve la fachada `NucleoDatos` construida por el arranque del cliente, que
- * el equipo de `src/frontend` consume en proceso para leer y escribir los
- * dominios. Devuelve `nullptr` si la base no está operativa (o si esta
- * configuración se compiló sin backend de persistencia).
- */
-NucleoDatos* nucleoDatosActivo();
-

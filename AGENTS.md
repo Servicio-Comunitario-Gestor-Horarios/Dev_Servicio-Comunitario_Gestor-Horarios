@@ -4,7 +4,7 @@
 
 - **Qué es:** sistema de gestión y optimización de horarios académicos (OR-Tools CP-SAT), aplicación de escritorio.
 - **Stack:** C++17 · Qt6 (Widgets/Sql/Network) · OR-Tools v9.15+ · SQLite · CMake 3.24+ / Ninja · CTest + Google Test / Qt Test.
-- **Estructura de módulos:** `src/app`, `src/common`, `src/backend` (dominio, solver, services, database), `src/middleware` (server/client/validation), `src/frontend` (views, dialogs, widgets, models). Tests en `test/`.
+- **Estructura de módulos:** `src/app`, `src/common`, `src/backend` (dominio, solver, services, database), `src/datos` (ciclo de vida de la base del cliente), `src/middleware` (server/client/validation), `src/frontend` (views, dialogs, widgets, models). Tests en `test/`.
 
 ## Idioma
 

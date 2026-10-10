@@ -22,6 +22,9 @@ add_subdirectory(frontend)
 
 if(BUILD_BACKEND)
     add_subdirectory(backend)
+    # `datos` encapsula el ciclo de vida de la base del lado cliente y depende
+    # de `backend`; solo existe cuando hay persistencia (BUILD_BACKEND=ON).
+    add_subdirectory(datos)
 endif()
 
 add_subdirectory(app)

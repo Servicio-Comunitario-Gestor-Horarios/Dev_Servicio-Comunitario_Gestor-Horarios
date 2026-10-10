@@ -62,9 +62,15 @@ if(TARGET middleware)
 	target_link_libraries(gestor-horarios PRIVATE middleware)
 endif()
 
+# El arranque del cliente usa el módulo `datos` para el ciclo de vida de la base
+# (ContextoBaseDatos). Si existe, el backend de persistencia está disponible.
+if(TARGET datos)
+	target_link_libraries(gestor-horarios PRIVATE datos)
+endif()
+
 # El arranque del cliente abre la base y construye el núcleo de datos solo si
 # el backend (persistencia) está disponible en esta configuración.
-if(TARGET backend)
+if(TARGET datos)
 	target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_BACKEND=1)
 endif()
 

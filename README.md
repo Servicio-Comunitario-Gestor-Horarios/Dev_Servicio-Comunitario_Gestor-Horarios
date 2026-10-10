@@ -26,7 +26,7 @@ horarios usando algoritmos de satisfacción de restricciones.
 Gestor-Horarios/
 ├── CMakeLists.txt          # Entry point del build. Detecta OR-Tools, Qt6, delegates a src/
 ├── src/                    # Codigo fuente
-│   ├── CMakeLists.txt      # Coordina los modulos (app, common, backend, middleware, frontend)
+│   ├── CMakeLists.txt      # Coordina los modulos (app, common, backend, datos, middleware, frontend)
 │   ├── app/                # Punto de entrada de la aplicacion (main.cpp)
 │   ├── common/             # Tipos compartidos entre modulos (errors, envelopes, version)
 │   │   └── include/common/
@@ -41,6 +41,7 @@ Gestor-Horarios/
 │   │       │   └── constraints/ #     Restricciones (duras y blandas)
 │   │       ├── services/      #   Servicios de alto nivel (reportes, estadisticas)
 │   │       └── database/      #   Persistencia SQLite (CRUD, consultas)
+│   ├── datos/              # Ciclo de vida de la base del cliente (ContextoBaseDatos)
 │   ├── middleware/          # Capa de comunicacion frontend <-> backend
 │   │   ├── include/middleware/ # API publica del middleware
 │   │   └── src/
@@ -92,6 +93,7 @@ Gestor-Horarios/
 | `src/backend/include/backend/` | Headers publicos del backend. Separar la interfaz de la implementacion permite que otros modulos (middleware) dependan solo de las interfaces, no del codigo interno. |
 | `src/backend/src/solver/core/` | Motor CP-SAT: variables, objetivos, configuracion del solver. Separado de constraints para poder probar y modificar restricciones sin tocar el motor. |
 | `src/backend/src/solver/constraints/` | Cada restriccion (no solapamiento, capacidad de aulas, disponibilidad de profesores, carga horaria, preferencias) en su propio archivo. Facil de agregar, modificar o desactivar sin afectar el core. |
+| `src/datos/` | Ciclo de vida de la base de datos del lado cliente: abre/migra/respalda y construye el `NucleoDatos` que consume la interfaz. UI-free y testeable por separado; mantiene la base fuera del proceso de calculo (RF-2). |
 | `src/middleware/` | Desacopla frontend de backend. El frontend nunca habla directamente con el backend; todo pasa por el middleware. Esto permite cambiar la implementacion del backend (ej: migrar a microservicios) sin tocar el frontend. |
 | `src/middleware/src/server/` | Recibe mensajes del frontend, los valida, los traduce a llamadas del backend. |
 | `src/middleware/src/client/` | Envia respuestas del backend de vuelta al frontend. |

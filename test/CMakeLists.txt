@@ -79,6 +79,13 @@ if(TARGET backend)
 endif()
 
 # ============================================================
+# Datos (ciclo de vida de la base del cliente) — requiere `datos`
+# ============================================================
+if(TARGET datos)
+	add_qtest(test_datos_contexto_base_datos datos/test_contexto_base_datos.cpp datos Qt6::Sql)
+endif()
+
+# ============================================================
 # Solver CP-SAT — requiere el target `backend_solver`
 # ============================================================
 if(TARGET backend_solver)

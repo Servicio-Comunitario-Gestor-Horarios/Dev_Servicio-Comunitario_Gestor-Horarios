@@ -129,8 +129,10 @@ si tiene éxito, reintentar la apertura.
 
 `src/backend/include/backend/services/NucleoDatos.hpp`. Fachada única sobre la conexión y los
 servicios de dominio; el frontend la consume **en proceso** (ya no por IPC) para docentes, aulas,
-materias, cursos, planes de estudio, turnos y recesos. Se construye con `NucleoDatos(QSqlDatabase&)`;
-el `NucleoDatos` **no es dueño** de la conexión (la abre/cierra el arranque con `AperturaBaseDatos`).
+materias, cursos, planes de estudio, turnos y recesos. El `NucleoDatos` **no es dueño** de la
+conexión ni se instancia en la interfaz: lo construye el `ContextoBaseDatos` del módulo `datos`
+(ver 2.7), que también se lo inyecta a la ventana principal. El frontend recibe un `NucleoDatos*`
+ya construido y operativo.
 
 ```cpp
 class NucleoDatos {
@@ -354,6 +356,47 @@ avisar con `detalle()` y no arrancar).
 diálogo de fallo/migración activo); con `Secundaria` salir con éxito; con `SinAcuse` mostrar
 `detalle()` y salir con error.
 
+### 2.7 `ContextoBaseDatos` — ciclo de vida de la base del cliente (implementado)
+
+`src/datos/include/datos/ContextoBaseDatos.hpp` (módulo `datos`, librería `datos`). Encapsula lo
+que antes hacía el arranque del cliente: resolver la ruta por defecto, abrir/crear/migrar/respaldar
+la base (`AperturaBaseDatos`), mantener la conexión persistente y construir el `NucleoDatos`. No
+depende de Qt Widgets, por lo que es testeable sin UI.
+
+```cpp
+class ContextoBaseDatos {
+public:
+    struct Opciones { QString nombreConexion; AperturaBaseDatos::Opciones apertura; };
+    ContextoBaseDatos();
+    ~ContextoBaseDatos();                    // RAII: cierra y libera la conexión
+    ContextoBaseDatos(const ContextoBaseDatos&) = delete;
+    ContextoBaseDatos& operator=(const ContextoBaseDatos&) = delete;
+
+    AperturaBaseDatos::Resultado abrir(const QString& ruta);
+    AperturaBaseDatos::Resultado abrir(const QString& ruta, const Opciones& opciones);
+
+    bool               abierto() const;
+    NucleoDatos&       nucleo();             // precondición: abierto()
+    const NucleoDatos& nucleo() const;
+    QSqlDatabase&      conexion();
+    QString            ruta() const;
+    static QString     rutaPorDefecto();
+};
+```
+
+**Quién lo usa.** El arranque del cliente (`src/app`, `ejecutarAplicacionFrontend`) crea un
+`ContextoBaseDatos`, llama a `abrir(ContextoBaseDatos::rutaPorDefecto())` y, si la apertura es
+`ok()`, inyecta `&contexto.nucleo()` en la ventana principal con `MainWindow::setNucleoDatos(...)`.
+El contexto vive durante toda la sesión (RAII) y se destruye al cerrar. El proceso de cálculo
+(`--backend`) **no** usa este componente (RF-2).
+
+**Cómo lo trata el frontend:**
+- No instancia la base ni resuelve su ruta: la recibe ya abierta. La ventana guarda el
+  `NucleoDatos*` inyectado (puede ser `nullptr` si el binario se compiló sin persistencia).
+- Si `abrir()` no es `ok()`, el arranque (no la ventana) muestra la causa con `Resultado::detalle`
+  y no levanta la interfaz; el diálogo de recuperación de RF-4 lo construye el frontend sobre
+  `AperturaBaseDatos::Resultado` (ver 2.1).
+
 ---
 
 ## 3. Generación de horarios (spec 002)
@@ -401,6 +444,7 @@ no bloqueante al arrancar; el cierre continúa aunque no responda (RF-2).
 | `AperturaBaseDatos::Resultado` | Diálogo de fallo (Reintentar/Restaurar/Crear nueva/Salir) | RF-4, RF-6 |
 | `Respaldo::restaurarRespaldo` | Restaurar respaldo elegido y reintentar apertura | RF-4 |
 | `NucleoDatos` | Listas desde la base y CRUD en proceso | RF-2 |
+| `ContextoBaseDatos` (`src/datos`) | El arranque lo crea y entrega `NucleoDatos*` a la ventana (`setNucleoDatos`) | RF-1, RF-2 |
 | `NucleoDatos::dependientesDe` / `eliminarConCascada` | Confirmación de cascada | RF-2 |
 | `estadoPendienteDe` / `GestorPendientes` | Marca por fila + «Reintentar»; aviso al cerrar | RF-3, RF-6, RNF-3/4 |
 | `InstanciaUnica` | Enfocar la instancia existente; salir si no hay acuse | RF-5 |

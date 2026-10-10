@@ -43,6 +43,7 @@
   - **`docs/constitution.md` §5 enmendada**: se quitaron "horarios guardados en SQLite" del listado de datos; presets/horarios se gestionan como archivos JSON.
   - Limpieza de restos de frontend: eliminados `src/frontend/src/main.cpp`, `src/frontend/src/aplicacion_frontend.cpp` y su `.hpp` huérfano, más sus entradas del CMake (rompían `cmake --preset full`); el ejecutable real vive en `src/app`.
 - **Alcance (2026-10-09):** NO implementamos `src/frontend` (interfaz Qt: vistas, listas, diálogos e indicadores): lo hace **otro equipo**. Nuestros entregables: `src/backend`, `src/app` y `src/middleware`. Exponemos la lógica y el **contrato de consumo** documentado en `docs/interfaz-frontend.md`. Las specs 001/002 y sus planes/tareas se reajustaron (fuera las tareas de frontend; nueva tarea de documentar la interfaz).
+- **Refactor de la base del cliente (2026-10-10):** se extrajo el ciclo de vida de la BD del arranque de la interfaz al módulo nuevo **`src/datos`** (`ContextoBaseDatos`), que abre/migra/respalda y construye el `NucleoDatos`. `src/app` lo crea y lo **inyecta** en `MainWindow` (`setNucleoDatos`); se eliminó el singleton global `nucleoDatosActivo()`. La UI no abre ni instancia la base (RF-2 intacto; el proceso de cálculo sigue sin tocarla). Documentado en `docs/interfaz-frontend.md` §2.7. Nuevo test `test_datos_contexto_base_datos`. Verificado en Docker: 30/33 (mismos 3 rojos conocidos) y `dev-frontend` compila.
 
 ## Siguiente paso
 
