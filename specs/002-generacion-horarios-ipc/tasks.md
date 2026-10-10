@@ -36,7 +36,7 @@
     - Código: `ServicioGeneracion.{hpp,cpp}` + `huellaDatos`/`estamparFechaGeneracion` (puras).
     - Hecho cuando: `ctest` pasa; cada desenlace (ok/no-factible/inválido/timeout/obsoleto) se comporta como exige RF-1 y el estado de generación es consultable por el frontend.
 
-- [ ] **T6. Middleware: socket fiable y rutas del solver.** RF-1, RF-2
+- [x] **T6. Middleware: socket fiable y rutas del solver.** RF-1, RF-2
     - Tests (rojo): `test/test_middleware_transport.cpp` — `solver_resolve`, salud y apagado ordenado; socket reutilizable sin tormenta de reintentos (F-CRASH1).
     - Código: `internalclient.cpp` (estado del socket), `messages.h`, `internalserver.cpp`.
     - Hecho cuando: `ctest` pasa; dos operaciones seguidas no disparan reconexiones espurias.
