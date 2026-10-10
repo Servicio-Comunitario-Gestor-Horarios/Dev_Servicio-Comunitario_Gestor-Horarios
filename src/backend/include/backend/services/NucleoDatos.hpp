@@ -31,7 +31,7 @@ public:
 
     // ─── Docentes ─────────────────────────────────────────────────────────
 
-    QVector<ProfesorDTO> listarDocentes() const;
+    Resultado<QVector<ProfesorDTO>> listarDocentes() const;
     Resultado<ProfesorDTO> crearDocente(const QString& id, const QString& nombre,
                                         const QString& email,
                                         const QString& telefono = QString());
@@ -42,7 +42,7 @@ public:
 
     // ─── Aulas ────────────────────────────────────────────────────────────
 
-    QVector<AulaDTO> listarAulas() const;
+    Resultado<QVector<AulaDTO>> listarAulas() const;
     Resultado<AulaDTO> crearAula(const QString& nombre, int capacidad,
                                  const QString& edificio = QString(),
                                  const QString& piso = QString());
@@ -53,7 +53,7 @@ public:
 
     // ─── Materias ─────────────────────────────────────────────────────────
 
-    QVector<MateriaDTO> listarMaterias() const;
+    Resultado<QVector<MateriaDTO>> listarMaterias() const;
     Resultado<MateriaDTO> crearMateria(const QString& nombre,
                                        const QString& requisitos = QString());
     Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre,
@@ -62,7 +62,7 @@ public:
 
     // ─── Planes de estudio ────────────────────────────────────────────────
 
-    QVector<PlanDTO> listarPlanes() const;
+    Resultado<QVector<PlanDTO>> listarPlanes() const;
     Resultado<PlanDTO> crearPlan(const QString& codigo, const QString& nombre,
                                  const QString& descripcion = QString());
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
@@ -71,7 +71,7 @@ public:
 
     // ─── Cursos ───────────────────────────────────────────────────────────
 
-    QVector<CursoDTO> listarCursos() const;
+    Resultado<QVector<CursoDTO>> listarCursos() const;
     Resultado<CursoDTO> crearCurso(const QString& nombre,
                                    const QString& turno = QString(),
                                    int aulaFija = -1, int numEstudiantes = 0,
@@ -87,7 +87,7 @@ public:
 
     // ─── Turnos y recesos ─────────────────────────────────────────────────
 
-    QVector<TurnoDTO> listarTurnos() const;
+    Resultado<QVector<TurnoDTO>> listarTurnos() const;
     Resultado<TurnoDTO> crearTurno(const QString& nombre, const QTime& inicio,
                                    const QTime& fin, int numSlots);
     Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio,

@@ -41,8 +41,8 @@ public:
     /** @brief Obtiene un aula por su ID. */
     Resultado<AulaDTO> obtenerAula(int id) const;
 
-    /** @brief Lista todas las aulas registradas. */
-    QVector<AulaDTO> listarAulas() const;
+    /** @brief Lista todas las aulas registradas. Error y vacío se distinguen. */
+    Resultado<QVector<AulaDTO>> listarAulas() const;
 
     /** @brief Actualiza los datos de un aula existente. */
     Resultado<AulaDTO> actualizarAula(int id, const QString& nombre, int capacidad,

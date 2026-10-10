@@ -159,7 +159,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor("P-B", "Álvarez", "a@uni.edu").ok);
         QVERIFY(m_servicio->crearProfesor("P-C", "Martínez","m@uni.edu").ok);
 
-        auto lista = m_servicio->listarProfesores();
+        auto lista = m_servicio->listarProfesores().valor;
         QCOMPARE(lista.size(), 3);
         QCOMPARE(lista[0].nombre, QString("Álvarez"));
         QCOMPARE(lista[1].nombre, QString("Martínez"));
@@ -167,7 +167,7 @@ private slots:
     }
 
     void listarProfesores_vacio() {
-        auto lista = m_servicio->listarProfesores();
+        auto lista = m_servicio->listarProfesores().valor;
         QVERIFY(lista.isEmpty());
     }
 

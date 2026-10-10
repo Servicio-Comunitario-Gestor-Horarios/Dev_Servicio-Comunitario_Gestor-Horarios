@@ -46,7 +46,7 @@ public:
 
     Resultado<CursoDTO> obtenerCurso(int id) const;
 
-    QVector<CursoDTO> listarCursos() const;
+    Resultado<QVector<CursoDTO>> listarCursos() const;
 
     Resultado<CursoDTO> actualizarCurso(int id,
                                         const QString& nombre,

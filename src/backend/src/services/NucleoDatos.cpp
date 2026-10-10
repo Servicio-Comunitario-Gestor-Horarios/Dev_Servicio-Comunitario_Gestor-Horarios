@@ -66,7 +66,7 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
 
 // ─── Docentes ──────────────────────────────────────────────────────────────
 
-QVector<ProfesorDTO> NucleoDatos::listarDocentes() const {
+Resultado<QVector<ProfesorDTO>> NucleoDatos::listarDocentes() const {
     return m_profesor.listarProfesores();
 }
 
@@ -103,7 +103,7 @@ bool NucleoDatos::eliminarDocente(const QString& id) {
 
 // ─── Aulas ─────────────────────────────────────────────────────────────────
 
-QVector<AulaDTO> NucleoDatos::listarAulas() const {
+Resultado<QVector<AulaDTO>> NucleoDatos::listarAulas() const {
     return m_aula.listarAulas();
 }
 
@@ -138,7 +138,7 @@ bool NucleoDatos::eliminarAula(int id) {
 
 // ─── Materias ──────────────────────────────────────────────────────────────
 
-QVector<MateriaDTO> NucleoDatos::listarMaterias() const {
+Resultado<QVector<MateriaDTO>> NucleoDatos::listarMaterias() const {
     return m_materias.listarMaterias();
 }
 
@@ -171,7 +171,7 @@ bool NucleoDatos::eliminarMateria(int id) {
 
 // ─── Planes de estudio ─────────────────────────────────────────────────────
 
-QVector<PlanDTO> NucleoDatos::listarPlanes() const {
+Resultado<QVector<PlanDTO>> NucleoDatos::listarPlanes() const {
     return m_planes.listarPlanes();
 }
 
@@ -205,7 +205,7 @@ bool NucleoDatos::eliminarPlan(const QString& codigo) {
 
 // ─── Cursos ────────────────────────────────────────────────────────────────
 
-QVector<CursoDTO> NucleoDatos::listarCursos() const {
+Resultado<QVector<CursoDTO>> NucleoDatos::listarCursos() const {
     return m_cursos.listarCursos();
 }
 
@@ -266,7 +266,7 @@ bool NucleoDatos::quitarMateriaDeCurso(int idCurso, int idMateria) {
 
 // ─── Turnos y recesos ──────────────────────────────────────────────────────
 
-QVector<TurnoDTO> NucleoDatos::listarTurnos() const {
+Resultado<QVector<TurnoDTO>> NucleoDatos::listarTurnos() const {
     return m_turnos.listarTurnos();
 }
 

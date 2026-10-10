@@ -63,6 +63,32 @@ private slots:
         QVERIFY(primaria.estaActiva());
     }
 
+    // ─── El enfoque conectado se invoca (cableado de la ventana) ───────────
+
+    void enfoque_receptorConectado_seInvoca()
+    {
+        const QString nombre = nombreUnico();
+
+        InstanciaUnica primaria(nombre);
+        QCOMPARE(primaria.iniciar(), Resultado::Primaria);
+
+        // Equivale al `connect` que hace el arranque del cliente con la ventana.
+        int enfoques = 0;
+        QObject::connect(&primaria, &InstanciaUnica::activarSolicitada, [&enfoques]() { ++enfoques; });
+
+        std::atomic<Resultado> resultadoSecundaria{Resultado::SinAcuse};
+        std::thread hilo([&]() {
+            InstanciaUnica secundaria(nombre, 3000);
+            resultadoSecundaria.store(secundaria.iniciar());
+        });
+
+        QTRY_VERIFY_WITH_TIMEOUT(enfoques >= 1, 5000);
+        hilo.join();
+
+        QCOMPARE(resultadoSecundaria.load(), Resultado::Secundaria);
+        QVERIFY(primaria.estaActiva());
+    }
+
     // ─── Sin acuse en el plazo → avisa y no arranca ────────────────────────
 
     void sinAcuse_enElPlazo_avisaYNoArranca()

@@ -1,7 +1,9 @@
 #include "backend/database/respaldo.hpp"
 
+#include "backend/database/apertura_base_datos.hpp"
 #include "backend/database/version_esquema.hpp"
 
+#include <QDebug>
 #include <QFile>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -24,6 +26,39 @@ namespace
         QString resultado = texto;
         resultado.replace(QLatin1Char('\''), QLatin1String("''"));
         return resultado;
+    }
+
+    /// Abre la base en `ruta` con una conexión temporal y delega el respaldo en
+    /// `respaldoFn`. Cierra y libera la conexión antes de volver.
+    bool respaldarArchivo(const QString& ruta, const QString& rutaRespaldo,
+                          const std::function<bool(QSqlDatabase&, const QString&, QString*)>& respaldoFn,
+                          QString* error)
+    {
+        const QString nombreConexion =
+            QStringLiteral("respaldo_descarte_%1")
+                .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+
+        bool ok = false;
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), nombreConexion);
+            db.setDatabaseName(ruta);
+
+            if (!db.open())
+            {
+                reportar(error,
+                         QStringLiteral("No se pudo abrir la base de datos para respaldarla."));
+            }
+            else
+            {
+                ok = respaldoFn(db, rutaRespaldo, error);
+                db.close();
+            }
+
+            db = QSqlDatabase();
+        }
+
+        QSqlDatabase::removeDatabase(nombreConexion);
+        return ok;
     }
 } // namespace
 
@@ -56,9 +91,12 @@ bool Respaldo::crearRespaldo(QSqlDatabase& db, const QString& rutaRespaldo, QStr
 
     if (!query.exec(sql))
     {
+        qWarning() << "No se pudo crear el respaldo:" << query.lastError().text();
         reportar(error,
-                 QStringLiteral("No se pudo crear el respaldo en «%1»: %2")
-                     .arg(rutaRespaldo, query.lastError().text()));
+                 QStringLiteral("No se pudo crear el respaldo en «%1». Verifique que haya espacio"
+                                " en disco y permisos de escritura en la carpeta de destino, e"
+                                " intente de nuevo.")
+                     .arg(rutaRespaldo));
         return false;
     }
 
@@ -120,17 +158,21 @@ bool Respaldo::validarRespaldo(const QString& rutaRespaldo, QString* error)
 
     if (!abierta)
     {
+        qWarning() << "No se pudo abrir el respaldo:" << detalle;
         reportar(error,
-                 QStringLiteral("No se pudo abrir el respaldo «%1»: %2")
-                     .arg(rutaRespaldo, detalle));
+                 QStringLiteral("No se pudo abrir el respaldo «%1». Compruebe que el archivo existe,"
+                                " no está en uso y es accesible, e intente de nuevo.")
+                     .arg(rutaRespaldo));
         return false;
     }
 
     if (!integridadOk)
     {
+        qWarning() << "El respaldo está dañado:" << detalle;
         reportar(error,
-                 QStringLiteral("El respaldo «%1» está dañado o no es una base de datos válida: %2")
-                     .arg(rutaRespaldo, detalle));
+                 QStringLiteral("El respaldo «%1» está dañado o no es una base de datos válida."
+                                " Elija otro respaldo o cree una base de datos nueva.")
+                     .arg(rutaRespaldo));
         return false;
     }
 
@@ -138,7 +180,8 @@ bool Respaldo::validarRespaldo(const QString& rutaRespaldo, QString* error)
     {
         reportar(error,
                  QStringLiteral("La versión de esquema del respaldo «%1» (%2) no es compatible"
-                                " con la esperada (%3).")
+                                " con la de esta aplicación (%3). Use un respaldo de una versión"
+                                " compatible o cree una base de datos nueva.")
                      .arg(rutaRespaldo)
                      .arg(version)
                      .arg(VersionEsquema::VERSION_ESQUEMA_ACTUAL));
@@ -200,4 +243,104 @@ bool Respaldo::restaurarRespaldo(const QString& rutaOrigen,
     }
 
     return true;
+}
+
+Respaldo::ResultadoDescarte
+Respaldo::descartarBaseYCrearNueva(const QString& ruta, const OpcionesDescarte& opciones)
+{
+    ResultadoDescarte resultado;
+
+    if (ruta.isEmpty())
+    {
+        resultado.estado = EstadoDescarte::FalloBase;
+        resultado.detalle = QStringLiteral("No se indicó la ruta de la base de datos.");
+        return resultado;
+    }
+
+    const auto respaldoFn =
+        opciones.respaldo
+            ? opciones.respaldo
+            : std::function<bool(QSqlDatabase&, const QString&, QString*)>(
+                  [](QSqlDatabase& db, const QString& rutaRespaldo, QString* error) -> bool {
+                      return Respaldo::crearRespaldo(db, rutaRespaldo, error);
+                  });
+
+    const auto crearFn =
+        opciones.crearNueva
+            ? opciones.crearNueva
+            : std::function<bool(const QString&, QString*)>(
+                  [](const QString& rutaNueva, QString* error) -> bool {
+                      const AperturaBaseDatos::Resultado res =
+                          AperturaBaseDatos::abrir(rutaNueva);
+                      if (!res.ok() && error)
+                          *error = res.detalle;
+                      return res.ok();
+                  });
+
+    // Sin base previa: no hay nada que respaldar ni descartar; se crea una nueva.
+    if (!QFile::exists(ruta))
+    {
+        QString error;
+        if (!crearFn(ruta, &error))
+        {
+            resultado.estado = EstadoDescarte::FalloCreacion;
+            resultado.detalle =
+                QStringLiteral("No se pudo crear la base de datos «%1». %2")
+                    .arg(ruta, error);
+            return resultado;
+        }
+
+        resultado.estado = EstadoDescarte::Ok;
+        resultado.detalle = QStringLiteral("No había una base anterior; se creó «%1».").arg(ruta);
+        return resultado;
+    }
+
+    // 1. Respaldo obligatorio antes de descartar.
+    const QDateTime ahora =
+        opciones.ahora.isValid() ? opciones.ahora : QDateTime::currentDateTime();
+    const QString rutaRespaldo = construirNombreRespaldo(ruta, ahora);
+
+    QString errorRespaldo;
+    if (!respaldarArchivo(ruta, rutaRespaldo, respaldoFn, &errorRespaldo))
+    {
+        resultado.estado = EstadoDescarte::FalloRespaldo;
+        resultado.detalle =
+            QStringLiteral("No se pudo respaldar la base «%1», así que no se descartó y no se"
+                           " creó una base nueva. Verifique el espacio en disco y los permisos, e"
+                           " intente de nuevo. %2")
+                .arg(ruta, errorRespaldo);
+        return resultado;
+    }
+
+    // Desde aquí el respaldo ya existe: se conserva su ruta aunque el descarte o
+    // la creación fallen, para poder ofrecer restaurarlo.
+    resultado.rutaRespaldo = rutaRespaldo;
+
+    // 2. Descartar la base anterior.
+    if (!QFile::remove(ruta))
+    {
+        resultado.estado = EstadoDescarte::FalloDescarte;
+        resultado.detalle =
+            QStringLiteral("Se respaldó la base anterior en «%1», pero no se pudo descartarla; no"
+                           " se creó una base nueva. Verifique los permisos e intente de nuevo.")
+                .arg(rutaRespaldo);
+        return resultado;
+    }
+
+    // 3. Crear la base nueva.
+    QString errorCreacion;
+    if (!crearFn(ruta, &errorCreacion))
+    {
+        resultado.estado = EstadoDescarte::FalloCreacion;
+        resultado.detalle =
+            QStringLiteral("Se descartó la base anterior, pero no se pudo crear la nueva. Puede"
+                           " restaurar el respaldo «%1». %2")
+                .arg(rutaRespaldo, errorCreacion);
+        return resultado;
+    }
+
+    resultado.estado = EstadoDescarte::Ok;
+    resultado.detalle =
+        QStringLiteral("Se respaldó la base anterior en «%1» y se creó una base nueva.").arg(rutaRespaldo);
+    return resultado;
 }

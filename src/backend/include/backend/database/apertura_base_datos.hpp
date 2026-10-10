@@ -59,6 +59,11 @@ namespace AperturaBaseDatos
         VersionEsquema::PasoMigracion paso;
         FuncionRespaldo respaldo;
         QDateTime ahora;
+
+        /// Observador de progreso de migración (RF-1): se invoca una vez por cada
+        /// paso, con la versión destino del paso, antes de aplicarlo. Permite a la
+        /// interfaz indicar que la migración está en marcha. Vacío = sin aviso.
+        std::function<void(int versionDestino)> progreso;
     };
 
     /// Abre la base de datos en `ruta` con los valores de producción.

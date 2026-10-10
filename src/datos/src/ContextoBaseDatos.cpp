@@ -45,12 +45,13 @@ AperturaBaseDatos::Resultado ContextoBaseDatos::abrir(const QString& ruta, const
 
     if (!m_conexion->open())
     {
+        qWarning() << "No se pudo abrir la base de datos para operar:" << m_conexion->lastError().text();
         AperturaBaseDatos::Resultado fallo;
         fallo.estado = AperturaBaseDatos::Estado::FalloApertura;
         fallo.detalle = QStringLiteral("No se pudo abrir la base de datos «%1» para operar con "
-                                       "ella. Verifique los permisos y el espacio en disco e "
-                                       "intente de nuevo. (Detalle: %2)")
-                            .arg(ruta, m_conexion->lastError().text());
+                                       "ella. Verifique que no esté en uso y que haya permisos de "
+                                       "lectura y escritura, e intente de nuevo.")
+                            .arg(ruta);
         cerrar();
         return fallo;
     }

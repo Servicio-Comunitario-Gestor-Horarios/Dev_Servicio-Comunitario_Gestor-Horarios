@@ -76,6 +76,15 @@ private:
         return total;
     }
 
+    /// Lee la versión de esquema almacenada en un archivo de base de datos.
+    int leerVersion(const QString& ruta)
+    {
+        QSqlDatabase db = abrirBase(ruta);
+        const int version = VersionEsquema::leerVersionEsquema(db);
+        cerrarBase(db);
+        return version;
+    }
+
 private slots:
 
     // ─── construirNombreRespaldo ────────────────────────────────────────────
@@ -231,6 +240,133 @@ private slots:
 
         // El destino conserva sus datos intactos.
         QCOMPARE(contarFilas(rutaDestino, "Profesores"), 2);
+    }
+
+    // ─── descartarBaseYCrearNueva (RF-4, RF-6) ─────────────────────────────
+
+    void descartarBaseYCrearNueva_respaldaYcreaNueva()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath("base.db");
+        crearBaseConDatos(rutaDb);
+        QCOMPARE(contarFilas(rutaDb, "Profesores"), 2);
+
+        const QDateTime ahora(QDate(2026, 10, 10), QTime(9, 15, 0));
+        Respaldo::OpcionesDescarte opciones;
+        opciones.ahora = ahora;
+
+        const Respaldo::ResultadoDescarte resultado =
+            Respaldo::descartarBaseYCrearNueva(rutaDb, opciones);
+
+        QVERIFY(resultado.ok());
+        QCOMPARE(resultado.estado, Respaldo::EstadoDescarte::Ok);
+        QCOMPARE(resultado.rutaRespaldo, Respaldo::construirNombreRespaldo(rutaDb, ahora));
+        QVERIFY(QFile::exists(resultado.rutaRespaldo));
+
+        // El respaldo conserva los datos anteriores.
+        QString error;
+        QVERIFY2(Respaldo::validarRespaldo(resultado.rutaRespaldo, &error), qPrintable(error));
+        QCOMPARE(contarFilas(resultado.rutaRespaldo, "Profesores"), 2);
+
+        // La base nueva tiene el esquema actual y está vacía.
+        QVERIFY(QFile::exists(rutaDb));
+        QCOMPARE(leerVersion(rutaDb), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+        QCOMPARE(contarFilas(rutaDb, "Profesores"), 0);
+    }
+
+    void descartarBaseYCrearNueva_respaldoImposible_noDescarta()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath("base.db");
+        crearBaseConDatos(rutaDb);
+
+        Respaldo::OpcionesDescarte opciones;
+        opciones.respaldo = [](QSqlDatabase&, const QString&, QString* error) -> bool {
+            if (error)
+                *error = QStringLiteral("no hay espacio en disco");
+            return false;
+        };
+
+        const Respaldo::ResultadoDescarte resultado =
+            Respaldo::descartarBaseYCrearNueva(rutaDb, opciones);
+
+        QCOMPARE(resultado.estado, Respaldo::EstadoDescarte::FalloRespaldo);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.rutaRespaldo.isEmpty());
+        QVERIFY(!resultado.detalle.isEmpty());
+        // La base anterior queda intacta: no se descartó sin respaldo.
+        QVERIFY(QFile::exists(rutaDb));
+        QCOMPARE(contarFilas(rutaDb, "Profesores"), 2);
+    }
+
+    void descartarBaseYCrearNueva_creacionFalla_conservaRespaldo()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath("base.db");
+        crearBaseConDatos(rutaDb);
+
+        const QDateTime ahora(QDate(2026, 10, 10), QTime(9, 30, 0));
+        Respaldo::OpcionesDescarte opciones;
+        opciones.ahora = ahora;
+        opciones.crearNueva = [](const QString&, QString* error) -> bool {
+            if (error)
+                *error = QStringLiteral("sin permisos de escritura");
+            return false;
+        };
+
+        const Respaldo::ResultadoDescarte resultado =
+            Respaldo::descartarBaseYCrearNueva(rutaDb, opciones);
+
+        QCOMPARE(resultado.estado, Respaldo::EstadoDescarte::FalloCreacion);
+        QVERIFY(!resultado.ok());
+        // Se descartó la base anterior...
+        QVERIFY(!QFile::exists(rutaDb));
+        // ...pero el respaldo sigue disponible para restaurar.
+        QCOMPARE(resultado.rutaRespaldo, Respaldo::construirNombreRespaldo(rutaDb, ahora));
+        QVERIFY(QFile::exists(resultado.rutaRespaldo));
+        QString error;
+        QVERIFY2(Respaldo::validarRespaldo(resultado.rutaRespaldo, &error), qPrintable(error));
+    }
+
+    void descartarBaseYCrearNueva_sinBase_creaNueva()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath("nueva.db");
+        QVERIFY(!QFile::exists(rutaDb));
+
+        const Respaldo::ResultadoDescarte resultado =
+            Respaldo::descartarBaseYCrearNueva(rutaDb);
+
+        QVERIFY(resultado.ok());
+        QVERIFY(resultado.rutaRespaldo.isEmpty());
+        QVERIFY(QFile::exists(rutaDb));
+        QCOMPARE(leerVersion(rutaDb), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+    }
+
+    // ─── Mensajes de error (RNF-1) ──────────────────────────────────────────
+
+    void respaldo_mensajeErrorSinTextoCrudoDeQt()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath("base.db");
+        crearBaseConDatos(rutaDb);
+
+        QSqlDatabase db = abrirBase(rutaDb);
+        // Directorio contenedor inexistente: el respaldo falla.
+        const QString rutaRespaldo = dir.filePath("no/existe/respaldo.db");
+        QString error;
+        QVERIFY(!Respaldo::crearRespaldo(db, rutaRespaldo, &error));
+        cerrarBase(db);
+
+        // RNF-1: mensaje en español, sin el texto crudo de Qt en inglés.
+        QVERIFY(!error.isEmpty());
+        QVERIFY(!error.contains("unable to", Qt::CaseInsensitive));
+        QVERIFY(!error.contains("no such", Qt::CaseInsensitive));
     }
 };
 

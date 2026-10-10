@@ -73,18 +73,23 @@ struct Resultado {
     bool    ok() const;     // true solo para OkCreada | OkAbierta | OkMigrada
 };
 
-struct Opciones { /* versionEsperada, paso, respaldo, ahora — inyectables en tests */ };
+struct Opciones { /* versionEsperada, paso, respaldo, ahora, progreso — inyectables en tests */ };
 
 Resultado abrir(const QString& ruta);                 // valores de producción
 Resultado abrir(const QString& ruta, const Opciones& opciones);
 }
 ```
 
+`Opciones::progreso` es un callback `std::function<void(int versionDestino)>` que se invoca una vez
+por cada paso de migración, antes de aplicarlo (RF-1). Permite a la interfaz indicar que la
+migración está en marcha. Vacío = sin aviso.
+
 **Cómo lo trata el frontend:**
 - `ok() == true` → continuar el arranque; si `estado == OkMigrada`, puede informar del respaldo.
 - `ok() == false` → diálogo de fallo RF-4 (Reintentar / Restaurar respaldo / Crear base nueva /
   Salir). Deshabilitar «Crear base nueva» si el motivo es `FalloRespaldo`. `rutaRespaldo` no vacío
   permite ofrecer restaurarlo.
+- Para «Crear base nueva» sobre una base dañada, usar `Respaldo::descartarBaseYCrearNueva` (ver 2.3).
 
 ### 2.2 `VersionEsquema` — versión de esquema (implementado)
 
@@ -118,12 +123,32 @@ QString construirNombreRespaldo(const QString& rutaDb, const QDateTime& ahora); 
 bool crearRespaldo(QSqlDatabase& db, const QString& rutaRespaldo, QString* error = nullptr);
 bool validarRespaldo(const QString& rutaRespaldo, QString* error = nullptr);   // integridad + versión
 bool restaurarRespaldo(const QString& rutaOrigen, const QString& rutaDestino, QString* error = nullptr);
+
+// Crear base nueva descartando la anterior, con respaldo obligatorio:
+enum class EstadoDescarte { Ok, FalloBase, FalloRespaldo, FalloDescarte, FalloCreacion };
+struct ResultadoDescarte {
+    EstadoDescarte estado = EstadoDescarte::FalloBase;
+    QString detalle;        // texto en español (causa + acciones)
+    QString rutaRespaldo;   // respaldo creado, si lo hubo (útil para restaurar)
+    bool ok() const;        // true solo para Ok
+};
+struct OpcionesDescarte { /* ahora, respaldo, crearNueva — inyectables en tests */ };
+ResultadoDescarte descartarBaseYCrearNueva(const QString& ruta,
+                                           const OpcionesDescarte& opciones = {});
 }
 ```
 
 **Cómo lo trata el frontend:** para «Restaurar respaldo» (RF-4), llamar a
 `restaurarRespaldo(origen, rutaBaseActual, &error)`; si falla, mostrar `error` y reabrir el diálogo;
 si tiene éxito, reintentar la apertura.
+
+Para «Crear base de datos nueva» (RF-4, RF-6), llamar a `descartarBaseYCrearNueva(rutaBaseActual)`:
+- `Ok` → base nueva creada; continuar el arranque.
+- `FalloRespaldo` → **no se descartó** nada; informar y dejar la opción deshabilitada (no se puede
+  descartar sin respaldo).
+- `FalloCreacion` → se descartó la anterior pero no se pudo crear la nueva; ofrecer restaurar
+  `rutaRespaldo`.
+- `FalloDescarte` → se respaldó pero no se pudo descartar; informar `detalle`.
 
 ### 2.4 `NucleoDatos` — fachada de dominios (implementado)
 
@@ -140,7 +165,7 @@ public:
     explicit NucleoDatos(QSqlDatabase& db);
 
     // Docentes (la tabla/servicio se llama "Profesor"; la fachada usa "Docente")
-    QVector<ProfesorDTO>   listarDocentes() const;
+    Resultado<QVector<ProfesorDTO>> listarDocentes() const;
     Resultado<ProfesorDTO> crearDocente(const QString& id, const QString& nombre,
                                         const QString& email, const QString& telefono = QString());
     Resultado<ProfesorDTO> actualizarDocente(const QString& id, const QString& nombre,
@@ -148,7 +173,7 @@ public:
     bool                   eliminarDocente(const QString& id);
 
     // Aulas
-    QVector<AulaDTO>    listarAulas() const;
+    Resultado<QVector<AulaDTO>> listarAulas() const;
     Resultado<AulaDTO>  crearAula(const QString& nombre, int capacidad,
                                   const QString& edificio = QString(), const QString& piso = QString());
     Resultado<AulaDTO>  actualizarAula(int id, const QString& nombre, int capacidad,
@@ -156,13 +181,13 @@ public:
     bool                eliminarAula(int id);
 
     // Materias
-    QVector<MateriaDTO>    listarMaterias() const;
+    Resultado<QVector<MateriaDTO>> listarMaterias() const;
     Resultado<MateriaDTO>  crearMateria(const QString& nombre, const QString& requisitos = QString());
     Resultado<MateriaDTO>  actualizarMateria(int id, const QString& nombre, const QString& requisitos = QString());
     bool                   eliminarMateria(int id);
 
     // Planes de estudio
-    QVector<PlanDTO>   listarPlanes() const;
+    Resultado<QVector<PlanDTO>> listarPlanes() const;
     Resultado<PlanDTO> crearPlan(const QString& codigo, const QString& nombre,
                                  const QString& descripcion = QString());
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
@@ -170,7 +195,7 @@ public:
     bool               eliminarPlan(const QString& codigo);
 
     // Cursos y su relación con materias
-    QVector<CursoDTO>        listarCursos() const;
+    Resultado<QVector<CursoDTO>> listarCursos() const;
     Resultado<CursoDTO>      crearCurso(const QString& nombre, const QString& turno = QString(),
                                         int aulaFija = -1, int numEstudiantes = 0,
                                         const QString& codigoPlan = QString());
@@ -182,7 +207,7 @@ public:
     bool                     quitarMateriaDeCurso(int idCurso, int idMateria);
 
     // Turnos y recesos
-    QVector<TurnoDTO>   listarTurnos() const;
+    Resultado<QVector<TurnoDTO>> listarTurnos() const;
     Resultado<TurnoDTO> crearTurno(const QString& nombre, const QTime& inicio, const QTime& fin, int numSlots);
     Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio, const QTime& fin, int numSlots);
     bool                eliminarTurno(const QString& nombre);
@@ -216,7 +241,8 @@ public:
 | `RecesoDTO` | `despuesDeSlot`, `duracion` (minutos), `inicio`, `fin` (pueden ser inválidos) |
 
 **Contrato de las operaciones:**
-- Los `listar*` devuelven el `QVector` directamente (vacío = sin datos o error de lectura); los
+- Los `listar*` devuelven `Resultado<QVector<Dto>>`: distinguen **error de lectura** (`!ok`, con
+  `mensajeError`) de **sin datos** (`ok` con vector `valor` vacío). Los
   `crear*`/`actualizar*`/`asignar*`/`agregar*` devuelven `Resultado<T>`; los `eliminar*`, `quitar*`
   y `eliminarConCascada` devuelven `bool`.
 - Cada escritura es atómica en su servicio. Si falla, **no queda aplicada** y se registra como
@@ -224,10 +250,12 @@ public:
 - `eliminarConCascada` ejecuta el borrado del registro y de todos sus dependientes en **una sola
   transacción**: si falla cualquier parte, revierte y devuelve `false` sin cambios parciales.
 
-**Cómo lo trata el frontend:** poblar las listas con los `listar*` al abrir cada vista; en las
-altas/modificaciones usar el `Resultado<T>` (`ok`/`mensajeError`); antes de una baja consultar
-`dependientesDe` y pedir confirmación explícita con la lista de `Dependencia::descripcion`; tras el
-éxito, refrescar la vista; ante error, mostrar `mensajeError` y **no** dar la operación por hecha.
+**Cómo lo trata el frontend:** poblar las listas con los `listar*` al abrir cada vista; como ahora
+devuelven `Resultado<QVector<Dto>>`, comprobar `ok`: si es `false`, mostrar `mensajeError` y **no**
+presentar la lista como vacía; en las altas/modificaciones usar el `Resultado<T>`
+(`ok`/`mensajeError`); antes de una baja consultar `dependientesDe` y pedir confirmación explícita
+con la lista de `Dependencia::descripcion`; tras el éxito, refrescar la vista; ante error, mostrar
+`mensajeError` y **no** dar la operación por hecha.
 
 #### 2.4.1 Eliminación en cascada (`cascada.hpp`)
 
@@ -352,9 +380,11 @@ signals:
 enfocó, acuse recibido: salir sin arrancar), `SinAcuse` (había otra pero no respondió en plazo:
 avisar con `detalle()` y no arrancar).
 
-**Cómo lo trata el frontend:** conectar `activarSolicitada()` a levantar/enfocar la ventana (o el
-diálogo de fallo/migración activo); con `Secundaria` salir con éxito; con `SinAcuse` mostrar
-`detalle()` y salir con error.
+**Cómo lo trata el frontend:** el arranque del cliente (`src/app`) ya conecta
+`activarSolicitada()` a `MainWindow` (`showNormal()` + `raise()` + `activateWindow()`), de modo que
+un segundo arranque trae la ventana al frente. El equipo de frontend puede extender ese enfoque al
+diálogo de fallo/migración que tenga abierto. Con `Secundaria` salir con éxito; con `SinAcuse`
+mostrar `detalle()` y salir con error.
 
 ### 2.7 `ContextoBaseDatos` — ciclo de vida de la base del cliente (implementado)
 

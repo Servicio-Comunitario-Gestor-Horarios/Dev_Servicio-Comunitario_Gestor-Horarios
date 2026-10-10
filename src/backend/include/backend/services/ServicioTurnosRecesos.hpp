@@ -43,7 +43,7 @@ public:
 
     Resultado<TurnoDTO> obtenerTurno(const QString& nombre) const;
 
-    QVector<TurnoDTO> listarTurnos() const;
+    Resultado<QVector<TurnoDTO>> listarTurnos() const;
 
     Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio,
                                         const QTime& fin, int numSlots);

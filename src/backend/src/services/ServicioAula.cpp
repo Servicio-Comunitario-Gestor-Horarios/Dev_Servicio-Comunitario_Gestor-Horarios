@@ -111,7 +111,7 @@ Resultado<AulaDTO> ServicioAula::obtenerAula(int id) const {
     return Resultado<AulaDTO>::exito(mapearARecord(query.record()));
 }
 
-QVector<AulaDTO> ServicioAula::listarAulas() const {
+Resultado<QVector<AulaDTO>> ServicioAula::listarAulas() const {
     QVector<AulaDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -119,14 +119,16 @@ QVector<AulaDTO> ServicioAula::listarAulas() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar aulas:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<AulaDTO>>::error(
+            QStringLiteral("No se pudieron leer las aulas registradas. Compruebe que la base de"
+                           " datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
 
-    return resultados;
+    return Resultado<QVector<AulaDTO>>::exito(resultados);
 }
 
 Resultado<AulaDTO> ServicioAula::actualizarAula(int id, const QString& nombre, int capacidad,
@@ -186,9 +188,14 @@ bool ServicioAula::eliminarAula(int id) {
 
 QVector<Aula> ServicioAula::obtenerTodasParaSolver() const {
     QVector<Aula> aulas;
-    auto dtoList = listarAulas();
+    const auto dtoResultado = listarAulas();
 
-    for (const auto& dto : dtoList) {
+    if (!dtoResultado.ok) {
+        qCritical() << "No se pudieron leer las aulas para el solver:" << dtoResultado.mensajeError;
+        return aulas;
+    }
+
+    for (const auto& dto : dtoResultado.valor) {
         aulas.append(dto.toAula());
     }
 

@@ -7,6 +7,8 @@
  * Inicializa la interfaz gráfica y el gestor de proceso backend.
  */
 
+class InstanciaUnica;
+
 /**
  * @brief Ejecuta la aplicación en modo frontend.
  *
@@ -22,6 +24,8 @@
  *
  * @param argc Número de argumentos de línea de comandos.
  * @param argv Arreglo de argumentos de línea de comandos.
+ * @param instanciaUnica Detector de instancia única ya iniciado (RF-5). Si no es
+ *        nulo, se conecta su señal `activarSolicitada()` al enfoque de la ventana.
  * @return Código de salida de la aplicación (0 = éxito).
  */
-int ejecutarAplicacionFrontend(int argc, char *argv[]);
+int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica = nullptr);

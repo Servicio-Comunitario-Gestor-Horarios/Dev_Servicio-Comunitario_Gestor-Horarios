@@ -195,7 +195,7 @@ private slots:
         const auto creado = m_nucleo->crearAula(QStringLiteral("Aula 101"), 30,
                                                 QStringLiteral("Edificio A"));
         QVERIFY(!creado.ok);
-        QVERIFY(m_nucleo->listarAulas().isEmpty());
+        QVERIFY(m_nucleo->listarAulas().valor.isEmpty());
 
         QVERIFY(m_nucleo->hayPendientes());
         const auto pendientes = m_nucleo->gestorPendientes().pendientes();
@@ -213,8 +213,8 @@ private slots:
         const auto reintento = m_nucleo->reintentarPendiente(id);
         QVERIFY(reintento.ok);
         QVERIFY(!m_nucleo->hayPendientes());
-        QCOMPARE(m_nucleo->listarAulas().size(), 1);
-        QCOMPARE(m_nucleo->listarAulas().first().nombre, QStringLiteral("Aula 101"));
+        QCOMPARE(m_nucleo->listarAulas().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarAulas().valor.first().nombre, QStringLiteral("Aula 101"));
     }
 
     void nucleo_falloDeBaja_registraPendienteEliminarYReintentoBorra()
@@ -228,7 +228,7 @@ private slots:
 
         QVERIFY(!m_nucleo->eliminarAula(aula.valor.id));
         // La baja no aplicada se conserva en la base (y en pantalla, en el frontend).
-        QCOMPARE(m_nucleo->listarAulas().size(), 1);
+        QCOMPARE(m_nucleo->listarAulas().valor.size(), 1);
         QVERIFY(m_nucleo->hayPendientes());
 
         const auto pendientes = m_nucleo->gestorPendientes().pendientes();
@@ -241,7 +241,7 @@ private slots:
         QVERIFY(ejecutar(QStringLiteral("DROP TRIGGER fallo_delete_aulas")));
         const auto reintento = m_nucleo->reintentarPendiente(pendientes.first().id);
         QVERIFY(reintento.ok);
-        QVERIFY(m_nucleo->listarAulas().isEmpty());
+        QVERIFY(m_nucleo->listarAulas().valor.isEmpty());
         QVERIFY(!m_nucleo->hayPendientes());
     }
 

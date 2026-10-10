@@ -92,7 +92,7 @@ private slots:
         m_servicio->crearPlan("A-PLAN", "Plan A");
         m_servicio->crearPlan("M-PLAN", "Plan M");
 
-        auto lista = m_servicio->listarPlanes();
+        auto lista = m_servicio->listarPlanes().valor;
         QCOMPARE(lista.size(), 3);
 
         // Ordenado por código

@@ -84,10 +84,10 @@ private slots:
         ContextoBaseDatos contexto;
         QVERIFY(contexto.abrir(ruta).ok());
 
-        const int antes = contexto.nucleo().listarMaterias().size();
+        const int antes = contexto.nucleo().listarMaterias().valor.size();
         const auto alta = contexto.nucleo().crearMateria(QStringLiteral("Matemáticas"));
         QVERIFY(alta.ok);
-        QCOMPARE(contexto.nucleo().listarMaterias().size(), antes + 1);
+        QCOMPARE(contexto.nucleo().listarMaterias().valor.size(), antes + 1);
     }
 
     void abrir_versionActual_abreSinRespaldo()
@@ -153,7 +153,7 @@ private slots:
 
         // Cada contexto opera sobre su propia base.
         QVERIFY(uno.nucleo().crearMateria(QStringLiteral("SoloUno")).ok);
-        QCOMPARE(otro.nucleo().listarMaterias().size(), 0);
+        QCOMPARE(otro.nucleo().listarMaterias().valor.size(), 0);
     }
 
     void abrir_reintentoSobreAbierto_cierraAnterior()
@@ -192,7 +192,7 @@ private slots:
 
         QCOMPARE(resultado.estado, Estado::OkAbierta);
         QVERIFY(resultado.ok());
-        QCOMPARE(reabierto.nucleo().listarMaterias().size(), 1);
+        QCOMPARE(reabierto.nucleo().listarMaterias().valor.size(), 1);
     }
 
     void rutaPorDefecto_noVacia()

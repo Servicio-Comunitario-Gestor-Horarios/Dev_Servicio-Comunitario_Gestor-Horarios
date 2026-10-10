@@ -160,6 +160,17 @@ namespace AperturaBaseDatos
                           return Migracion::aplicarPaso(conexion, destino);
                       });
 
+        // Observador de progreso: se envuelve el paso para avisar antes de cada uno.
+        const std::function<void(int)>& progreso = opciones.progreso;
+        const VersionEsquema::PasoMigracion pasoConProgreso =
+            progreso
+                ? VersionEsquema::PasoMigracion(
+                      [paso, progreso](QSqlDatabase& conexion, int destino) -> bool {
+                          progreso(destino);
+                          return paso(conexion, destino);
+                      })
+                : paso;
+
         const FuncionRespaldo respaldo =
             opciones.respaldo ? opciones.respaldo
                               : FuncionRespaldo(
@@ -186,14 +197,17 @@ namespace AperturaBaseDatos
 
             if (!db.open())
             {
+                qWarning() << "No se pudo abrir la base de datos:" << db.lastError().text();
                 resultado.estado = Estado::FalloApertura;
                 resultado.detalle =
-                    QStringLiteral("No se pudo abrir la base de datos «%1»: %2")
-                        .arg(ruta, db.lastError().text());
+                    QStringLiteral("No se pudo abrir la base de datos «%1». Verifique que el archivo"
+                                   " no esté en uso y que haya permisos de lectura y escritura, e"
+                                   " intente de nuevo.")
+                        .arg(ruta);
             }
             else
             {
-                resultado = procesar(db, ruta, existe, versionEsperada, paso, respaldo, ahora);
+                resultado = procesar(db, ruta, existe, versionEsperada, pasoConProgreso, respaldo, ahora);
                 db.close();
             }
 

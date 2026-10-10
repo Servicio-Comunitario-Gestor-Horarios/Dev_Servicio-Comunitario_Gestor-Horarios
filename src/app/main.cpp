@@ -7,7 +7,8 @@
 #include "app/instancia_unica.hpp"
 
 // Declaraciones de los módulos de aplicación
-int ejecutarAplicacionFrontend(int argc, char *argv[]);
+class InstanciaUnica;
+int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica);
 int ejecutarAplicacionBackend(int argc, char *argv[]);
 
 /**
@@ -71,6 +72,7 @@ int main(int argc, char *argv[])
     }
 
     // Somos la instancia principal: continuar el arranque del cliente (base de
-    // datos y núcleo de datos), delegado en `ejecutarAplicacionFrontend`.
-    return ejecutarAplicacionFrontend(argc, argv);
+    // datos y núcleo de datos), delegado en `ejecutarAplicacionFrontend`, al que
+    // se le pasa el detector para enfocar la ventana si otra instancia lo pide.
+    return ejecutarAplicacionFrontend(argc, argv, &instanciaUnica);
 }

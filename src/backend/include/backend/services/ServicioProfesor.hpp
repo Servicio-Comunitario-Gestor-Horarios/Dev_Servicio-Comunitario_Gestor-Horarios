@@ -50,7 +50,7 @@ public:
 
     Resultado<ProfesorDTO> obtenerProfesor(const QString& id) const;
 
-    QVector<ProfesorDTO>   listarProfesores() const;
+    Resultado<QVector<ProfesorDTO>> listarProfesores() const;
 
     Resultado<ProfesorDTO> actualizarProfesor(const QString& id,
                                               const QString& nombre,

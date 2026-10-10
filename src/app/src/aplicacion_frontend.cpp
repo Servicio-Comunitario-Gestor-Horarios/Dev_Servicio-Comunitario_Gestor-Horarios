@@ -1,5 +1,6 @@
 #include "app/aplicacion_frontend.hpp"
 #include "app/gestor_proceso_backend.hpp"
+#include "app/instancia_unica.hpp"
 #include "logindialog.h"
 #include "views/main_window.hpp"
 
@@ -11,7 +12,7 @@
 #include "datos/ContextoBaseDatos.hpp"
 #endif
 
-int ejecutarAplicacionFrontend(int argc, char *argv[])
+int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica)
 {
     Q_UNUSED(argc);
     Q_UNUSED(argv);
@@ -62,6 +63,19 @@ int ejecutarAplicacionFrontend(int argc, char *argv[])
     ventana.setNucleoDatos(&contexto.nucleo());
 #endif
     ventana.show();
+
+    // 5. Enfoque de la instancia existente (RF-5): si otra instancia pide activar,
+    //    traer esta ventana al frente. La detección sigue activa durante toda la
+    //    sesión (la mantiene viva `main.cpp`).
+    if (instanciaUnica)
+    {
+        QObject::connect(instanciaUnica, &InstanciaUnica::activarSolicitada, &ventana,
+                         [&ventana]() {
+                             ventana.showNormal();
+                             ventana.raise();
+                             ventana.activateWindow();
+                         });
+    }
 
     return QApplication::exec();
 }

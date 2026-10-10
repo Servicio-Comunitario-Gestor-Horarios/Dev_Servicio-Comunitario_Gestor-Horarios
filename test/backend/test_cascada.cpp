@@ -292,12 +292,12 @@ private slots:
 
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("plan"), QStringLiteral("IS-2026")));
 
-        QCOMPARE(m_nucleo->listarPlanes().size(), 0);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 0);
         QCOMPARE(contar(QStringLiteral("PlanEstudio_Materia")), 0);
         QCOMPARE(contar(QStringLiteral("Cursos")), 0);
         QCOMPARE(contar(QStringLiteral("Curso_Materia")), 0);
         // La materia en sí no es un dependiente del plan: se conserva.
-        QCOMPARE(m_nucleo->listarMaterias().size(), 1);
+        QCOMPARE(m_nucleo->listarMaterias().valor.size(), 1);
     }
 
     void eliminarConCascada_materia_borraSusVinculos()
@@ -317,14 +317,14 @@ private slots:
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("materia"),
                                              QString::number(materia.valor.id)));
 
-        QCOMPARE(m_nucleo->listarMaterias().size(), 0);
+        QCOMPARE(m_nucleo->listarMaterias().valor.size(), 0);
         QCOMPARE(contar(QStringLiteral("PlanEstudio_Materia")), 0);
         QCOMPARE(contar(QStringLiteral("Profesor_Materia")), 0);
         QCOMPARE(contar(QStringLiteral("Curso_Materia")), 0);
         // El plan, el docente y el curso se conservan.
-        QCOMPARE(m_nucleo->listarPlanes().size(), 1);
-        QCOMPARE(m_nucleo->listarDocentes().size(), 1);
-        QCOMPARE(m_nucleo->listarCursos().size(), 1);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarCursos().valor.size(), 1);
     }
 
     void eliminarConCascada_curso_borraCursoMateria()
@@ -338,9 +338,9 @@ private slots:
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("curso"),
                                              QString::number(curso.valor.id)));
 
-        QCOMPARE(m_nucleo->listarCursos().size(), 0);
+        QCOMPARE(m_nucleo->listarCursos().valor.size(), 0);
         QCOMPARE(contar(QStringLiteral("Curso_Materia")), 0);
-        QCOMPARE(m_nucleo->listarMaterias().size(), 1);
+        QCOMPARE(m_nucleo->listarMaterias().valor.size(), 1);
     }
 
     void eliminarConCascada_registroInexistente_falla()
@@ -374,16 +374,16 @@ private slots:
                                               QStringLiteral("IS-2026")));
 
         // Nada aplicado: el plan, el vínculo y el curso siguen ahí.
-        QCOMPARE(m_nucleo->listarPlanes().size(), 1);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 1);
         QCOMPARE(contar(QStringLiteral("PlanEstudio_Materia")), 1);
-        QCOMPARE(m_nucleo->listarCursos().size(), 1);
+        QCOMPARE(m_nucleo->listarCursos().valor.size(), 1);
         QCOMPARE(contar(QStringLiteral("Curso_Materia")), 1);
 
         // Retirado el trigger, la cascada vuelve a funcionar.
         QVERIFY(ejecutar(QStringLiteral("DROP TRIGGER fallo_cascada")));
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("plan"),
                                              QStringLiteral("IS-2026")));
-        QCOMPARE(m_nucleo->listarPlanes().size(), 0);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 0);
         QCOMPARE(contar(QStringLiteral("PlanEstudio_Materia")), 0);
     }
 };

@@ -261,6 +261,98 @@ private slots:
         QVERIFY(!resultado.rutaRespaldo.isEmpty());
         QVERIFY(QFile::exists(resultado.rutaRespaldo));
     }
+
+    // ─── Progreso de migración (RF-1) ───────────────────────────────────────
+
+    void migracion_notificaProgresoPorPaso()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("progreso.db");
+        crearBaseVersion(ruta, 1);
+
+        QVector<int> pasos;
+        Opciones opciones;
+        opciones.versionEsperada = 2;
+        opciones.respaldo = [](QSqlDatabase& db, const QString& rutaResp,
+                               QString* error) -> bool {
+            return Respaldo::crearRespaldo(db, rutaResp, error);
+        };
+        opciones.paso = [](QSqlDatabase& db, int destino) -> bool {
+            QSqlQuery query(db);
+            return query.exec(QStringLiteral("CREATE TABLE DominioV%1 (id INTEGER PRIMARY KEY)")
+                                  .arg(destino));
+        };
+        opciones.progreso = [&pasos](int destino) { pasos.append(destino); };
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
+
+        QCOMPARE(resultado.estado, Estado::OkMigrada);
+        QVERIFY(resultado.ok());
+        QCOMPARE(pasos, QVector<int>({2}));
+    }
+
+    void migracion_notificaCadaPaso()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("progreso_multipaso.db");
+        crearBaseVersion(ruta, 1);
+
+        QVector<int> pasos;
+        Opciones opciones;
+        opciones.versionEsperada = 3;
+        opciones.respaldo = [](QSqlDatabase& db, const QString& rutaResp,
+                               QString* error) -> bool {
+            return Respaldo::crearRespaldo(db, rutaResp, error);
+        };
+        opciones.paso = [](QSqlDatabase& db, int destino) -> bool {
+            QSqlQuery query(db);
+            return query.exec(QStringLiteral("CREATE TABLE DominioV%1 (id INTEGER PRIMARY KEY)")
+                                  .arg(destino));
+        };
+        opciones.progreso = [&pasos](int destino) { pasos.append(destino); };
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
+
+        QCOMPARE(resultado.estado, Estado::OkMigrada);
+        QVERIFY(resultado.ok());
+        QCOMPARE(pasos, QVector<int>({2, 3}));
+    }
+
+    void sinMigracion_noNotificaProgreso()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("sin_migracion.db");
+        crearBaseVersion(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+        bool notificado = false;
+        Opciones opciones;
+        opciones.progreso = [&notificado](int) { notificado = true; };
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
+
+        QCOMPARE(resultado.estado, Estado::OkAbierta);
+        QVERIFY(!notificado);
+    }
+
+    // ─── Mensajes de error (RNF-1) ──────────────────────────────────────────
+
+    void abrir_noAbrible_mensajeSinTextoCrudoDeQt()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        // Directorio contenedor inexistente: SQLite no puede crear el archivo.
+        const QString ruta = dir.filePath("sub/no_existe/base.db");
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloApertura);
+        QVERIFY(!resultado.detalle.isEmpty());
+        QVERIFY(!resultado.detalle.contains("unable to", Qt::CaseInsensitive));
+        QVERIFY(!resultado.detalle.contains("no such", Qt::CaseInsensitive));
+    }
 };
 
 QTEST_MAIN(TestAperturaBaseDatos)

@@ -85,7 +85,7 @@ Resultado<PlanDTO> ServicioPlanesEstudio::obtenerPlan(const QString& codigo) con
     return Resultado<PlanDTO>::exito(mapearARecord(query.record()));
 }
 
-QVector<PlanDTO> ServicioPlanesEstudio::listarPlanes() const {
+Resultado<QVector<PlanDTO>> ServicioPlanesEstudio::listarPlanes() const {
     QVector<PlanDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -93,14 +93,16 @@ QVector<PlanDTO> ServicioPlanesEstudio::listarPlanes() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar planes:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<PlanDTO>>::error(
+            QStringLiteral("No se pudieron leer los planes de estudio registrados. Compruebe que"
+                           " la base de datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
         resultados.append(mapearARecord(query.record()));
     }
 
-    return resultados;
+    return Resultado<QVector<PlanDTO>>::exito(resultados);
 }
 
 Resultado<PlanDTO> ServicioPlanesEstudio::actualizarPlan(const QString& codigo, const QString& nombre,

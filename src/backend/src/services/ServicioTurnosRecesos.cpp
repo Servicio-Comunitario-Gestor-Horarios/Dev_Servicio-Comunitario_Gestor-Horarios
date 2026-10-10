@@ -128,7 +128,7 @@ Resultado<TurnoDTO> ServicioTurnosRecesos::obtenerTurno(const QString& nombre) c
     return Resultado<TurnoDTO>::exito(dto);
 }
 
-QVector<TurnoDTO> ServicioTurnosRecesos::listarTurnos() const {
+Resultado<QVector<TurnoDTO>> ServicioTurnosRecesos::listarTurnos() const {
     QVector<TurnoDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -136,7 +136,9 @@ QVector<TurnoDTO> ServicioTurnosRecesos::listarTurnos() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar turnos:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<TurnoDTO>>::error(
+            QStringLiteral("No se pudieron leer los turnos registrados. Compruebe que la base de"
+                           " datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
@@ -145,7 +147,7 @@ QVector<TurnoDTO> ServicioTurnosRecesos::listarTurnos() const {
         resultados.append(dto);
     }
 
-    return resultados;
+    return Resultado<QVector<TurnoDTO>>::exito(resultados);
 }
 
 Resultado<TurnoDTO> ServicioTurnosRecesos::actualizarTurno(const QString& nombre,

@@ -221,7 +221,7 @@ Resultado<ProfesorDTO> ServicioProfesor::obtenerProfesor(const QString& id) cons
     return Resultado<ProfesorDTO>::exito(dto);
 }
 
-QVector<ProfesorDTO> ServicioProfesor::listarProfesores() const {
+Resultado<QVector<ProfesorDTO>> ServicioProfesor::listarProfesores() const {
     QVector<ProfesorDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -230,7 +230,9 @@ QVector<ProfesorDTO> ServicioProfesor::listarProfesores() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar profesores:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<ProfesorDTO>>::error(
+            QStringLiteral("No se pudieron leer los docentes registrados. Compruebe que la base de"
+                           " datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
@@ -246,7 +248,7 @@ QVector<ProfesorDTO> ServicioProfesor::listarProfesores() const {
                   return QString::localeAwareCompare(a.nombre, b.nombre) < 0;
               });
 
-    return resultados;
+    return Resultado<QVector<ProfesorDTO>>::exito(resultados);
 }
 
 Resultado<ProfesorDTO> ServicioProfesor::actualizarProfesor(const QString& id,
@@ -482,10 +484,17 @@ bool ServicioProfesor::limpiarMaterias(const QString& idProfesor) {
 
 QVector<Profesor> ServicioProfesor::obtenerTodosParaSolver() const {
     QVector<Profesor> profesores;
-    auto dtoList = listarProfesores();
-    profesores.reserve(dtoList.size());
+    const auto dtoResultado = listarProfesores();
 
-    for (const auto& dto : dtoList) {
+    if (!dtoResultado.ok) {
+        qCritical() << "No se pudieron leer los docentes para el solver:"
+                    << dtoResultado.mensajeError;
+        return profesores;
+    }
+
+    profesores.reserve(dtoResultado.valor.size());
+
+    for (const auto& dto : dtoResultado.valor) {
         profesores.append(dto.toProfesor());
     }
 

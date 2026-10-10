@@ -77,21 +77,41 @@ private slots:
         QVERIFY(tablaExiste(QStringLiteral("Recesos")));
     }
 
+    // ─── Contrato de lectura: error vs vacío (RF-3) ─────────────────────────
+
+    void listar_vacio_devuelveExitoConListaVacia()
+    {
+        const auto aulas = m_nucleo->listarAulas();
+        QVERIFY(aulas.ok);
+        QVERIFY(aulas.valor.isEmpty());
+    }
+
+    void listar_falloDeLectura_devuelveError()
+    {
+        // Cerrar la conexión fuerza que la siguiente consulta falle.
+        m_dbManager->database().close();
+
+        const auto aulas = m_nucleo->listarAulas();
+        QVERIFY(!aulas.ok);
+        QVERIFY(!aulas.mensajeError.isEmpty());
+        QVERIFY(aulas.valor.isEmpty());
+    }
+
     // ─── Docentes ───────────────────────────────────────────────────────────
 
     void docentes_altaModificacionBaja()
     {
         auto creado = m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com", "555");
         QVERIFY(creado.ok);
-        QCOMPARE(m_nucleo->listarDocentes().size(), 1);
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 1);
 
         auto actualizado =
             m_nucleo->actualizarDocente("P1", "Ana Gómez", "ana@test.com", "777");
         QVERIFY(actualizado.ok);
-        QCOMPARE(m_nucleo->listarDocentes().first().nombre, QStringLiteral("Ana Gómez"));
+        QCOMPARE(m_nucleo->listarDocentes().valor.first().nombre, QStringLiteral("Ana Gómez"));
 
         QVERIFY(m_nucleo->eliminarDocente("P1"));
-        QVERIFY(m_nucleo->listarDocentes().isEmpty());
+        QVERIFY(m_nucleo->listarDocentes().valor.isEmpty());
     }
 
     // ─── Aulas ──────────────────────────────────────────────────────────────
@@ -100,15 +120,15 @@ private slots:
     {
         auto creado = m_nucleo->crearAula("Aula 101", 30, "Edificio A", "Piso 1");
         QVERIFY(creado.ok);
-        QCOMPARE(m_nucleo->listarAulas().size(), 1);
+        QCOMPARE(m_nucleo->listarAulas().valor.size(), 1);
 
         auto actualizado = m_nucleo->actualizarAula(creado.valor.id, "Aula 101", 45,
                                                     "Edificio B", "Piso 2");
         QVERIFY(actualizado.ok);
-        QCOMPARE(m_nucleo->listarAulas().first().capacidad, 45);
+        QCOMPARE(m_nucleo->listarAulas().valor.first().capacidad, 45);
 
         QVERIFY(m_nucleo->eliminarAula(creado.valor.id));
-        QVERIFY(m_nucleo->listarAulas().isEmpty());
+        QVERIFY(m_nucleo->listarAulas().valor.isEmpty());
     }
 
     // ─── Materias ───────────────────────────────────────────────────────────
@@ -117,14 +137,14 @@ private slots:
     {
         auto creado = m_nucleo->crearMateria("Matemática");
         QVERIFY(creado.ok);
-        QCOMPARE(m_nucleo->listarMaterias().size(), 1);
+        QCOMPARE(m_nucleo->listarMaterias().valor.size(), 1);
 
         auto actualizado = m_nucleo->actualizarMateria(creado.valor.id, "Matemática II");
         QVERIFY(actualizado.ok);
-        QCOMPARE(m_nucleo->listarMaterias().first().nombre, QStringLiteral("Matemática II"));
+        QCOMPARE(m_nucleo->listarMaterias().valor.first().nombre, QStringLiteral("Matemática II"));
 
         QVERIFY(m_nucleo->eliminarMateria(creado.valor.id));
-        QVERIFY(m_nucleo->listarMaterias().isEmpty());
+        QVERIFY(m_nucleo->listarMaterias().valor.isEmpty());
     }
 
     // ─── Planes de estudio ──────────────────────────────────────────────────
@@ -133,16 +153,16 @@ private slots:
     {
         auto creado = m_nucleo->crearPlan("IS-2026", "Ingeniería de Sistemas");
         QVERIFY(creado.ok);
-        QCOMPARE(m_nucleo->listarPlanes().size(), 1);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 1);
 
         auto actualizado =
             m_nucleo->actualizarPlan("IS-2026", "Ingeniería de Sistemas v2", "Descripción");
         QVERIFY(actualizado.ok);
-        QCOMPARE(m_nucleo->listarPlanes().first().nombre,
+        QCOMPARE(m_nucleo->listarPlanes().valor.first().nombre,
                  QStringLiteral("Ingeniería de Sistemas v2"));
 
         QVERIFY(m_nucleo->eliminarPlan("IS-2026"));
-        QVERIFY(m_nucleo->listarPlanes().isEmpty());
+        QVERIFY(m_nucleo->listarPlanes().valor.isEmpty());
     }
 
     // ─── Cursos ─────────────────────────────────────────────────────────────
@@ -165,7 +185,7 @@ private slots:
         QVERIFY(asignada.ok);
         QCOMPARE(asignada.valor.horasSemanales, 4);
 
-        auto lista = m_nucleo->listarCursos();
+        auto lista = m_nucleo->listarCursos().valor;
         QCOMPARE(lista.size(), 1);
         QCOMPARE(lista.first().materias.size(), 1);
         QCOMPARE(lista.first().materias.first().idMateria, materia.valor.id);
@@ -177,7 +197,7 @@ private slots:
         QCOMPARE(actualizado.valor.numEstudiantes, 35);
 
         QVERIFY(m_nucleo->eliminarCurso(creado.valor.id));
-        QVERIFY(m_nucleo->listarCursos().isEmpty());
+        QVERIFY(m_nucleo->listarCursos().valor.isEmpty());
     }
 
     // ─── Turnos y recesos ───────────────────────────────────────────────────
@@ -194,7 +214,7 @@ private slots:
         QCOMPARE(receso.valor.despuesDeSlot, 2);
         QCOMPARE(receso.valor.duracion, 15);
 
-        auto lista = m_nucleo->listarTurnos();
+        auto lista = m_nucleo->listarTurnos().valor;
         QCOMPARE(lista.size(), 1);
         QCOMPARE(lista.first().recesos.size(), 1);
         QCOMPARE(lista.first().recesos.first().duracion, 15);
@@ -204,10 +224,10 @@ private slots:
         QCOMPARE(actualizado.valor.numSlots, 6);
 
         QVERIFY(m_nucleo->eliminarReceso("Tarde", 2));
-        QCOMPARE(m_nucleo->listarTurnos().first().recesos.size(), 0);
+        QCOMPARE(m_nucleo->listarTurnos().valor.first().recesos.size(), 0);
 
         QVERIFY(m_nucleo->eliminarTurno("Tarde"));
-        QVERIFY(m_nucleo->listarTurnos().isEmpty());
+        QVERIFY(m_nucleo->listarTurnos().valor.isEmpty());
     }
 
     // ─── Persistencia tras reapertura ───────────────────────────────────────
@@ -229,15 +249,15 @@ private slots:
         cerrarBase();
         abrirBase();
 
-        QCOMPARE(m_nucleo->listarDocentes().size(), 1);
-        QCOMPARE(m_nucleo->listarAulas().size(), 1);
-        QCOMPARE(m_nucleo->listarMaterias().size(), 1);
-        QCOMPARE(m_nucleo->listarPlanes().size(), 1);
-        QCOMPARE(m_nucleo->listarCursos().size(), 1);
-        QCOMPARE(m_nucleo->listarTurnos().size(), 1);
-        QCOMPARE(m_nucleo->listarTurnos().first().recesos.size(), 1);
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarAulas().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarMaterias().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarPlanes().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarCursos().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarTurnos().valor.size(), 1);
+        QCOMPARE(m_nucleo->listarTurnos().valor.first().recesos.size(), 1);
 
-        auto cursos = m_nucleo->listarCursos();
+        auto cursos = m_nucleo->listarCursos().valor;
         QCOMPARE(cursos.first().nombre, QStringLiteral("1º A"));
         QCOMPARE(cursos.first().codigoPlan, QStringLiteral("IS-2026"));
         QCOMPARE(cursos.first().materias.size(), 1);
@@ -247,7 +267,7 @@ private slots:
         QVERIFY(m_nucleo->eliminarDocente("P1"));
         cerrarBase();
         abrirBase();
-        QVERIFY(m_nucleo->listarDocentes().isEmpty());
+        QVERIFY(m_nucleo->listarDocentes().valor.isEmpty());
     }
 };
 

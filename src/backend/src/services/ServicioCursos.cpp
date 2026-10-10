@@ -137,7 +137,7 @@ Resultado<CursoDTO> ServicioCursos::obtenerCurso(int id) const {
     return Resultado<CursoDTO>::exito(dto);
 }
 
-QVector<CursoDTO> ServicioCursos::listarCursos() const {
+Resultado<QVector<CursoDTO>> ServicioCursos::listarCursos() const {
     QVector<CursoDTO> resultados;
 
     QSqlQuery query(m_db);
@@ -146,7 +146,9 @@ QVector<CursoDTO> ServicioCursos::listarCursos() const {
 
     if (!query.exec()) {
         qCritical() << "Error al listar cursos:" << query.lastError().text();
-        return resultados;
+        return Resultado<QVector<CursoDTO>>::error(
+            QStringLiteral("No se pudieron leer los cursos registrados. Compruebe que la base de"
+                           " datos esté disponible e intente de nuevo."));
     }
 
     while (query.next()) {
@@ -155,7 +157,7 @@ QVector<CursoDTO> ServicioCursos::listarCursos() const {
         resultados.append(dto);
     }
 
-    return resultados;
+    return Resultado<QVector<CursoDTO>>::exito(resultados);
 }
 
 Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, const QString& nombre,
