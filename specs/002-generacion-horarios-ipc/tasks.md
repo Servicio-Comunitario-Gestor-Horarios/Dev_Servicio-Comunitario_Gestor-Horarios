@@ -26,7 +26,7 @@
     - Código: `validarEntradaSolver` sobre `SolverConfig::fromJson`.
     - Hecho cuando: `ctest` pasa; cada regla V1–V12 tiene su caso y el fallo muestra el motivo.
 
-- [ ] **T4. Validador de salida P1–P4.** RF-3
+- [x] **T4. Validador de salida P1–P4.** RF-3
     - Tests (rojo): `test/backend/test_validador_salida.cpp` — P1–P3 generan avisos; P4 (solapamiento) → no presentable.
     - Código: `ValidadorSalidaSolver.{hpp,cpp}` + `analizarSalidaSolver` (pura); devuelve el `AnalisisSalida` que consumirá el frontend.
     - Hecho cuando: `ctest` pasa; un resultado con solapamiento se marca no presentable y uno correcto expone solo avisos.

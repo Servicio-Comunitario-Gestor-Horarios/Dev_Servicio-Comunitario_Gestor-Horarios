@@ -54,6 +54,7 @@ target_sources(backend PRIVATE
 				src/services/CargadorConfiguracionSolver.cpp
 				src/services/ConstructorEntradaSolver.cpp
 				src/services/ValidadorEntradaSolver.cpp
+				src/services/ValidadorSalidaSolver.cpp
 )
 
 target_include_directories(backend PUBLIC
