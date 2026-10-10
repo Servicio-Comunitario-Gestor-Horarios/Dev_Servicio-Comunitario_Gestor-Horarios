@@ -25,6 +25,11 @@ if(BUILD_BACKEND)
     # `datos` encapsula el ciclo de vida de la base del lado cliente y depende
     # de `backend`; solo existe cuando hay persistencia (BUILD_BACKEND=ON).
     add_subdirectory(datos)
+
+    # Consola de prueba de la base de datos (herramienta de desarrollo).
+    if(BUILD_CONSOLA)
+        add_subdirectory(consola)
+    endif()
 endif()
 
 add_subdirectory(app)
