@@ -31,7 +31,7 @@
     - Código: `ValidadorSalidaSolver.{hpp,cpp}` + `analizarSalidaSolver` (pura); devuelve el `AnalisisSalida` que consumirá el frontend.
     - Hecho cuando: `ctest` pasa; un resultado con solapamiento se marca no presentable y uno correcto expone solo avisos.
 
-- [ ] **T5. Servicio de generación: envío, timeout e "datos anteriores".** RF-1, RF-5
+- [x] **T5. Servicio de generación: envío, timeout e "datos anteriores".** RF-1, RF-5
     - Tests (rojo): `test/backend/test_servicio_generacion.cpp` — timeout 60 s → abandona e ignora resultado tardío; no-factible; contrato inválido; huella distinta → "datos anteriores"; expone el estado de "generación en curso".
     - Código: `ServicioGeneracion.{hpp,cpp}` + `huellaDatos`/`estamparFechaGeneracion` (puras).
     - Hecho cuando: `ctest` pasa; cada desenlace (ok/no-factible/inválido/timeout/obsoleto) se comporta como exige RF-1 y el estado de generación es consultable por el frontend.

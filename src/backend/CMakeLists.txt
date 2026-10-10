@@ -55,6 +55,8 @@ target_sources(backend PRIVATE
 				src/services/ConstructorEntradaSolver.cpp
 				src/services/ValidadorEntradaSolver.cpp
 				src/services/ValidadorSalidaSolver.cpp
+				src/services/ServicioGeneracion.cpp
+				include/backend/services/ServicioGeneracion.hpp
 )
 
 target_include_directories(backend PUBLIC
@@ -71,6 +73,9 @@ target_link_libraries(backend PUBLIC
 )
 
 set_project_warnings(backend)
+
+# `ServicioGeneracion` es un QObject (señal `finalizada`): necesita moc.
+set_target_properties(backend PROPERTIES AUTOMOC ON)
 
 # -- backend_solver: motor CP-SAT --
 add_library(backend_solver STATIC)
