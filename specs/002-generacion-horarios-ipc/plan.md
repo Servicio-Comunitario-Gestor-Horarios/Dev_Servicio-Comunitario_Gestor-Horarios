@@ -4,6 +4,7 @@ Estado: propuesto (a la espera de aprobación explícita del usuario para pasar 
 Spec de referencia: `specs/002-generacion-horarios-ipc/spec.md` (aprobada, sin dudas abiertas).
 Constitución: `docs/constitution.md` (stack único, separación lógica/UI, tests primero).
 Depende de: `specs/001-base-datos-local/spec.md` (base de datos y núcleo de datos del cliente).
+Interfaz de consumo: `docs/interfaz-frontend.md` (documentación viva del contrato que expone nuestro lado; la crea/amplía la tarea de documentación de la interfaz, T9, sobre lo creado por la spec 001).
 
 > Este documento describe el CÓMO. No introduce dependencias nuevas: C++17 · Qt6 (Widgets/Network)
 > · OR-Tools · CMake/Ninja · CTest.
@@ -36,10 +37,14 @@ La **configuración del solver y los presets** son archivos JSON gestionados por
 la base de datos no interviene. El proceso de cálculo recibe el JSON de entrada y devuelve el
 horario resuelto.
 
-Reparto por capa (constitución §3):
-- `src/backend`: construcción/validación del JSON del solver y análisis de salida. Sin Qt Widgets.
+Reparto por capa (constitución §3). **Entregables de esta spec:** `src/backend`, `src/app` y
+`src/middleware`. La interfaz Qt de `src/frontend` la implementa **otro equipo**: consumirá la
+generación y el contrato de datos que exponemos, documentados en `docs/interfaz-frontend.md`
+(sección «Generación de horarios»).
+
+- `src/backend`: construcción/validación del JSON del solver, análisis de salida y lectura/escritura de archivos (config, presets, horarios). Sin Qt Widgets.
 - `src/middleware`: transporte y validación del protocolo IPC únicamente.
-- `src/frontend`: interfaz Qt; consume `backend` en proceso y el cliente IPC de `middleware`.
+- `src/frontend` (otro equipo): interfaz Qt; consume `backend` en proceso y el cliente IPC de `middleware` según el contrato expuesto.
 - `src/app`: modo `--backend` y ciclo de vida del proceso de cálculo.
 
 ---
@@ -54,6 +59,11 @@ Reparto por capa (constitución §3):
 | `src/backend/include/backend/services/CargadorConfiguracionSolver.hpp` + `.cpp` **(nuevo)** | Carga/guarda la configuración del solver y los presets como archivos JSON (no base de datos). Informa de fallos de lectura/escritura. | RF-1, RF-4 |
 | `src/backend/include/backend/services/ValidadorSalidaSolver.hpp` + `.cpp` **(nuevo)** | Aplica las validaciones posteriores del contrato (P1–P4): conflictos de solapamiento, horas no cubiertas, exceso de horas de profesor, exceso de capacidad de aula. Devuelve `AnalisisSalida` presentable o no. | RF-3 |
 | `src/backend/include/backend/services/ServicioGeneracion.hpp` + `.cpp` **(nuevo)** | Orquesta una generación: snapshot → construir entrada → validar pre (V1–V12 con `SolverConfig::fromJson`) → enviar por IPC → esperar con plazo de 60 s → validar salida → marcar "datos anteriores" si el snapshot cambió. Ignora resultados tardíos. | RF-1, RF-3 |
+| `src/backend/.../ServicioHorarioSalida` **(existente, se consolida)** | Lectura/escritura de un horario generado como archivo JSON en el destino elegido (RF-4). El diálogo de elección de archivo es del frontend. | RF-4 |
+
+> La escritura/lectura de **horarios y presets como archivo** es nuestra (backend); el diálogo de
+> archivo corresponde al equipo de frontend. La parte de presets/configuración la cubre
+> `CargadorConfiguracionSolver`; la del horario, `ServicioHorarioSalida`.
 
 ### 1.2 Middleware — transporte para el proceso de cálculo (RF-1, RF-2)
 
@@ -72,14 +82,25 @@ Reparto por capa (constitución §3):
 | `src/app/src/gestor_proceso_backend.cpp` / `.hpp` **(modificado)** | Lanzar el hijo una vez, comprobar salud (5 s) y solicitar apagado ordenado (5 s). Se elimina el reinicio automático con backoff (fuera de alcance). | RF-2 |
 | `src/app/src/aplicacion_frontend.cpp` **(modificado)** | Lanza el proceso de cálculo y comprueba salud 5 s; conecta el guardia de cierre de trabajo sin guardar (RF-5). | RF-2, RF-5 |
 
-### 1.4 Frontend — interfaz (RF-1, RF-3, RF-4, RF-5)
+### 1.4 Interfaz expuesta para el equipo de frontend (contrato de consumo)
 
-| Archivo | Responsabilidad | RF |
+La interfaz Qt de `src/frontend` (vista de generación, visualización y diálogos) la implementa
+**otro equipo**; **no es un entregable de esta spec**. Nuestro lado expone la lógica y el
+contrato de datos que esa interfaz consume, con las firmas, estados y errores detallados en
+**`docs/interfaz-frontend.md`** (documentación viva). Aquí solo se resume el reparto.
+
+| Elemento que exponemos | Lo que el frontend hace con él | RF |
 |---|---|---|
-| `src/frontend/src/views/generation_widget.{hpp,cpp}` **(nuevo)** | Vista de generación: botón Generar, validación previa, estado en curso, aviso de no-factible/inválido/timeout, confirmación "datos anteriores", paso a visualización. | RF-1, RF-3 |
-| `src/frontend/src/views/schedule_visualization_widget.{hpp,cpp}` **(modificado)** | Pinta el `HorarioSalida` generado (curso × día/slot) y sus avisos (P1–P3); el guardado como archivo es acción del usuario. Deja de depender de datos de prueba por IPC. | RF-1, RF-3 |
-| `src/frontend/src/dialogs/save_schedule_dialog.{hpp,cpp}` **(nuevo)** | Elección de nombre/destino y guardado del horario/preset como archivo JSON, con reintento sin perder el contenido. | RF-4 |
-| `src/frontend/src/views/main_window.cpp` / `.hpp` **(modificado)** | Recibe `ServicioGeneracion`; sustituye el placeholder de "Generación" por la vista real; propaga el guardia de cierre. | RF-1, RF-5 |
+| `ServicioGeneracion` (estados, señales, plazo de 60 s, huella «datos anteriores») | Vista de generación: botón «Generar» (bloqueado si hay una en curso), estados validando/enviando/calculando/no-factible/inválido/timeout/listo y confirmación «datos anteriores». | RF-1, RF-3 |
+| `AnalisisSalida` (avisos P1–P3, conflicto de solapamiento P4) | Rejilla del horario + panel de avisos; nunca presenta como válido un resultado con conflictos. | RF-3 |
+| `HorarioSalida` (`metadata`/`horarios`) + servicio de archivos de horario (`guardarHorario`/`cargarHorario`) | Visualización del horario y guardado/carga como archivo JSON (el diálogo de archivo es del frontend). | RF-1, RF-4 |
+| `CargadorConfiguracionSolver` | Cargar/guardar la configuración del solver y los presets como JSON. | RF-1, RF-4 |
+| Estado de generación en curso / horario sin guardar | Guardia de cierre cancelable al intentar cerrar la aplicación. | RF-5 |
+| Salud del proceso de cálculo (5 s) | Aviso no bloqueante al arrancar y continuación del cierre al salir. | RF-2 |
+
+> El contrato completo (firmas, estados, errores y tratamiento esperado) se documentará en
+> `docs/interfaz-frontend.md`, sección «Generación de horarios». Esa documentación la crea/amplía
+> la tarea de documentación de la interfaz (T9).
 
 ---
 
@@ -136,7 +157,7 @@ generar():
                 si huellaDatos(instantanea actual) != huella:
                     marcar "corresponde a datos anteriores"                          # RF-1
                     pedir confirmación antes de guardar
-                guardar solo si el usuario lo pide (save_schedule_dialog)            # RF-1, RF-4
+                guardar solo si el usuario lo pide (archivo JSON, diálogo del frontend) # RF-1, RF-4
 ```
 
 Proceso de cálculo (`--backend`), ruta `solver_resolve` (RF-1, RF-2):
@@ -165,7 +186,11 @@ closeEvent():
 
 ---
 
-## 4. Interfaz (cómo se pinta)
+## 4. Interfaz (cómo se pinta) — comportamiento esperado del frontend
+
+> Estos elementos los implementa el equipo de frontend. Se describen aquí como el
+> comportamiento que debe ofrecer la interfaz que consume nuestro contrato (ver §1.4 y
+> `docs/interfaz-frontend.md`); no son entregables de esta spec.
 
 | Elemento | Comportamiento visual | RF |
 |---|---|---|
@@ -206,8 +231,10 @@ cmake --preset full && cmake --build build && ctest --preset full
 
 - **Tests primero** en cada tarea: se escriben en rojo, luego el código, y la tarea solo se
   marca al pasar en verde (constitución §4).
-- Frameworks ya integrados: **Google Test** (lógica/backend) y **Qt Test** (middleware/frontend).
-  Se registran con `add_gtest` / `add_qtest` en `test/CMakeLists.txt`.
+- Frameworks ya integrados: **Google Test** (lógica/backend) y **Qt Test** (middleware). Se
+  registran con `add_gtest` / `add_qtest` en `test/CMakeLists.txt`.
+- Los tests de interfaz (`test/frontend/...`) son responsabilidad del equipo de frontend; en su
+  lugar verificamos el contrato que exponemos (estados de generación y `Resultado<T>`).
 - Los tests de solver (OR-Tools) solo corren en el preset `full` dentro de Docker; los de lógica,
   construcción/validación de JSON y middleware son independientes de OR-Tools.
 
@@ -219,7 +246,7 @@ cmake --preset full && cmake --build build && ctest --preset full
 | Backend | `test/backend/test_servicio_generacion.cpp` (QTest) | Timeout 60 s → abandona e ignora resultado tardío; no-factible; contrato inválido; huella distinta → "datos anteriores". | RF-1 |
 | Middleware | `test/test_middleware_transport.cpp` (extender) | Ruta `solver_resolve`; apagado ordenado; salud; socket reutilizable sin tormenta de reintentos. | RF-1, RF-2 |
 | App/integración | `test/test_ipc_aislamiento_bd.cpp` (QTest) | El proceso de cálculo arranca y resuelve sin crear ni abrir archivo de base; rechaza ops de negocio. | RF-2 |
-| Frontend (Qt Test) | `test/frontend/test_guardia_cierre_generacion.cpp` (QTest) | `closeEvent` cancelable con horario sin guardar o generación en curso. | RF-5 |
+| Backend (contrato) | `test/backend/test_contrato_generacion.cpp` (QTest) | La semántica que consume el frontend: estados de `ServicioGeneracion` (calculando/no-factible/inválido/timeout/«datos anteriores») y `Resultado<T>` con código de error. | RF-1, RF-3, RF-5 |
 
 Cobertura por criterio de finalización de la spec: cada RF tiene al menos un test verificable
 (la traza se formaliza en `tasks.md` con "Hecho cuando:").
@@ -230,11 +257,11 @@ Cobertura por criterio de finalización de la spec: cada RF tiene al menos un te
 
 | RF | Partes del plan |
 |---|---|
-| RF-1 | §1.1 (`ConstructorEntradaSolver`, `CargadorConfiguracionSolver`, `ServicioGeneracion`), §1.3 (ruta `solver_resolve`), §1.4 (vista generación/guardado), §3.1, tests constructor/generación/middleware |
+| RF-1 | §1.1 (`ConstructorEntradaSolver`, `CargadorConfiguracionSolver`, `ServicioGeneracion`), §1.3 (ruta `solver_resolve`), §1.4 (estados de generación expuestos al frontend), §3.1, tests constructor/generación/middleware/contrato |
 | RF-2 | §0, §1.2 (middleware), §1.3 (`aplicacion_backend`, `GestorProcesoBackend`), §3.1, §4 (salud), tests middleware/aislamiento |
-| RF-3 | §1.1 (`ValidadorSalidaSolver`), §1.4 (visualización + avisos), §3.1, test validador de salida |
-| RF-4 | §1.1 (`CargadorConfiguracionSolver`), §1.4 (`save_schedule_dialog`), test cargador de configuración |
-| RF-5 | §1.3/§1.4 (guardia de cierre), §3.2, test guardia |
+| RF-3 | §1.1 (`ValidadorSalidaSolver`), §1.4 (`AnalisisSalida` para visualización + avisos), §3.1, test validador de salida |
+| RF-4 | §1.1 (`CargadorConfiguracionSolver`, `ServicioHorarioSalida`), test cargador de configuración y archivos de horario |
+| RF-5 | §1.3 (cierre del proceso de cálculo), §1.4 (estado expuesto para la guardia de cierre), §3.2, test contrato |
 
 RNF cubierto de forma transversal: RNF-1 (textos en español en todos los avisos y diálogos).
 

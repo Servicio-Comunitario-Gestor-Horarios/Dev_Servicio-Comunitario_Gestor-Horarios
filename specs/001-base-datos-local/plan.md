@@ -3,6 +3,7 @@
 Estado: propuesto (a la espera de aprobación explícita del usuario para pasar a `tasks.md`).
 Spec de referencia: `specs/001-base-datos-local/spec.md` (aprobada, sin dudas abiertas).
 Constitución: `docs/constitution.md` (stack único, separación lógica/UI, tests primero, protección de datos).
+Interfaz de consumo: `docs/interfaz-frontend.md` (documentación viva del contrato que expone nuestro lado; la crea y mantiene la tarea de documentación de la interfaz, T8).
 
 > Este documento describe el CÓMO. No introduce dependencias nuevas: todo se resuelve con
 > C++17 · Qt6 (Widgets/Sql) · SQLite · CMake/Ninja · CTest. El proceso de cálculo (solver) se
@@ -23,10 +24,14 @@ Cambio central respecto al código actual: la base de datos deja de intervenir e
 `--backend`. Los `Servicio*` y `DatabaseManager` pasan a usarse en el proceso cliente; los widgets
 dejan de mandar `OP_CREAR/ACTUALIZAR/ELIMINAR_*` por IPC y llaman a los servicios en proceso.
 
-Reparto por capa (constitución §3):
+Reparto por capa (constitución §3). **Entregables de esta spec:** `src/backend`, `src/app` y
+`src/middleware`. La interfaz Qt de `src/frontend` la implementa **otro equipo**: consumirá en
+proceso la lógica y el contrato de datos que expone `src/backend`, documentados en
+`docs/interfaz-frontend.md` (sección «Interfaz expuesta para el equipo de frontend»).
+
 - `src/backend`: dominios, `DatabaseManager`, migraciones, respaldo, servicios CRUD. Sin Qt Widgets.
 - `src/middleware`: transporte del protocolo IPC (detallado en el plan 002).
-- `src/frontend`: interfaz Qt; consume `backend` en proceso.
+- `src/frontend` (otro equipo): interfaz Qt; consume `backend` en proceso según el contrato expuesto.
 - `src/app`: arranque, instancia única, apertura de base y ciclo de vida.
 
 ---
@@ -68,14 +73,25 @@ Nuevas tablas de dominio que exige RF-2 (migración v2):
 | `src/app/src/aplicacion_frontend.cpp` **(reescrito)** | Orquesta el arranque: instancia única → apertura de base (RF-1) → si falla, diálogo (RF-4) → crea `NucleoDatos` → `MainWindow` con las dependencias → guardia de cierre (RF-6). | RF-1, RF-4, RF-5, RF-6 |
 | `src/app/main.cpp` **(modificado)** | Parseo de `--backend`/`--version`/`--help`; en modo cliente, instancia única antes de construir la UI. | RF-5 |
 
-### 1.4 Frontend — interfaz (RF-2, RF-3, RF-4, RF-6)
+### 1.4 Interfaz expuesta para el equipo de frontend (contrato de consumo)
 
-| Archivo | Responsabilidad | RF |
+La interfaz Qt de `src/frontend` (vistas, listas, diálogos e indicadores) la implementa **otro
+equipo**; **no es un entregable de esta spec**. Nuestro lado expone la lógica y el contrato de
+datos que esa interfaz consume, con las firmas, estados y errores detallados en
+**`docs/interfaz-frontend.md`** (documentación viva). Aquí solo se resume el reparto.
+
+| Elemento que exponemos | Lo que el frontend hace con él | RF |
 |---|---|---|
-| `src/frontend/src/views/main_window.cpp` / `.hpp` **(modificado)** | Recibe `NucleoDatos` (en lugar de `InternalClient`) y lo reparte a las vistas; propaga el guardia de cierre. | RF-2, RF-6 |
-| `src/frontend/src/dialogs/database_failure_dialog.{hpp,cpp}` **(nuevo)** | Diálogo RF-4 con Reintentar / Restaurar respaldo / Crear base nueva (pierde datos) / Salir, deshabilitando "Crear base nueva" si no hay respaldo posible. | RF-4, RF-6 |
-| `src/frontend/src/views/teacher_list_widget.*`, `classroom_list_widget.*`, `subject_list_widget.*` **(modificados)** | CRUD contra `NucleoDatos` en proceso; carga de listado al abrir/arrancar; confirmación de cascada; marca visual de "pendiente de guardar/eliminar" con reintento. | RF-2, RF-3, RNF-4 |
-| `src/frontend/src/views/dashboard_widget.*` | Sin cambios funcionales (puede reflejar el estado de la base tras `NucleoDatos`). | — |
+| `AperturaBaseDatos::Resultado` (`estado`, `detalle`, `rutaRespaldo`, `ok()`) | Diálogo de fallo (RF-4) con Reintentar / Restaurar respaldo / Crear base nueva (pierde datos) / Salir; deshabilita «Crear base nueva» si no hubo respaldo posible. | RF-4, RF-6 |
+| Progreso de migración (estado de la apertura) | Indicador «Migrando…» y bloqueo de la operación con datos hasta terminar. | RF-1 |
+| `NucleoDatos` (listar/crear/actualizar/eliminar con `Resultado<T>`) | Listas (docentes/aulas/asignaturas/cursos/turnos) pobladas desde la base y CRUD en proceso; confirmación de cascada. | RF-2 |
+| Dependencias de cascada (`dependenciasDe`) | Diálogo que lista los dependientes que se borrarán y pide confirmación explícita. | RF-2 |
+| Estado por registro (`estadoPendienteDe`, `GestorPendientes`) | Fila normal / **pendiente de guardar** (resaltada) / **pendiente de eliminar** (atenuada) + acción «Reintentar». | RF-3, RNF-3, RNF-4 |
+| Consulta de cambios pendientes (RF-6) | Guardia de cierre cancelable al intentar cerrar la aplicación. | RF-6 |
+
+> El contrato completo (firmas, estados, errores y tratamiento esperado) se documentará en
+> `docs/interfaz-frontend.md`, sección «Base de datos local». Esa documentación la crea la tarea
+> de documentación de la interfaz (T8).
 
 ---
 
@@ -190,7 +206,11 @@ closeEvent():
 
 ---
 
-## 4. Interfaz (cómo se pinta)
+## 4. Interfaz (cómo se pinta) — comportamiento esperado del frontend
+
+> Estos elementos los implementa el equipo de frontend. Se describen aquí como el
+> comportamiento que debe ofrecer la interfaz que consume nuestro contrato (ver §1.4 y
+> `docs/interfaz-frontend.md`); no son entregables de esta spec.
 
 | Elemento | Comportamiento visual | RF |
 |---|---|---|
@@ -231,8 +251,10 @@ cmake --preset full && cmake --build build && ctest --preset full
 
 - **Tests primero** en cada tarea: se escriben en rojo, luego el código, y la tarea solo se
   marca al pasar en verde (constitución §4).
-- Frameworks ya integrados: **Google Test** (lógica/backend) y **Qt Test** (middleware/frontend).
-  Se registran con `add_gtest` / `add_qtest` en `test/CMakeLists.txt`.
+- Frameworks ya integrados: **Google Test** (lógica/backend) y **Qt Test** (middleware). Se
+  registran con `add_gtest` / `add_qtest` en `test/CMakeLists.txt`.
+- Los tests de interfaz (`test/frontend/...`) son responsabilidad del equipo de frontend; en su
+  lugar verificamos el contrato que exponemos (estados, `Resultado<T>` y estado por registro).
 
 | Capa | Archivo de test (nuevo/ext.) | Qué comprueba | RF |
 |---|---|---|---|
@@ -242,8 +264,7 @@ cmake --preset full && cmake --build build && ctest --preset full
 | Backend | `test/backend/test_nucleo_datos.cpp` (QTest) | Alta/modificación/baja persisten y se recuperan tras reapertura; cascada atómica (fallo → nada aplicado); dependientes. | RF-2 |
 | Backend puro | `test/backend/test_gestor_pendientes.cpp` (GTest) | Estado guardado/pendiente-guardar/pendiente-eliminar; reintento con éxito/sin éxito. | RF-3, RNF-4 |
 | App | `test/test_instancia_unica.cpp` (QTest) | Segundo arranque enfoca al primero; sin acuse en 10 s → avisa y no arranca; detección activa durante migración. | RF-5 |
-| Frontend (Qt Test) | `test/frontend/test_estado_pendiente_ui.cpp` (QTest) | La fila muestra el estado por registro (RNF-4) sin perder datos (RNF-3). | RF-3, RNF-3, RNF-4 |
-| Frontend (Qt Test) | `test/frontend/test_guardia_cierre.cpp` (QTest) | `closeEvent` cancelable con cambios pendientes. | RF-6 |
+| Backend (contrato) | `test/backend/test_contrato_interfaz.cpp` (QTest) | La semántica que consume el frontend: `AperturaBaseDatos::Resultado::ok()`/`estado`/`rutaRespaldo`, `Resultado<T>::exito/error` con código, y `estadoPendienteDe` (guardado / pendiente-guardar / pendiente-eliminar). | RF-3, RF-4, RNF-4 |
 
 Cobertura por criterio de finalización de la spec: cada RF tiene al menos un test verificable
 (la traza se formaliza en `tasks.md` con "Hecho cuando:").
@@ -256,10 +277,10 @@ Cobertura por criterio de finalización de la spec: cada RF tiene al menos un te
 |---|---|
 | RF-1 | §1.1 (`version_esquema`, `respaldo`, `apertura_base_datos`, `DatabaseManager`, `migracion`), §3.1, §4 (estado de migración), tests versión/respaldo/apertura |
 | RF-2 | §1.1 (migración v2: dominios nuevos), §1.2 (`NucleoDatos`, servicios), §3.2, §4 (listas/cascada), test `nucleo_datos` |
-| RF-3 | §1.2 (`GestorPendientes`), §1.4 (estado pendiente), §3.2, tests pendientes/UI |
-| RF-4 | §1.1 (`apertura`, `respaldo`), §1.4 (`database_failure_dialog`), §3.1, §4 (diálogo), tests respaldo/apertura |
+| RF-3 | §1.2 (`GestorPendientes`), §1.4 (`estadoPendienteDe`/pendientes expuestos al frontend), §3.2, test contrato |
+| RF-4 | §1.1 (`apertura`, `respaldo`), §1.4 (`AperturaBaseDatos::Resultado` para el diálogo), §3.1, §4 (comportamiento del frontend), tests respaldo/apertura/contrato |
 | RF-5 | §1.3 (`instancia_unica`, `main`, `aplicacion_frontend`), §3.3, test instancia única |
-| RF-6 | §1.1 (`respaldo`), §1.3/§1.4 (guardia de cierre, confirmaciones), §3.4, §4, test guardia |
+| RF-6 | §1.1 (`respaldo`), §1.3 (guardia de cierre en el arranque), §1.4 (consulta de pendientes expuesta), §3.4, §4, test contrato |
 
 RNF cubiertos de forma transversal: RNF-1 (textos en español en todos los diálogos/avisos),
 RNF-2 (apertura normal sin intervención), RNF-3/RNF-4 (estado pendiente sin perder datos),

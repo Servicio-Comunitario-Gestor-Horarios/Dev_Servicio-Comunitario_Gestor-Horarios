@@ -2,8 +2,11 @@
 
 - Spec: `specs/001-base-datos-local/spec.md`
 - Plan: `specs/001-base-datos-local/plan.md`
+- Interfaz de consumo (otro equipo): `docs/interfaz-frontend.md`
 - Comando de tests: `cmake --preset full && cmake --build build && ctest --preset full`
 - Regla: **tests primero** (rojo → código → verde → marcar → parar). Una tarea cada vez.
+- Entregables: `src/backend`, `src/app` y `src/middleware`. La interfaz de `src/frontend`
+  (vistas, listas, diálogos e indicadores) la implementa otro equipo; no se implementa aquí.
 
 ---
 
@@ -22,42 +25,35 @@
     - Código: `apertura_base_datos.{hpp,cpp}`; `DatabaseManager` delega versión/migración.
     - Hecho cuando: `ctest` pasa y ninguna rama aplica cambios parciales.
 
-- [ ] **T4. Diálogo de fallo y flujo de recuperación.** RF-4, RF-6
-    - Tests (rojo): `test/frontend/test_database_failure_dialog.cpp` — 4 opciones; "Crear base nueva" deshabilitada sin respaldo; reapertura del diálogo tras fallo.
-    - Código: `database_failure_dialog.{hpp,cpp}` + enlace con `apertura_base_datos` (Reintentar/Restaurar/Crear/Salir).
-    - Hecho cuando: `ctest` pasa; con base corrupta el diálogo ofrece las 4 rutas y "Crear base nueva" exige respaldo.
-
-- [ ] **T5. Núcleo de datos: CRUD de dominios.** RF-2
+- [ ] **T4. Núcleo de datos: CRUD de dominios.** RF-2
     - Tests (rojo): `test/backend/test_nucleo_datos.cpp` — alta/modificación/baja persisten y se recuperan tras reapertura; CRUD de Cursos y Turnos/Recesos.
     - Código: `NucleoDatos.{hpp,cpp}`; `ServicioCursos`, `ServicioTurnosRecesos` nuevos; migración v2 con las tablas de dominio.
     - Hecho cuando: `ctest` pasa; los datos de todos los dominios se recuperan tras cerrar y reabrir la base.
 
-- [ ] **T6. Eliminación en cascada atómica.** RF-2
+- [ ] **T5. Eliminación en cascada atómica.** RF-2
     - Tests (rojo): `test/backend/test_cascada.cpp` — `dependenciasDe` lista dependientes; borrado con cascada es atómico (fallo → nada aplicado); cancelación no toca datos.
     - Código: consulta de dependientes en `ServicioMaterias/Profesor/PlanesEstudio/Aula` + `eliminarConCascada` en `NucleoDatos`.
     - Hecho cuando: `ctest` pasa; un fallo a mitad de cascada no deja ninguna parte aplicada.
 
-- [ ] **T7. Cambios pendientes y reintento.** RF-3, RNF-3, RNF-4
+- [ ] **T6. Cambios pendientes y reintento.** RF-3, RNF-3, RNF-4
     - Tests (rojo): `test/backend/test_gestor_pendientes.cpp` — estado guardado/pendiente-guardar/pendiente-eliminar; reintento con éxito y sin éxito; sin perder de pantalla.
-    - Código: `GestorPendientes.{hpp,cpp}` + `estadoPendienteDe` (pura).
+    - Código: `GestorPendientes.{hpp,cpp}` + `estadoPendienteDe` (pura); consulta de pendientes que consumirá la guardia de cierre.
     - Hecho cuando: `ctest` pasa; tras fallo de escritura el registro queda pendiente y el reintento lo guarda.
 
-- [ ] **T8. Instancia única.** RF-5
-    - Tests (rojo): `test/test_instancia_unica.cpp` — segundo arranque enfoca al primero; sin acuse en 10 s → avisa y no arranca; detección activa durante migración/diálogo.
-    - Código: `instancia_unica.{hpp,cpp}` + enganche en `main.cpp` y `aplicacion_frontend.cpp`.
-    - Hecho cuando: `ctest` pasa; dos arranques simultáneos resultan en una sola instancia operativa.
+- [ ] **T7. Instancia única y arranque del cliente.** RF-5, RF-2
+    - Tests (rojo): `test/test_instancia_unica.cpp` — segundo arranque enfoca al primero; sin acuse en 10 s → avisa y no arranca; detección activa durante la migración.
+    - Código: `instancia_unica.{hpp,cpp}` + enganche en `main.cpp` y `aplicacion_frontend.cpp` (instancia única → apertura con `AperturaBaseDatos` → construcción de `NucleoDatos`; la interfaz la toma el frontend).
+    - Hecho cuando: `ctest` pasa; dos arranques simultáneos resultan en una sola instancia y el arranque deja la base abierta y el núcleo de datos disponible para el frontend.
 
-- [ ] **T9. Arranque cliente y listas desde la base.** RF-2, RF-5
-    - Tests (rojo): `test/frontend/test_listas_desde_bd.cpp` — las listas se pueblan desde la base al abrir y reflejan el estado guardado/pendiente.
-    - Código: `aplicacion_frontend.cpp` (instancia única → apertura → `NucleoDatos` → `MainWindow`); `main_window.*` y `*_list_widget.*` contra `NucleoDatos`.
-    - Hecho cuando: `ctest` pasa y al arrancar las vistas muestran datos persistidos (no de prueba).
-
-- [ ] **T10. Guardia de cierre por cambios pendientes.** RF-6
-    - Tests (rojo): `test/frontend/test_guardia_cierre.cpp` — `closeEvent` cancelable con cambios pendientes; sin pendientes cierra normal.
-    - Código: guardia de cierre en `MainWindow`/ventana principal.
-    - Hecho cuando: `ctest` pasa; cerrar con pendientes pregunta y permite cancelar.
+- [ ] **T8. Documentar la interfaz expuesta al frontend (base de datos y núcleo de datos).** RF-2, RF-3, RF-4
+    - Tests (rojo): `test/backend/test_contrato_interfaz.cpp` — la semántica que consume el frontend: `AperturaBaseDatos::Resultado::ok()`/`estado`/`rutaRespaldo`, `Resultado<T>::exito/error` con código y `estadoPendienteDe`.
+    - Código: ninguno de producto; se documenta `docs/interfaz-frontend.md` (sección «Base de datos local»: `VersionEsquema`, `Respaldo`, `AperturaBaseDatos`, `NucleoDatos`, dominios y estado por registro).
+    - Hecho cuando: `ctest` pasa el test de contrato y `docs/interfaz-frontend.md` describe, para cada elemento expuesto, qué expone, su firma/contrato, sus estados/errores y cómo debe tratarlo el frontend.
 
 ## Cobertura
 
-- RF-1 → T1, T2, T3; RF-2 → T5, T6, T9; RF-3 → T7; RF-4 → T4; RF-5 → T8, T9; RF-6 → T2, T4, T10.
-- RNF-1 (mensajes) transversal; RNF-2 → T3; RNF-3/RNF-4 → T7, T9; RNF-5 → T1, T3.
+- RF-1 → T1, T2, T3; RF-2 → T4, T5, T7; RF-3 → T6; RF-4 → T3 (apertura/respaldo) + contrato de T8;
+  RF-5 → T7; RF-6 → T2, T6.
+- RNF-1 (mensajes) transversal; RNF-2 → T3; RNF-3/RNF-4 → T6; RNF-5 → T1, T3.
+- Los diálogos y la guardia de cierre (parte de interfaz de RF-4/RF-6) los implementa y testea el
+  equipo de frontend sobre el contrato documentado en T8.

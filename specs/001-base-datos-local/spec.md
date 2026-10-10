@@ -8,6 +8,8 @@ Hasta ahora la aplicación no tiene una conexión operativa entre la interfaz y 
 
 El objetivo es que la interfaz funcione sobre datos reales y persistidos, que el usuario pueda operar incluso ante fallos de la base con una salida clara, y que exista una sola instancia. La base solo persiste dominios de entidad; la configuración del solver, los presets y los horarios se gestionan como archivos JSON (spec 002).
 
+El consumidor de la lógica y del contrato de datos que define esta spec es la interfaz de usuario, que implementa otro equipo (ver «Fuera de alcance»): nuestro lado entrega la lógica y el contrato de datos que esa interfaz consume.
+
 ## Usuarios
 
 - **Usuario académico:** gestiona docentes, aulas, asignaturas, cursos, planes de estudio, turnos y recesos.
@@ -112,6 +114,7 @@ El objetivo es que la interfaz funcione sobre datos reales y persistidos, que el
 
 ## Fuera de alcance
 
+- **Interfaz de usuario (Qt) de `src/frontend`** (diálogos, vistas e indicadores): la implementa otro equipo. Esta spec define el comportamiento del producto y nuestro lado entrega la **lógica y el contrato de datos** que esa interfaz consume; el contrato de consumo se documenta en `docs/interfaz-frontend.md`. No se implementan aquí los widgets, las vistas ni los diálogos.
 - Inicio de sesión y gestión de usuarios: el inicio de sesión no valida contra la base de datos en esta versión.
 - Varias instancias simultáneas y cualquier forma de concurrencia o desincronización sobre la misma base de datos.
 - Bloqueo de la base de datos por otro proceso externo, o base borrada o sustituida externamente mientras la aplicación está en uso.

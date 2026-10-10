@@ -4,17 +4,17 @@
 
 ## Fase actual
 
-- **Fase:** implementación en curso — T1 y T2 de 001 hechas
-- **Fecha:** 2026-10-08
+- **Fase:** implementación en curso — T1–T3 de 001 hechas; alcance reajustado (sin frontend)
+- **Fecha:** 2026-10-09
 - **Rama:** `sdd/001-base-datos-local`
 - **Specs en curso:** `specs/001-base-datos-local` (implementando), `specs/002-generacion-horarios-ipc` (pendiente)
-- **Siguiente paso:** implementar T3 de `specs/001-base-datos-local` (apertura con migración y respaldo obligatorio)
+- **Siguiente paso:** implementar T4 de `specs/001-base-datos-local` (Núcleo de datos: CRUD de dominios)
 
 ## Specs activas
 
 | Spec | Estado | Fase |
 |---|---|---|
-| 001-base-datos-local | aprobada | implementando (T1–T2 hechas; siguiente T3) |
+| 001-base-datos-local | aprobada | implementando (T1–T3 hechas; siguiente T4) |
 | 002-generacion-horarios-ipc | aprobada | tareas redactadas (depende de 001) |
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
@@ -41,14 +41,15 @@
   - Borrado **en cascada con confirmación**, atómico.
   - **`docs/constitution.md` §5 enmendada**: se quitaron "horarios guardados en SQLite" del listado de datos; presets/horarios se gestionan como archivos JSON.
   - Limpieza de restos de frontend: eliminados `src/frontend/src/main.cpp`, `src/frontend/src/aplicacion_frontend.cpp` y su `.hpp` huérfano, más sus entradas del CMake (rompían `cmake --preset full`); el ejecutable real vive en `src/app`.
+- **Alcance (2026-10-09):** NO implementamos `src/frontend` (interfaz Qt: vistas, listas, diálogos e indicadores): lo hace **otro equipo**. Nuestros entregables: `src/backend`, `src/app` y `src/middleware`. Exponemos la lógica y el **contrato de consumo** documentado en `docs/interfaz-frontend.md`. Las specs 001/002 y sus planes/tareas se reajustaron (fuera las tareas de frontend; nueva tarea de documentar la interfaz).
 
 ## Siguiente paso
 
-1. Implementar T3 de `specs/001-base-datos-local` (apertura con migración y respaldo obligatorio), y seguir T4–T10.
+1. Implementar T4 de `specs/001-base-datos-local` (Núcleo de datos: CRUD de dominios), y seguir T5–T8.
 2. Después, `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001).
 
 ## Progreso de implementación
 
-- 001: T1 (esquema versionado) ✅, T2 (respaldo) ✅. Tests rojo→verde por tarea.
+- 001: T1 (esquema versionado) ✅, T2 (respaldo) ✅, T3 (apertura con migración y respaldo obligatorio) ✅. Tests rojo→verde por tarea.
 - Tests ajenos que fallan (no tocar): `test_servicio_profesor` (trabajo sin commitear), `test_solver_horarios`, `test_solver_benchmark` (solver).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

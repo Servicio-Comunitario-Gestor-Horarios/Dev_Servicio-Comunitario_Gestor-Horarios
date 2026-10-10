@@ -6,7 +6,7 @@ Estado: aprobada
 
 El lado cliente prepara el JSON de entrada del contrato documentado del motor de solver (datos de dominio tomados de la base de datos, más la configuración del solver y los presets, que se manejan como archivos JSON), lo valida y lo envía al proceso de cálculo. El proceso de cálculo solo resuelve el problema y nunca accede a la base de datos. Al recibir la salida, el lado cliente la valida, la muestra y permite guardarla como archivo JSON.
 
-El objetivo es que la generación funcione sobre datos reales y que quede delimitado qué lado posee los datos y qué lado calcula.
+El objetivo es que la generación funcione sobre datos reales y que quede delimitado qué lado posee los datos y qué lado calcula. El consumidor de la lógica y del contrato de datos que define esta spec es la interfaz de usuario, que implementa otro equipo (ver «Fuera de alcance»): nuestro lado entrega la lógica y el contrato de datos que esa interfaz consume.
 
 ## Usuarios
 
@@ -82,6 +82,7 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 
 ## Fuera de alcance
 
+- **Interfaz de usuario (Qt) de `src/frontend`** (diálogos, vistas e indicadores de generación): la implementa otro equipo. Esta spec define el comportamiento del producto y nuestro lado entrega la **lógica y el contrato de datos** que esa interfaz consume; el contrato de consumo se documenta en `docs/interfaz-frontend.md`. No se implementan aquí los widgets, las vistas ni los diálogos.
 - Que el proceso de cálculo acceda a la base de datos de cualquier forma.
 - Modificación del contrato JSON de entrada/salida del solver.
 - Segundas generaciones concurrentes: mientras una generación está en curso no se admite otra petición.
