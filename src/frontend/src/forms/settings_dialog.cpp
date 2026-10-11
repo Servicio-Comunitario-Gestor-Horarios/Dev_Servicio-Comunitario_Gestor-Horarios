@@ -4,6 +4,10 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QApplication>
+#include <QSettings>
+#include <QFile>
+#include <QStandardPaths>
+#include <QDir>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Configuración del Sistema");
@@ -43,12 +47,18 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 
     m_darkModeSwitch = new ToggleSwitch(this);
 
-    // USAR LA PROPIEDAD GLOBAL REAL EN VEZ DE BUSCAR EN EL STYLESHEET
-    m_temaInicial = qApp->property("isDarkMode").toBool();
+    // USAR QSettings PARA PERSISTIR EL TEMA
+    QSettings settings("LiceoRobertSerra", "GestorHorarios");
+    m_temaInicial = settings.value("darkMode", false).toBool();
     m_darkModeSwitch->setChecked(m_temaInicial);
 
-    // CONEXIÓN CLAVE: Al mover el switch, emite la señal al instante
-    connect(m_darkModeSwitch, &QCheckBox::toggled, this, &SettingsDialog::themeChanged);
+    // CONEXIÓN: Al mover el switch, SOLO actualiza vista previa (no guarda)
+    // Usamos una lambda para evitar bucles con el stylesheet global
+    connect(m_darkModeSwitch, &QCheckBox::toggled, this, [this](bool checked) {
+        if (!m_updatingFromSettings) {
+            emit themeChanged(checked);
+        }
+    });
 
     themeRow->addLayout(themeTextLayout);
     themeRow->addStretch();
@@ -72,7 +82,12 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     QPushButton *btnGuardar = new QPushButton("Guardar Configuración", this);
     btnGuardar->setStyleSheet("padding: 8px 16px; border: none; border-radius: 4px; background: #243c8a; color: white; font-weight: bold;");
     btnGuardar->setCursor(Qt::PointingHandCursor);
-    connect(btnGuardar, &QPushButton::clicked, this, &QDialog::accept);
+    connect(btnGuardar, &QPushButton::clicked, this, [this]() {
+        // Guardar en QSettings al aceptar
+        QSettings settings("LiceoRobertSerra", "GestorHorarios");
+        settings.setValue("darkMode", m_darkModeSwitch->isChecked());
+        accept();
+    });
 
     buttonsLayout->addWidget(btnDescartar);
     buttonsLayout->addWidget(btnGuardar);
@@ -85,9 +100,11 @@ bool SettingsDialog::isDarkMode() const {
 
 void SettingsDialog::cancelarCambios() {
     // Si descarta, revertimos el tema al estado original y actualizamos visualmente el switch
+    m_updatingFromSettings = true;
     emit themeChanged(m_temaInicial);
     m_darkModeSwitch->blockSignals(true);
     m_darkModeSwitch->setChecked(m_temaInicial);
     m_darkModeSwitch->blockSignals(false);
+    m_updatingFromSettings = false;
     reject();
 }

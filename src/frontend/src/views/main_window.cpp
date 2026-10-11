@@ -30,6 +30,7 @@
 #include <QLabel>
 #include <QFrame>
 #include <QVariant>
+#include <QSettings>
 
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
@@ -70,8 +71,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(m_btnGeneracion, &QPushButton::clicked, this, &MainWindow::mostrarGeneracion);
     connect(m_btnVisualizacion, &QPushButton::clicked, this, &MainWindow::mostrarVisualizacion);
 
-    // Iniciar el tema por defecto (claro)
-    aplicarTemaGlobal(false);
+    // Cargar tema guardado desde QSettings
+    QSettings settings("LiceoRobertSerra", "GestorHorarios");
+    bool darkMode = settings.value("darkMode", false).toBool();
+    aplicarTemaGlobal(darkMode);
     mostrarInicio();
 }
 
@@ -257,7 +260,7 @@ void MainWindow::mostrarGeneracion() {
 }
 
 void MainWindow::mostrarVisualizacion() {
-    m_contenedorVistas->setCurrentIndex(5);
+    m_contenedorVistas->setCurrentIndex(6);
     activarBoton(m_btnVisualizacion);
 }
 
@@ -331,7 +334,7 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     else if (index == 2) mostrarAulas();
     else if (index == 3) mostrarAsignaturas();
     else if (index == 4) mostrarGeneracion();
-    else if (index == 5) mostrarVisualizacion();
+    else if (index == 6) mostrarVisualizacion();
 
     if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
         dashboard->actualizarTema(modoOscuro);

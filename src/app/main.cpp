@@ -34,6 +34,8 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--backend") == 0) {
             QCoreApplication app(argc, argv);
+            app.setOrganizationName("LiceoRobertSerra");
+            app.setApplicationName("GestorHorarios");
             return ejecutarAplicacionBackend(argc, argv);
         }
         if (std::strcmp(argv[i], "--version") == 0) {
@@ -48,6 +50,8 @@ int main(int argc, char *argv[])
 
     // Modo frontend (default): UI + lanzamiento automático del backend
     QApplication app(argc, argv);
+    app.setOrganizationName("LiceoRobertSerra");
+    app.setApplicationName("GestorHorarios");
 
     // Instancia única (RF-5): la detección se activa antes de abrir la base de
     // datos y permanece viva durante todo el arranque (migración y diálogos).

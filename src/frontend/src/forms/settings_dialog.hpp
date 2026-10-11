@@ -19,4 +19,5 @@ private slots:
 private:
     ToggleSwitch *m_darkModeSwitch;
     bool m_temaInicial; // Guarda el estado original
+    bool m_updatingFromSettings = false; // Evita bucles al actualizar desde settings
 };

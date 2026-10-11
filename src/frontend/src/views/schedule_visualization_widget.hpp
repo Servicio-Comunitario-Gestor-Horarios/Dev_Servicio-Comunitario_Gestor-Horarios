@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QVector>
 #include <QMap>
+#include <QString>
 #include <middleware/internalclient.h>
 #include <middleware/messages.h>
 
@@ -27,6 +28,8 @@ private slots:
 
 private:
     void setupUi();
+    void ensureSchedulesDirectory();
+    void copyEmbeddedTestSchedules();
     void sendRequest(const QString& op, const QJsonObject& payload);
     void openTeacherScheduleDialog(const QJsonObject& data);
     void openStudentScheduleDialog(const QJsonObject& data);
@@ -39,4 +42,5 @@ private:
     QPushButton* m_btnLoadTestData = nullptr;
     InternalClient* m_client = nullptr;
     QJsonObject m_pendingRequest;
+    QString m_schedulesDir;
 };

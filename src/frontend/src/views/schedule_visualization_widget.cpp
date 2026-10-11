@@ -14,11 +14,16 @@
 #include <QJsonDocument>
 #include <QFile>
 #include <QDebug>
+#include <QFileDialog>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFileInfo>
 
 ScheduleVisualizationWidget::ScheduleVisualizationWidget(QWidget *parent)
     : QWidget(parent)
 {
     setupUi();
+    ensureSchedulesDirectory();
 }
 
 void ScheduleVisualizationWidget::setupUi()
@@ -100,8 +105,8 @@ void ScheduleVisualizationWidget::setupUi()
     separator->setStyleSheet("color: #e0e0e0; margin: 10px 0;");
     buttonsLayout->addWidget(separator);
 
-    // Botón: Cargar datos de prueba
-    m_btnLoadTestData = new QPushButton("📥  Cargar Horarios de Prueba", buttonsContainer);
+    // Botón: Cargar horarios desde archivo
+    m_btnLoadTestData = new QPushButton("📁  Cargar Horarios desde Archivo", buttonsContainer);
     m_btnLoadTestData->setCursor(Qt::PointingHandCursor);
     m_btnLoadTestData->setFixedSize(350, 60);
     m_btnLoadTestData->setStyleSheet(
@@ -129,13 +134,51 @@ void ScheduleVisualizationWidget::setupUi()
     // Etiqueta informativa
     QLabel* infoLabel = new QLabel(
         "Seleccione una opción para visualizar y editar los horarios.\n"
-        "Use 'Cargar Horarios de Prueba' para cargar datos de ejemplo.",
+        "Use 'Cargar Horarios desde Archivo' para elegir un archivo JSON de horarios guardados.",
         this
     );
     infoLabel->setAlignment(Qt::AlignCenter);
     infoLabel->setStyleSheet("font-size: 13px; color: #6b7280; margin-top: 10px;");
     infoLabel->setWordWrap(true);
     mainLayout->addWidget(infoLabel);
+}
+
+void ScheduleVisualizationWidget::ensureSchedulesDirectory()
+{
+    // Crear directorio para horarios en AppData/LiceoRobertSerra/GestorHorarios/schedules
+    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (appDataPath.isEmpty()) {
+        appDataPath = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/LiceoRobertSerra";
+    }
+    
+    m_schedulesDir = appDataPath + "/schedules";
+    QDir dir;
+    if (!dir.exists(m_schedulesDir)) {
+        dir.mkpath(m_schedulesDir);
+    }
+    
+    // Copiar el archivo de prueba integrado si no existe ningún archivo
+    QDir schedulesDir(m_schedulesDir);
+    if (schedulesDir.entryList(QStringList() << "*.json", QDir::Files).isEmpty()) {
+        copyEmbeddedTestSchedules();
+    }
+}
+
+void ScheduleVisualizationWidget::copyEmbeddedTestSchedules()
+{
+    QFile sourceFile(":/test_data/test_schedules.json");
+    if (sourceFile.open(QIODevice::ReadOnly)) {
+        QByteArray data = sourceFile.readAll();
+        sourceFile.close();
+        
+        QString destPath = m_schedulesDir + "/test_schedules.json";
+        QFile destFile(destPath);
+        if (destFile.open(QIODevice::WriteOnly)) {
+            destFile.write(data);
+            destFile.close();
+            qDebug() << "Archivo de prueba copiado a:" << destPath;
+        }
+    }
 }
 
 void ScheduleVisualizationWidget::setClient(InternalClient* client)
@@ -170,35 +213,35 @@ void ScheduleVisualizationWidget::onStudentSchedulesClicked()
 
 void ScheduleVisualizationWidget::onLoadTestDataClicked()
 {
-    // Cargar archivo JSON de prueba desde recursos
-    QFile file(":/test_data/test_schedules.json");
-    QByteArray data;
+    // Abrir diálogo para seleccionar archivo JSON de horarios
+    QString filePath = QFileDialog::getOpenFileName(
+        this,
+        "Seleccionar Archivo de Horarios",
+        m_schedulesDir,
+        "Archivos JSON (*.json);;Todos los archivos (*.*)"
+    );
 
-    if (file.open(QIODevice::ReadOnly)) {
-        data = file.readAll();
-        file.close();
-    } else {
-        // Intentar cargar desde ruta relativa (para desarrollo)
-        QFile file2("../test_schedules.json");
-        if (file2.open(QIODevice::ReadOnly)) {
-            data = file2.readAll();
-            file2.close();
-        } else {
-            QMessageBox::warning(this, "Error",
-                "No se encontró el archivo de datos de prueba.\n"
-                "Asegúrese de que test_schedules.json esté en el directorio del proyecto.");
-            return;
-        }
+    if (filePath.isEmpty()) {
+        return; // Usuario canceló
     }
 
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (doc.isNull()) {
-        QMessageBox::warning(this, "Error", "El archivo JSON de prueba no es válido.");
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::warning(this, "Error",
+            "No se pudo abrir el archivo seleccionado:\n" + filePath);
         return;
     }
 
-    // Determinar si se cargan horarios de profesores o estudiantes basado en el botón
-    // Por defecto cargamos ambos tipos de datos
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (doc.isNull()) {
+        QMessageBox::warning(this, "Error", "El archivo JSON no es válido.");
+        return;
+    }
+
+    // Determinar si se cargan horarios de profesores o estudiantes
     QJsonObject obj = doc.object();
     if (obj.contains("teachers")) {
         openTeacherScheduleDialog(obj);
@@ -207,7 +250,9 @@ void ScheduleVisualizationWidget::onLoadTestDataClicked()
         openStudentScheduleDialog(obj);
     }
 
-    QMessageBox::information(this, "Éxito", "Datos de prueba cargados correctamente.\nLos diálogos de horarios se han abierto.");
+    QString fileName = QFileInfo(filePath).fileName();
+    QMessageBox::information(this, "Éxito", 
+        QString("Horarios cargados desde:\n%1\n\nLos diálogos de horarios se han abierto.").arg(fileName));
 }
 
 void ScheduleVisualizationWidget::openTeacherScheduleDialog(const QJsonObject& data)
