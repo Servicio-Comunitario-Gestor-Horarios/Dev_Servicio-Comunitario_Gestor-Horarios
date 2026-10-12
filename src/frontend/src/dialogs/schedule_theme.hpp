@@ -21,6 +21,14 @@
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include <QAbstractAnimation>
+#include <QDialog>
+#include <QFrame>
+#include <QLabel>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QMessageBox>
+#include <QDialogButtonBox>
 
 #include <cmath>
 
@@ -145,6 +153,137 @@ inline void applyShadow(QWidget* w, bool dark, int blur = 30, int dy = 10)
     s->setOffset(0, dy);
     s->setColor(dark ? QColor(0, 0, 0, 150) : QColor(15, 23, 41, 32));
     w->setGraphicsEffect(s);
+}
+
+/**
+ * Aplica el estilo del sistema a un QMessageBox (los popups de Qt por defecto
+ * usan la paleta del sistema operativo y desentonan con el tema de la app).
+ */
+inline void applyMessageBoxTheme(QMessageBox& mb)
+{
+    const Palette p = current();
+    mb.setStyleSheet(QString(
+        "QMessageBox { background:%1; }"
+        "QLabel { color:%2; font-size:13px; }"
+        "QPushButton {"
+        "  min-width:96px; min-height:30px; padding:4px 16px;"
+        "  border-radius:8px; border:1px solid %3;"
+        "  background:%4; color:%2; font-weight:600;"
+        "}"
+        "QPushButton:hover { background:%5; border-color:%6; }"
+        "QPushButton:default { background:%6; color:#FFFFFF; border:none; }"
+        "QPushButton:default:hover { background:%7; }")
+        .arg(p.surface, p.text, p.border, p.surface2, p.surface3, p.accent, p.accentStrong));
+}
+
+/** Muestra un popup informativo/de advertencia con el estilo del sistema. */
+inline void showStyledMessage(QWidget* parent, const QString& title,
+                              const QString& text, bool warning = false)
+{
+    QMessageBox mb(parent);
+    mb.setWindowTitle(title);
+    mb.setText(text);
+    mb.setIcon(warning ? QMessageBox::Warning : QMessageBox::Information);
+    mb.setStandardButtons(QMessageBox::Ok);
+    mb.button(QMessageBox::Ok)->setText("Entendido");
+    applyMessageBoxTheme(mb);
+    mb.exec();
+}
+
+/**
+ * Diálogo de conflicto al mover un bloque. Presenta las ocupaciones detectadas
+ * en otros horarios y ofrece Cancelar o Intercambiar (actualizando todos los
+ * horarios afectados). Devuelve true si el usuario elige Intercambiar.
+ */
+inline bool askSwapConflict(QWidget* parent, const QString& title,
+                            const QString& intro, const QStringList& details)
+{
+    const Palette p = current();
+
+    QDialog dlg(parent);
+    dlg.setWindowTitle(title);
+    dlg.setModal(true);
+    dlg.setMinimumWidth(470);
+
+    auto* root = new QVBoxLayout(&dlg);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
+
+    // Tarjeta contenedora.
+    auto* card = new QFrame(&dlg);
+    card->setObjectName("conflictCard");
+    auto* lay = new QVBoxLayout(card);
+    lay->setContentsMargins(26, 22, 26, 20);
+    lay->setSpacing(14);
+
+    auto* heading = new QLabel(title, card);
+    heading->setObjectName("conflictTitle");
+    lay->addWidget(heading);
+
+    auto* introLabel = new QLabel(intro, card);
+    introLabel->setObjectName("conflictIntro");
+    introLabel->setWordWrap(true);
+    lay->addWidget(introLabel);
+
+    if (!details.isEmpty()) {
+        auto* box = new QFrame(card);
+        box->setObjectName("conflictBox");
+        auto* boxLay = new QVBoxLayout(box);
+        boxLay->setContentsMargins(14, 12, 14, 12);
+        boxLay->setSpacing(8);
+        for (const QString& d : details) {
+            auto* l = new QLabel(QString::fromUtf8("\u2022  ") + d, box);
+            l->setObjectName("conflictDetail");
+            l->setWordWrap(true);
+            boxLay->addWidget(l);
+        }
+        lay->addWidget(box);
+    }
+
+    auto* buttons = new QHBoxLayout();
+    buttons->setSpacing(10);
+    buttons->addStretch(1);
+
+    auto* cancel = new QPushButton("Cancelar", card);
+    cancel->setObjectName("conflictCancel");
+    cancel->setCursor(Qt::PointingHandCursor);
+    cancel->setMinimumHeight(36);
+    auto* swap = new QPushButton("Intercambiar", card);
+    swap->setObjectName("conflictSwap");
+    swap->setCursor(Qt::PointingHandCursor);
+    swap->setMinimumHeight(36);
+    swap->setDefault(true);
+
+    buttons->addWidget(cancel);
+    buttons->addWidget(swap);
+    lay->addLayout(buttons);
+
+    root->addWidget(card);
+
+    QObject::connect(cancel, &QPushButton::clicked, &dlg, &QDialog::reject);
+    QObject::connect(swap,   &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    dlg.setStyleSheet(QString(
+        "#conflictCard { background:%1; border:1px solid %2; border-radius:14px; }"
+        "#conflictTitle { font-size:17px; font-weight:700; color:%3; }"
+        "#conflictIntro { font-size:13px; color:%4; }"
+        "#conflictBox { background:%5; border:1px solid %2; border-radius:10px; }"
+        "#conflictDetail { font-size:12px; color:%6; }"
+        "#conflictCancel {"
+        "  min-width:110px; padding:6px 18px; border-radius:9px;"
+        "  border:1px solid %2; background:%5; color:%3; font-weight:600;"
+        "}"
+        "#conflictCancel:hover { background:%7; }"
+        "#conflictSwap {"
+        "  min-width:130px; padding:6px 18px; border-radius:9px; border:none;"
+        "  color:#FFFFFF; font-weight:700;"
+        "  background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 %8, stop:1 %9);"
+        "}"
+        "#conflictSwap:hover { background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 %9, stop:1 %10); }")
+        .arg(p.surface, p.border, p.text, p.textMuted, p.surface2, p.textSubtle,
+             p.surface3, p.accent, p.accentStrong, p.accentSoft));
+
+    return dlg.exec() == QDialog::Accepted;
 }
 
 } // namespace ScheduleTheme

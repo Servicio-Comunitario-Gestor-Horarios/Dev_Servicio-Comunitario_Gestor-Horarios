@@ -1,91 +1,44 @@
 #pragma once
 
-#include <QDialog>
-#include <QScrollArea>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QLabel>
-#include <QPushButton>
-#include <QButtonGroup>
-#include <QPropertyAnimation>
-#include <QEasingCurve>
-#include <QJsonObject>
-#include <QJsonArray>
+#include "schedule_grid_dialog.hpp"
+
 #include <QString>
+#include <QStringList>
 #include <QVector>
-#include <QWidget>
-#include <QTimer>
-#include <QEvent>            // para eventFilter
+
+class QPushButton;
+class QButtonGroup;
+class QWidget;
 
 /**
  * @brief Diálogo de visualización/edición de horarios de profesores.
  *
- * Estética basada en el prototipo SchedulePrototype: superficies claras,
- * tarjetas con sombra, navegador vertical de docentes con píldora activa en
- * degradado índigo y bloques de materia coloreados.
+ * La rejilla, el arrastrar/soltar y los conflictos viven en ScheduleGridDialog.
+ * Aquí sólo se aporta el navegador vertical de docentes y el título.
  */
-class TeacherScheduleDialog : public QDialog
+class TeacherScheduleDialog : public ScheduleGridDialog
 {
     Q_OBJECT
 public:
     explicit TeacherScheduleDialog(const QJsonObject& schedulesData, QWidget* parent = nullptr);
     ~TeacherScheduleDialog() override = default;
 
-signals:
-    void scheduleModified(const QJsonObject& updatedSchedules);
-
 protected:
-    bool eventFilter(QObject* watched, QEvent* event) override;
-    void showEvent(QShowEvent* event) override;
-
-private slots:
-    void onPreviousTeacher();
-    void onNextTeacher();
-    void onCellClicked(int day, int slot,
-                       const QString& teacherName,
-                       const QString& currentSubject);
+    ScheduleModel::Ref currentRef() const override;
+    QString            displayName() const override;
+    void               onScheduleChanged() override;
 
 private:
-    void setupUi(const QJsonObject& schedulesData);
-    void buildStyles();
-    void buildNavigator();
-    void showTeacherSchedule(int index);
-    void createScheduleGrid(const QJsonObject& teacherSchedule);
-    void updateNavigationButtons();
-    int  countBlocks(const QJsonObject& schedule) const;
+    void setupUi();
+    QWidget* buildNavigator(QWidget* parent);
+    void showTeacher(int index);
+    void updateNavButtons();
 
-    bool checkConflict(const QString& teacherName, int day, int slot,
-                       const QString& newSubject);
-    void showConflictDialog(const QString& teacherName, int day, int slot,
-                            const QString& currentSubject,
-                            const QString& newSubject);
-    void applySubjectChange(const QString& teacherName, int day, int slot,
-                            const QString& newSubject);
+    QStringList m_teacherNames;
+    int m_currentIndex = 0;
 
-    struct TeacherSchedule {
-        QString name;
-        QJsonObject schedule; // day -> slot -> subject
-    };
-
-    QVector<TeacherSchedule> m_teacherSchedules;
-    int m_currentTeacherIndex = 0;
-
-    // Cabecera
-    QLabel* m_eyebrowLabel = nullptr;
-    QLabel* m_titleLabel = nullptr;
-    QLabel* m_subtitleLabel = nullptr;
-    QPushButton* m_btnPrevious = nullptr;
-    QPushButton* m_btnNext = nullptr;
-
-    // Navegador de docentes
     QButtonGroup* m_navGroup = nullptr;
     QVector<QPushButton*> m_navButtons;
-
-    // Cuadrícula
-    QScrollArea* m_gridScroll = nullptr;
-    QWidget* m_gridHost = nullptr;
-    QGridLayout* m_scheduleGrid = nullptr;
-
-    bool m_entranceDone = false;
+    QPushButton* m_btnPrevious = nullptr;
+    QPushButton* m_btnNext = nullptr;
 };

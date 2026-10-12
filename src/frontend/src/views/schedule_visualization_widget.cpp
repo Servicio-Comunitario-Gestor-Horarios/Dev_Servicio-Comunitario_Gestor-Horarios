@@ -8,6 +8,7 @@
 #include "schedule_visualization_widget.hpp"
 #include "teacher_schedule_dialog.hpp"
 #include "student_schedule_dialog.hpp"
+#include "schedule_theme.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -204,7 +205,8 @@ void ScheduleVisualizationWidget::setClient(InternalClient* client)
 void ScheduleVisualizationWidget::onTeacherSchedulesClicked()
 {
     if (!m_hasLoadedData || !m_loadedTeacherSchedules.contains("teachers")) {
-        QMessageBox::warning(this, "Sin datos", "No hay horarios de profesores cargados.\nPrimero cargue un archivo de horarios.");
+        ScheduleTheme::showStyledMessage(this, "Sin datos",
+            "No hay horarios de profesores cargados.\nPrimero cargue un archivo de horarios.", true);
         return;
     }
     
@@ -215,7 +217,8 @@ void ScheduleVisualizationWidget::onTeacherSchedulesClicked()
 void ScheduleVisualizationWidget::onStudentSchedulesClicked()
 {
     if (!m_hasLoadedData || !m_loadedStudentSchedules.contains("years")) {
-        QMessageBox::warning(this, "Sin datos", "No hay horarios de estudiantes cargados.\nPrimero cargue un archivo de horarios.");
+        ScheduleTheme::showStyledMessage(this, "Sin datos",
+            "No hay horarios de estudiantes cargados.\nPrimero cargue un archivo de horarios.", true);
         return;
     }
     
@@ -239,8 +242,8 @@ void ScheduleVisualizationWidget::onLoadScheduleClicked()
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "Error",
-            "No se pudo abrir el archivo seleccionado:\n" + filePath);
+        ScheduleTheme::showStyledMessage(this, "Error",
+            "No se pudo abrir el archivo seleccionado:\n" + filePath, true);
         return;
     }
 
@@ -249,7 +252,7 @@ void ScheduleVisualizationWidget::onLoadScheduleClicked()
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
-        QMessageBox::warning(this, "Error", "El archivo JSON no es válido.");
+        ScheduleTheme::showStyledMessage(this, "Error", "El archivo JSON no es válido.", true);
         return;
     }
 
@@ -269,7 +272,8 @@ void ScheduleVisualizationWidget::onLoadScheduleClicked()
     }
 
     if (!m_hasLoadedData) {
-        QMessageBox::warning(this, "Error", "El archivo no contiene datos de horarios válidos (falta 'teachers' o 'years').");
+        ScheduleTheme::showStyledMessage(this, "Error",
+            "El archivo no contiene datos de horarios válidos (falta 'teachers' o 'years').", true);
         return;
     }
 
@@ -287,7 +291,7 @@ void ScheduleVisualizationWidget::onLoadScheduleClicked()
     }
     msg += "\n\nAhora use los botones arriba para visualizarlos.";
     
-    QMessageBox::information(this, "Éxito", msg);
+    ScheduleTheme::showStyledMessage(this, "Éxito", msg, false);
 }
 
 void ScheduleVisualizationWidget::showTeacherSchedules(const QJsonObject& data)
@@ -298,8 +302,9 @@ void ScheduleVisualizationWidget::showTeacherSchedules(const QJsonObject& data)
 
     connect(dialog, &TeacherScheduleDialog::scheduleModified, [this](const QJsonObject& updatedData) {
         qDebug() << "Horario de profesor modificado, enviar al backend:" << updatedData;
-        // Actualizar datos locales si se modifican
+        // La edición puede afectar tanto a docentes como a secciones (intercambios).
         m_loadedTeacherSchedules = updatedData;
+        m_loadedStudentSchedules = updatedData;
     });
 
     dialog->show();
@@ -313,7 +318,8 @@ void ScheduleVisualizationWidget::showStudentSchedules(const QJsonObject& data)
 
     connect(dialog, &StudentScheduleDialog::scheduleModified, [this](const QJsonObject& updatedData) {
         qDebug() << "Horario de estudiante modificado, enviar al backend:" << updatedData;
-        // Actualizar datos locales si se modifican
+        // La edición puede afectar tanto a secciones como a docentes (intercambios).
+        m_loadedTeacherSchedules = updatedData;
         m_loadedStudentSchedules = updatedData;
     });
 
@@ -334,7 +340,7 @@ void ScheduleVisualizationWidget::onRespuestaRecibida(const QJsonObject& respues
 
     if (code != Middleware::RESP_EXITO) {
         QString errorMsg = respuesta["message"].toString("Error desconocido");
-        QMessageBox::critical(this, "Error", errorMsg);
+        ScheduleTheme::showStyledMessage(this, "Error", errorMsg, true);
         return;
     }
 
@@ -366,9 +372,9 @@ void ScheduleVisualizationWidget::handleTeacherSchedulesResponse(const QJsonObje
             }
         }
         
-        QMessageBox::information(this, "Horarios de Profesores", 
+        ScheduleTheme::showStyledMessage(this, "Horarios de Profesores",
             "Horarios de profesores recibidos del backend.\n"
-            "Haga clic en 'Horarios de Profesores' para visualizarlos.");
+            "Haga clic en 'Horarios de Profesores' para visualizarlos.", false);
     }
 }
 
@@ -380,13 +386,15 @@ void ScheduleVisualizationWidget::handleStudentSchedulesResponse(const QJsonObje
         m_btnStudentSchedules->setEnabled(true);
         m_hasLoadedData = true;
         
-        QMessageBox::information(this, "Horarios de Estudiantes", 
+        ScheduleTheme::showStyledMessage(this, "Horarios de Estudiantes",
             "Horarios de estudiantes recibidos del backend.\n"
-            "Haga clic en 'Horarios de Estudiantes' para visualizarlos.");
+            "Haga clic en 'Horarios de Estudiantes' para visualizarlos.", false);
     }
 }
 
 void ScheduleVisualizationWidget::handleLoadTestDataResponse(const QJsonObject& respuesta)
 {
-    QMessageBox::information(this, "Éxito", "Datos de prueba cargados correctamente en el backend.");
+    Q_UNUSED(respuesta);
+    ScheduleTheme::showStyledMessage(this, "Éxito",
+        "Datos de prueba cargados correctamente en el backend.", false);
 }
