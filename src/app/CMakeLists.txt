@@ -75,4 +75,7 @@ if(TARGET datos)
 	target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_BACKEND=1)
 endif()
 
+# Forzar C++17 para evitar conflictos con OR-Tools que usa C++20
+target_compile_features(gestor-horarios PRIVATE cxx_std_17)
+
 set_project_warnings(gestor-horarios)

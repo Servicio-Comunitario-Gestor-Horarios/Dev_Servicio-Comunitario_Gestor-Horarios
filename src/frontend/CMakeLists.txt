@@ -36,6 +36,7 @@ set(FRONTEND_HEADERS
 				src/views/schedule_visualization_widget.hpp
 				src/dialogs/teacher_schedule_dialog.hpp
 				src/dialogs/student_schedule_dialog.hpp
+				src/dialogs/schedule_theme.hpp
 				src/forms/settings_dialog.hpp
 )
 

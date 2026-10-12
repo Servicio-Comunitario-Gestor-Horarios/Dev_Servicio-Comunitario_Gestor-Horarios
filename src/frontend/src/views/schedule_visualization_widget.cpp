@@ -1,7 +1,8 @@
 /**
  * @file schedule_visualization_widget.cpp
  * @brief Widget principal para la visualización de horarios
- *        Muestra dos botones: Horarios de Profesores y Horarios de Estudiantes
+ *        Permite cargar horarios desde archivo y visualizar por separado
+ *        los horarios de profesores y estudiantes
  */
 
 #include "schedule_visualization_widget.hpp"
@@ -21,6 +22,7 @@
 
 ScheduleVisualizationWidget::ScheduleVisualizationWidget(QWidget *parent)
     : QWidget(parent)
+    , m_hasLoadedData(false)
 {
     setupUi();
     ensureSchedulesDirectory();
@@ -70,7 +72,12 @@ void ScheduleVisualizationWidget::setupUi()
         "QPushButton:pressed {"
         "   background-color: #283593;"
         "}"
+        "QPushButton:disabled {"
+        "   background-color: #bdbdbd;"
+        "   color: #9e9e9e;"
+        "}"
     );
+    m_btnTeacherSchedules->setEnabled(false);
     connect(m_btnTeacherSchedules, &QPushButton::clicked, this, &ScheduleVisualizationWidget::onTeacherSchedulesClicked);
     buttonsLayout->addWidget(m_btnTeacherSchedules, 0, Qt::AlignCenter);
 
@@ -94,7 +101,12 @@ void ScheduleVisualizationWidget::setupUi()
         "QPushButton:pressed {"
         "   background-color: #00695c;"
         "}"
+        "QPushButton:disabled {"
+        "   background-color: #bdbdbd;"
+        "   color: #9e9e9e;"
+        "}"
     );
+    m_btnStudentSchedules->setEnabled(false);
     connect(m_btnStudentSchedules, &QPushButton::clicked, this, &ScheduleVisualizationWidget::onStudentSchedulesClicked);
     buttonsLayout->addWidget(m_btnStudentSchedules, 0, Qt::AlignCenter);
 
@@ -106,10 +118,10 @@ void ScheduleVisualizationWidget::setupUi()
     buttonsLayout->addWidget(separator);
 
     // Botón: Cargar horarios desde archivo
-    m_btnLoadTestData = new QPushButton("📁  Cargar Horarios desde Archivo", buttonsContainer);
-    m_btnLoadTestData->setCursor(Qt::PointingHandCursor);
-    m_btnLoadTestData->setFixedSize(350, 60);
-    m_btnLoadTestData->setStyleSheet(
+    m_btnLoadSchedule = new QPushButton("📁  Cargar Horarios desde Archivo", buttonsContainer);
+    m_btnLoadSchedule->setCursor(Qt::PointingHandCursor);
+    m_btnLoadSchedule->setFixedSize(350, 60);
+    m_btnLoadSchedule->setStyleSheet(
         "QPushButton {"
         "   background-color: #ff9800;"
         "   color: white;"
@@ -126,15 +138,15 @@ void ScheduleVisualizationWidget::setupUi()
         "   background-color: #ef6c00;"
         "}"
     );
-    connect(m_btnLoadTestData, &QPushButton::clicked, this, &ScheduleVisualizationWidget::onLoadTestDataClicked);
-    buttonsLayout->addWidget(m_btnLoadTestData, 0, Qt::AlignCenter);
+    connect(m_btnLoadSchedule, &QPushButton::clicked, this, &ScheduleVisualizationWidget::onLoadScheduleClicked);
+    buttonsLayout->addWidget(m_btnLoadSchedule, 0, Qt::AlignCenter);
 
     mainLayout->addWidget(buttonsContainer);
 
     // Etiqueta informativa
     QLabel* infoLabel = new QLabel(
-        "Seleccione una opción para visualizar y editar los horarios.\n"
-        "Use 'Cargar Horarios desde Archivo' para elegir un archivo JSON de horarios guardados.",
+        "Primero cargue un archivo de horarios usando el botón de abajo.\n"
+        "Luego podrá visualizar los horarios de profesores y estudiantes por separado.",
         this
     );
     infoLabel->setAlignment(Qt::AlignCenter);
@@ -191,27 +203,27 @@ void ScheduleVisualizationWidget::setClient(InternalClient* client)
 
 void ScheduleVisualizationWidget::onTeacherSchedulesClicked()
 {
-    if (!m_client) {
-        QMessageBox::warning(this, "Error", "No hay conexión con el backend.");
+    if (!m_hasLoadedData || !m_loadedTeacherSchedules.contains("teachers")) {
+        QMessageBox::warning(this, "Sin datos", "No hay horarios de profesores cargados.\nPrimero cargue un archivo de horarios.");
         return;
     }
-
-    m_pendingRequest = {{"op", "teacher_schedules_list"}};
-    sendRequest("teacher_schedules_list", {});
+    
+    // Mostrar los horarios de profesores ya cargados
+    showTeacherSchedules(m_loadedTeacherSchedules);
 }
 
 void ScheduleVisualizationWidget::onStudentSchedulesClicked()
 {
-    if (!m_client) {
-        QMessageBox::warning(this, "Error", "No hay conexión con el backend.");
+    if (!m_hasLoadedData || !m_loadedStudentSchedules.contains("years")) {
+        QMessageBox::warning(this, "Sin datos", "No hay horarios de estudiantes cargados.\nPrimero cargue un archivo de horarios.");
         return;
     }
-
-    m_pendingRequest = {{"op", "student_schedules_list"}};
-    sendRequest("student_schedules_list", {});
+    
+    // Mostrar los horarios de estudiantes ya cargados
+    showStudentSchedules(m_loadedStudentSchedules);
 }
 
-void ScheduleVisualizationWidget::onLoadTestDataClicked()
+void ScheduleVisualizationWidget::onLoadScheduleClicked()
 {
     // Abrir diálogo para seleccionar archivo JSON de horarios
     QString filePath = QFileDialog::getOpenFileName(
@@ -241,45 +253,68 @@ void ScheduleVisualizationWidget::onLoadTestDataClicked()
         return;
     }
 
-    // Determinar si se cargan horarios de profesores o estudiantes
+    // Guardar los datos cargados
     QJsonObject obj = doc.object();
+    m_hasLoadedData = false;
+    m_loadedTeacherSchedules = QJsonObject();
+    m_loadedStudentSchedules = QJsonObject();
+
     if (obj.contains("teachers")) {
-        openTeacherScheduleDialog(obj);
+        m_loadedTeacherSchedules = obj;
+        m_hasLoadedData = true;
     }
     if (obj.contains("years")) {
-        openStudentScheduleDialog(obj);
+        m_loadedStudentSchedules = obj;
+        m_hasLoadedData = true;
     }
 
+    if (!m_hasLoadedData) {
+        QMessageBox::warning(this, "Error", "El archivo no contiene datos de horarios válidos (falta 'teachers' o 'years').");
+        return;
+    }
+
+    // Habilitar botones según lo que se cargó
+    m_btnTeacherSchedules->setEnabled(m_loadedTeacherSchedules.contains("teachers"));
+    m_btnStudentSchedules->setEnabled(m_loadedStudentSchedules.contains("years"));
+
     QString fileName = QFileInfo(filePath).fileName();
-    QMessageBox::information(this, "Éxito", 
-        QString("Horarios cargados desde:\n%1\n\nLos diálogos de horarios se han abierto.").arg(fileName));
+    QString msg = QString("Horarios cargados correctamente desde:\n%1").arg(fileName);
+    if (m_loadedTeacherSchedules.contains("teachers")) {
+        msg += "\n✓ Horarios de profesores disponibles";
+    }
+    if (m_loadedStudentSchedules.contains("years")) {
+        msg += "\n✓ Horarios de estudiantes disponibles";
+    }
+    msg += "\n\nAhora use los botones arriba para visualizarlos.";
+    
+    QMessageBox::information(this, "Éxito", msg);
 }
 
-void ScheduleVisualizationWidget::openTeacherScheduleDialog(const QJsonObject& data)
+void ScheduleVisualizationWidget::showTeacherSchedules(const QJsonObject& data)
 {
     TeacherScheduleDialog* dialog = new TeacherScheduleDialog(data, this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowModality(Qt::ApplicationModal);
 
-    // Conectar señal de modificación
     connect(dialog, &TeacherScheduleDialog::scheduleModified, [this](const QJsonObject& updatedData) {
-        // Aquí se podría enviar al backend para guardar
         qDebug() << "Horario de profesor modificado, enviar al backend:" << updatedData;
+        // Actualizar datos locales si se modifican
+        m_loadedTeacherSchedules = updatedData;
     });
 
     dialog->show();
 }
 
-void ScheduleVisualizationWidget::openStudentScheduleDialog(const QJsonObject& data)
+void ScheduleVisualizationWidget::showStudentSchedules(const QJsonObject& data)
 {
     StudentScheduleDialog* dialog = new StudentScheduleDialog(data, this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->setWindowModality(Qt::ApplicationModal);
 
-    // Conectar señal de modificación
     connect(dialog, &StudentScheduleDialog::scheduleModified, [this](const QJsonObject& updatedData) {
-        // Aquí se podría enviar al backend para guardar
         qDebug() << "Horario de estudiante modificado, enviar al backend:" << updatedData;
+        // Actualizar datos locales si se modifican
+        m_loadedStudentSchedules = updatedData;
     });
 
     dialog->show();
@@ -314,17 +349,40 @@ void ScheduleVisualizationWidget::onRespuestaRecibida(const QJsonObject& respues
 
 void ScheduleVisualizationWidget::handleTeacherSchedulesResponse(const QJsonObject& respuesta)
 {
-    // Abrir diálogo con los horarios recibidos del backend
+    // Guardar datos y habilitar botón (NO abrir diálogo automáticamente)
     if (respuesta.contains("data")) {
-        openTeacherScheduleDialog(respuesta["data"].toObject());
+        m_loadedTeacherSchedules = respuesta["data"].toObject();
+        m_btnTeacherSchedules->setEnabled(true);
+        m_hasLoadedData = true;
+        
+        // También verificar si hay datos de estudiantes en la respuesta
+        if (respuesta.contains("students_data") || respuesta.contains("years")) {
+            m_loadedStudentSchedules = respuesta.value("students_data").toObject();
+            if (m_loadedStudentSchedules.isEmpty() && respuesta.contains("years")) {
+                m_loadedStudentSchedules = respuesta.value("years").toObject();
+            }
+            if (!m_loadedStudentSchedules.isEmpty()) {
+                m_btnStudentSchedules->setEnabled(true);
+            }
+        }
+        
+        QMessageBox::information(this, "Horarios de Profesores", 
+            "Horarios de profesores recibidos del backend.\n"
+            "Haga clic en 'Horarios de Profesores' para visualizarlos.");
     }
 }
 
 void ScheduleVisualizationWidget::handleStudentSchedulesResponse(const QJsonObject& respuesta)
 {
-    // Abrir diálogo con los horarios recibidos del backend
+    // Guardar datos y habilitar botón (NO abrir diálogo automáticamente)
     if (respuesta.contains("data")) {
-        openStudentScheduleDialog(respuesta["data"].toObject());
+        m_loadedStudentSchedules = respuesta["data"].toObject();
+        m_btnStudentSchedules->setEnabled(true);
+        m_hasLoadedData = true;
+        
+        QMessageBox::information(this, "Horarios de Estudiantes", 
+            "Horarios de estudiantes recibidos del backend.\n"
+            "Haga clic en 'Horarios de Estudiantes' para visualizarlos.");
     }
 }
 
