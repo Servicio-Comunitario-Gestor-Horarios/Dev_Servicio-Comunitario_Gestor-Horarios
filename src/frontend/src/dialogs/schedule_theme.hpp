@@ -18,7 +18,6 @@
 #include <QString>
 #include <QWidget>
 #include <QGraphicsDropShadowEffect>
-#include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include <QEasingCurve>
 #include <QAbstractAnimation>
@@ -129,7 +128,15 @@ inline QColor subjectTextColor(const QColor& c)
     return L > 0.5 ? QColor("#1B2232") : QColor("#FFFFFF");
 }
 
-/** Sombra suave estilo "elevación" (QSS no soporta box-shadow). */
+/** Sombra suave estilo "elevación" (QSS no soporta box-shadow).
+ *
+ * IMPORTANTE: usar solo en widgets con pocos hijos o que no se repintan con
+ * frecuencia. Un QGraphicsEffect obliga a Qt a renderizar todo el subárbol en
+ * un pixmap fuera de pantalla en cada repintado (p. ej. al hacer hover), y si
+ * se anidan efectos (sombra + opacidad) la caché del efecto exterior puede
+ * quedar obsoleta y mostrar el contenido en blanco. Por eso NO se aplica
+ * ninguna sombra ni efecto a la tarjeta que contiene la cuadrícula.
+ */
 inline void applyShadow(QWidget* w, bool dark, int blur = 30, int dy = 10)
 {
     if (!w) return;
@@ -138,24 +145,6 @@ inline void applyShadow(QWidget* w, bool dark, int blur = 30, int dy = 10)
     s->setOffset(0, dy);
     s->setColor(dark ? QColor(0, 0, 0, 150) : QColor(15, 23, 41, 32));
     w->setGraphicsEffect(s);
-}
-
-/** Animación de aparición (fade) reutilizable. */
-inline void fadeIn(QWidget* w, int durationMs, double from = 0.0, double to = 1.0)
-{
-    if (!w) return;
-    auto* eff = new QGraphicsOpacityEffect(w);
-    eff->setOpacity(from);
-    w->setGraphicsEffect(eff);
-
-    // El padre del animation es el propio efecto: si el efecto se reemplaza
-    // (setGraphicsEffect) o se destruye, la animación muere con él.
-    auto* anim = new QPropertyAnimation(eff, "opacity", eff);
-    anim->setDuration(durationMs);
-    anim->setStartValue(from);
-    anim->setEndValue(to);
-    anim->setEasingCurve(QEasingCurve::OutCubic);
-    anim->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 } // namespace ScheduleTheme

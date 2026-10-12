@@ -133,9 +133,12 @@ void TeacherScheduleDialog::setupUi(const QJsonObject& schedulesData)
     body->setSpacing(16);
 
     // --- Tarjeta de la cuadrícula ---
+    // Sin QGraphicsDropShadowEffect: la cuadrícula tiene decenas de widgets que
+    // se repintan al pasar el cursor; un efecto aquí forzaría un renderizado
+    // fuera de pantalla continuo (fragmentación/parpadeo). La elevación se logra
+    // con borde y fondo de superficie.
     QFrame* scheduleCard = new QFrame(this);
     scheduleCard->setObjectName("ScheduleCard");
-    applyShadow(scheduleCard, darkMode());
     QVBoxLayout* cardLayout = new QVBoxLayout(scheduleCard);
     cardLayout->setContentsMargins(10, 10, 10, 10);
     cardLayout->setSpacing(0);
@@ -449,12 +452,24 @@ void TeacherScheduleDialog::createScheduleGrid(const QJsonObject& schedule)
         }
     }
 
-    // Ajustar el huésped a la medida exacta de la cuadrícula
-    m_scheduleGrid->invalidate();
-    m_gridHost->setFixedSize(m_scheduleGrid->sizeHint());
+    // Ajustar el huésped a la medida exacta de la cuadrícula.
+    // No usar m_scheduleGrid->sizeHint() aquí: justo tras reconstruir la
+    // cuadrícula los widgets recién creados todavía no se consideran visibles y
+    // QWidgetItem::isEmpty() los trata como vacíos, por lo que sizeHint() puede
+    // devolver 0x0. Eso dejaba el contenedor sin tamaño (cuadrícula en blanco)
+    // al cambiar de docente. Calculamos el tamaño de forma determinista.
+    const int gap = m_scheduleGrid->spacing();
+    const int gridW = kTimeColW + kDays.size() * kDayColW + kDays.size() * gap;
+    const int gridH = kHeaderH + kSlots.size() * kRowH + kSlots.size() * gap;
+    m_gridHost->setFixedSize(gridW, gridH);
+    m_scheduleGrid->activate();
 
-    // Animación de aparición de la cuadrícula
-    fadeIn(m_gridHost, 200, 0.0, 1.0);
+    // NOTA: no se aplica ninguna animación con QGraphicsEffect (fade) sobre la
+    // cuadrícula. Un efecto de opacidad aquí obliga a Qt a renderizar todo el
+    // subárbol en un pixmap fuera de pantalla en cada repintado (parpadeo/
+    // fragmentación al pasar el cursor) y, si su animación no progresa (p. ej.
+    // durante la reconstrucción síncrona), deja la cuadrícula en opacidad 0
+    // (en blanco). La aparición del diálogo se anima con windowOpacity.
 }
 
 bool TeacherScheduleDialog::eventFilter(QObject* watched, QEvent* event)
