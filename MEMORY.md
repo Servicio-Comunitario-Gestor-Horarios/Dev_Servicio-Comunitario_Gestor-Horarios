@@ -7,8 +7,8 @@
 - **Fase:** spec **004 implementada** (T1–T9: curso por `anio`+`seccion` con `turno`/`aula`, esquema único, cascadas con anulación, consola y contrato del frontend). Suite **38/43**; los 4 rojos son de la **spec 005**.
 - **Fecha:** 2026-10-15
 - **Rama:** `sdd/004-persistencia-campos-curso`
-- **Specs en curso:** `specs/004-persistencia-campos-curso` (**implementada**), `specs/005-nucleo-solver` (borrador)
-- **Siguiente paso:** retomar la **spec 005** (núcleo del solver): re-aprobar la spec (modelo de config nuevo), regenerar plan/tareas y cerrar los 4 tests rojos (constructor_entrada, validador_entrada, ipc_aislamiento_bd, solver).
+- **Specs en curso:** `specs/004-persistencia-campos-curso` (**implementada**), `specs/005-nucleo-solver` (**aprobada**; plan/tareas pendientes)
+- **Siguiente paso:** regenerar `plan.md`/`tasks.md` de **005** e implementar el motor (objetivo, D1/D2/D9); cerrar los 4 tests rojos (constructor_entrada, validador_entrada, ipc_aislamiento_bd, solver).
 
 ## Specs activas
 

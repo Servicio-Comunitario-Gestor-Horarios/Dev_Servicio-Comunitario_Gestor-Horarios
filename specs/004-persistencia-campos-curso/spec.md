@@ -290,8 +290,12 @@ describe el cambio observable.
   identifica la causa (RF-1).
 - **Aula referenciada eliminada:** se muestran los cursos dependientes y se pide confirmación; si el
   usuario confirma, los cursos quedan sin aula (referencia nula) (RF-1).
-- **Curso sin turno:** se conserva sin turno; si se usa ese turno o lo elige el solver es decisión
-  diferida a la spec 006 (RF-2).
+- **Curso sin turno:** se **conserva sin turno** (el turno persistido es **opcional**, RF-1/RF-2). Al
+  **generar**, la spec 005 exige que todo curso **declare** turno: es **obligatorio** en la entrada del
+  solver y, si falta, la entrada se **rechaza** (V7). Por tanto, un curso sin turno persistido no puede
+  entrar en una generación hasta que se le asigne uno; lo único **diferido a la spec 006** es la
+  **asignación automática** (que el solver elija el turno). La persistencia admite el curso sin turno;
+  su uso en la generación lo decide la 005 (RF-2).
 - **Turno referenciado eliminado:** se muestran los cursos dependientes y se pide confirmación; si el
   usuario confirma, los cursos quedan sin turno (RF-5).
 - **Intento de asignar, quitar o consultar las materias de un curso:** la operación ya no existe; las
@@ -322,9 +326,11 @@ describe el cambio observable.
   existen versiones (el esquema es único).
 - **La traducción de índice de aula a nombre**, la **interfaz de usuario** y la presentación de los
   cursos; las aporta otro equipo.
-- **Turnos automáticos y el toggle de `turno`** (spec 006): decidir si se usa el turno persistido del
-  curso o si el solver lo elige. Aquí solo se persiste el `turno` como dato **opcional** del curso
-  (RF-1, RF-2).
+- **La asignación automática de turno y el toggle de `turno`** (spec 006): decidir si el solver
+  **elige** el turno de un curso que no lo declara. Aquí solo se persiste el `turno` como dato
+  **opcional** del curso (RF-1, RF-2); en cambio, **al generar** el turno debe **declararse** (la spec
+  005 lo exige y rechaza su ausencia, V7), de modo que lo diferido es la **asignación automática**, no
+  el uso del turno declarado.
 - **Generación parcial** y horarios previos (spec 007).
 
 ## Criterios de finalización
