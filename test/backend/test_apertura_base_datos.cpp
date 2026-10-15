@@ -1,22 +1,19 @@
-#include <QDateTime>
 #include <QFile>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QString>
-#include <QStringList>
 #include <QTemporaryDir>
 #include <QTest>
 
 #include <backend/database/apertura_base_datos.hpp>
-#include <backend/database/respaldo.hpp>
 #include <backend/database/version_esquema.hpp>
 
 using AperturaBaseDatos::Estado;
 using AperturaBaseDatos::Opciones;
 using AperturaBaseDatos::Resultado;
 
-/// Tests de la apertura de la base con migración y respaldo obligatorio (RF-1, RF-4).
+/// Tests de la apertura con esquema único: crear o abrir, o fallar sin migrar (RF-6).
 class TestAperturaBaseDatos : public QObject
 {
     Q_OBJECT
@@ -24,39 +21,34 @@ class TestAperturaBaseDatos : public QObject
 private:
     int m_contadorConexiones = 0;
 
-    /// Abre una conexión de prueba a una base en archivo con un nombre único.
     QSqlDatabase abrirBase(const QString& ruta)
     {
-        const QString nombre =
-            QStringLiteral("test_apertura_%1").arg(++m_contadorConexiones);
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", nombre);
+        const QString nombre = QStringLiteral("test_apertura_%1").arg(++m_contadorConexiones);
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), nombre);
         db.setDatabaseName(ruta);
         db.open();
         return db;
     }
 
-    /// Cierra una conexión y la elimina del registro de Qt.
     void cerrarBase(QSqlDatabase& db)
     {
         const QString nombre = db.connectionName();
-
         if (db.isOpen())
             db.close();
-
         db = QSqlDatabase();
         QSqlDatabase::removeDatabase(nombre);
     }
 
-    /// Crea una base con el esquema v1 y fija la versión indicada (0 = ausente).
-    void crearBaseVersion(const QString& ruta, int version)
+    /// Crea una base con el esquema único y, si se indica, fija otra versión.
+    void crearBaseConEsquema(const QString& ruta, int version)
     {
         QSqlDatabase db = abrirBase(ruta);
-        VersionEsquema::aplicarHasta(db, 1);
-        VersionEsquema::fijarVersionEsquema(db, version);
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        if (version != VersionEsquema::VERSION_ESQUEMA_ACTUAL)
+            QVERIFY(VersionEsquema::fijarVersionEsquema(db, version));
         cerrarBase(db);
     }
 
-    /// Lee la versión de esquema almacenada en un archivo de base de datos.
     int leerVersion(const QString& ruta)
     {
         QSqlDatabase db = abrirBase(ruta);
@@ -65,21 +57,28 @@ private:
         return version;
     }
 
-    /// Indica si una tabla existe en el archivo de base de datos dado.
     bool tablaExiste(const QString& ruta, const QString& tabla)
     {
         QSqlDatabase db = abrirBase(ruta);
         QSqlQuery query(db);
-        query.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=:nombre");
-        query.bindValue(":nombre", tabla);
+        query.prepare(QStringLiteral("SELECT name FROM sqlite_master "
+                                     "WHERE type='table' AND name=:nombre"));
+        query.bindValue(QStringLiteral(":nombre"), tabla);
         const bool existe = query.exec() && query.next();
         cerrarBase(db);
         return existe;
     }
 
-private slots:
+    /// Añade una tabla retirada a una base ya creada.
+    void crearTablaRetirada(const QString& ruta)
+    {
+        QSqlDatabase db = abrirBase(ruta);
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("CREATE TABLE Curso_Materia (id INTEGER)")));
+        cerrarBase(db);
+    }
 
-    // ─── Base inexistente ───────────────────────────────────────────────────
+private slots:
 
     void abrir_inexistente_creaEsquemaYVersion()
     {
@@ -94,264 +93,112 @@ private slots:
         QVERIFY(resultado.ok());
         QVERIFY(QFile::exists(ruta));
         QCOMPARE(leerVersion(ruta), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
-        QVERIFY(tablaExiste(ruta, "Profesores"));
-        QVERIFY(tablaExiste(ruta, "Aulas"));
+        QVERIFY(tablaExiste(ruta, QStringLiteral("Cursos")));
+        QVERIFY(!tablaExiste(ruta, QStringLiteral("Curso_Materia")));
     }
 
-    // ─── Base existente, sin migración ──────────────────────────────────────
-
-    void abrir_versionActual_abreSinRespaldo()
+    void abrir_versionYCatalogoCorrectos_abre()
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         const QString ruta = dir.filePath("actual.db");
-        crearBaseVersion(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
 
         const Resultado resultado = AperturaBaseDatos::abrir(ruta);
 
         QCOMPARE(resultado.estado, Estado::OkAbierta);
         QVERIFY(resultado.ok());
-        // Abrir sin migrar no debe crear respaldo alguno.
-        QVERIFY(resultado.rutaRespaldo.isEmpty());
     }
 
-    void abrir_versionAusente_falla()
+    void abrir_versionAusente_fallaEsquema()
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         const QString ruta = dir.filePath("ausente.db");
-        crearBaseVersion(ruta, 0);
+        crearBaseConEsquema(ruta, 0);
 
         const Resultado resultado = AperturaBaseDatos::abrir(ruta);
 
-        QCOMPARE(resultado.estado, Estado::FalloAusente);
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
     }
 
-    void abrir_versionPosterior_falla()
+    void abrir_versionAnterior_fallaEsquema()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("anterior.db");
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+    }
+
+    void abrir_versionPosterior_fallaEsquema()
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         const QString ruta = dir.filePath("posterior.db");
-        crearBaseVersion(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL + 1);
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL + 1);
 
         const Resultado resultado = AperturaBaseDatos::abrir(ruta);
 
-        QCOMPARE(resultado.estado, Estado::FalloPosterior);
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
-        QVERIFY(!resultado.detalle.isEmpty());
     }
 
-    void abrir_rutaVacia_falla()
+    void abrir_catalogoNoEsperado_fallaEsquema()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("catalogo.db");
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+        crearTablaRetirada(ruta); // Curso_Materia sobra
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+    }
+
+    void abrir_falloEsquema_noBorraNiMigra()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("conserva.db");
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1);
+        crearTablaRetirada(ruta);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        // No se migra ni se borran datos: la versión y la tabla siguen ahí.
+        QCOMPARE(leerVersion(ruta), VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1);
+        QVERIFY(tablaExiste(ruta, QStringLiteral("Curso_Materia")));
+    }
+
+    void abrir_rutaVacia_fallaApertura()
     {
         const Resultado resultado = AperturaBaseDatos::abrir(QString());
-
         QCOMPARE(resultado.estado, Estado::FalloApertura);
         QVERIFY(!resultado.ok());
     }
-
-    // ─── Migración con respaldo obligatorio ─────────────────────────────────
-
-    void migracion_respaldaAntesDeMigrar()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("migrar.db");
-        crearBaseVersion(ruta, 1);
-
-        const QDateTime ahora(QDate(2026, 10, 8), QTime(12, 0, 0));
-        int llamadasRespaldo = 0;
-        QStringList orden;
-        QString rutaRespaldoRegistrada;
-
-        Opciones opciones;
-        opciones.versionEsperada = 2;
-        opciones.ahora = ahora;
-        opciones.respaldo = [&](QSqlDatabase& db, const QString& rutaResp,
-                                QString* error) -> bool {
-            ++llamadasRespaldo;
-            orden << QStringLiteral("respaldo");
-            rutaRespaldoRegistrada = rutaResp;
-            return Respaldo::crearRespaldo(db, rutaResp, error);
-        };
-        opciones.paso = [&](QSqlDatabase& db, int destino) -> bool {
-            orden << QStringLiteral("paso");
-            if (destino != 2)
-                return false;
-            QSqlQuery query(db);
-            return query.exec("CREATE TABLE DominioV2 (id INTEGER PRIMARY KEY)");
-        };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::OkMigrada);
-        QVERIFY(resultado.ok());
-        QCOMPARE(llamadasRespaldo, 1);
-        // El respaldo se pide antes de ejecutar la migración.
-        QCOMPARE(orden, QStringList({QStringLiteral("respaldo"), QStringLiteral("paso")}));
-        QCOMPARE(resultado.rutaRespaldo, rutaRespaldoRegistrada);
-        QCOMPARE(resultado.rutaRespaldo, Respaldo::construirNombreRespaldo(ruta, ahora));
-        QVERIFY(QFile::exists(resultado.rutaRespaldo));
-        QCOMPARE(leerVersion(ruta), 2);
-        QVERIFY(tablaExiste(ruta, "DominioV2"));
-    }
-
-    void migracion_sinRespaldo_fallaSinMigrar()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("sin_respaldo.db");
-        crearBaseVersion(ruta, 1);
-
-        bool pasoLlamado = false;
-
-        Opciones opciones;
-        opciones.versionEsperada = 2;
-        opciones.respaldo = [](QSqlDatabase&, const QString&, QString* error) -> bool {
-            if (error)
-                *error = QStringLiteral("no hay espacio para el respaldo");
-            return false;
-        };
-        opciones.paso = [&](QSqlDatabase&, int) -> bool {
-            pasoLlamado = true;
-            return true;
-        };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::FalloRespaldo);
-        QVERIFY(!resultado.ok());
-        // Sin respaldo no se migra: ni el paso se ejecuta ni la versión cambia.
-        QVERIFY(!pasoLlamado);
-        QCOMPARE(leerVersion(ruta), 1);
-        QVERIFY(!tablaExiste(ruta, "DominioV2"));
-    }
-
-    void migracion_fallida_dejaEstadoConocido()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("fallo_migracion.db");
-        crearBaseVersion(ruta, 1);
-
-        Opciones opciones;
-        opciones.versionEsperada = 2;
-        opciones.respaldo = [](QSqlDatabase& db, const QString& rutaResp,
-                               QString* error) -> bool {
-            return Respaldo::crearRespaldo(db, rutaResp, error);
-        };
-        opciones.paso = [](QSqlDatabase& db, int destino) -> bool {
-            if (destino == 2)
-            {
-                QSqlQuery query(db);
-                query.exec("CREATE TABLE TablaParcial (id INTEGER PRIMARY KEY)");
-            }
-            return false;
-        };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::FalloMigracion);
-        QVERIFY(!resultado.ok());
-        // Estado conocido: la versión previa queda intacta y no hay cambios parciales.
-        QCOMPARE(leerVersion(ruta), 1);
-        QVERIFY(!tablaExiste(ruta, "TablaParcial"));
-        // Se conserva la ruta del respaldo creado antes de migrar.
-        QVERIFY(!resultado.rutaRespaldo.isEmpty());
-        QVERIFY(QFile::exists(resultado.rutaRespaldo));
-    }
-
-    // ─── Progreso de migración (RF-1) ───────────────────────────────────────
-
-    void migracion_notificaProgresoPorPaso()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("progreso.db");
-        crearBaseVersion(ruta, 1);
-
-        QVector<int> pasos;
-        Opciones opciones;
-        opciones.versionEsperada = 2;
-        opciones.respaldo = [](QSqlDatabase& db, const QString& rutaResp,
-                               QString* error) -> bool {
-            return Respaldo::crearRespaldo(db, rutaResp, error);
-        };
-        opciones.paso = [](QSqlDatabase& db, int destino) -> bool {
-            QSqlQuery query(db);
-            return query.exec(QStringLiteral("CREATE TABLE DominioV%1 (id INTEGER PRIMARY KEY)")
-                                  .arg(destino));
-        };
-        opciones.progreso = [&pasos](int destino) { pasos.append(destino); };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::OkMigrada);
-        QVERIFY(resultado.ok());
-        QCOMPARE(pasos, QVector<int>({2}));
-    }
-
-    void migracion_notificaCadaPaso()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("progreso_multipaso.db");
-        crearBaseVersion(ruta, 1);
-
-        QVector<int> pasos;
-        Opciones opciones;
-        opciones.versionEsperada = 3;
-        opciones.respaldo = [](QSqlDatabase& db, const QString& rutaResp,
-                               QString* error) -> bool {
-            return Respaldo::crearRespaldo(db, rutaResp, error);
-        };
-        opciones.paso = [](QSqlDatabase& db, int destino) -> bool {
-            QSqlQuery query(db);
-            return query.exec(QStringLiteral("CREATE TABLE DominioV%1 (id INTEGER PRIMARY KEY)")
-                                  .arg(destino));
-        };
-        opciones.progreso = [&pasos](int destino) { pasos.append(destino); };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::OkMigrada);
-        QVERIFY(resultado.ok());
-        QCOMPARE(pasos, QVector<int>({2, 3}));
-    }
-
-    void sinMigracion_noNotificaProgreso()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("sin_migracion.db");
-        crearBaseVersion(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
-
-        bool notificado = false;
-        Opciones opciones;
-        opciones.progreso = [&notificado](int) { notificado = true; };
-
-        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::OkAbierta);
-        QVERIFY(!notificado);
-    }
-
-    // ─── Mensajes de error (RNF-1) ──────────────────────────────────────────
 
     void abrir_noAbrible_mensajeSinTextoCrudoDeQt()
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
-        // Directorio contenedor inexistente: SQLite no puede crear el archivo.
         const QString ruta = dir.filePath("sub/no_existe/base.db");
 
         const Resultado resultado = AperturaBaseDatos::abrir(ruta);
 
         QCOMPARE(resultado.estado, Estado::FalloApertura);
         QVERIFY(!resultado.detalle.isEmpty());
-        QVERIFY(!resultado.detalle.contains("unable to", Qt::CaseInsensitive));
-        QVERIFY(!resultado.detalle.contains("no such", Qt::CaseInsensitive));
+        QVERIFY(!resultado.detalle.contains(QStringLiteral("unable to"), Qt::CaseInsensitive));
+        QVERIFY(!resultado.detalle.contains(QStringLiteral("no such"), Qt::CaseInsensitive));
     }
 };
 

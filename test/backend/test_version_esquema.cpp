@@ -10,22 +10,18 @@ using VersionEsquema::EstadoApertura;
 
 namespace {
 
-/// Devuelve true si `tabla` existe en el esquema de la conexión dada.
 bool tablaExiste(QSqlDatabase& db, const QString& tabla)
 {
     QSqlQuery query(db);
-    query.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=:nombre");
-    query.bindValue(":nombre", tabla);
-
-    if (!query.exec())
-        return false;
-
-    return query.next();
+    query.prepare(QStringLiteral("SELECT name FROM sqlite_master "
+                                 "WHERE type='table' AND name=:nombre"));
+    query.bindValue(QStringLiteral(":nombre"), tabla);
+    return query.exec() && query.next();
 }
 
 } // namespace
 
-/// Tests de la decisión de apertura y del mecanismo de migraciones versionadas (RF-1).
+/// Tests de la decisión de apertura y de la creación del esquema único (RF-6).
 class TestVersionEsquema : public QObject
 {
     Q_OBJECT
@@ -33,22 +29,19 @@ class TestVersionEsquema : public QObject
 private:
     QString m_nombreConexion;
 
-    /// Abre una conexión SQLite en memoria con un nombre único por test.
     QSqlDatabase abrirBaseEnMemoria()
     {
         m_nombreConexion = QStringLiteral("test_version_esquema");
-        QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", m_nombreConexion);
-        db.setDatabaseName(":memory:");
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_nombreConexion);
+        db.setDatabaseName(QStringLiteral(":memory:"));
         db.open();
         return db;
     }
 
-    /// Cierra y elimina la conexión en memoria de este test.
     void cerrarBase(QSqlDatabase& db)
     {
         if (db.isOpen())
             db.close();
-
         db = QSqlDatabase();
         QSqlDatabase::removeDatabase(m_nombreConexion);
     }
@@ -59,96 +52,90 @@ private slots:
 
     void decidirApertura_inexistente_debeCrear()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(false, 0, 1), EstadoApertura::Crear);
-    }
-
-    void decidirApertura_versionAusente_debeFallar()
-    {
-        // Versión almacenada ausente/no interpretable (SQLite devuelve 0).
-        QCOMPARE(VersionEsquema::decidirApertura(true, 0, 1), EstadoApertura::FalloAusente);
-    }
-
-    void decidirApertura_versionAnterior_debeMigrar()
-    {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 1, 3), EstadoApertura::Migrar);
+        QCOMPARE(VersionEsquema::decidirApertura(false, 0, 2), EstadoApertura::Crear);
     }
 
     void decidirApertura_versionIgual_debeAbrir()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 3, 3), EstadoApertura::Abrir);
+        QCOMPARE(VersionEsquema::decidirApertura(true, 2, 2), EstadoApertura::Abrir);
     }
 
-    void decidirApertura_versionPosterior_debeFallar()
+    void decidirApertura_versionAusente_debeFallarEsquema()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 4, 3), EstadoApertura::FalloPosterior);
+        QCOMPARE(VersionEsquema::decidirApertura(true, 0, 2), EstadoApertura::FalloEsquema);
     }
 
-    // ─── aplicarHasta ───────────────────────────────────────────────────────
+    void decidirApertura_versionAnterior_debeFallarEsquema()
+    {
+        QCOMPARE(VersionEsquema::decidirApertura(true, 1, 2), EstadoApertura::FalloEsquema);
+    }
 
-    void aplicarHasta_esquemaReal_fijaVersionActual()
+    void decidirApertura_versionPosterior_debeFallarEsquema()
+    {
+        QCOMPARE(VersionEsquema::decidirApertura(true, 3, 2), EstadoApertura::FalloEsquema);
+    }
+
+    // ─── crearEsquema ───────────────────────────────────────────────────────
+
+    void crearEsquema_creaCatalogoYFijaVersion()
     {
         QSqlDatabase db = abrirBaseEnMemoria();
 
         QCOMPARE(VersionEsquema::leerVersionEsquema(db), 0);
 
-        QVERIFY(VersionEsquema::aplicarHasta(db, VersionEsquema::VERSION_ESQUEMA_ACTUAL));
+        QVERIFY(VersionEsquema::crearEsquema(db));
         QCOMPARE(VersionEsquema::leerVersionEsquema(db), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+        QVERIFY(tablaExiste(db, QStringLiteral("Aulas")));
+        QVERIFY(tablaExiste(db, QStringLiteral("Profesores")));
+        QVERIFY(tablaExiste(db, QStringLiteral("Cursos")));
+        QVERIFY(!tablaExiste(db, QStringLiteral("Curso_Materia")));
 
-        QVERIFY(tablaExiste(db, "Aulas"));
-        QVERIFY(tablaExiste(db, "Profesores"));
-
-        // Repetir la migración ya aplicada no vuelve a actuar (idempotente).
-        QVERIFY(VersionEsquema::aplicarHasta(db, VersionEsquema::VERSION_ESQUEMA_ACTUAL));
+        // Idempotente: repetir no falla ni cambia la versión.
+        QVERIFY(VersionEsquema::crearEsquema(db));
         QCOMPARE(VersionEsquema::leerVersionEsquema(db), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
 
         cerrarBase(db);
     }
 
-    void aplicarHasta_v1aV2_pasoExitoso_fijaVersionDestino()
+    // ─── esquemaEsperado ────────────────────────────────────────────────────
+
+    void esquemaEsperado_aceptaEsquemaCorrecto()
     {
         QSqlDatabase db = abrirBaseEnMemoria();
-
-        const auto paso = [](QSqlDatabase& d, int destino) -> bool {
-            QSqlQuery query(d);
-            if (destino == 1)
-                return query.exec("CREATE TABLE Base (id INTEGER PRIMARY KEY)");
-            if (destino == 2)
-                return query.exec("CREATE TABLE Extra (id INTEGER PRIMARY KEY)");
-            return false;
-        };
-
-        QVERIFY(VersionEsquema::aplicarHasta(db, 2, paso));
-        QCOMPARE(VersionEsquema::leerVersionEsquema(db), 2);
-        QVERIFY(tablaExiste(db, "Base"));
-        QVERIFY(tablaExiste(db, "Extra"));
-
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(VersionEsquema::esquemaEsperado(db));
         cerrarBase(db);
     }
 
-    void aplicarHasta_v1aV2_falloSimulado_dejaVersionPreviaIntacta()
+    void esquemaEsperado_rechazaTablaRetirada()
     {
         QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
 
-        // Primero aplicamos la versión 1 real.
-        QVERIFY(VersionEsquema::aplicarHasta(db, 1));
-        QCOMPARE(VersionEsquema::leerVersionEsquema(db), 1);
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE Curso_Materia (id INTEGER)")));
 
-        // La migración a v2 crea una tabla y después falla: debe revertirse por completo.
-        const auto pasoFallido = [](QSqlDatabase& d, int destino) -> bool {
-            if (destino == 2)
-            {
-                QSqlQuery query(d);
-                query.exec("CREATE TABLE TablaParcial (id INTEGER PRIMARY KEY)");
-            }
-            return false;
-        };
+        QVERIFY(!VersionEsquema::esquemaEsperado(db));
+        cerrarBase(db);
+    }
 
-        QVERIFY(!VersionEsquema::aplicarHasta(db, 2, pasoFallido));
+    void esquemaEsperado_rechazaCursosSinColumnaAula()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
 
-        // La versión previa queda intacta y no hay cambios parciales.
-        QCOMPARE(VersionEsquema::leerVersionEsquema(db), 1);
-        QVERIFY(!tablaExiste(db, "TablaParcial"));
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE Cursos")));
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE Cursos ("
+                                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                      "anio INTEGER NOT NULL,"
+                                      "seccion TEXT NOT NULL,"
+                                      "turno TEXT,"
+                                      "fecha_creacion TEXT,"
+                                      "fecha_modificacion TEXT,"
+                                      "UNIQUE(anio, seccion))")));
 
+        QVERIFY(!VersionEsquema::esquemaEsperado(db)); // falta la columna `aula`
         cerrarBase(db);
     }
 };

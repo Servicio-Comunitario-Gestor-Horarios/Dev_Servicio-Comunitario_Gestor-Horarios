@@ -1,8 +1,5 @@
 #include "backend/database/apertura_base_datos.hpp"
 
-#include "backend/database/migracion.hpp"
-#include "backend/database/respaldo.hpp"
-
 #include <QDebug>
 #include <QFile>
 #include <QSqlError>
@@ -22,9 +19,8 @@ namespace
                        const QString& ruta,
                        bool existe,
                        int versionEsperada,
-                       const VersionEsquema::PasoMigracion& paso,
-                       const AperturaBaseDatos::FuncionRespaldo& respaldo,
-                       const QDateTime& ahora)
+                       const std::function<bool(QSqlDatabase&)>& crear,
+                       const std::function<bool(QSqlDatabase&)>& verificar)
     {
         Resultado resultado;
 
@@ -34,98 +30,45 @@ namespace
             pragma.exec(QStringLiteral("PRAGMA foreign_keys = ON"));
         }
 
-        // Base inexistente: crear el esquema inicial y fijar la versión.
+        // Base inexistente: crear el esquema único entero.
         if (!existe)
         {
-            if (!VersionEsquema::aplicarHasta(db, versionEsperada, paso))
+            if (!crear(db))
             {
                 resultado.estado = Estado::FalloApertura;
                 resultado.detalle =
-                    QStringLiteral("No se pudo crear el esquema inicial de la base «%1».")
-                        .arg(ruta);
+                    QStringLiteral("No se pudo crear el esquema de la base «%1».").arg(ruta);
                 return resultado;
             }
 
             resultado.estado = Estado::OkCreada;
             resultado.detalle =
-                QStringLiteral("Se creó la base de datos «%1» con el esquema inicial.").arg(ruta);
+                QStringLiteral("Se creó la base de datos «%1» con el esquema único.").arg(ruta);
             return resultado;
         }
 
+        // Base existente: versión y catálogo deben corresponder al esquema esperado.
         const int versionArchivo = VersionEsquema::leerVersionEsquema(db);
 
         const VersionEsquema::EstadoApertura decision =
             VersionEsquema::decidirApertura(true, versionArchivo, versionEsperada);
 
-        switch (decision)
+        if (decision == VersionEsquema::EstadoApertura::Abrir && verificar(db))
         {
-            case VersionEsquema::EstadoApertura::Abrir:
-                resultado.estado = Estado::OkAbierta;
-                resultado.detalle =
-                    QStringLiteral("La base de datos «%1» ya está en la versión %2.")
-                        .arg(ruta)
-                        .arg(versionArchivo);
-                return resultado;
-
-            case VersionEsquema::EstadoApertura::FalloAusente:
-                resultado.estado = Estado::FalloAusente;
-                resultado.detalle =
-                    QStringLiteral("La versión de esquema de «%1» está ausente o no es"
-                                   " interpretable; no se migra.")
-                        .arg(ruta);
-                return resultado;
-
-            case VersionEsquema::EstadoApertura::FalloPosterior:
-                resultado.estado = Estado::FalloPosterior;
-                resultado.detalle =
-                    QStringLiteral("La versión de esquema de «%1» (%2) es posterior a la"
-                                   " esperada (%3).")
-                        .arg(ruta)
-                        .arg(versionArchivo)
-                        .arg(versionEsperada);
-                return resultado;
-
-            case VersionEsquema::EstadoApertura::Migrar:
-            case VersionEsquema::EstadoApertura::Crear:
-                break;
-        }
-
-        // Migración: el respaldo es obligatorio. Si no se puede respaldar, no se migra.
-        const QString rutaRespaldo = Respaldo::construirNombreRespaldo(ruta, ahora);
-
-        QString errorRespaldo;
-
-        if (!respaldo(db, rutaRespaldo, &errorRespaldo))
-        {
-            resultado.estado = Estado::FalloRespaldo;
+            resultado.estado = Estado::OkAbierta;
             resultado.detalle =
-                QStringLiteral("No se pudo respaldar la base «%1» antes de migrar;"
-                               " no se migró. %2")
-                    .arg(ruta, errorRespaldo);
-            return resultado;
-        }
-
-        resultado.rutaRespaldo = rutaRespaldo;
-
-        if (!VersionEsquema::aplicarHasta(db, versionEsperada, paso))
-        {
-            // `aplicarHasta` revierte cada paso fallido: la versión previa queda intacta.
-            resultado.estado = Estado::FalloMigracion;
-            resultado.detalle =
-                QStringLiteral("La migración de «%1» falló; la base queda en su versión"
-                               " previa (%2). Respaldo: «%3».")
+                QStringLiteral("La base de datos «%1» ya está en la versión %2.")
                     .arg(ruta)
-                    .arg(versionArchivo)
-                    .arg(rutaRespaldo);
+                    .arg(versionArchivo);
             return resultado;
         }
 
-        resultado.estado = Estado::OkMigrada;
+        resultado.estado = Estado::FalloEsquema;
         resultado.detalle =
-            QStringLiteral("La base de datos «%1» se migró de la versión %2 a la %3.")
+            QStringLiteral("El esquema de «%1» no corresponde al esperado (versión %2);"
+                           " no se migra ni se modifican los datos.")
                 .arg(ruta)
-                .arg(versionArchivo)
-                .arg(versionEsperada);
+                .arg(versionArchivo);
         return resultado;
     }
 } // namespace
@@ -152,36 +95,19 @@ namespace AperturaBaseDatos
         // Resolver las dependencias no inyectadas con los valores de producción.
         const int versionEsperada = opciones.versionEsperada;
 
-        const VersionEsquema::PasoMigracion paso =
-            opciones.paso
-                ? opciones.paso
-                : VersionEsquema::PasoMigracion(
-                      [](QSqlDatabase& conexion, int destino) -> bool {
-                          return Migracion::aplicarPaso(conexion, destino);
-                      });
+        const std::function<bool(QSqlDatabase&)> crear =
+            opciones.crear ? opciones.crear
+                           : std::function<bool(QSqlDatabase&)>(
+                                 [](QSqlDatabase& db) -> bool {
+                                     return VersionEsquema::crearEsquema(db);
+                                 });
 
-        // Observador de progreso: se envuelve el paso para avisar antes de cada uno.
-        const std::function<void(int)>& progreso = opciones.progreso;
-        const VersionEsquema::PasoMigracion pasoConProgreso =
-            progreso
-                ? VersionEsquema::PasoMigracion(
-                      [paso, progreso](QSqlDatabase& conexion, int destino) -> bool {
-                          progreso(destino);
-                          return paso(conexion, destino);
-                      })
-                : paso;
-
-        const FuncionRespaldo respaldo =
-            opciones.respaldo ? opciones.respaldo
-                              : FuncionRespaldo(
-                                    [](QSqlDatabase& conexion, const QString& rutaRespaldo,
-                                       QString* error) -> bool {
-                                        return Respaldo::crearRespaldo(conexion, rutaRespaldo,
-                                                                       error);
-                                    });
-
-        const QDateTime ahora =
-            opciones.ahora.isValid() ? opciones.ahora : QDateTime::currentDateTime();
+        const std::function<bool(QSqlDatabase&)> verificar =
+            opciones.verificar ? opciones.verificar
+                               : std::function<bool(QSqlDatabase&)>(
+                                     [](QSqlDatabase& db) -> bool {
+                                         return VersionEsquema::esquemaEsperado(db);
+                                     });
 
         // Se comprueba antes de abrir porque SQLite crea el archivo al abrirlo.
         const bool existe = QFile::exists(ruta);
@@ -207,7 +133,7 @@ namespace AperturaBaseDatos
             }
             else
             {
-                resultado = procesar(db, ruta, existe, versionEsperada, pasoConProgreso, respaldo, ahora);
+                resultado = procesar(db, ruta, existe, versionEsperada, crear, verificar);
                 db.close();
             }
 

@@ -23,14 +23,10 @@ namespace
         using Estado = AperturaBaseDatos::Estado;
         switch (estado)
         {
-            case Estado::OkCreada:       return QStringLiteral("OkCreada (base nueva)");
-            case Estado::OkAbierta:      return QStringLiteral("OkAbierta (versión actual)");
-            case Estado::OkMigrada:      return QStringLiteral("OkMigrada (migración aplicada)");
-            case Estado::FalloAusente:   return QStringLiteral("FalloAusente (versión de esquema ausente)");
-            case Estado::FalloPosterior: return QStringLiteral("FalloPosterior (versión posterior a la esperada)");
-            case Estado::FalloApertura:  return QStringLiteral("FalloApertura (no se pudo abrir/crear)");
-            case Estado::FalloRespaldo:  return QStringLiteral("FalloRespaldo (no se pudo respaldar)");
-            case Estado::FalloMigracion: return QStringLiteral("FalloMigracion (migración fallida)");
+            case Estado::OkCreada:      return QStringLiteral("OkCreada (base nueva)");
+            case Estado::OkAbierta:     return QStringLiteral("OkAbierta (esquema actual)");
+            case Estado::FalloEsquema:  return QStringLiteral("FalloEsquema (esquema no esperado)");
+            case Estado::FalloApertura: return QStringLiteral("FalloApertura (no se pudo abrir/crear)");
         }
         return QStringLiteral("Desconocido");
     }
@@ -89,8 +85,6 @@ int main(int argc, char* argv[])
     salida << "Apertura      : " << estadoAperturaATexto(apertura.estado) << '\n';
     if (!apertura.detalle.isEmpty())
         salida << "Detalle       : " << apertura.detalle << '\n';
-    if (!apertura.rutaRespaldo.isEmpty())
-        salida << "Respaldo      : " << apertura.rutaRespaldo << '\n';
     salida.flush();
 
     if (!apertura.ok())

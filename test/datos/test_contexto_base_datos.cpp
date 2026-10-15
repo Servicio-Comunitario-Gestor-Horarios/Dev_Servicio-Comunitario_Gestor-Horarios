@@ -102,7 +102,6 @@ private slots:
 
         QCOMPARE(resultado.estado, Estado::OkAbierta);
         QVERIFY(resultado.ok());
-        QVERIFY(resultado.rutaRespaldo.isEmpty());
         QVERIFY(contexto.abierto());
     }
 
@@ -116,7 +115,7 @@ private slots:
         ContextoBaseDatos contexto;
         const AperturaBaseDatos::Resultado resultado = contexto.abrir(ruta);
 
-        QCOMPARE(resultado.estado, Estado::FalloPosterior);
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
         QVERIFY(!contexto.abierto());
@@ -132,7 +131,7 @@ private slots:
         ContextoBaseDatos contexto;
         const AperturaBaseDatos::Resultado resultado = contexto.abrir(ruta);
 
-        QCOMPARE(resultado.estado, Estado::FalloAusente);
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
         QVERIFY(!contexto.abierto());
     }
