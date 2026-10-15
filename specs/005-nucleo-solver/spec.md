@@ -700,8 +700,8 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
   spec (RF-13).
 - **Diferido: fijar al profesor a un salón en el modo de aulas móviles** («en aulas móviles, el profesor
   es fijo en un salón»), fuera de alcance por ahora.
-- **Diferido: turnos automáticos y el toggle de `turno`** (spec 006): decidir si se usa el turno
-  persistido del curso o si el solver lo elige. En esta spec el `turno` del curso es **obligatorio**: se
+- **Diferido: turnos automáticos y el toggle de `turno`** (spec 006): decidir si el solver
+  asigna el turno cuando el curso no lo declara. En esta spec el `turno` del curso es **obligatorio**: se
   toma tal cual de su configuración y, si falta, la entrada se **rechaza** (V7). La **asignación
   automática de turno** (un curso sin turno ⇒ el solver lo elige) queda **diferida a la spec 006**.
 - **Diferido: generación parcial** y horarios previos (spec 007).
