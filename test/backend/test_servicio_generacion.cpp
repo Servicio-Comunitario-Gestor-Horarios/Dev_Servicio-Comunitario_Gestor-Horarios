@@ -87,8 +87,22 @@ private:
 
     QJsonObject entradaValida() const
     {
-        return construirJsonEntrada(dominio(), parametros(),
-                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        QJsonObject j = construirJsonEntrada(dominio(), parametros(),
+                                             QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        // TODO(spec 005): las materias del curso se derivan de su plan. Hasta
+        // entonces, el test las aporta a mano para que la entrada sea valida.
+        QJsonArray cursos = j["cursos"].toArray();
+        QJsonObject c = cursos[0].toObject();
+        if (c["materias"].toArray().isEmpty())
+            c["materias"] = QJsonArray{QJsonObject{{QStringLiteral("materia_idx"), 0},
+                                                   {QStringLiteral("horas_semanales"), 2}}};
+        if (!c.contains(QStringLiteral("num_estudiantes")) || c["num_estudiantes"].toInt() <= 0)
+            c[QStringLiteral("num_estudiantes")] = 1;
+        if (c["plan"].toString().isEmpty())
+            c[QStringLiteral("plan")] = QStringLiteral("IS-2026");
+        cursos[0] = c;
+        j["cursos"] = cursos;
+        return j;
     }
 
     /// Salida válida: cubre las 2 horas sin solapamientos.
