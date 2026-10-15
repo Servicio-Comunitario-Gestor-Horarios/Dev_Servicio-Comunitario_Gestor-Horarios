@@ -27,18 +27,51 @@ CursoDTO ServicioCursos::mapearARecord(const QSqlRecord& record) const {
 
 Resultado<CursoDTO> ServicioCursos::crearCurso(int anio, const QString& seccion,
                                                const QString& turno, int aula) {
+    const auto identidad = validarIdentidadCurso(anio, seccion);
+    if (!identidad.ok) {
+        return Resultado<CursoDTO>::error(identidad.mensajeError);
+    }
+
+    if (aula > 0 && !existeAula(aula)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+    }
+
+    if (existeCurso(identidad.valor.anio, identidad.valor.seccion)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                           "Elija otro año o sección.")
+                .arg(identidad.valor.anio)
+                .arg(identidad.valor.seccion),
+            -2);
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "INSERT INTO Cursos (anio, seccion, turno, aula) "
         "VALUES (:anio, :seccion, :turno, :aula)"
     );
-    query.bindValue(":anio", anio);
-    query.bindValue(":seccion", normalizarSeccion(seccion));
+    query.bindValue(":anio", identidad.valor.anio);
+    query.bindValue(":seccion", identidad.valor.seccion);
     query.bindValue(":turno", turno.trimmed().isEmpty() ? QVariant() : turno.trimmed());
     query.bindValue(":aula", aula > 0 ? QVariant(aula) : QVariant());
 
     if (!query.exec()) {
-        qCritical() << "Error al crear curso:" << query.lastError().text();
+        const QString err = query.lastError().text();
+        if (err.contains(QStringLiteral("UNIQUE"))) {
+            // Defensa en profundidad: la unicidad la garantiza el esquema (RF-1).
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                               "Elija otro año o sección.")
+                    .arg(identidad.valor.anio)
+                    .arg(identidad.valor.seccion),
+                -2);
+        }
+        if (err.contains(QStringLiteral("FOREIGN KEY"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+        }
+        qCritical() << "Error al crear curso:" << err;
         return Resultado<CursoDTO>::error("Error al guardar el curso en la base de datos.");
     }
 
@@ -93,6 +126,30 @@ Resultado<QVector<CursoDTO>> ServicioCursos::listarCursos() const {
 
 Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, int anio, const QString& seccion,
                                                     const QString& turno, int aula) {
+    if (id <= 0) {
+        return Resultado<CursoDTO>::error("ID de curso inválido.");
+    }
+
+    const auto identidad = validarIdentidadCurso(anio, seccion);
+    if (!identidad.ok) {
+        return Resultado<CursoDTO>::error(identidad.mensajeError);
+    }
+
+    if (aula > 0 && !existeAula(aula)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+    }
+
+    // La unicidad no debe rechazar el propio registro al no cambiar su identidad.
+    if (existeCurso(identidad.valor.anio, identidad.valor.seccion, id)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                           "Elija otro año o sección.")
+                .arg(identidad.valor.anio)
+                .arg(identidad.valor.seccion),
+            -2);
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "UPDATE Cursos SET "
@@ -103,14 +160,24 @@ Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, int anio, const QStr
         "fecha_modificacion = CURRENT_TIMESTAMP "
         "WHERE id = :id"
     );
-    query.bindValue(":anio", anio);
-    query.bindValue(":seccion", normalizarSeccion(seccion));
+    query.bindValue(":anio", identidad.valor.anio);
+    query.bindValue(":seccion", identidad.valor.seccion);
     query.bindValue(":turno", turno.trimmed().isEmpty() ? QVariant() : turno.trimmed());
     query.bindValue(":aula", aula > 0 ? QVariant(aula) : QVariant());
     query.bindValue(":id", id);
 
     if (!query.exec()) {
-        qCritical() << "Error al actualizar curso:" << query.lastError().text();
+        const QString err = query.lastError().text();
+        if (err.contains(QStringLiteral("UNIQUE"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("Ya existe un curso con ese año y sección. Elija otro año o sección."),
+                -2);
+        }
+        if (err.contains(QStringLiteral("FOREIGN KEY"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+        }
+        qCritical() << "Error al actualizar curso:" << err;
         return Resultado<CursoDTO>::error(
             "Error al actualizar el curso en la base de datos.");
     }
@@ -135,4 +202,21 @@ bool ServicioCursos::eliminarCurso(int id) {
     }
 
     return del.numRowsAffected() > 0;
+}
+
+bool ServicioCursos::existeCurso(int anio, const QString& seccion, int exceptoId) const {
+    QSqlQuery query(m_db);
+    query.prepare("SELECT 1 FROM Cursos WHERE anio = :anio AND seccion = :seccion "
+                  "AND id <> :excepto LIMIT 1");
+    query.bindValue(":anio", anio);
+    query.bindValue(":seccion", seccion);
+    query.bindValue(":excepto", exceptoId);
+    return query.exec() && query.next();
+}
+
+bool ServicioCursos::existeAula(int idAula) const {
+    QSqlQuery query(m_db);
+    query.prepare("SELECT 1 FROM Aulas WHERE id = :id LIMIT 1");
+    query.bindValue(":id", idAula);
+    return query.exec() && query.next();
 }

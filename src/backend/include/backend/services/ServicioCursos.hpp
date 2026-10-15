@@ -111,4 +111,10 @@ private:
     QSqlDatabase& m_db;
 
     CursoDTO mapearARecord(const QSqlRecord& record) const;
+
+    /// ¿Existe ya un curso con esa identidad? (`exceptoId` para permitir el propio).
+    bool existeCurso(int anio, const QString& seccion, int exceptoId = -1) const;
+
+    /// ¿Existe un aula con ese id?
+    bool existeAula(int idAula) const;
 };

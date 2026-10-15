@@ -194,6 +194,53 @@ private slots:
         QVERIFY(m_nucleo->listarCursos().valor.isEmpty());
     }
 
+    void cursos_validacionIdentidadYAula()
+    {
+        auto aula = m_nucleo->crearAula("Aula 1", 30);
+        QVERIFY(aula.ok);
+
+        // Alta valida.
+        QVERIFY(m_nucleo->crearCurso(1, "A").ok);
+
+        // Duplicado año+sección (normaliza mayúsculas/espacios): mensaje con campo y valor.
+        auto dup = m_nucleo->crearCurso(1, "a");
+        QVERIFY(!dup.ok);
+        QVERIFY(dup.mensajeError.contains(QStringLiteral("1")));
+        QVERIFY(dup.mensajeError.contains(QStringLiteral("A")));
+
+        // Año invalido.
+        QVERIFY(!m_nucleo->crearCurso(0, "B").ok);
+        QVERIFY(!m_nucleo->crearCurso(-1, "B").ok);
+
+        // Seccion invalida (vacia, solo espacios, dos caracteres).
+        QVERIFY(!m_nucleo->crearCurso(2, QString()).ok);
+        QVERIFY(!m_nucleo->crearCurso(2, QStringLiteral("   ")).ok);
+        QVERIFY(!m_nucleo->crearCurso(2, QStringLiteral("AB")).ok);
+
+        // Seccion no ASCII valida, normalizada a mayusculas.
+        auto noAscii = m_nucleo->crearCurso(2, QString::fromUtf8("ñ"));
+        QVERIFY(noAscii.ok);
+        QCOMPARE(noAscii.valor.seccion, QString::fromUtf8("Ñ"));
+
+        // Aula inexistente se rechaza.
+        QVERIFY(!m_nucleo->crearCurso(3, "A", QString(), 99999).ok);
+
+        // Aula existente y curso sin aula: ambos validos.
+        QVERIFY(m_nucleo->crearCurso(3, "A", QString(), aula.valor.id).ok);
+        QVERIFY(m_nucleo->crearCurso(3, "B").ok);
+
+        // Actualizar sin cambiar la identidad se acepta.
+        auto creado = m_nucleo->crearCurso(4, "A");
+        QVERIFY(creado.ok);
+        QVERIFY(m_nucleo->actualizarCurso(creado.valor.id, 4, "A", QString(), -1).ok);
+
+        // Actualizar hacia una identidad ya ocupada se rechaza.
+        QVERIFY(!m_nucleo->actualizarCurso(creado.valor.id, 1, "A").ok);
+
+        // Actualizar con aula inexistente se rechaza.
+        QVERIFY(!m_nucleo->actualizarCurso(creado.valor.id, 4, "A", QString(), 99999).ok);
+    }
+
     // ─── Turnos y recesos ───────────────────────────────────────────────────
 
     void turnosRecesos_altaModificacionBaja()
