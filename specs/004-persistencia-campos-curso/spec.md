@@ -1,6 +1,6 @@
 # Spec 004 - Persistencia y servicios de los cursos
 
-Estado: aprobada
+Estado: implementada
 
 > **Cambio de requisito (modelo de dominio, 2026-10-15).** Tras aprobar las specs 004 y 005, el
 > modelo del curso cambió: se **retiran de la base** el nombre, el número de estudiantes, el código

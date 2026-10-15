@@ -4,12 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** spec **004 re-aprobada** (modelo de curso nuevo; spec completa de **BD + servicios**) — plan + tareas **regenerados** (**9 tareas**); pendiente aprobar plan/tareas e implementar
+- **Fase:** spec **004 implementada** (T1–T9: curso por `anio`+`seccion` con `turno`/`aula`, esquema único, cascadas con anulación, consola y contrato del frontend). Suite **38/43**; los 4 rojos son de la **spec 005**.
 - **Fecha:** 2026-10-15
-- **Rama:** `develop`
-- **Specs en curso:** `specs/004-persistencia-campos-curso` (aprobada; 9 tareas), `specs/005-nucleo-solver` (**borrador**: se rehace por el cambio de modelo; pendiente re-aprobación)
-- **Siguiente paso:** aprobar plan/tareas de 004 e implementar T1…T9 (T2–T6 son un refactor acoplado). La **construcción de la entrada del solver** se movió a la **spec 005** (RF-13).
-- **Modo de implementación (004/005):** el **agente escribe los tests**; el **usuario escribe el código de producción**; el agente revisa. Tests primero (rojo→verde).
+- **Rama:** `sdd/004-persistencia-campos-curso`
+- **Specs en curso:** `specs/004-persistencia-campos-curso` (**implementada**), `specs/005-nucleo-solver` (borrador)
+- **Siguiente paso:** retomar la **spec 005** (núcleo del solver): re-aprobar la spec (modelo de config nuevo), regenerar plan/tareas y cerrar los 4 tests rojos (constructor_entrada, validador_entrada, ipc_aislamiento_bd, solver).
 
 ## Specs activas
 
@@ -18,7 +17,7 @@
 | 001-base-datos-local | aprobada | **implementada** (T1–T8) |
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
-| 004-persistencia-campos-curso | aprobada | spec aprobada (QA ok); plan/tareas pendientes |
+| 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9; suite 38/43) |
 | 005-nucleo-solver | aprobada | spec aprobada; plan propuesto (sin el puente D-10) |
 
 > Épico **solver** (la numeración sigue el orden de trabajo): **004 (persistencia de campos) → 005 (núcleo del solver) → 006 (turnos automáticos) → 007 (generación parcial)**. 006 y 007 reservadas, sin crear.
