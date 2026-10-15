@@ -9,6 +9,12 @@ Interfaz de consumo: `docs/interfaz-frontend.md` (documentación viva del contra
 > Este documento describe el CÓMO. No introduce dependencias nuevas: C++17 · Qt6 (Widgets/Network)
 > · OR-Tools · CMake/Ninja · CTest.
 
+> **Superseded parcialmente (2026-10-15).** El **contrato JSON de entrada** descrito abajo
+> (`ConstructorEntradaSolver`, las 13 secciones con materias por curso y `aula_fija` por curso) queda
+> superado por la spec **005** tras el cambio de modelo: materias derivadas del plan, planes embebidos
+> y modo de aula fija global. La spec 005 está en **borrador**; este plan se reajustará al regenerar
+> su plan 005. El resto (transporte IPC, análisis de salida, guardado de archivos) sigue vigente.
+
 ---
 
 ## 0. Arquitectura objetivo y frontera con el solver

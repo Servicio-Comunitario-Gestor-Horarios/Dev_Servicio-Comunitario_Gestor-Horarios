@@ -97,7 +97,7 @@ migración está en marcha. Vacío = sin aviso.
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 2;   // v1 = esquema base; v2 = cursos, turnos y recesos
+constexpr int VERSION_ESQUEMA_ACTUAL = 2;   // esquema unico (sin migracion por version)
 enum class EstadoApertura { Crear, Abrir, Migrar, FalloAusente, FalloPosterior };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
@@ -194,17 +194,13 @@ public:
                                       const QString& descripcion = QString());
     bool               eliminarPlan(const QString& codigo);
 
-    // Cursos y su relación con materias
+    // Cursos (identidad ano+seccion; turno y aula opcionales)
     Resultado<QVector<CursoDTO>> listarCursos() const;
-    Resultado<CursoDTO>      crearCurso(const QString& nombre, const QString& turno = QString(),
-                                        int aulaFija = -1, int numEstudiantes = 0,
-                                        const QString& codigoPlan = QString());
-    Resultado<CursoDTO>      actualizarCurso(int id, const QString& nombre, const QString& turno = QString(),
-                                             int aulaFija = -1, int numEstudiantes = 0,
-                                             const QString& codigoPlan = QString());
+    Resultado<CursoDTO>      crearCurso(int anio, const QString& seccion,
+                                        const QString& turno = QString(), int aula = -1);
+    Resultado<CursoDTO>      actualizarCurso(int id, int anio, const QString& seccion,
+                                             const QString& turno = QString(), int aula = -1);
     bool                     eliminarCurso(int id);
-    Resultado<CursoMateriaDTO> asignarMateriaACurso(int idCurso, int idMateria, int horasSemanales);
-    bool                     quitarMateriaDeCurso(int idCurso, int idMateria);
 
     // Turnos y recesos
     Resultado<QVector<TurnoDTO>> listarTurnos() const;
@@ -235,8 +231,7 @@ public:
 | `AulaDTO` | `id`, `nombre`, `capacidad`, `edificio`, `piso` |
 | `MateriaDTO` | `id`, `nombre`, `requisitos` |
 | `PlanDTO` | `codigo`, `nombre`, `descripcion` |
-| `CursoDTO` | `id`, `nombre`, `turno`, `aulaFija` (`-1` si no tiene), `numEstudiantes`, `codigoPlan`, `QVector<CursoMateriaDTO> materias` |
-| `CursoMateriaDTO` | `idMateria`, `nombreMateria`, `horasSemanales` |
+| `CursoDTO` | `id`, `anio`, `seccion`, `turno`, `aula` (`-1` si no tiene) |
 | `TurnoDTO` | `nombre`, `inicio`, `fin`, `numSlots`, `QVector<RecesoDTO> recesos` |
 | `RecesoDTO` | `despuesDeSlot`, `duracion` (minutos), `inicio`, `fin` (pueden ser inválidos) |
 
@@ -265,16 +260,17 @@ depende de qué. `NucleoDatos::dependientesDe`/`eliminarConCascada` usan **estas
 
 | `dominio` | Tabla raíz (clave) | Dependientes que arrastra |
 |---|---|---|
-| `plan` | `PlanEstudio` (`codigo`) | materias del plan y cursos del plan (con sus materias) |
-| `materia` | `Materias` (`id`) | vínculos plan-materia, profesor-materia y curso-materia |
+| `plan` | `PlanEstudio` (`codigo`) | materias del plan |
+| `materia` | `Materias` (`id`) | vínculos plan-materia y profesor-materia |
 | `profesor` | `Profesores` (`id`) | profesor-materia y disponibilidad |
-| `aula` | `Aulas` (`id`) | cursos con esa aula fija (con sus materias) |
-| `curso` | `Cursos` (`id`) | curso-materia |
-| `turno` | `Turnos` (`nombre`) | recesos y cursos del turno |
+| `aula` | `Aulas` (`id`) | **anula** la referencia de los cursos con esa aula (no los borra) |
+| `curso` | `Cursos` (`id`) | (ninguno) |
+| `turno` | `Turnos` (`nombre`) | recesos y **anula** la referencia de los cursos del turno |
 
 `Dependencia` es `{ QString dominio; qint64 id; QString descripcion; }` (`descripcion` ya viene en
 español, lista para el diálogo). `dependientesDe` devuelve vacío para un dominio desconocido o `id`
-vacío. La cascada es recursiva (un curso dependiente arrastra sus materias).
+vacío. Unas relaciones **borran** el dependiente y otras (aula→cursos, turno→cursos) solo
+**anulan la referencia** (`SET NULL`): el curso permanece sin esa aula o turno.
 
 > **Ojo con la clave `profesor`:** las operaciones CRUD de docentes son `crearDocente`/…, pero la
 > cascada de un docente se pide con `dependientesDe("profesor", id)` /
@@ -335,9 +331,8 @@ alta o modificación pendiente es `PendienteGuardar`; una baja pendiente es `Pen
 | `materia` | alta | nombre |
 | `materia` | modificación / baja | id (como texto) |
 | `plan` | alta / modificación / baja | código del plan |
-| `curso` | alta | nombre (aún no hay id) |
+| `curso` | alta | identidad `"<anio>-<seccion>"` normalizada |
 | `curso` | modificación / baja | id (como texto) |
-| `curso_materia` | asignar / quitar | `"<idCurso>-<idMateria>"` |
 | `turno` | alta / modificación / baja | nombre del turno |
 | `receso` | agregar / eliminar | `"<turno>-<despuesDeSlot>"` |
 

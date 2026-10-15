@@ -34,14 +34,10 @@ private:
         turno.recesos = {receso};
         d.turnos = {turno};
 
-        CursoMateriaDTO cm; cm.idMateria = 1; cm.nombreMateria = QStringLiteral("Matemática");
-        cm.horasSemanales = 5;
         CursoDTO curso;
-        curso.id = 100; curso.nombre = QStringLiteral("1ro A");
+        curso.id = 100; curso.anio = 1; curso.seccion = QStringLiteral("A");
         curso.turno = QStringLiteral("manana");
-        curso.aulaFija = 10; curso.numEstudiantes = 20;
-        curso.codigoPlan = QStringLiteral("Ciencias");
-        curso.materias = {cm};
+        curso.aula = 10;
         d.cursos = {curso};
 
         FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(9, 0);
@@ -141,10 +137,9 @@ private slots:
         const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 0, 0));
         const QJsonObject json = construirJsonEntrada(dominioCompleto(), parametros(), ahora);
 
-        // Matemática es el índice 0 del pool global.
-        QCOMPARE(json["cursos"].toArray()[0].toObject()["materias"].toArray()[0]
-                     .toObject()["materia_idx"].toInt(),
-                 0);
+        // TODO(spec 005): las materias del curso se derivan de su plan; hasta
+        // entonces el curso no aporta materias a la entrada.
+        QVERIFY(json["cursos"].toArray()[0].toObject()["materias"].toArray().isEmpty());
         QCOMPARE(json["profesores"].toArray()[0].toObject()["materias_asignadas"].toArray()[0].toInt(),
                  0);
         // El docente del dominio toma sus horas del preset (casadas por nombre).

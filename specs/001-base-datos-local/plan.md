@@ -49,6 +49,12 @@ proceso la lógica y el contrato de datos que expone `src/backend`, documentados
 | `src/backend/src/database/migracion.cpp` **(reescrito)** | Migraciones versionadas y transaccionales (el `CREATE TABLE IF NOT EXISTS` actual queda como migración v1). Sigue en `namespace Migracion`. | RF-1 |
 
 Nuevas tablas de dominio que exige RF-2 (migración v2):
+
+> **OBSOLETO (2026-10-15).** La definición de `Cursos` y `Curso_Materia` de abajo queda **superseded**
+> por las specs **004** y **005** (cambio de modelo): `Cursos` pasa a `(anio, seccion, turno, aula FK)`
+> sin `nombre`/`num_estudiantes`/`codigo_plan`/`aula_fija`, `Curso_Materia` desaparece y la migración
+> se colapsa a un único esquema. El resto de la migración (tablas de otros dominios) sigue vigente.
+
 - `Cursos(id, nombre UNIQUE, turno, aula_fija, num_estudiantes, codigo_plan FK)`
 - `Curso_Materia(id_Curso FK, id_Materia FK, horas_semanales)`
 - `Turnos(nombre PK, inicio, fin, slots)` y `Recesos(turno FK, despues_de_slot, duracion, inicio, fin)`

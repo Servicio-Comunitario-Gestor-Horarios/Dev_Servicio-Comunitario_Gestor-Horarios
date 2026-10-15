@@ -6,34 +6,72 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QString>
+#include <QStringList>
+
+namespace
+{
+    /// Tablas que debe tener el esquema único.
+    const QStringList TABLAS_ESPERADAS = {
+        QStringLiteral("Aulas"),        QStringLiteral("Profesores"),
+        QStringLiteral("Materias"),     QStringLiteral("Profesor_Materia"),
+        QStringLiteral("Disponibilidad_Profesor"), QStringLiteral("PlanEstudio"),
+        QStringLiteral("PlanEstudio_Materia"),     QStringLiteral("Turnos"),
+        QStringLiteral("Recesos"),      QStringLiteral("Cursos")
+    };
+
+    /// Tablas que NO deben existir (retiradas en el modelo nuevo).
+    const QStringList TABLAS_RETIRADAS = { QStringLiteral("Curso_Materia") };
+
+    /// Columnas que debe tener la tabla `Cursos`.
+    const QStringList COLUMNAS_CURSOS = {
+        QStringLiteral("anio"), QStringLiteral("seccion"),
+        QStringLiteral("turno"), QStringLiteral("aula")
+    };
+
+    bool tablaExiste(QSqlDatabase& db, const QString& tabla)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("SELECT name FROM sqlite_master "
+                                     "WHERE type='table' AND name=:nombre"));
+        query.bindValue(QStringLiteral(":nombre"), tabla);
+        return query.exec() && query.next();
+    }
+
+    bool columnaExiste(QSqlDatabase& db, const QString& tabla, const QString& columna)
+    {
+        QSqlQuery query(db);
+        // `PRAGMA table_info` no admite parámetros enlazados; el nombre de tabla es
+        // una constante interna, por lo que la interpolación no supone inyección.
+        if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(tabla)))
+            return false;
+
+        while (query.next())
+            if (query.value(1).toString().compare(columna, Qt::CaseInsensitive) == 0)
+                return true;
+
+        return false;
+    }
+} // namespace
 
 VersionEsquema::EstadoApertura VersionEsquema::decidirApertura(bool existe,
                                                                int versionArchivo,
                                                                int versionEsperada)
 {
-    // Sin archivo: hay que crear el esquema inicial.
     if (!existe)
         return EstadoApertura::Crear;
-
-    // Versión ausente o no interpretable (SQLite devuelve 0 por defecto).
-    if (versionArchivo <= 0)
-        return EstadoApertura::FalloAusente;
-
-    if (versionArchivo < versionEsperada)
-        return EstadoApertura::Migrar;
 
     if (versionArchivo == versionEsperada)
         return EstadoApertura::Abrir;
 
-    // Cualquier versión posterior se trata como fallo de apertura.
-    return EstadoApertura::FalloPosterior;
+    // Ausente (<=0), anterior o posterior: todas se tratan como esquema no esperado.
+    return EstadoApertura::FalloEsquema;
 }
 
 int VersionEsquema::leerVersionEsquema(QSqlDatabase& db)
 {
     QSqlQuery query(db);
 
-    if (!query.exec("PRAGMA user_version"))
+    if (!query.exec(QStringLiteral("PRAGMA user_version")))
     {
         qCritical() << "No se pudo leer la version de esquema:" << query.lastError().text();
         return -1;
@@ -51,7 +89,7 @@ bool VersionEsquema::fijarVersionEsquema(QSqlDatabase& db, int version)
 
     // `PRAGMA user_version` no admite parámetros enlazados; `version` es un int,
     // por lo que la interpolación no supone riesgo de inyección.
-    if (!query.exec(QString("PRAGMA user_version = %1").arg(version)))
+    if (!query.exec(QStringLiteral("PRAGMA user_version = %1").arg(version)))
     {
         qCritical() << "No se pudo fijar la version de esquema:" << query.lastError().text();
         return false;
@@ -60,61 +98,54 @@ bool VersionEsquema::fijarVersionEsquema(QSqlDatabase& db, int version)
     return true;
 }
 
-bool VersionEsquema::aplicarHasta(QSqlDatabase& db,
-                                  int versionDestino,
-                                  const PasoMigracion& paso)
+bool VersionEsquema::crearEsquema(QSqlDatabase& db)
 {
     if (!db.isOpen())
     {
-        qCritical() << "No se puede migrar: la base de datos no esta abierta.";
+        qCritical() << "No se puede crear el esquema: la base de datos no esta abierta.";
         return false;
     }
 
-    const int versionActual = leerVersionEsquema(db);
-
-    if (versionActual < 0)
-        return false;
-
-    // Ya estamos en la versión destino (o por delante): nada que aplicar.
-    if (versionActual >= versionDestino)
-        return true;
-
-    for (int destino = versionActual + 1; destino <= versionDestino; ++destino)
+    if (!db.transaction())
     {
-        if (!db.transaction())
-        {
-            qCritical() << "No se pudo iniciar la transaccion de migracion:"
-                        << db.lastError().text();
-            return false;
-        }
+        qCritical() << "No se pudo iniciar la transaccion de creacion del esquema:"
+                    << db.lastError().text();
+        return false;
+    }
 
-        const bool ok = paso(db, destino) && fijarVersionEsquema(db, destino);
+    const bool ok = Migracion::aplicarPaso(db)
+                 && fijarVersionEsquema(db, VERSION_ESQUEMA_ACTUAL);
 
-        if (!ok)
-        {
-            db.rollback();
-            qCritical() << "Migracion a la version" << destino
-                        << "fallida; se revierte a la version" << versionActual << ".";
-            return false;
-        }
+    if (!ok)
+    {
+        db.rollback();
+        qCritical() << "La creacion del esquema fallo; se revierte.";
+        return false;
+    }
 
-        if (!db.commit())
-        {
-            db.rollback();
-            qCritical() << "No se pudo confirmar la migracion a la version"
-                        << destino << ":" << db.lastError().text();
-            return false;
-        }
+    if (!db.commit())
+    {
+        db.rollback();
+        qCritical() << "No se pudo confirmar la creacion del esquema:" << db.lastError().text();
+        return false;
     }
 
     return true;
 }
 
-bool VersionEsquema::aplicarHasta(QSqlDatabase& db, int versionDestino)
+bool VersionEsquema::esquemaEsperado(QSqlDatabase& db)
 {
-    const PasoMigracion paso = [](QSqlDatabase& conexion, int destino) -> bool {
-        return Migracion::aplicarPaso(conexion, destino);
-    };
+    for (const QString& tabla : TABLAS_ESPERADAS)
+        if (!tablaExiste(db, tabla))
+            return false;
 
-    return aplicarHasta(db, versionDestino, paso);
+    for (const QString& columna : COLUMNAS_CURSOS)
+        if (!columnaExiste(db, QStringLiteral("Cursos"), columna))
+            return false;
+
+    for (const QString& retirada : TABLAS_RETIRADAS)
+        if (tablaExiste(db, retirada))
+            return false;
+
+    return true;
 }

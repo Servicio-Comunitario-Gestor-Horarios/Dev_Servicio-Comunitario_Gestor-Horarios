@@ -10,100 +10,66 @@
 
 ServicioCursos::ServicioCursos(QSqlDatabase& db) : m_db(db) {}
 
-bool ServicioCursos::validarCurso(const QString& nombre, int numEstudiantes,
-                                  QString& error) const {
-    if (nombre.trimmed().isEmpty()) {
-        error = "El nombre del curso no puede estar vacío.";
-        return false;
-    }
-
-    if (numEstudiantes < 0) {
-        error = "El número de estudiantes no puede ser negativo.";
-        return false;
-    }
-
-    return true;
-}
-
 CursoDTO ServicioCursos::mapearARecord(const QSqlRecord& record) const {
     CursoDTO dto;
-    dto.id = record.value("id").toInt();
-    dto.nombre = record.value("nombre").toString();
-    dto.turno = record.value("turno").toString();
+    dto.id      = record.value("id").toInt();
+    dto.anio    = record.value("anio").toInt();
+    dto.seccion = record.value("seccion").toString();
+    dto.turno   = record.value("turno").toString();
 
-    const QVariant aula = record.value("aula_fija");
-    dto.aulaFija = aula.isNull() ? -1 : aula.toInt();
+    const QVariant aula = record.value("aula");
+    dto.aula = aula.isNull() ? -1 : aula.toInt();
 
-    dto.numEstudiantes = record.value("num_estudiantes").toInt();
-    dto.codigoPlan = record.value("codigo_plan").toString();
     return dto;
-}
-
-bool ServicioCursos::cargarMaterias(CursoDTO& dto) const {
-    QSqlQuery q(m_db);
-    q.prepare(
-        "SELECT m.id AS id, m.nombre AS nombre, cm.horas_semanales AS horas "
-        "FROM Curso_Materia cm "
-        "JOIN Materias m ON m.id = cm.id_Materia "
-        "WHERE cm.id_Curso = :id "
-        "ORDER BY m.nombre"
-    );
-    q.bindValue(":id", dto.id);
-
-    if (!q.exec()) {
-        qCritical() << "Error al cargar materias del curso:" << q.lastError().text();
-        return false;
-    }
-
-    while (q.next()) {
-        CursoMateriaDTO m;
-        m.idMateria = q.value("id").toInt();
-        m.nombreMateria = q.value("nombre").toString();
-        m.horasSemanales = q.value("horas").toInt();
-        dto.materias.append(m);
-    }
-
-    return true;
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
-Resultado<CursoDTO> ServicioCursos::crearCurso(const QString& nombre,
-                                               const QString& turno,
-                                               int aulaFija,
-                                               int numEstudiantes,
-                                               const QString& codigoPlan) {
-    QString error;
-    if (!validarCurso(nombre, numEstudiantes, error)) {
-        return Resultado<CursoDTO>::error(error);
+Resultado<CursoDTO> ServicioCursos::crearCurso(int anio, const QString& seccion,
+                                               const QString& turno, int aula) {
+    const auto identidad = validarIdentidadCurso(anio, seccion);
+    if (!identidad.ok) {
+        return Resultado<CursoDTO>::error(identidad.mensajeError);
     }
 
-    // Pre-chequeo de duplicado (nombre es UNIQUE en el esquema).
-    {
-        QSqlQuery check(m_db);
-        check.prepare("SELECT 1 FROM Cursos WHERE nombre = :nombre LIMIT 1");
-        check.bindValue(":nombre", nombre.trimmed());
-        if (check.exec() && check.next()) {
-            return Resultado<CursoDTO>::error("Ya existe un curso con ese nombre.", -2);
-        }
+    if (aula > 0 && !existeAula(aula)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+    }
+
+    if (existeCurso(identidad.valor.anio, identidad.valor.seccion)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                           "Elija otro año o sección.")
+                .arg(identidad.valor.anio)
+                .arg(identidad.valor.seccion),
+            -2);
     }
 
     QSqlQuery query(m_db);
     query.prepare(
-        "INSERT INTO Cursos (nombre, turno, aula_fija, num_estudiantes, codigo_plan) "
-        "VALUES (:nombre, :turno, :aula_fija, :num_estudiantes, :codigo_plan)"
+        "INSERT INTO Cursos (anio, seccion, turno, aula) "
+        "VALUES (:anio, :seccion, :turno, :aula)"
     );
-    query.bindValue(":nombre", nombre.trimmed());
-    query.bindValue(":turno", turno.trimmed());
-    query.bindValue(":aula_fija", aulaFija > 0 ? QVariant(aulaFija) : QVariant());
-    query.bindValue(":num_estudiantes", numEstudiantes);
-    query.bindValue(":codigo_plan",
-                    codigoPlan.trimmed().isEmpty() ? QVariant() : codigoPlan.trimmed());
+    query.bindValue(":anio", identidad.valor.anio);
+    query.bindValue(":seccion", identidad.valor.seccion);
+    query.bindValue(":turno", turno.trimmed().isEmpty() ? QVariant() : turno.trimmed());
+    query.bindValue(":aula", aula > 0 ? QVariant(aula) : QVariant());
 
     if (!query.exec()) {
         const QString err = query.lastError().text();
-        if (err.contains("UNIQUE")) {
-            return Resultado<CursoDTO>::error("Ya existe un curso con ese nombre.", -2);
+        if (err.contains(QStringLiteral("UNIQUE"))) {
+            // Defensa en profundidad: la unicidad la garantiza el esquema (RF-1).
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                               "Elija otro año o sección.")
+                    .arg(identidad.valor.anio)
+                    .arg(identidad.valor.seccion),
+                -2);
+        }
+        if (err.contains(QStringLiteral("FOREIGN KEY"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("El aula indicada no existe; elija un aula registrada."));
         }
         qCritical() << "Error al crear curso:" << err;
         return Resultado<CursoDTO>::error("Error al guardar el curso en la base de datos.");
@@ -118,8 +84,7 @@ Resultado<CursoDTO> ServicioCursos::obtenerCurso(int id) const {
     }
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, turno, aula_fija, num_estudiantes, codigo_plan "
-                  "FROM Cursos WHERE id = :id");
+    query.prepare("SELECT id, anio, seccion, turno, aula FROM Cursos WHERE id = :id");
     query.bindValue(":id", id);
 
     if (!query.exec()) {
@@ -131,21 +96,14 @@ Resultado<CursoDTO> ServicioCursos::obtenerCurso(int id) const {
         return Resultado<CursoDTO>::error("No se encontró un curso con ese ID.", -3);
     }
 
-    CursoDTO dto = mapearARecord(query.record());
-    if (!cargarMaterias(dto)) {
-        return Resultado<CursoDTO>::error(
-            "Error al cargar las materias del curso.");
-    }
-
-    return Resultado<CursoDTO>::exito(dto);
+    return Resultado<CursoDTO>::exito(mapearARecord(query.record()));
 }
 
 Resultado<QVector<CursoDTO>> ServicioCursos::listarCursos() const {
     QVector<CursoDTO> resultados;
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, turno, aula_fija, num_estudiantes, codigo_plan "
-                  "FROM Cursos ORDER BY nombre");
+    query.prepare("SELECT id, anio, seccion, turno, aula FROM Cursos");
 
     if (!query.exec()) {
         qCritical() << "Error al listar cursos:" << query.lastError().text();
@@ -155,51 +113,69 @@ Resultado<QVector<CursoDTO>> ServicioCursos::listarCursos() const {
     }
 
     while (query.next()) {
-        CursoDTO dto = mapearARecord(query.record());
-        cargarMaterias(dto);
-        resultados.append(dto);
+        resultados.append(mapearARecord(query.record()));
     }
 
     std::stable_sort(resultados.begin(), resultados.end(),
                      [](const CursoDTO& a, const CursoDTO& b) {
-                         return nombreAntes(a.nombre, b.nombre);
+                         return cursoAntes(a.anio, a.seccion, b.anio, b.seccion);
                      });
 
     return Resultado<QVector<CursoDTO>>::exito(resultados);
 }
 
-Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, const QString& nombre,
-                                                    const QString& turno, int aulaFija,
-                                                    int numEstudiantes,
-                                                    const QString& codigoPlan) {
-    QString error;
-    if (!validarCurso(nombre, numEstudiantes, error)) {
-        return Resultado<CursoDTO>::error(error);
+Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, int anio, const QString& seccion,
+                                                    const QString& turno, int aula) {
+    if (id <= 0) {
+        return Resultado<CursoDTO>::error("ID de curso inválido.");
+    }
+
+    const auto identidad = validarIdentidadCurso(anio, seccion);
+    if (!identidad.ok) {
+        return Resultado<CursoDTO>::error(identidad.mensajeError);
+    }
+
+    if (aula > 0 && !existeAula(aula)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("El aula indicada no existe; elija un aula registrada."));
+    }
+
+    // La unicidad no debe rechazar el propio registro al no cambiar su identidad.
+    if (existeCurso(identidad.valor.anio, identidad.valor.seccion, id)) {
+        return Resultado<CursoDTO>::error(
+            QStringLiteral("Ya existe un curso con el año %1 y la sección «%2». "
+                           "Elija otro año o sección.")
+                .arg(identidad.valor.anio)
+                .arg(identidad.valor.seccion),
+            -2);
     }
 
     QSqlQuery query(m_db);
     query.prepare(
         "UPDATE Cursos SET "
-        "nombre = :nombre, "
+        "anio = :anio, "
+        "seccion = :seccion, "
         "turno = :turno, "
-        "aula_fija = :aula_fija, "
-        "num_estudiantes = :num_estudiantes, "
-        "codigo_plan = :codigo_plan, "
+        "aula = :aula, "
         "fecha_modificacion = CURRENT_TIMESTAMP "
         "WHERE id = :id"
     );
-    query.bindValue(":nombre", nombre.trimmed());
-    query.bindValue(":turno", turno.trimmed());
-    query.bindValue(":aula_fija", aulaFija > 0 ? QVariant(aulaFija) : QVariant());
-    query.bindValue(":num_estudiantes", numEstudiantes);
-    query.bindValue(":codigo_plan",
-                    codigoPlan.trimmed().isEmpty() ? QVariant() : codigoPlan.trimmed());
+    query.bindValue(":anio", identidad.valor.anio);
+    query.bindValue(":seccion", identidad.valor.seccion);
+    query.bindValue(":turno", turno.trimmed().isEmpty() ? QVariant() : turno.trimmed());
+    query.bindValue(":aula", aula > 0 ? QVariant(aula) : QVariant());
     query.bindValue(":id", id);
 
     if (!query.exec()) {
         const QString err = query.lastError().text();
-        if (err.contains("UNIQUE")) {
-            return Resultado<CursoDTO>::error("Ya existe un curso con ese nombre.", -2);
+        if (err.contains(QStringLiteral("UNIQUE"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("Ya existe un curso con ese año y sección. Elija otro año o sección."),
+                -2);
+        }
+        if (err.contains(QStringLiteral("FOREIGN KEY"))) {
+            return Resultado<CursoDTO>::error(
+                QStringLiteral("El aula indicada no existe; elija un aula registrada."));
         }
         qCritical() << "Error al actualizar curso:" << err;
         return Resultado<CursoDTO>::error(
@@ -216,98 +192,31 @@ Resultado<CursoDTO> ServicioCursos::actualizarCurso(int id, const QString& nombr
 bool ServicioCursos::eliminarCurso(int id) {
     if (id <= 0) return false;
 
-    if (!m_db.transaction()) {
-        qCritical() << "No se pudo iniciar la transacción para eliminar el curso.";
-        return false;
-    }
-
-    // La relación con materias no tiene ON DELETE CASCADE: se borra primero.
-    QSqlQuery borrarMaterias(m_db);
-    borrarMaterias.prepare("DELETE FROM Curso_Materia WHERE id_Curso = :id");
-    borrarMaterias.bindValue(":id", id);
-
-    if (!borrarMaterias.exec()) {
-        qCritical() << "Error al eliminar materias del curso:"
-                    << borrarMaterias.lastError().text();
-        m_db.rollback();
-        return false;
-    }
-
     QSqlQuery del(m_db);
     del.prepare("DELETE FROM Cursos WHERE id = :id");
     del.bindValue(":id", id);
 
     if (!del.exec()) {
         qCritical() << "Error al eliminar curso:" << del.lastError().text();
-        m_db.rollback();
         return false;
     }
 
-    const bool borrado = del.numRowsAffected() > 0;
-    if (!borrado) {
-        m_db.rollback();
-        return false;
-    }
-
-    m_db.commit();
-    return true;
+    return del.numRowsAffected() > 0;
 }
 
-// ─── Materias del curso (N:M) ─────────────────────────────────────────────
-
-Resultado<CursoMateriaDTO> ServicioCursos::asignarMateria(int idCurso, int idMateria,
-                                                          int horasSemanales) {
-    if (idCurso <= 0 || idMateria <= 0) {
-        return Resultado<CursoMateriaDTO>::error("Curso o materia inválidos.");
-    }
-
-    if (horasSemanales < 0) {
-        return Resultado<CursoMateriaDTO>::error(
-            "Las horas semanales no pueden ser negativas.");
-    }
-
+bool ServicioCursos::existeCurso(int anio, const QString& seccion, int exceptoId) const {
     QSqlQuery query(m_db);
-    query.prepare(
-        "INSERT OR REPLACE INTO Curso_Materia (id_Curso, id_Materia, horas_semanales) "
-        "VALUES (:id_Curso, :id_Materia, :horas)"
-    );
-    query.bindValue(":id_Curso", idCurso);
-    query.bindValue(":id_Materia", idMateria);
-    query.bindValue(":horas", horasSemanales);
-
-    if (!query.exec()) {
-        qCritical() << "Error al asignar materia al curso:" << query.lastError().text();
-        return Resultado<CursoMateriaDTO>::error(
-            "Error al guardar la materia del curso.");
-    }
-
-    CursoMateriaDTO dto;
-    dto.idMateria = idMateria;
-    dto.horasSemanales = horasSemanales;
-
-    QSqlQuery nombre(m_db);
-    nombre.prepare("SELECT nombre FROM Materias WHERE id = :id");
-    nombre.bindValue(":id", idMateria);
-    if (nombre.exec() && nombre.next()) {
-        dto.nombreMateria = nombre.value("nombre").toString();
-    }
-
-    return Resultado<CursoMateriaDTO>::exito(dto);
+    query.prepare("SELECT 1 FROM Cursos WHERE anio = :anio AND seccion = :seccion "
+                  "AND id <> :excepto LIMIT 1");
+    query.bindValue(":anio", anio);
+    query.bindValue(":seccion", seccion);
+    query.bindValue(":excepto", exceptoId);
+    return query.exec() && query.next();
 }
 
-bool ServicioCursos::quitarMateria(int idCurso, int idMateria) {
-    if (idCurso <= 0 || idMateria <= 0) return false;
-
+bool ServicioCursos::existeAula(int idAula) const {
     QSqlQuery query(m_db);
-    query.prepare("DELETE FROM Curso_Materia "
-                  "WHERE id_Curso = :id_Curso AND id_Materia = :id_Materia");
-    query.bindValue(":id_Curso", idCurso);
-    query.bindValue(":id_Materia", idMateria);
-
-    if (!query.exec()) {
-        qCritical() << "Error al quitar materia del curso:" << query.lastError().text();
-        return false;
-    }
-
-    return query.numRowsAffected() > 0;
+    query.prepare("SELECT 1 FROM Aulas WHERE id = :id LIMIT 1");
+    query.bindValue(":id", idAula);
+    return query.exec() && query.next();
 }

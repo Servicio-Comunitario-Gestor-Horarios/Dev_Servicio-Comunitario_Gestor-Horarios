@@ -151,11 +151,9 @@ void ConsolaDatos::imprimirAyuda()
   planes    eliminar <codigo>
 
   cursos    listar
-  cursos    crear    "<nombre>" [turno] [aulaFija] [numEstudiantes] [codigoPlan]
-  cursos    actualizar <id> "<nombre>" [turno] [aulaFija] [numEstudiantes] [codigoPlan]
+  cursos    crear    <anio> <seccion> [turno] [aula]
+  cursos    actualizar <id> <anio> <seccion> [turno] [aula]
   cursos    eliminar <id>
-  cursos    asignar  <idCurso> <idMateria> <horasSemanales>
-  cursos    quitar   <idCurso> <idMateria>
 
   turnos    listar
   turnos    crear    "<nombre>" <inicio HH:mm> <fin HH:mm> <numSlots>
@@ -395,7 +393,7 @@ void ConsolaDatos::cmdPlanes(const Args& args)
 
 void ConsolaDatos::cmdCursos(const Args& args)
 {
-    if (args.size() < 2) { imprimir(QStringLiteral("Uso: cursos listar|crear|actualizar|eliminar|asignar|quitar ...")); return; }
+    if (args.size() < 2) { imprimir(QStringLiteral("Uso: cursos listar|crear|actualizar|eliminar ...")); return; }
     const QString accion = args[1].toLower();
 
     if (accion == QStringLiteral("listar"))
@@ -404,37 +402,40 @@ void ConsolaDatos::cmdCursos(const Args& args)
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("cursos: %1").arg(r.valor.size()));
         for (const CursoDTO& c : r.valor)
-            imprimir(QStringLiteral("  %1 | %2 | turno=%3 | aulaFija=%4 | estudiantes=%5 | plan=%6 | materias=%7")
-                         .arg(c.id).arg(c.nombre,
-                                        c.turno.isEmpty() ? QStringLiteral("-") : c.turno)
-                         .arg(c.aulaFija)
-                         .arg(c.numEstudiantes)
-                         .arg(c.codigoPlan.isEmpty() ? QStringLiteral("-") : c.codigoPlan)
-                         .arg(c.materias.size()));
+            imprimir(QStringLiteral("  %1 | %2 | anio=%3 | seccion=%4 | turno=%5 | aula=%6")
+                         .arg(c.id)
+                         .arg(nombreCurso(c.anio, c.seccion))
+                         .arg(c.anio)
+                         .arg(c.seccion)
+                         .arg(c.turno.isEmpty() ? QStringLiteral("-") : c.turno)
+                         .arg(c.aula > 0 ? QString::number(c.aula) : QStringLiteral("-")));
         return;
     }
     if (accion == QStringLiteral("crear"))
     {
-        if (args.size() < 3) { imprimir(QStringLiteral("Uso: cursos crear \"<nombre>\" [turno] [aulaFija] [numEstudiantes] [codigoPlan]")); return; }
-        const QString turno = args.size() > 3 ? args[3] : QString();
-        const int aulaFija = args.size() > 4 ? args[4].toInt() : -1;
-        const int numEstudiantes = args.size() > 5 ? args[5].toInt() : 0;
-        const QString codigoPlan = args.size() > 6 ? args[6] : QString();
-        imprimir(resultadoATexto(nucleo().crearCurso(args[2], turno, aulaFija, numEstudiantes, codigoPlan),
-                                 QStringLiteral("curso «%1» creado").arg(args[2])));
+        if (args.size() < 4) { imprimir(QStringLiteral("Uso: cursos crear <anio> <seccion> [turno] [aula]")); return; }
+        bool okAnio = false;
+        const int anio = args[2].toInt(&okAnio);
+        if (!okAnio) { imprimir(QStringLiteral("error: año inválido")); return; }
+        const QString turno = args.size() > 4 ? args[4] : QString();
+        const int aula = args.size() > 5 ? args[5].toInt() : -1;
+        imprimir(resultadoATexto(
+            nucleo().crearCurso(anio, args[3], turno, aula),
+            QStringLiteral("curso %1 creado").arg(nombreCurso(anio, normalizarSeccion(args[3])))));
         return;
     }
     if (accion == QStringLiteral("actualizar"))
     {
-        if (args.size() < 4) { imprimir(QStringLiteral("Uso: cursos actualizar <id> \"<nombre>\" [turno] [aulaFija] [numEstudiantes] [codigoPlan]")); return; }
-        bool okId = false; const int id = args[2].toInt(&okId);
-        if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
-        const QString turno = args.size() > 4 ? args[4] : QString();
-        const int aulaFija = args.size() > 5 ? args[5].toInt() : -1;
-        const int numEstudiantes = args.size() > 6 ? args[6].toInt() : 0;
-        const QString codigoPlan = args.size() > 7 ? args[7] : QString();
-        imprimir(resultadoATexto(nucleo().actualizarCurso(id, args[3], turno, aulaFija, numEstudiantes, codigoPlan),
-                                 QStringLiteral("curso %1 actualizado").arg(id)));
+        if (args.size() < 5) { imprimir(QStringLiteral("Uso: cursos actualizar <id> <anio> <seccion> [turno] [aula]")); return; }
+        bool okId = false, okAnio = false;
+        const int id = args[2].toInt(&okId);
+        const int anio = args[3].toInt(&okAnio);
+        if (!okId || !okAnio) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
+        const QString turno = args.size() > 5 ? args[5] : QString();
+        const int aula = args.size() > 6 ? args[6].toInt() : -1;
+        imprimir(resultadoATexto(
+            nucleo().actualizarCurso(id, anio, args[4], turno, aula),
+            QStringLiteral("curso %1 actualizado").arg(id)));
         return;
     }
     if (accion == QStringLiteral("eliminar"))
@@ -443,29 +444,6 @@ void ConsolaDatos::cmdCursos(const Args& args)
         bool okId = false; const int id = args[2].toInt(&okId);
         if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
         imprimir(textoBool(nucleo().eliminarCurso(id), QStringLiteral("curso %1 eliminado").arg(id)));
-        return;
-    }
-    if (accion == QStringLiteral("asignar"))
-    {
-        if (args.size() < 5) { imprimir(QStringLiteral("Uso: cursos asignar <idCurso> <idMateria> <horasSemanales>")); return; }
-        bool okC = false, okM = false, okH = false;
-        const int idCurso = args[2].toInt(&okC);
-        const int idMateria = args[3].toInt(&okM);
-        const int horas = args[4].toInt(&okH);
-        if (!okC || !okM || !okH) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
-        imprimir(resultadoATexto(nucleo().asignarMateriaACurso(idCurso, idMateria, horas),
-                                 QStringLiteral("materia %1 asignada al curso %2").arg(idMateria).arg(idCurso)));
-        return;
-    }
-    if (accion == QStringLiteral("quitar"))
-    {
-        if (args.size() < 4) { imprimir(QStringLiteral("Uso: cursos quitar <idCurso> <idMateria>")); return; }
-        bool okC = false, okM = false;
-        const int idCurso = args[2].toInt(&okC);
-        const int idMateria = args[3].toInt(&okM);
-        if (!okC || !okM) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
-        imprimir(textoBool(nucleo().quitarMateriaDeCurso(idCurso, idMateria),
-                           QStringLiteral("materia %1 quitada del curso %2").arg(idMateria).arg(idCurso)));
         return;
     }
     imprimir(QStringLiteral("acción desconocida: %1").arg(accion));

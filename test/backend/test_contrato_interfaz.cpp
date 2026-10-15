@@ -6,7 +6,7 @@
  * exponemos y que la interfaz (otro equipo) da por supuesta según
  * `docs/interfaz-frontend.md`, sección «Base de datos local»:
  *   - `Resultado<T>::exito()` / `error()` (valor, mensaje y `codigoError`);
- *   - `AperturaBaseDatos::Resultado::ok()`, `detalle` y `rutaRespaldo`;
+ *   - `AperturaBaseDatos::Resultado::ok()` y `detalle`;
  *   - `estadoPendienteDe` para los tres estados por registro.
  *
  * Si este test cambia, hay que actualizar también la documentación viva del
@@ -67,8 +67,8 @@ private:
     void crearBaseVersion(const QString& ruta, int version)
     {
         QSqlDatabase db = abrirConexion(ruta);
-        VersionEsquema::aplicarHasta(db, 1);
-        VersionEsquema::fijarVersionEsquema(db, version);
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(VersionEsquema::fijarVersionEsquema(db, version));
         cerrarConexion(db);
     }
 
@@ -113,10 +113,9 @@ private slots:
     {
         // Contrato: `ok()` es true solo con la base operativa.
         const QVector<Estado> exitos = {
-            Estado::OkCreada, Estado::OkAbierta, Estado::OkMigrada};
+            Estado::OkCreada, Estado::OkAbierta};
         const QVector<Estado> fallos = {
-            Estado::FalloAusente, Estado::FalloPosterior, Estado::FalloApertura,
-            Estado::FalloRespaldo, Estado::FalloMigracion};
+            Estado::FalloEsquema, Estado::FalloApertura};
 
         for (const Estado estado : exitos) {
             ResultadoApertura resultado;
@@ -142,8 +141,6 @@ private slots:
         QCOMPARE(resultado.estado, Estado::OkCreada);
         QVERIFY(resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
-        // Crear no migra: nunca hay respaldo asociado.
-        QVERIFY(resultado.rutaRespaldo.isEmpty());
     }
 
     void apertura_versionActual_okSinRespaldo()
@@ -157,30 +154,6 @@ private slots:
 
         QCOMPARE(resultado.estado, Estado::OkAbierta);
         QVERIFY(resultado.ok());
-        QVERIFY(resultado.rutaRespaldo.isEmpty());
-    }
-
-    void apertura_migracion_exitoExponeRutaRespaldo()
-    {
-        QTemporaryDir dir;
-        QVERIFY(dir.isValid());
-        const QString ruta = dir.filePath("migrar.db");
-        crearBaseVersion(ruta, 1);
-
-        const QDateTime ahora(QDate(2026, 10, 9), QTime(12, 0, 0));
-
-        Opciones opciones;
-        opciones.ahora = ahora;
-
-        const ResultadoApertura resultado = AperturaBaseDatos::abrir(ruta, opciones);
-
-        QCOMPARE(resultado.estado, Estado::OkMigrada);
-        QVERIFY(resultado.ok());
-        // El frontend puede ofrecer restaurar el respaldo usando esta ruta.
-        QVERIFY(!resultado.rutaRespaldo.isEmpty());
-        QVERIFY(QFile::exists(resultado.rutaRespaldo));
-        QCOMPARE(resultado.rutaRespaldo,
-                 Respaldo::construirNombreRespaldo(ruta, ahora));
     }
 
     void apertura_versionAusente_falloConDetalle()
@@ -192,7 +165,7 @@ private slots:
 
         const ResultadoApertura resultado = AperturaBaseDatos::abrir(ruta);
 
-        QCOMPARE(resultado.estado, Estado::FalloAusente);
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
         // El diálogo de fallo (RF-4) necesita un motivo legible en español.
         QVERIFY(!resultado.detalle.isEmpty());

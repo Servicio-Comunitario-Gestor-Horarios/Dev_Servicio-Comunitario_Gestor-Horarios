@@ -22,7 +22,24 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 ## Definiciones
 
 - **Lado cliente:** todo el programa salvo el proceso de cálculo.
-- **JSON de entrada/salida del solver:** contrato de datos del motor de solver, con sus validaciones previas y posteriores. Esta spec no modifica ese contrato.
+- **JSON de entrada/salida del solver:** contrato de datos del motor de solver, con sus validaciones
+  previas y posteriores. Esta spec no modifica ese contrato. *(La spec 005 lo **supersede** tras el
+  cambio de modelo: el curso se identifica por año+sección; las materias y horas del curso **se
+  derivan de su plan** (no de `Curso_Materia`); el **modo de aula fija es global** (booleano, por
+  defecto verdadero) con el aula del curso traducida a índice; la entrada **embebe los planes** de
+  estudio; y se añaden los años del docente. Ver `specs/005-nucleo-solver/spec.md` y
+  `docs/constitution.md` §7.)*
+- **Avisos posteriores (retirados por la spec 005, hasta nuevo aviso):** la spec 005 **elimina de
+  momento** los avisos de *horas no cubiertas* y de *capacidad de aula* de RF-3. **Más adelante
+  podrían reintroducirse** (capacidad de aula / horas no cubiertas) como avisos **post-solver**, fuera
+  del solver. No contradice a la 005: su invariante **D3 garantiza exactamente las horas** de cada
+  materia-curso, de modo que no hay «horas no cubiertas» que avisar.
+- **Número de estudiantes (opcional y sin regla, spec 005):** la spec 005 convierte el número de
+  estudiantes del curso en un dato **opcional sin regla de negocio**: el contrato lo **acepta y
+  conserva** y solo comprueba su **forma** (entero positivo) **cuando está presente** (V9); si falta,
+  la entrada **no se invalida**. Por eso un **curso sin estudiantes** ya **no** es «dominio
+  insuficiente» ni motivo de rechazo previo. *(La definición del dato y su validación están en
+  `specs/005-nucleo-solver/spec.md`.)*
 - **Configuración del solver y presets:** conjuntos de datos que se gestionan como archivos JSON y no se persisten en la base de datos.
 - **Horario generado:** resultado devuelto por el proceso de cálculo, mostrado en pantalla pero aún no guardado por el usuario.
 - **Horario guardado:** archivo JSON que el usuario decide crear a partir de un horario generado.
@@ -53,6 +70,13 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 - CUANDO el proceso de cálculo devuelva un resultado estructuralmente válido (RF-1), EL SISTEMA aplicará las validaciones posteriores del contrato: si no hay conflictos de solapamiento, lo presentará como horario generado y mostrará junto a él los avisos de horas no cubiertas, exceso de horas de profesor y exceso de capacidad de aula, conforme a los umbrales del contrato.
 - SI las validaciones posteriores detectan conflictos de solapamiento, ENTONCES EL SISTEMA informará que el cálculo falló y no presentará el resultado como horario válido.
 
+> **Nota de supersesión (spec 005, hasta nuevo aviso).** La spec 005 **retira de momento** los avisos de
+> **horas no cubiertas** y de **exceso de capacidad de aula**, y con ellos sus **umbrales del
+> contrato**; se conserva el aviso de **exceso de horas de profesor**. No hay contradicción: el solver
+> de la 005 garantiza **exactamente las horas** de cada materia-curso (D3) y la capacidad de aula está
+> fuera de alcance. **Más adelante podrían reintroducirse** la capacidad de aula y las horas no
+> cubiertas como avisos **post-solver** (ver Definiciones → «Avisos posteriores»).
+
 ### RF-4. Guardado de horarios y presets como archivos
 
 - CUANDO el usuario solicite guardar un horario generado, EL SISTEMA lo escribirá como archivo JSON en el destino que el usuario elija.
@@ -69,14 +93,14 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 
 ## Casos límite
 
-- Dominios vacíos o insuficientes para construir el JSON de entrada (sin materias, sin profesores o curso sin estudiantes) → validación previa y no se envía la petición (RF-1).
+- Dominios vacíos o insuficientes para construir el JSON de entrada (sin materias o sin profesores) → validación previa y no se envía la petición (RF-1). *(Un **curso sin estudiantes** ya no es dominio insuficiente: la spec 005 hace el número de estudiantes **opcional y sin regla**; ver Definiciones → «Número de estudiantes».)*
 - El proceso de cálculo devuelve que no hay solución → aviso al usuario y no se ofrece guardarlo (RF-1).
 - El proceso de cálculo devuelve un JSON de salida inválido o corrupto → aviso y no se presenta como resultado válido (RF-1).
 - El proceso de cálculo no responde en 60 segundos o pierde la comunicación tras la petición → aviso, la petición se da por abandonada y la aplicación sigue operando (RF-1).
 - El usuario edita datos enviados mientras el proceso de cálculo trabaja → el resultado se marca como de datos anteriores y requiere confirmación para guardarlo (RF-1).
 - El proceso de cálculo no está disponible al arrancar (no responde en 5 s) → aviso no bloqueante (RF-2).
 - El apagado del proceso de cálculo no responde en su plazo → se avisa y el cierre continúa (RF-2).
-- El resultado incluye avisos de validación posterior (horas, capacidad) → se muestran junto al horario generado (RF-3).
+- El resultado incluye avisos de validación posterior (exceso de horas de profesor) → se muestran junto al horario generado (RF-3). *(Los avisos de **horas no cubiertas** y de **capacidad de aula** quedan **retirados por la spec 005 hasta nuevo aviso**; ver Definiciones → «Avisos posteriores».)*
 - Fallo al guardar un horario o un preset como archivo (disco lleno, permisos) → aviso y reintento, sin perder el contenido (RF-4).
 - Cierre de la aplicación con un horario generado sin guardar o una generación en curso → aviso cancelable (RF-5).
 

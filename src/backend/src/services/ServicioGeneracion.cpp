@@ -28,14 +28,13 @@ QString huellaDatos(const DatosDominio& datos)
         canon += QStringLiteral("P:%1|%2;").arg(p.codigo, p.nombre);
     for (const CursoDTO& c : datos.cursos)
     {
-        canon += QStringLiteral("C:%1|%2|%3|%4|%5|%6;")
+        // Solo los campos persistidos del curso (RF-5): sin materias, sin plan ni
+        // numero de estudiantes (viven en la configuracion del solver).
+        canon += QStringLiteral("C:%1|%2|%3|%4|%5;")
                      .arg(c.id)
-                     .arg(c.nombre, c.turno)
-                     .arg(c.aulaFija)
-                     .arg(c.numEstudiantes)
-                     .arg(c.codigoPlan);
-        for (const CursoMateriaDTO& cm : c.materias)
-            canon += QStringLiteral("cm:%1,%2;").arg(cm.idMateria).arg(cm.horasSemanales);
+                     .arg(c.anio)
+                     .arg(c.seccion, c.turno)
+                     .arg(c.aula);
     }
     for (const TurnoDTO& t : datos.turnos)
     {

@@ -19,8 +19,7 @@ namespace
         return true;
     }
 
-    /// Migración v1 (baseline): esquema inicial de la base de datos.
-    bool aplicarV1(QSqlDatabase& db)
+    bool aplicar(QSqlDatabase& db)
     {
         QSqlQuery query(db);
 
@@ -106,14 +105,6 @@ namespace
             ")"
         )) return false;
 
-        return true;
-    }
-
-    /// Migración v2: dominios de curso, turnos y recesos (RF-2).
-    bool aplicarV2(QSqlDatabase& db)
-    {
-        QSqlQuery query(db);
-
         // ── Turnos ──
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Turnos ("
@@ -139,45 +130,27 @@ namespace
         )) return false;
 
         // ── Cursos ──
+        // Identidad (anio, seccion) unica en todo el sistema; `aula` es una
+        // referencia opcional a Aulas(id). No existe `Curso_Materia`: las materias
+        // del curso se derivan de su plan (spec 005).
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Cursos ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "nombre TEXT NOT NULL UNIQUE,"
-            "turno TEXT,"
-            "aula_fija INTEGER,"
-            "num_estudiantes INTEGER NOT NULL DEFAULT 0 CHECK(num_estudiantes >= 0),"
-            "codigo_plan TEXT REFERENCES PlanEstudio(codigo),"
+            "anio INTEGER NOT NULL CHECK(anio >= 1),"
+            "seccion TEXT NOT NULL CHECK(length(seccion) = 1),"
+            "turno TEXT REFERENCES Turnos(nombre),"
+            "aula INTEGER REFERENCES Aulas(id),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
-            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
-            ")"
-        )) return false;
-
-        // ── Curso-Materia (N:M con horas semanales) ──
-        if (!ejecutar(query,
-            "CREATE TABLE IF NOT EXISTS Curso_Materia ("
-            "id_Curso INTEGER NOT NULL REFERENCES Cursos(id),"
-            "id_Materia INTEGER NOT NULL REFERENCES Materias(id),"
-            "horas_semanales INTEGER NOT NULL DEFAULT 0 CHECK(horas_semanales >= 0),"
-            "PRIMARY KEY (id_Curso, id_Materia)"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "UNIQUE(anio, seccion)"
             ")"
         )) return false;
 
         return true;
-    }
-} // namespace
+}
+}
 
-bool Migracion::aplicarPaso(QSqlDatabase& db, int versionDestino)
+bool Migracion::aplicarPaso(QSqlDatabase& db)
 {
-    switch (versionDestino)
-    {
-        case 1:
-            return aplicarV1(db);
-
-        case 2:
-            return aplicarV2(db);
-
-        default:
-            qCritical() << "Migracion no implementada para la version" << versionDestino;
-            return false;
-    }
+    return aplicar(db);
 }

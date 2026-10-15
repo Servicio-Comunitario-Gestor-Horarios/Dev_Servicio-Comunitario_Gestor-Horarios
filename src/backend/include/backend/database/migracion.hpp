@@ -4,10 +4,10 @@
 
 namespace Migracion
 {
-    /// Aplica el paso de migración correspondiente a `versionDestino`.
+    /// Crea **de una sola vez** el catálogo completo del esquema único.
     ///
-    /// Retorna false si esa versión no está implementada o si alguna sentencia
-    /// falla. No gestiona transacciones: las abre y cierra
-    /// `VersionEsquema::aplicarHasta` una por cada versión.
-    bool aplicarPaso(QSqlDatabase& db, int versionDestino);
+    /// No hay pasos versionados ni parámetro de versión: la base se crea entera.
+    /// Retorna false si alguna sentencia falla. No gestiona transacciones: la
+    /// transacción la abre y cierra `VersionEsquema::crearEsquema`.
+    bool aplicarPaso(QSqlDatabase& db);
 }

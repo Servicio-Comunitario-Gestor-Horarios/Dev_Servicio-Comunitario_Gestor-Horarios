@@ -45,7 +45,7 @@ private:
     {
         QSqlDatabase db = abrirBase(ruta);
 
-        if (!VersionEsquema::aplicarHasta(db, VersionEsquema::VERSION_ESQUEMA_ACTUAL))
+        if (!VersionEsquema::crearEsquema(db))
             return; // no se crea la base; el test lo detectará al consultar
 
         {

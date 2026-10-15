@@ -32,14 +32,10 @@ private:
         turno.numSlots = 6;
         d.turnos = {turno};
 
-        CursoMateriaDTO cm; cm.idMateria = 1; cm.nombreMateria = QStringLiteral("Matemática");
-        cm.horasSemanales = 5;
         CursoDTO curso;
-        curso.id = 100; curso.nombre = QStringLiteral("1ro A");
+        curso.id = 100; curso.anio = 1; curso.seccion = QStringLiteral("A");
         curso.turno = QStringLiteral("manana");
-        curso.aulaFija = 10; curso.numEstudiantes = 20;
-        curso.codigoPlan = QStringLiteral("Ciencias");
-        curso.materias = {cm};
+        curso.aula = 10;
         d.cursos = {curso};
 
         FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(8, 0);
@@ -72,8 +68,17 @@ private:
 
     QJsonObject jsonValido() const
     {
-        return construirJsonEntrada(dominio(), parametros(),
-                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        QJsonObject j = construirJsonEntrada(dominio(), parametros(),
+                                             QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        // TODO(spec 005): las materias del curso se derivan de su plan. Hasta
+        // entonces, el test las aporta a mano para ejercitar el validador.
+        conCurso(j, [](QJsonObject& c) {
+            if (c["materias"].toArray().isEmpty())
+                c["materias"] = QJsonArray{QJsonObject{
+                    {QStringLiteral("materia_idx"), 0},
+                    {QStringLiteral("horas_semanales"), 5}}};
+        });
+        return j;
     }
 
     /// Devuelve el JSON con el primer curso modificado por `f`.
@@ -103,6 +108,9 @@ private:
     void ponerMateriaIdxCurso(QJsonObject& curso, int valor) const
     {
         QJsonArray materias = curso["materias"].toArray();
+        if (materias.isEmpty())
+            materias.append(QJsonObject{{QStringLiteral("materia_idx"), 0},
+                                        {QStringLiteral("horas_semanales"), 5}});
         QJsonObject m = materias[0].toObject();
         m["materia_idx"] = valor;
         materias[0] = m;

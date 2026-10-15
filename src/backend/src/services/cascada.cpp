@@ -6,7 +6,7 @@ namespace
     RelacionCascada relacion(const QString& dominio, const QString& tabla,
                              const QString& columna, const QString& columnaId,
                              const QString& etiqueta, const QString& descripcion,
-                             bool esDominio)
+                             bool esDominio, ModoAccion modo = ModoAccion::Eliminar)
     {
         RelacionCascada r;
         r.dominio = dominio;
@@ -16,8 +16,12 @@ namespace
         r.etiqueta = etiqueta;
         r.descripcion = descripcion;
         r.esDominio = esDominio;
+        r.modo = modo;
         return r;
     }
+
+    /// Etiqueta legible de un curso dependiente: «año sección».
+    const QString ETIQUETA_CURSO = QStringLiteral("anio || ' ' || seccion");
 } // namespace
 
 QVector<RelacionCascada> dependenciasDe(const QString& dominio)
@@ -32,10 +36,6 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("codigo_PlanEstudio"), QStringLiteral("rowid"),
             QStringLiteral("codigo_PlanEstudio"), QStringLiteral("Materia del plan"), false));
 
-        relaciones.append(relacion(
-            QStringLiteral("curso"), QStringLiteral("Cursos"),
-            QStringLiteral("codigo_plan"), QStringLiteral("id"),
-            QStringLiteral("nombre"), QStringLiteral("Curso del plan"), true));
     }
     else if (dominio == QStringLiteral("materia"))
     {
@@ -50,11 +50,6 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("id_Materia"), QStringLiteral("rowid"),
             QStringLiteral("id_Profesor"), QStringLiteral("Docente que imparte la materia"),
             false));
-
-        relaciones.append(relacion(
-            QStringLiteral("curso_materia"), QStringLiteral("Curso_Materia"),
-            QStringLiteral("id_Materia"), QStringLiteral("rowid"),
-            QStringLiteral("id_Curso"), QStringLiteral("Curso que incluye la materia"), false));
     }
     else if (dominio == QStringLiteral("profesor"))
     {
@@ -72,15 +67,13 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
     {
         relaciones.append(relacion(
             QStringLiteral("curso"), QStringLiteral("Cursos"),
-            QStringLiteral("aula_fija"), QStringLiteral("id"),
-            QStringLiteral("nombre"), QStringLiteral("Curso con aula fija"), true));
+            QStringLiteral("aula"), QStringLiteral("id"),
+            ETIQUETA_CURSO, QStringLiteral("Curso con esa aula"), false,
+            ModoAccion::AnularReferencia));
     }
     else if (dominio == QStringLiteral("curso"))
     {
-        relaciones.append(relacion(
-            QStringLiteral("curso_materia"), QStringLiteral("Curso_Materia"),
-            QStringLiteral("id_Curso"), QStringLiteral("rowid"),
-            QStringLiteral("id_Materia"), QStringLiteral("Materia del curso"), false));
+        // El curso ya no arrastra nada (se retiro Curso_Materia).
     }
     else if (dominio == QStringLiteral("turno"))
     {
@@ -92,7 +85,8 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
         relaciones.append(relacion(
             QStringLiteral("curso"), QStringLiteral("Cursos"),
             QStringLiteral("turno"), QStringLiteral("id"),
-            QStringLiteral("nombre"), QStringLiteral("Curso del turno"), true));
+            ETIQUETA_CURSO, QStringLiteral("Curso con ese turno"), false,
+            ModoAccion::AnularReferencia));
     }
 
     return relaciones;

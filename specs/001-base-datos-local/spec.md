@@ -2,6 +2,21 @@
 
 Estado: implementada
 
+> **Nota de supersesión (2026-10-15).** El modelo de **cursos** de esta spec (estructura persistida
+> `Cursos` y relación `Curso_Materia`) queda **superseded** por las specs **004** (aprobada) y **005**
+> (borrador) tras el cambio de modelo de dominio: el curso se persiste con `anio`/`seccion`/`turno`/
+> `aula` (sin nombre ni relación curso–materia) y la migración se colapsa a un único esquema. La spec
+> **004 anula además el versionado de esquema y la migración por versión de esta spec**: el arranque
+> ya **no** decide «versión anterior → migrar» ni aplica pasos versionados, y un esquema que no
+> coincida con el **esquema esperado** (catálogo de tablas/columnas y marca de versión) es un **fallo
+> de apertura** que no migra ni borra datos. Por tanto, aquí ya **no rigen**: la parte de **RF-1** que
+> migra una base «de versión anterior» (aplicar migraciones, respaldo previo a la migración, estado
+> «migrando») ni la noción de «versión de esquema anterior». El resto de esta spec sigue vigente: el
+> arranque de una base **inexistente** (creación), el **respaldo obligatorio** para operaciones
+> destructivas, el **diálogo de fallo de apertura** (RF-4), la **instancia única** (RF-5), la
+> **cascada con confirmación** (RF-2) y los **cambios pendientes** (RF-3, RF-6). Ver
+> `specs/004-persistencia-campos-curso/spec.md` y `specs/005-nucleo-solver/spec.md`.
+
 ## Contexto y objetivo
 
 Hasta ahora la aplicación no tiene una conexión operativa entre la interfaz y la base de datos: los datos que ve el usuario no se persistieron ni se recuperaron de forma fiable. Esta spec establece que el lado cliente (el programa salvo el proceso de cálculo) es el dueño de la base de datos: la abre, la migra, la lee y la escribe.

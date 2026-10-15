@@ -209,28 +209,26 @@ Resultado<QVector<CursoDTO>> NucleoDatos::listarCursos() const {
     return m_cursos.listarCursos();
 }
 
-Resultado<CursoDTO> NucleoDatos::crearCurso(const QString& nombre,
-                                            const QString& turno, int aulaFija,
-                                            int numEstudiantes,
-                                            const QString& codigoPlan) {
+Resultado<CursoDTO> NucleoDatos::crearCurso(int anio, const QString& seccion,
+                                            const QString& turno, int aula) {
+    const QString identidad = QStringLiteral("%1-%2").arg(anio).arg(normalizarSeccion(seccion));
     return conPendiente(
-        m_pendientes, QStringLiteral("curso"), nombre, TipoOperacion::Alta,
-        QStringLiteral("Pendiente de guardar: curso %1").arg(nombre),
-        [this, nombre, turno, aulaFija, numEstudiantes, codigoPlan]() {
-            return m_cursos.crearCurso(nombre, turno, aulaFija, numEstudiantes, codigoPlan);
+        m_pendientes, QStringLiteral("curso"), identidad, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: curso %1")
+            .arg(nombreCurso(anio, normalizarSeccion(seccion))),
+        [this, anio, seccion, turno, aula]() {
+            return m_cursos.crearCurso(anio, seccion, turno, aula);
         });
 }
 
-Resultado<CursoDTO> NucleoDatos::actualizarCurso(int id, const QString& nombre,
-                                                 const QString& turno, int aulaFija,
-                                                 int numEstudiantes,
-                                                 const QString& codigoPlan) {
+Resultado<CursoDTO> NucleoDatos::actualizarCurso(int id, int anio, const QString& seccion,
+                                                 const QString& turno, int aula) {
     return conPendiente(
         m_pendientes, QStringLiteral("curso"), claveDe(id), TipoOperacion::Modificacion,
-        QStringLiteral("Pendiente de guardar: curso %1").arg(nombre),
-        [this, id, nombre, turno, aulaFija, numEstudiantes, codigoPlan]() {
-            return m_cursos.actualizarCurso(id, nombre, turno, aulaFija, numEstudiantes,
-                                            codigoPlan);
+        QStringLiteral("Pendiente de guardar: curso %1")
+            .arg(nombreCurso(anio, normalizarSeccion(seccion))),
+        [this, id, anio, seccion, turno, aula]() {
+            return m_cursos.actualizarCurso(id, anio, seccion, turno, aula);
         });
 }
 
@@ -239,29 +237,6 @@ bool NucleoDatos::eliminarCurso(int id) {
         m_pendientes, QStringLiteral("curso"), claveDe(id), TipoOperacion::Baja,
         QStringLiteral("Pendiente de eliminar: curso %1").arg(id),
         [this, id]() { return m_cursos.eliminarCurso(id); });
-}
-
-Resultado<CursoMateriaDTO> NucleoDatos::asignarMateriaACurso(int idCurso, int idMateria,
-                                                             int horasSemanales) {
-    const QString clave = QStringLiteral("%1-%2").arg(idCurso).arg(idMateria);
-    return conPendiente(
-        m_pendientes, QStringLiteral("curso_materia"), clave, TipoOperacion::Alta,
-        QStringLiteral("Pendiente de guardar: materia %1 en el curso %2")
-            .arg(idMateria)
-            .arg(idCurso),
-        [this, idCurso, idMateria, horasSemanales]() {
-            return m_cursos.asignarMateria(idCurso, idMateria, horasSemanales);
-        });
-}
-
-bool NucleoDatos::quitarMateriaDeCurso(int idCurso, int idMateria) {
-    const QString clave = QStringLiteral("%1-%2").arg(idCurso).arg(idMateria);
-    return conPendienteBool(
-        m_pendientes, QStringLiteral("curso_materia"), clave, TipoOperacion::Baja,
-        QStringLiteral("Pendiente de eliminar: materia %1 del curso %2")
-            .arg(idMateria)
-            .arg(idCurso),
-        [this, idCurso, idMateria]() { return m_cursos.quitarMateria(idCurso, idMateria); });
 }
 
 // ─── Turnos y recesos ──────────────────────────────────────────────────────
@@ -394,6 +369,20 @@ QVector<Dependencia> NucleoDatos::dependientesDe(const QString& dominio,
 bool NucleoDatos::borrarRecursivo(const QString& dominio, const QString& id) {
     const QVector<RelacionCascada> relaciones = dependenciasDe(dominio);
     for (const RelacionCascada& rel : relaciones) {
+        if (rel.modo == ModoAccion::AnularReferencia) {
+            // Deja la referencia en NULL; el dependiente no se borra (RF-1, RF-5).
+            QSqlQuery anular(m_db);
+            anular.prepare(QStringLiteral("UPDATE %1 SET %2 = NULL WHERE %2 = :padre")
+                               .arg(rel.tabla, rel.columna));
+            anular.bindValue(":padre", id);
+            if (!anular.exec()) {
+                qCritical() << "Error al anular la referencia de" << dominio << ":"
+                            << anular.lastError().text();
+                return false;
+            }
+            continue;
+        }
+
         if (rel.esDominio) {
             // Recoge los ids de los hijos y los borra (con sus dependencias) antes
             // de borrar el padre, respetando las claves foráneas.

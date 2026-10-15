@@ -94,21 +94,15 @@ bool DatabaseManager::runMigrations(bool existia)
     switch (decision)
     {
         case VersionEsquema::EstadoApertura::Crear:
-        case VersionEsquema::EstadoApertura::Migrar:
-            return VersionEsquema::aplicarHasta(m_db, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+            return VersionEsquema::crearEsquema(m_db);
 
         case VersionEsquema::EstadoApertura::Abrir:
-            return true;
+            // La version coincide; el catalogo debe corresponder al esquema unico.
+            return VersionEsquema::esquemaEsperado(m_db);
 
-        case VersionEsquema::EstadoApertura::FalloAusente:
-            qCritical() << "La base de datos existe pero su version de esquema esta"
-                           " ausente o no es interpretable (no se migra).";
-            return false;
-
-        case VersionEsquema::EstadoApertura::FalloPosterior:
-            qCritical() << "La base de datos tiene una version de esquema posterior"
-                           " a la esperada:"
-                        << versionArchivo << ">" << VersionEsquema::VERSION_ESQUEMA_ACTUAL;
+        case VersionEsquema::EstadoApertura::FalloEsquema:
+            qCritical() << "El esquema de la base no corresponde al esperado (version"
+                        << versionArchivo << "); no se migra.";
             return false;
     }
 
