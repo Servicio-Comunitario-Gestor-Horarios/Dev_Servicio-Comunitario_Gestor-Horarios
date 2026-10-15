@@ -148,9 +148,8 @@ private slots:
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
 
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         const auto dependencias =
             m_nucleo->dependientesDe(QStringLiteral("plan"), QStringLiteral("IS-2026"));
@@ -171,9 +170,8 @@ private slots:
         QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
         QVERIFY(m_profesor->asignarMateria("P1", materia.valor.id));
 
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         const auto dependencias = m_nucleo->dependientesDe(
             QStringLiteral("materia"), QString::number(materia.valor.id));
@@ -187,7 +185,7 @@ private slots:
     {
         auto aula = m_nucleo->crearAula("Aula 101", 30, "Edificio A");
         QVERIFY(aula.ok);
-        auto curso = m_nucleo->crearCurso("1º A", QString(), aula.valor.id, 20);
+        auto curso = m_nucleo->crearCurso(1, "A", QString(), aula.valor.id);
         QVERIFY(curso.ok);
 
         const auto dependencias = m_nucleo->dependientesDe(
@@ -200,9 +198,8 @@ private slots:
     {
         auto materia = m_nucleo->crearMateria("Química");
         QVERIFY(materia.ok);
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20);
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 2).ok);
 
         const auto dependencias = m_nucleo->dependientesDe(
             QStringLiteral("curso"), QString::number(curso.valor.id));
@@ -255,9 +252,8 @@ private slots:
         auto materia = m_nucleo->crearMateria("Matemática");
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         const int planesAntes = contar(QStringLiteral("PlanEstudio"));
         const int planMateriaAntes = contar(QStringLiteral("PlanEstudio_Materia"));
@@ -286,9 +282,8 @@ private slots:
         auto materia = m_nucleo->crearMateria("Matemática");
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("plan"), QStringLiteral("IS-2026")));
 
@@ -310,9 +305,8 @@ private slots:
         QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
         QVERIFY(m_profesor->asignarMateria("P1", materia.valor.id));
 
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("materia"),
                                              QString::number(materia.valor.id)));
@@ -331,9 +325,8 @@ private slots:
     {
         auto materia = m_nucleo->crearMateria("Química");
         QVERIFY(materia.ok);
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20);
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 2).ok);
 
         QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("curso"),
                                              QString::number(curso.valor.id)));
@@ -360,9 +353,8 @@ private slots:
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
 
-        auto curso = m_nucleo->crearCurso("1º A", QString(), -1, 20, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         // Falla simulada: al borrar el plan (después de borrar sus dependientes)
         // el trigger aborta la transacción entera.

@@ -1,5 +1,7 @@
 #include "backend/services/ConstructorEntradaSolver.hpp"
 
+#include "backend/services/ServicioCursos.hpp"
+
 #include <QJsonArray>
 #include <QTime>
 #include <QVector>
@@ -158,20 +160,15 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
     // Cursos.
     for (const CursoDTO& c : datos.cursos)
     {
+        // TODO(spec 005): el nombre, el plan, el numero de estudiantes, el modo de
+        // aula fija y las materias (derivadas del plan) son de la configuracion del
+        // solver. Aqui solo se traslada lo que hoy persiste el dominio.
         CursoSolverConfig curso;
-        curso.nombre          = c.nombre;
+        curso.nombre          = nombreCurso(c.anio, c.seccion);
         curso.turno           = c.turno;
-        curso.aula_fija       = indiceAula(datos.aulas, c.aulaFija);
-        curso.num_estudiantes = c.numEstudiantes;
-        curso.plan            = c.codigoPlan;
-
-        for (const CursoMateriaDTO& cm : c.materias)
-        {
-            MateriaCurso mc;
-            mc.materiaIDx      = indiceMateria(datos.materias, cm.idMateria);
-            mc.horasSemanales  = cm.horasSemanales;
-            curso.materias.append(mc);
-        }
+        curso.aula_fija       = indiceAula(datos.aulas, c.aula);
+        curso.num_estudiantes = 0;
+        curso.plan            = QString();
         salida.cursos.append(curso);
     }
 

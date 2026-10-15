@@ -72,18 +72,11 @@ public:
     // ─── Cursos ───────────────────────────────────────────────────────────
 
     Resultado<QVector<CursoDTO>> listarCursos() const;
-    Resultado<CursoDTO> crearCurso(const QString& nombre,
-                                   const QString& turno = QString(),
-                                   int aulaFija = -1, int numEstudiantes = 0,
-                                   const QString& codigoPlan = QString());
-    Resultado<CursoDTO> actualizarCurso(int id, const QString& nombre,
-                                        const QString& turno = QString(),
-                                        int aulaFija = -1, int numEstudiantes = 0,
-                                        const QString& codigoPlan = QString());
+    Resultado<CursoDTO> crearCurso(int anio, const QString& seccion,
+                                   const QString& turno = QString(), int aula = -1);
+    Resultado<CursoDTO> actualizarCurso(int id, int anio, const QString& seccion,
+                                        const QString& turno = QString(), int aula = -1);
     bool eliminarCurso(int id);
-    Resultado<CursoMateriaDTO> asignarMateriaACurso(int idCurso, int idMateria,
-                                                    int horasSemanales);
-    bool quitarMateriaDeCurso(int idCurso, int idMateria);
 
     // ─── Turnos y recesos ─────────────────────────────────────────────────
 

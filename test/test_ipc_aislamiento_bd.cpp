@@ -39,14 +39,10 @@ private:
         turno.numSlots = 6;
         d.turnos = {turno};
 
-        CursoMateriaDTO cm; cm.idMateria = 1; cm.nombreMateria = QStringLiteral("Matemática");
-        cm.horasSemanales = 2;
         CursoDTO curso;
-        curso.id = 100; curso.nombre = QStringLiteral("1ro A");
+        curso.id = 100; curso.anio = 1; curso.seccion = QStringLiteral("A");
         curso.turno = QStringLiteral("manana");
-        curso.aulaFija = 10; curso.numEstudiantes = 20;
-        curso.codigoPlan = QStringLiteral("Ciencias");
-        curso.materias = {cm};
+        curso.aula = 10;
         d.cursos = {curso};
 
         MateriaAsignadaDTO asig; asig.id = 1; asig.nombre = QStringLiteral("Matemática");

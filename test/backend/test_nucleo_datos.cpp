@@ -72,7 +72,7 @@ private slots:
                  VersionEsquema::VERSION_ESQUEMA_ACTUAL);
 
         QVERIFY(tablaExiste(QStringLiteral("Cursos")));
-        QVERIFY(tablaExiste(QStringLiteral("Curso_Materia")));
+        QVERIFY(!tablaExiste(QStringLiteral("Curso_Materia"))); // retirada (RF-5)
         QVERIFY(tablaExiste(QStringLiteral("Turnos")));
         QVERIFY(tablaExiste(QStringLiteral("Recesos")));
     }
@@ -169,32 +169,26 @@ private slots:
 
     void cursos_altaModificacionBaja()
     {
-        QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería de Sistemas").ok);
         QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
-        auto materia = m_nucleo->crearMateria("Programación");
-        QVERIFY(materia.ok);
+        auto aula = m_nucleo->crearAula("Aula 1", 30);
+        QVERIFY(aula.ok);
 
-        auto creado = m_nucleo->crearCurso("1º A", "Mañana", -1, 30, "IS-2026");
+        auto creado = m_nucleo->crearCurso(1, "A", "Mañana", aula.valor.id);
         QVERIFY(creado.ok);
-        QCOMPARE(creado.valor.nombre, QStringLiteral("1º A"));
+        QCOMPARE(creado.valor.anio, 1);
+        QCOMPARE(creado.valor.seccion, QStringLiteral("A"));
         QCOMPARE(creado.valor.turno, QStringLiteral("Mañana"));
-        QCOMPARE(creado.valor.numEstudiantes, 30);
-        QCOMPARE(creado.valor.codigoPlan, QStringLiteral("IS-2026"));
-
-        auto asignada = m_nucleo->asignarMateriaACurso(creado.valor.id, materia.valor.id, 4);
-        QVERIFY(asignada.ok);
-        QCOMPARE(asignada.valor.horasSemanales, 4);
+        QCOMPARE(creado.valor.aula, aula.valor.id);
 
         auto lista = m_nucleo->listarCursos().valor;
         QCOMPARE(lista.size(), 1);
-        QCOMPARE(lista.first().materias.size(), 1);
-        QCOMPARE(lista.first().materias.first().idMateria, materia.valor.id);
+        QCOMPARE(lista.first().anio, 1);
+        QCOMPARE(lista.first().seccion, QStringLiteral("A"));
 
         auto actualizado =
-            m_nucleo->actualizarCurso(creado.valor.id, "1º B", "Mañana", -1, 35, "IS-2026");
+            m_nucleo->actualizarCurso(creado.valor.id, 1, "B", "Mañana", aula.valor.id);
         QVERIFY(actualizado.ok);
-        QCOMPARE(actualizado.valor.nombre, QStringLiteral("1º B"));
-        QCOMPARE(actualizado.valor.numEstudiantes, 35);
+        QCOMPARE(actualizado.valor.seccion, QStringLiteral("B"));
 
         QVERIFY(m_nucleo->eliminarCurso(creado.valor.id));
         QVERIFY(m_nucleo->listarCursos().valor.isEmpty());
@@ -241,9 +235,8 @@ private slots:
         QVERIFY(m_nucleo->crearAula("Aula 1", 30, "Edificio A").ok);
         auto materia = m_nucleo->crearMateria("Matemática");
         QVERIFY(materia.ok);
-        auto curso = m_nucleo->crearCurso("1º A", "Mañana", -1, 25, "IS-2026");
+        auto curso = m_nucleo->crearCurso(1, "A", "Mañana", -1);
         QVERIFY(curso.ok);
-        QVERIFY(m_nucleo->asignarMateriaACurso(curso.valor.id, materia.valor.id, 3).ok);
 
         // Cerrar y reabrir la base: todo debe seguir ahí.
         cerrarBase();
@@ -258,10 +251,8 @@ private slots:
         QCOMPARE(m_nucleo->listarTurnos().valor.first().recesos.size(), 1);
 
         auto cursos = m_nucleo->listarCursos().valor;
-        QCOMPARE(cursos.first().nombre, QStringLiteral("1º A"));
-        QCOMPARE(cursos.first().codigoPlan, QStringLiteral("IS-2026"));
-        QCOMPARE(cursos.first().materias.size(), 1);
-        QCOMPARE(cursos.first().materias.first().horasSemanales, 3);
+        QCOMPARE(cursos.first().anio, 1);
+        QCOMPARE(cursos.first().seccion, QStringLiteral("A"));
 
         // Una baja también persiste tras reapertura.
         QVERIFY(m_nucleo->eliminarDocente("P1"));

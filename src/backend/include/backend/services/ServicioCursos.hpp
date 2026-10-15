@@ -81,62 +81,34 @@ inline bool cursoAntes(int anioA, const QString& secA, int anioB, const QString&
     return nombreAntes(secA, secB);
 }
 
-/// Materia asignada a un curso, con sus horas semanales.
-struct CursoMateriaDTO {
-    int idMateria = 0;
-    QString nombreMateria;
-    int horasSemanales = 0;
-};
-
 /// Representación persistente de un curso.
 struct CursoDTO {
-    int id = -1;
-    QString nombre;
+    int     id      = -1;
+    int     anio    = 0;
+    QString seccion;
     QString turno;
-    int aulaFija = -1;          ///< id del aula fija (o -1 si no tiene)
-    int numEstudiantes = 0;
-    QString codigoPlan;         ///< codigo del PlanEstudio asociado (o vacío)
-
-    QVector<CursoMateriaDTO> materias;
+    int     aula    = -1;   ///< id del aula referenciada (o -1 si no tiene)
 };
 
-/// Servicio CRUD sobre la tabla Cursos y la relación Curso_Materia (RF-2).
+/// Servicio CRUD sobre la tabla Cursos (RF-2).
 class ServicioCursos {
 public:
     explicit ServicioCursos(QSqlDatabase& db);
 
-    // ─── CRUD ─────────────────────────────────────────────────────────────
-
-    Resultado<CursoDTO> crearCurso(const QString& nombre,
-                                   const QString& turno = QString(),
-                                   int aulaFija = -1,
-                                   int numEstudiantes = 0,
-                                   const QString& codigoPlan = QString());
+    Resultado<CursoDTO> crearCurso(int anio, const QString& seccion,
+                                   const QString& turno = QString(), int aula = -1);
 
     Resultado<CursoDTO> obtenerCurso(int id) const;
 
     Resultado<QVector<CursoDTO>> listarCursos() const;
 
-    Resultado<CursoDTO> actualizarCurso(int id,
-                                        const QString& nombre,
-                                        const QString& turno = QString(),
-                                        int aulaFija = -1,
-                                        int numEstudiantes = 0,
-                                        const QString& codigoPlan = QString());
+    Resultado<CursoDTO> actualizarCurso(int id, int anio, const QString& seccion,
+                                        const QString& turno = QString(), int aula = -1);
 
     bool eliminarCurso(int id);
-
-    // ─── Materias del curso (N:M) ─────────────────────────────────────────
-
-    Resultado<CursoMateriaDTO> asignarMateria(int idCurso, int idMateria,
-                                              int horasSemanales);
-
-    bool quitarMateria(int idCurso, int idMateria);
 
 private:
     QSqlDatabase& m_db;
 
-    bool validarCurso(const QString& nombre, int numEstudiantes, QString& error) const;
     CursoDTO mapearARecord(const QSqlRecord& record) const;
-    bool cargarMaterias(CursoDTO& dto) const;
 };
