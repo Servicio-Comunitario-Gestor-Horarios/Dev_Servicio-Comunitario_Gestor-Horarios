@@ -20,6 +20,12 @@ struct Dependencia {
     QString descripcion;  ///< texto en español para el diálogo de confirmación
 };
 
+/// Qué se hace con las filas dependientes al eliminar el padre.
+enum class ModoAccion {
+    Eliminar,          ///< La fila dependiente se borra.
+    AnularReferencia   ///< La referencia se anula (columna = NULL); la fila permanece.
+};
+
 /// Relación directa de un dominio padre con las filas que dependen de él.
 struct RelacionCascada {
     QString dominio;        ///< dominio lógico del dependiente
@@ -29,6 +35,7 @@ struct RelacionCascada {
     QString etiqueta;       ///< columna de texto para describir el dependiente (opcional)
     QString descripcion;    ///< descripción base en español
     bool esDominio = false; ///< el dependiente es a su vez un dominio con cascada propia
+    ModoAccion modo = ModoAccion::Eliminar; ///< borrar la fila o anular la referencia
 };
 
 /// Tabla y columna clave de un dominio raíz.

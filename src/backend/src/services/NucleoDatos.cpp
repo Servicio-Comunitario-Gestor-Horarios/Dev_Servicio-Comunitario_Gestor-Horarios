@@ -369,6 +369,20 @@ QVector<Dependencia> NucleoDatos::dependientesDe(const QString& dominio,
 bool NucleoDatos::borrarRecursivo(const QString& dominio, const QString& id) {
     const QVector<RelacionCascada> relaciones = dependenciasDe(dominio);
     for (const RelacionCascada& rel : relaciones) {
+        if (rel.modo == ModoAccion::AnularReferencia) {
+            // Deja la referencia en NULL; el dependiente no se borra (RF-1, RF-5).
+            QSqlQuery anular(m_db);
+            anular.prepare(QStringLiteral("UPDATE %1 SET %2 = NULL WHERE %2 = :padre")
+                               .arg(rel.tabla, rel.columna));
+            anular.bindValue(":padre", id);
+            if (!anular.exec()) {
+                qCritical() << "Error al anular la referencia de" << dominio << ":"
+                            << anular.lastError().text();
+                return false;
+            }
+            continue;
+        }
+
         if (rel.esDominio) {
             // Recoge los ids de los hijos y los borra (con sus dependencias) antes
             // de borrar el padre, respetando las claves foráneas.
