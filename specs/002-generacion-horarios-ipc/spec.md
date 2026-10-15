@@ -22,7 +22,13 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 ## Definiciones
 
 - **Lado cliente:** todo el programa salvo el proceso de cálculo.
-- **JSON de entrada/salida del solver:** contrato de datos del motor de solver, con sus validaciones previas y posteriores. Esta spec no modifica ese contrato.
+- **JSON de entrada/salida del solver:** contrato de datos del motor de solver, con sus validaciones
+  previas y posteriores. Esta spec no modifica ese contrato. *(La spec 005 lo **supersede** tras el
+  cambio de modelo: el curso se identifica por año+sección; las materias y horas del curso **se
+  derivan de su plan** (no de `Curso_Materia`); el **modo de aula fija es global** (booleano, por
+  defecto verdadero) con el aula del curso traducida a índice; la entrada **embebe los planes** de
+  estudio; y se añaden los años del docente. Ver `specs/005-nucleo-solver/spec.md` y
+  `docs/constitution.md` §7.)*
 - **Configuración del solver y presets:** conjuntos de datos que se gestionan como archivos JSON y no se persisten en la base de datos.
 - **Horario generado:** resultado devuelto por el proceso de cálculo, mostrado en pantalla pero aún no guardado por el usuario.
 - **Horario guardado:** archivo JSON que el usuario decide crear a partir de un horario generado.

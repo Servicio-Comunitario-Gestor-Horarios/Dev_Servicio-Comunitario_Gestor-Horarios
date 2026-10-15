@@ -4,12 +4,12 @@
 
 ## Fase actual
 
-- **Fase:** spec 001 **implementada** (T1–T8 completas) — pendiente arreglar el ordenamiento de
-  `ServicioProfesor`; siguiente spec 002
-- **Fecha:** 2026-10-09
-- **Rama:** `sdd/001-base-datos-local`
-- **Specs en curso:** `specs/001-base-datos-local` (implementada), `specs/002-generacion-horarios-ipc` (pendiente)
-- **Siguiente paso:** implementar `specs/002-generacion-horarios-ipc/tasks.md` (depende de 001)
+- **Fase:** spec **004 re-aprobada** (modelo de curso nuevo; spec completa de **BD + servicios**) — plan + tareas **regenerados** (**9 tareas**); pendiente aprobar plan/tareas e implementar
+- **Fecha:** 2026-10-15
+- **Rama:** `develop`
+- **Specs en curso:** `specs/004-persistencia-campos-curso` (aprobada; 9 tareas), `specs/005-nucleo-solver` (**borrador**: se rehace por el cambio de modelo; pendiente re-aprobación)
+- **Siguiente paso:** aprobar plan/tareas de 004 e implementar T1…T9 (T2–T6 son un refactor acoplado). La **construcción de la entrada del solver** se movió a la **spec 005** (RF-13).
+- **Modo de implementación (004/005):** el **agente escribe los tests**; el **usuario escribe el código de producción**; el agente revisa. Tests primero (rojo→verde).
 
 ## Specs activas
 
@@ -18,6 +18,10 @@
 | 001-base-datos-local | aprobada | **implementada** (T1–T8) |
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
+| 004-persistencia-campos-curso | aprobada | spec aprobada (QA ok); plan/tareas pendientes |
+| 005-nucleo-solver | aprobada | spec aprobada; plan propuesto (sin el puente D-10) |
+
+> Épico **solver** (la numeración sigue el orden de trabajo): **004 (persistencia de campos) → 005 (núcleo del solver) → 006 (turnos automáticos) → 007 (generación parcial)**. 006 y 007 reservadas, sin crear.
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
 > (superaba las 10 tareas) y se renumeró desde 001.
@@ -48,14 +52,22 @@
 - **Cierre de los huecos de la 001 (spec 003, 2026-10-10):** implementados T1–T5. T1: `Respaldo::descartarBaseYCrearNueva` (respaldo obligatorio antes de descartar la base) + `ResultadoDescarte`. T2: los `listar*` de los seis servicios de dominio y de `NucleoDatos` devuelven `Resultado<QVector<Dto>>` (error ≠ vacío), con call sites de tests actualizados. T3: `AperturaBaseDatos::Opciones::progreso` (callback por paso de migración). T4: el arranque conecta `InstanciaUnica::activarSolicitada()` al enfoque de `MainWindow`. T5: mensajes de respaldo/apertura en español con causa y acciones (sin texto crudo de Qt). Contrato actualizado en `docs/interfaz-frontend.md` §2.1/§2.3/§2.4/§2.6. Verificado en Docker: 30/33 (mismos 3 rojos ajenos).
 - **Ordenamiento con acentos (2026-10-10):** los `listar*` de dominio ordenan con `QCollator` (`QLocale(es_ES)`, `CaseInsensitive`) vía el helper `backend/services/ordenacion.hpp`, en vez del orden binario de SQLite o `QString::localeAwareCompare` (que con locale POSIX degradaba a codepoint: «Á» tras «Z»). Sin dependencia nueva: `QCollator` ∈ Qt6Core (ya enlazado por el ejecutable; `ldd` sin cambios). `test_servicio_profesor` en verde, con el nuevo caso `listarProfesores_ordenConAcentosYMayusculas`.
 - **Consola de datos (2026-10-10):** módulo `src/consola` → ejecutable `gestor-horarios-consola` (herramienta de desarrollo, `option(BUILD_CONSOLA)`, se compila con `BUILD_BACKEND=ON`). Reutiliza el contrato del frontend (`ContextoBaseDatos` + `NucleoDatos`); comandos `docentes/aulas/materias/planes/cursos/turnos`, `dependientes`, `cascada`, `pendientes`, `reintentar`, `estado`; modo REPL y `--cmd` no interactivo; `--db <ruta>`. Documentada en `docs/guias/consola-datos.md`. Sin dependencia nueva (solo enlaza `datos`).
+- **Épico solver — comportamiento definido (2026-10-13):** se añadió la **§7 "El solver y su contrato"** a `docs/constitution.md` (y se enmendó: §7.2 con **peso por par** para suplentes; §7.4 con **V14** y **V15**). Decisiones de modelado aprobadas:
+  - **Horas de aula del profesor = tope + exceso penalizado** (`PESO_HORAS`). Minimizar "déficit" es **inerte** (Σ déficit constante, porque las horas totales asignadas las fijan las horas de las materias-curso); por eso no se declara INFEASIBLE por horas.
+  - **Nuevas invariantes duras:** un docente por materia-curso (D1/D2) y enlace clase↔aula (D9). **D12 eliminada** (redundante con D8 aula no solapada).
+  - **Suplente = preferencia en el objetivo** (S2): titular antes que suplente; entre suplentes, mayor `peso` del par (docente, materia-suplente). Constantes del motor: `PESO_HORAS` y `coste_máximo_de_suplente`; el `peso` por par es dato de entrada.
+  - **Contrato de configuración:** los cursos se identifican por **`anio`+`seccion`** (el nombre se **deriva**: `"1ro A"`, ordinal `{1:ro,2:do,3:ro,resto:to}`) y `aula_fija` pasa a **booleano + `aula` (índice)**; los docentes ganan **`anios`** (vacío = cualquiera). La BD `Cursos` sumará `anio`/`seccion` (**spec 004**). Validaciones **V13/V14/V15**.
+  - La spec **005** supersede el contrato JSON de 002 (anotado en `specs/002-generacion-horarios-ipc/spec.md`). `docs/solver/` queda como **referencia histórica**.
+  - **Años del docente: viven en el preset/config, NO en la BD** (no hay columna nueva en `docentes`). **No hay presets antiguos** → sin compatibilidad hacia atrás. La persistencia (spec 004) solo añade `anio`/`seccion` a `Cursos` y expone los campos en el dominio/DTO (el mapeo DTO→JSON es de la spec 005).
+  - **Modo didáctico:** en el solver, **el usuario implementa**; el agente explica comandos/lógica y revisa. NO usar el subagente @implementer aquí.
+  - Tests del solver que fallan (hoy 39/41 en Docker): los deja verdes la spec **005**.
 
 ## Siguiente paso
 
-1. **Deuda técnica pendiente (ajena a las specs 001–003):** los 2 tests del solver
-   (`test_solver_horarios`, `test_solver_benchmark`).
-2. **Cableado de `ServicioGeneracion` con el cliente IPC real** (adaptador `PuertoSolver`) en
-   `src/app`/`src/frontend`: la lógica está lista y testeada; el consumo UI↔IPC lo hace el equipo de
-   frontend según `docs/interfaz-frontend.md` §3.
+1. **Spec 004 (persistencia de campos de curso) — aprobada:** redactar `plan.md` + `tasks.md` → implementación (didáctica: el usuario implementa).
+2. **Orden del épico solver:** 004 (persistencia) → 005 (núcleo) → 006 (turnos automáticos) → 007 (generación parcial).
+3. **Pendiente en 005 (núcleo solver, aprobada):** al redactar su `plan.md`/`tasks.md`, @planner resuelve las 4 precisiones del reviewer ("franjas útiles" de V14, `peso` negativo → chequeo de rango, nota de 002, "conserva V1–V12" vs V8). **Los huecos de numeración ya se resolvieron** (004 = RF-1..5; 005 = RF-1..12; plan sin huecos). Su plan ya está propuesto y **sin el puente D-10**.
+4. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`) en `src/app`: la lógica está lista; el consumo UI↔IPC lo hace el equipo de frontend (`docs/interfaz-frontend.md` §3).
 
 ## Progreso de implementación
 
