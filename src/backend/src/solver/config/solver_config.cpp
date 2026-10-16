@@ -357,7 +357,7 @@ const TurnoConfig* buscarTurno(const SolverConfig& c, const QString& nombre)
     return nullptr;
 }
 
-/// V1. Estructura: el JSON trae todas las secciones requeridas.
+/// V1. Estructura: el JSON trae todas las secciones requeridas y una version reconocida (RF-10).
 QString validarEstructura(const QJsonObject& obj)
 {
     const QStringList requeridas = {QStringLiteral("version"),      QStringLiteral("dimensiones"),
@@ -369,6 +369,12 @@ QString validarEstructura(const QJsonObject& obj)
         if (!obj.contains(clave))
             return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
 
+    // RF-10: esta spec produce y acepta la version `1.0`; otra (no reconocida) se rechaza con
+    // causa (1) entrada invalida. La version ausente ya se rechaza arriba (seccion requerida).
+    const QString version = obj.value(QLatin1String("version")).toString();
+    if (version != QLatin1String("1.0"))
+        return QStringLiteral("V1: version de configuracion no reconocida ('%1'); se espera '1.0'.")
+            .arg(version);
     return {};
 }
 

@@ -161,6 +161,38 @@ private slots:
         QVERIFY(!config.valor.toJson().contains(QStringLiteral("nombre")));
     }
 
+    /// RF-10: la espec produce y acepta la version `1.0`.
+    void version_1_0_pasa()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("version")] = QStringLiteral("1.0");
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+    }
+
+    /// RF-10: version ausente => rechazo (entrada invalida).
+    void versionAusente_falla()
+    {
+        QJsonObject o = configValida();
+        o.remove(QStringLiteral("version"));
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY(!config.ok);
+        QVERIFY(!config.mensajeError.isEmpty());
+    }
+
+    /// RF-10: version no reconocida (posterior) => rechazo indicando la causa.
+    void versionNoReconocida_falla()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("version")] = QStringLiteral("9.9");
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(!config.ok, "una version no reconocida debe rechazarse (RF-10)");
+        QVERIFY(config.mensajeError.contains(QStringLiteral("1.0")));
+    }
+
     void guardarCarpetaInexistente_error()
     {
         QTemporaryDir dir;
