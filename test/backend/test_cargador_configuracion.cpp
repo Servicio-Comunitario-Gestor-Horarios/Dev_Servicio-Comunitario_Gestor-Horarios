@@ -19,7 +19,8 @@ private:
     QJsonObject configValida() const
     {
         QJsonObject o;
-        o["version"] = QStringLiteral("1.0");
+        o["version"]   = QStringLiteral("1.0");
+        o["aula_fija"] = true;   // GLOBAL (por defecto true)
 
         QJsonObject dim;
         dim["num_profesores"] = 1;
@@ -44,27 +45,35 @@ private:
 
         o["recesos"] = QJsonArray{};
 
+        // Planes EMBEBIDOS (materias + horas + año).
+        QJsonObject materiaPlan;
+        materiaPlan["materia_idx"]     = 0;
+        materiaPlan["curso"]           = 1;   // año al que aplica
+        materiaPlan["horas_semanales"] = 2;
+        QJsonObject plan;
+        plan["codigo"]   = QStringLiteral("Ciencias");
+        plan["materias"] = QJsonArray{materiaPlan};
+        o["planes"] = QJsonArray{plan};
+
+        // Curso por IDENTIDAD (sin `nombre`).
         QJsonObject curso;
-        curso["nombre"]          = QStringLiteral("1ro A");
+        curso["anio"]            = 1;
+        curso["seccion"]         = QStringLiteral("A");
         curso["turno"]           = QStringLiteral("manana");
-        curso["aula_fija"]       = 0;
-        curso["num_estudiantes"] = 20;
         curso["plan"]            = QStringLiteral("Ciencias");
-        QJsonObject materiaCurso;
-        materiaCurso["materia_idx"]     = 0;
-        materiaCurso["horas_semanales"] = 2;
-        curso["materias"] = QJsonArray{materiaCurso};
+        curso["num_estudiantes"] = 20;
+        curso["aula"]            = 0;
         o["cursos"] = QJsonArray{curso};
 
         QJsonObject profesor;
-        profesor["nombre"]              = QStringLiteral("Ana");
-        profesor["horas_requeridas"]    = 2;
-        profesor["horas_aula"]          = 2;
-        profesor["turno"]               = QString();
-        profesor["plan"]                = QString();
-        profesor["materias_asignadas"]  = QJsonArray{0};
-        profesor["materias_suplente"]   = QJsonArray{};
-        profesor["disponibilidad"]      = QJsonArray{};
+        profesor["nombre"]             = QStringLiteral("Ana");
+        profesor["horas_aula"]         = 2;          // `horas_requeridas` opcional (ausente)
+        profesor["turno"]              = QString();
+        profesor["plan"]               = QString();
+        profesor["anios"]              = QJsonArray{1};
+        profesor["materias_asignadas"] = QJsonArray{0};
+        profesor["materias_suplente"]  = QJsonArray{};
+        profesor["disponibilidad"]     = QJsonArray{};
         o["profesores"] = QJsonArray{profesor};
 
         QJsonObject materia;
@@ -76,19 +85,6 @@ private:
         aula["tipo"]      = QStringLiteral("regular");
         aula["capacidad"] = 30;
         o["aulas"] = QJsonArray{aula};
-
-        QJsonObject planificacion;
-        planificacion["activa"] = false;
-        o["planificacion"] = planificacion;
-
-        QJsonObject generacion;
-        generacion["cursos_a_generar"] = QJsonArray{0};
-        o["generacion"] = generacion;
-
-        QJsonObject penalizaciones;
-        penalizaciones["capacidad_aula"]      = 100;
-        penalizaciones["emergencia_profesor"] = 50;
-        o["penalizaciones"] = penalizaciones;
 
         return o;
     }
@@ -140,8 +136,27 @@ private slots:
         const auto leido = CargadorConfiguracionSolver::cargar(ruta);
         QVERIFY2(leido.ok, qPrintable(leido.mensajeError));
 
-        // Se reproduce la configuración: mismas 13 secciones y valores.
+        // El JSON serializado NO contiene `nombre` (el nombre es presentación, spec 004).
+        const QJsonObject serializado = config.valor.toJson();
+        QVERIFY(!serializado.contains(QStringLiteral("nombre")));
+
+        // Se reproduce la configuración: mismas secciones y valores.
         QCOMPARE(leido.valor.toJson(), config.valor.toJson());
+    }
+
+    void camposDesconocidos_seToleran()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("campo_extra")] = QStringLiteral("se ignora");
+        QJsonObject cursoExtra = o["cursos"].toArray()[0].toObject();
+        cursoExtra[QStringLiteral("nombre")] = QStringLiteral("1ro A"); // nombre se ignora
+        o["cursos"] = QJsonArray{cursoExtra};
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+        // Ni el campo desconocido ni `nombre` reaparecen al serializar.
+        QVERIFY(!config.valor.toJson().contains(QStringLiteral("campo_extra")));
+        QVERIFY(!config.valor.toJson().contains(QStringLiteral("nombre")));
     }
 
     void guardarCarpetaInexistente_error()
