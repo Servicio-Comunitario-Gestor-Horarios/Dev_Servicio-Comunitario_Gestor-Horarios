@@ -13,7 +13,6 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
     // ── x[p][m][c][d][s]  +  z[p][c][m] ──
     for (int c = 0; c < dim.num_cursos; ++c) {
         const CursoSolverConfig& curso = config.cursos[c];
-        const QVector<int> slotsCurso = slotsPorTurno.value(curso.turno);   // D11
 
         for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
             const int m = mc.materiaIDx;
@@ -21,35 +20,20 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
             for (int p = 0; p < dim.num_profesores; ++p) {
                 const ProfesorSolverConfig& prof = config.profesores[p];
 
-                // Elegibilidad (poda): D7 (plan) y D13 (año).
+                // Poda de elegibilidad: opta por la materia (titular/suplente), plan (D7) y año (D13).
+                if (!docenteOptaPorMateria(prof, m)) continue;
                 if (!prof.plan.isEmpty()  && curso.plan != prof.plan) continue;
                 if (!prof.anios.isEmpty() && !prof.anios.contains(curso.anio)) continue;
 
-                bool esTitular = prof.materias_asignadas.contains(m);
-                bool esSuplente = false;
-                for (const MateriaSuplente& ms : prof.materias_suplente)
-                    if (ms.materiaIDx == m) { esSuplente = true; break; }
-                if (!esTitular && !esSuplente) continue;
+                // z SIEMPRE para todo candidato elegible por plan/año: los recortes por turno y
+                // disponibilidad viven en las `x` y, vía D3 (`Σx = bloques·z`), fuerzan z=0. De este
+                // modo un (curso,materia) sin candidato con disponibilidad hace INFEASIBLE a D1,
+                // en lugar de omitirse en silencio.
+                vars.asignacionDocente[{p, c, m}] = model.NewBoolVar();
 
-                const QVector<int> slotsProfesor =
-                    prof.turno.isEmpty() ? QVector<int>() : slotsPorTurno.value(prof.turno);
-
-                bool creoAlguno = false;
-                for (int d = 0; d < dim.num_dias; ++d) {
-                    QVector<int> dispDia;
-                    for (const Disponibilidad& disp : prof.disponibilidad)
-                        if (disp.dia == d) { dispDia = disp.slot; break; }
-
-                    for (int s : slotsCurso) {
-                        if (!dispDia.contains(s)) continue;
-                        // D6: turno del docente (si definido).
-                        if (!prof.turno.isEmpty() && !slotsProfesor.contains(s)) continue;
+                for (int d = 0; d < dim.num_dias; ++d)
+                    for (int s : slotsDisponibles(config, curso, prof, d))
                         vars.assignment[{p, m, c, d, s}] = model.NewBoolVar();
-                        creoAlguno = true;
-                    }
-                }
-                if (creoAlguno)
-                    vars.asignacionDocente[{p, c, m}] = model.NewBoolVar();
             }
         }
     }

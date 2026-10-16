@@ -368,6 +368,7 @@ QString validarEstructura(const QJsonObject& obj)
     for (const QString& clave : requeridas)
         if (!obj.contains(clave))
             return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
+
     return {};
 }
 
@@ -508,26 +509,20 @@ QString validarDisponibilidad(const SolverConfig& c)
 }
 
 /// V13. Cada materia-curso tiene al menos un candidato elegible.
+/// Exige, para cada par (curso, materia) derivado del plan, un docente que opte por la materia
+/// (titular o suplente), respete plan y año y tenga disponibilidad que SOLAPE con las franjas del
+/// turno declarado del curso. Evalúa sobre los contratos, antes de resolver; no exige capacidad.
 QString validarCandidatosElegibles(const SolverConfig& c)
 {
     for (const CursoSolverConfig& cu : c.cursos) {
         for (const PlanMateriaConfig& mc : materiasDelCurso(c, cu)) {
             bool hay = false;
-            for (const ProfesorSolverConfig& p : c.profesores) {
-                bool opta = p.materias_asignadas.contains(mc.materiaIDx);
-                for (const MateriaSuplente& s : p.materias_suplente)
-                    if (s.materiaIDx == mc.materiaIDx) opta = true;
-                if (!opta) continue;
-                if (!p.turno.isEmpty() && p.turno != cu.turno) continue;
-                if (!p.plan.isEmpty()  && p.plan  != cu.plan)  continue;
-                if (!p.anios.isEmpty() && !p.anios.contains(cu.anio)) continue;
-                if (p.disponibilidad.isEmpty()) continue;
-                hay = true;
-                break;
-            }
+            for (const ProfesorSolverConfig& p : c.profesores)
+                if (docenteCandidatoElegible(c, cu, p, mc.materiaIDx)) { hay = true; break; }
             if (!hay)
-                return QStringLiteral("V13: la materia %1 del curso %2%3 no tiene candidato elegible.")
-                    .arg(mc.materiaIDx).arg(cu.anio).arg(cu.seccion);
+                return QStringLiteral("V13: la materia %1 del curso %2%3 no tiene candidato elegible "
+                                      "con disponibilidad en las franjas de su turno '%4'.")
+                    .arg(mc.materiaIDx).arg(cu.anio).arg(cu.seccion).arg(cu.turno);
         }
     }
     return {};

@@ -39,10 +39,12 @@ struct VariablesSolver {
  *
  * Recorre cursos -> materias (derivadas de su plan) -> profesores y crea `x` SOLO donde:
  * 1. p tiene la materia m (titular o suplente),
- * 2. p es elegible (plan/turno/anio; D6/D7/D13),
+ * 2. p es elegible (plan/anio; D7/D13),
  * 3. p esta disponible en (d, s),
- * 4. (d, s) esta dentro del turno DEL CURSO (D11).
- * Crea `z[p][c][m]` por candidato con al menos una `x`.
+ * 4. (d, s) esta dentro del turno DEL CURSO (D11) y, si p declara turno, dentro del suyo (D6).
+ * Crea `z[p][c][m]` para TODO candidato elegible por plan/anio (aunque no tenga ninguna `x`):
+ * los recortes por turno/disponibilidad viven en las `x` y D3 (`Σx = bloques·z`) fuerza z=0, de
+ * modo que la ausencia de candidato con disponibilidad hace INFEASIBLE a D1 (no se omite).
  * `y[c][d][s][a]` solo con el modo de aulas moviles (config.aula_fija == false).
  *
  * @param model Modelo CP-SAT donde se crean las BoolVar

@@ -122,6 +122,33 @@ private slots:
         QVERIFY(resultado.errores[0].contains("INFEASIBLE"));
     }
 
+    // ── D1/D3 SIEMPRE publicadas: sin candidato disponible => INFEASIBLE, nunca éxito con 0 bloques ──
+    // Curso cuyo turno (tarde) no se solapa con la disposición del único titular (mañana):
+    // debe fallar la factibilidad, no devolver éxito con la materia-curso sin cubrir.
+    void solver_sinCandidatoDisponible_esInfeasible() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 3, 8};
+        config.franja_horaria = {60, 8};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}, {"tarde", {4, 5, 6, 7}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 2}}}};                  // materia 0, 2 bloques
+        config.cursos = {{1, "A", "tarde", 20, "Plan General", 0}};        // curso de turno TARDE
+        config.profesores = {
+            // Único titular: solo disponible por la mañana, fuera del turno del curso.
+            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, dispCompleta()}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito,
+                 "un curso cuyo único candidato no se solapa con su turno debe ser INFEASIBLE");
+        QVERIFY(!resultado.errores.isEmpty());
+        QVERIFY(resultado.errores[0].contains("INFEASIBLE"));
+    }
+
     // ── XOR: un docente por materia-curso ──
     void solver_xorUnDocentePorMateria() {
         SolverConfig config;

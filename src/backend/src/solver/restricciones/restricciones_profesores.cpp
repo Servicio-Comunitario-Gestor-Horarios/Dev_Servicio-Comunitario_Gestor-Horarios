@@ -1,7 +1,6 @@
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
-#include <QPair>
 #include <vector>
 
 // D5 — un profesor no da dos clases a la vez.
@@ -33,35 +32,35 @@ void restriccionUnDocentePorMateria(
 ) {
     const int dur = config.franja_horaria.duracion_minutos;
 
-    QMap<QPair<int, int>, int> bloquesDe;                 // (c,m) -> bloques
     for (int c = 0; c < config.cursos.size(); ++c) {
         for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[c])) {
-            bloquesDe[{c, mc.materiaIDx}] = bloques(mc.horasSemanales, dur);
+            const int m = mc.materiaIDx;
+            const int bloquesMateria = bloques(mc.horasSemanales, dur);
+
+            std::vector<BoolVar> zDe;   // z de los docentes candidatos de (c,m)
+            for (auto it = vars.asignacionDocente.constBegin();
+                 it != vars.asignacionDocente.constEnd(); ++it) {
+                const auto [p, zc, zm] = it.key();
+                if (zc != c || zm != m) continue;
+                zDe.push_back(it.value());
+
+                // D3: sum_{d,s} x[p,m,c,d,s] == bloques(c,m) * z[p,c,m].
+                // La igualdad SIEMPRE se publica: si el docente no tiene ninguna x (turno o
+                // disponibilidad que no se solapan), fuerza z=0 en lugar de omitirse.
+                std::vector<BoolVar> xDe;
+                for (auto xi = vars.assignment.constBegin(); xi != vars.assignment.constEnd(); ++xi) {
+                    const auto [xp, xm, xc, xd, xs] = xi.key();
+                    (void)xd; (void)xs;
+                    if (xp == p && xm == m && xc == c) xDe.push_back(xi.value());
+                }
+                const LinearExpr sumaX = xDe.empty() ? LinearExpr(0) : LinearExpr::Sum(xDe);
+                model.AddEquality(sumaX, LinearExpr(it.value()) * bloquesMateria);
+            }
+
+            // D1: exactamente un docente por materia-curso. Se publica para TODA materia del plan;
+            // si no hay ningún candidato (zDe vacío) la igualdad 0 == 1 hace INFEASIBLE.
+            model.AddEquality(zDe.empty() ? LinearExpr(0) : LinearExpr::Sum(zDe), 1);
         }
-    }
-
-    QMap<QPair<int, int>, std::vector<BoolVar>> zDe;      // (c,m) -> z
-
-    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd(); ++it) {
-        const auto [p, c, m] = it.key();
-        zDe[{c, m}].push_back(it.value());
-
-        // D2: sum_{d,s} x[p,m,c,d,s] == bloques(c,m) * z[p,c,m]
-        std::vector<BoolVar> xDe;
-        for (auto xi = vars.assignment.constBegin(); xi != vars.assignment.constEnd(); ++xi) {
-            const auto [xp, xm, xc, xd, xs] = xi.key();
-            (void)xd; (void)xs;
-            if (xp == p && xm == m && xc == c) xDe.push_back(xi.value());
-        }
-        if (!xDe.empty()) {
-            model.AddEquality(LinearExpr::Sum(xDe),
-                              LinearExpr(it.value()) * bloquesDe.value({c, m}));
-        }
-    }
-
-    // D1: exactamente un docente por materia-curso.
-    for (auto it = zDe.constBegin(); it != zDe.constEnd(); ++it) {
-        model.AddEquality(LinearExpr::Sum(it.value()), 1);
     }
 }
 

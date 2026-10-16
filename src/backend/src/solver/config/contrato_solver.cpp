@@ -41,3 +41,49 @@ QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig &config, const Cu
     }
     return {};
 }
+
+namespace {
+    /// Slots declarados por el turno `nombre`, o vacío si no existe.
+    QVector<int> slotsDelTurno(const SolverConfig& config, const QString& nombre) {
+        for (const TurnoConfig& t : config.turnos.turnos)
+            if (t.nombre == nombre)
+                return t.slot;
+        return {};
+    }
+}
+
+bool docenteOptaPorMateria(const ProfesorSolverConfig& prof, int materiaIDx) {
+    if (prof.materias_asignadas.contains(materiaIDx)) return true;
+    for (const MateriaSuplente& s : prof.materias_suplente)
+        if (s.materiaIDx == materiaIDx) return true;
+    return false;
+}
+
+QVector<int> slotsDisponibles(const SolverConfig& config, const CursoSolverConfig& curso,
+                              const ProfesorSolverConfig& prof, int dia) {
+    QVector<int> disponibles;
+    const QVector<int> slotsCurso = slotsDelTurno(config, curso.turno);          // D11
+    const QVector<int> slotsProfesor =
+        prof.turno.isEmpty() ? QVector<int>() : slotsDelTurno(config, prof.turno);
+
+    QVector<int> dispDia;
+    for (const Disponibilidad& disp : prof.disponibilidad)
+        if (disp.dia == dia) { dispDia = disp.slot; break; }
+
+    for (int s : slotsCurso) {
+        if (!dispDia.contains(s)) continue;                                     // disponibilidad
+        if (!prof.turno.isEmpty() && !slotsProfesor.contains(s)) continue;      // D6
+        disponibles.append(s);
+    }
+    return disponibles;
+}
+
+bool docenteCandidatoElegible(const SolverConfig& config, const CursoSolverConfig& curso,
+                              const ProfesorSolverConfig& prof, int materiaIDx) {
+    if (!docenteOptaPorMateria(prof, materiaIDx)) return false;                 // titular o suplente
+    if (!prof.plan.isEmpty() && prof.plan != curso.plan) return false;          // D7
+    if (!prof.anios.isEmpty() && !prof.anios.contains(curso.anio)) return false; // D13
+    for (int d = 0; d < config.dimensiones.num_dias; ++d)
+        if (!slotsDisponibles(config, curso, prof, d).isEmpty()) return true;
+    return false;
+}

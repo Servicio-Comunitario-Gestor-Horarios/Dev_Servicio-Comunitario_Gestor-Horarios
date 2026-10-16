@@ -224,6 +224,43 @@ private slots:
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
+    /// V13 debe cruzar la disponibilidad del docente con las franjas del turno del curso:
+    /// un candidato cuyo rango no se solapa con el turno del curso no es elegible.
+    void v13_sinDisponibilidadEnElTurno_falla()
+    {
+        QJsonObject j = jsonValido();
+
+        // Se añade un turno 'tarde' (slots 6-11) y se amplía el día a 12 slots, de modo que
+        // el único candidato pueda declarar disponibilidad FUERA del turno del curso (mañana).
+        QJsonObject dim = j["dimensiones"].toObject();
+        dim["num_slots_dia"] = 12;
+        j["dimensiones"] = dim;
+
+        QJsonObject turnos = j["turnos"].toObject();
+        QJsonArray arrTurnos = turnos["turnos"].toArray();
+        QJsonObject tarde;
+        tarde["nombre"] = QStringLiteral("tarde");
+        QJsonArray slotsTarde;
+        for (int s = 6; s <= 11; ++s) slotsTarde.append(s);
+        tarde["slot"] = slotsTarde;
+        arrTurnos.append(tarde);
+        turnos["turnos"] = arrTurnos;
+        j["turnos"] = turnos;
+
+        // El único candidato solo está disponible en la tarde; el curso es de mañana.
+        j = conProfesor(j, [](QJsonObject& p) {
+            QJsonArray disp = p["disponibilidad"].toArray();
+            QJsonObject d0 = disp[0].toObject();
+            d0["slot"] = QJsonArray{6, 7};
+            disp[0] = d0;
+            p["disponibilidad"] = disp;
+        });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("V13")));
+    }
+
     void jsonVacio_falla()
     {
         const auto resultado = validarEntradaSolver(QJsonObject{});
