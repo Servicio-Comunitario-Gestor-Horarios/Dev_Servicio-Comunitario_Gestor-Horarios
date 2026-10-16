@@ -112,7 +112,7 @@ private slots:
         config.planes = {{"Plan General", {{0, 1, 4}, {0, 2, 4}}}}; // materia 0 en anios 1 y 2
         config.profesores = {
             {"Prof A", 16, 16, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1}}}}};
-        config.dimensiones = {1, 1, 2, 2, 3, 4};
+        config.dimensiones = {1, 2, 2, 2, 3, 4};   // 1 docente, 2 materias, 2 aulas, 2 cursos
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -120,6 +120,88 @@ private slots:
         QVERIFY(!resultado.exito);
         QVERIFY(!resultado.errores.isEmpty());
         QVERIFY(resultado.errores[0].contains("INFEASIBLE"));
+        // RF-6: la causa es un conflicto de asignación de docente (D3): el único docente
+        // elegible solo dispone de 2 franjas para una materia de 4 bloques.
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+    }
+
+    // ── RF-6/RNF-3: al no ser factible, se informa la PRIMERA categoría de causa ──
+
+    void solver_falloCausaEntradaInvalida() {
+        // Curso sin turno declarado: configuración inválida → categoría (1) entrada inválida.
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 2};
+        config.franja_horaria = {60, 2};
+        config.turnos.turnos = {{"manana", {0, 1}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 2}}}};
+        config.cursos = {{1, "A", "", 20, "Plan General", 0}};   // sin turno
+        config.profesores = {
+            {"Prof A", 2, 2, "", "Plan General", {}, {0}, {}, {{0, {0, 1}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (1)"), qPrintable(texto));
+        QVERIFY2(texto.contains("turno"), qPrintable(texto));
+    }
+
+    void solver_falloCausaConflictoDeAula() {
+        // Dos cursos que comparten el aula fija y, juntos, piden más bloques que franjas tiene
+        // el aula (cada uno cabe por separado): la causa es el aula → categoría (2).
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 1, 1, 2, 1, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula compartida", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}, {0, 2, 4}}}};   // 4 bloques por curso
+        config.cursos = {
+            {1, "A", "manana", 20, "Plan General", 0},
+            {2, "A", "manana", 20, "Plan General", 0}};                // MISMA aula
+        config.profesores = {
+            {"Prof A", 4, 4, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}},
+            {"Prof B", 4, 4, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("Aula compartida"), qPrintable(texto));
+    }
+
+    void solver_falloCausaConflictoDePersona() {
+        // Un curso cuyo plan pide más bloques que franjas ofrece su turno → categoría (3).
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 2};
+        config.franja_horaria = {60, 2};
+        config.turnos.turnos = {{"manana", {0, 1}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};   // 4 bloques en un turno de 2 franjas
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof A", 4, 4, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (3)"), qPrintable(texto));
+        QVERIFY2(texto.contains("1|A"), qPrintable(texto));
     }
 
     // ── D1/D3 SIEMPRE publicadas: sin candidato disponible => INFEASIBLE, nunca éxito con 0 bloques ──
