@@ -1,6 +1,7 @@
 #include <QTest>
 
 #include <backend/services/ValidadorSalidaSolver.hpp>
+#include <backend/solver/config/contrato_solver.hpp>
 
 /// Tests de las validaciones posteriores de la salida del solver (P1–P4, RF-3).
 class TestValidadorSalida : public QObject
@@ -11,15 +12,19 @@ private:
     SolverConfig configBase() const
     {
         SolverConfig config;
+        config.aula_fija = true;
         config.materias = {MateriaSolverConfig{QStringLiteral("Matemática")}};
         config.aulas = {AulaSolverConfig{QStringLiteral("A1"), QStringLiteral("regular"), 30}};
+        config.planes = {PlanSolverConfig{QStringLiteral("Ciencias"),
+                                          {PlanMateriaConfig{0, 1, 2}}}};
 
-        CursoSolverConfig curso;
-        curso.nombre = QStringLiteral("1ro A");
-        curso.num_estudiantes = 20;
-        MateriaCurso mc; mc.materiaIDx = 0; mc.horasSemanales = 2;
-        curso.materias = {mc};
-        config.cursos = {curso};
+        CursoSolverConfig cursoA;
+        cursoA.anio = 1; cursoA.seccion = QStringLiteral("A");
+        cursoA.num_estudiantes = 20; cursoA.plan = QStringLiteral("Ciencias"); cursoA.aula = 0;
+        CursoSolverConfig cursoB;
+        cursoB.anio = 1; cursoB.seccion = QStringLiteral("B");
+        cursoB.num_estudiantes = 20; cursoB.plan = QStringLiteral("Ciencias"); cursoB.aula = 0;
+        config.cursos = {cursoA, cursoB};
 
         ProfesorSolverConfig prof;
         prof.nombre = QStringLiteral("Ana");
@@ -39,7 +44,7 @@ private:
         dia.dia = 0;
         dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}, AsignacionOutput{1, 0, 0, 0}};
         curso.dias = {dia};
-        h.horarios[QStringLiteral("1ro A")] = curso;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
         return h;
     }
 
@@ -64,7 +69,7 @@ private slots:
         dia.dia = 0;
         dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}};
         otro.dias = {dia};
-        h.horarios[QStringLiteral("1ro B")] = otro;
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = otro;
 
         const AnalisisSalida a = analizarSalidaSolver(h, configBase());
         QVERIFY(!a.presentable());
@@ -82,7 +87,7 @@ private slots:
         dia.dia = 0;
         dia.asignaciones = {AsignacionOutput{0, 0, -1, 0}};  // profesor -1, misma aula 0
         otro.dias = {dia};
-        h.horarios[QStringLiteral("1ro B")] = otro;
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = otro;
 
         const AnalisisSalida a = analizarSalidaSolver(h, configBase());
         QVERIFY(!a.presentable());
@@ -92,7 +97,7 @@ private slots:
     {
         // El curso debería tener 2 horas; solo se asigna 1.
         HorarioSalida h = horarioValido();
-        h.horarios[QStringLiteral("1ro A")].dias[0].asignaciones = {AsignacionOutput{0, 0, 0, 0}};
+        h.horarios[claveCurso(1, QStringLiteral("A"))].dias[0].asignaciones = {AsignacionOutput{0, 0, 0, 0}};
 
         const AnalisisSalida a = analizarSalidaSolver(h, configBase());
         QVERIFY(a.presentable());
