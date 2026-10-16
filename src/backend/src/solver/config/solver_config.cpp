@@ -1,600 +1,55 @@
 #include "backend/solver/config/solver_config.hpp"
+
+#include "backend/solver/config/contrato_solver.hpp"
+
 #include <QJsonArray>
-#include <QJsonDocument>
-#include <QSet>
-
-/**
- * @file solver_config.cpp
- * @brief Implementación del parser de configuración del solver CP-SAT.
- */
-
-/* --- Helpers de parseo por sección --- */
-
-/**
- * @brief Parsea la sección de dimensiones del JSON.
- * @param obj Objeto JSON raíz.
- * @return Estructura de dimensiones parseada.
- */
-static DimensionesConfig parsearDimensiones(const QJsonObject& obj) {
-    DimensionesConfig d;
-    d.num_profesores = obj["num_profesores"].toInt();
-    d.num_materias   = obj["num_materias"].toInt();
-    d.num_aulas      = obj["num_aulas"].toInt();
-    d.num_cursos     = obj["num_cursos"].toInt();
-    d.num_dias       = obj["num_dias"].toInt();
-    d.num_slots_dia  = obj["num_slots_dia"].toInt();
-    return d;
-}
-
-/**
- * @brief Parsea la sección de franja horaria del JSON.
- * @param obj Objeto JSON raíz.
- * @return Estructura de franja horaria parseada.
- */
-static FranjaHorariaConfig parsearFranjaHoraria(const QJsonObject& obj) {
-    FranjaHorariaConfig f;
-    f.duracion_minutos = obj["duracion_minutos"].toInt();
-    f.slots_por_turno  = obj["slots_por_turno"].toInt();
-    return f;
-}
-
-/**
- * @brief Parsea un array de turnos individuales.
- * @param arr Array JSON con objetos de turno.
- * @return Vector de turnos parseados.
- */
-static QVector<TurnoConfig> parsearTurnosIndividuales(const QJsonArray& arr) {
-    QVector<TurnoConfig> turnos;
-    for (const auto& item : arr) {
-        TurnoConfig t;
-        QJsonObject obj = item.toObject();
-        t.nombre = obj["nombre"].toString();
-        for (const auto& slot : obj["slot"].toArray()) {
-            t.slot.append(slot.toInt());
-        }
-        turnos.append(t);
-    }
-    return turnos;
-}
-
-/**
- * @brief Parsea la sección de turnos del JSON.
- * @param obj Objeto JSON raíz.
- * @return Estructura de turnos parseada.
- */
-static TurnosConfig parsearTurnos(const QJsonObject& obj) {
-    TurnosConfig tc;
-    tc.turnos = parsearTurnosIndividuales(obj["turnos"].toArray());
-    return tc;
-}
-
-/**
- * @brief Parsea un array de recesos.
- * @param arr Array JSON con objetos de receso.
- * @return Vector de recesos parseados.
- */
-static QVector<RecesoConfig> parsearRecesos(const QJsonArray& arr) {
-    QVector<RecesoConfig> recesos;
-    for (const auto& item : arr) {
-        RecesoConfig r;
-        QJsonObject obj = item.toObject();
-        r.turno           = obj["turno"].toString();
-        r.despues_de_slot = obj["despues_de_slot"].toInt();
-        r.duracion        = obj["duracion"].toInt();
-        r.inicio          = obj["inicio"].toString();
-        r.fin             = obj["fin"].toString();
-        recesos.append(r);
-    }
-    return recesos;
-}
-
-/**
- * @brief Parsea el array de materias de un curso.
- * @param arr Array JSON con objetos de materia-curso.
- * @return Vector de MateriaCurso parseados.
- */
-static QVector<MateriaCurso> parsearMateriasCurso(const QJsonArray& arr) {
-    QVector<MateriaCurso> materias;
-    for (const auto& item : arr) {
-        MateriaCurso mc;
-        QJsonObject obj = item.toObject();
-        mc.materiaIDx    = obj["materia_idx"].toInt();
-        mc.horasSemanales = obj["horas_semanales"].toInt();
-        materias.append(mc);
-    }
-    return materias;
-}
-
-/**
- * @brief Parsea el array de cursos.
- * @param arr Array JSON con objetos de curso.
- * @return Vector de cursos parseados.
- */
-static QVector<CursoSolverConfig> parsearCursos(const QJsonArray& arr) {
-    QVector<CursoSolverConfig> cursos;
-    for (const auto& item : arr) {
-        CursoSolverConfig c;
-        QJsonObject obj = item.toObject();
-        c.nombre           = obj["nombre"].toString();
-        c.turno            = obj["turno"].toString();
-        c.aula_fija        = obj["aula_fija"].toInt(-1);
-        c.num_estudiantes  = obj["num_estudiantes"].toInt();
-        c.plan             = obj["plan"].toString();
-        c.materias         = parsearMateriasCurso(obj["materias"].toArray());
-        cursos.append(c);
-    }
-    return cursos;
-}
-
-/**
- * @brief Parsea el array de materias suplentes de un profesor.
- * @param arr Array JSON con objetos de materia suplente.
- * @return Vector de MateriaSuplente parseados.
- */
-static QVector<MateriaSuplente> parsearMateriasSuplentes(const QJsonArray& arr) {
-    QVector<MateriaSuplente> suplentes;
-    for (const auto& item : arr) {
-        MateriaSuplente ms;
-        QJsonObject obj = item.toObject();
-        ms.materiaIDx = obj["materia_idx"].toInt();
-        ms.peso       = obj["peso"].toInt();
-        suplentes.append(ms);
-    }
-    return suplentes;
-}
-
-/**
- * @brief Parsea la disponibilidad de un profesor.
- * @param arr Array JSON con objetos de disponibilidad.
- * @return Vector de Disponibilidad parseados.
- */
-static QVector<Disponibilidad> parsearDisponibilidad(const QJsonArray& arr) {
-    QVector<Disponibilidad> disponibilidad;
-    for (const auto& item : arr) {
-        Disponibilidad d;
-        QJsonObject obj = item.toObject();
-        d.dia = obj["dia"].toInt();
-        for (const auto& slot : obj["slot"].toArray()) {
-            d.slot.append(slot.toInt());
-        }
-        disponibilidad.append(d);
-    }
-    return disponibilidad;
-}
-
-/**
- * @brief Parsea el array de profesores.
- * @param arr Array JSON con objetos de profesor.
- * @return Vector de profesores parseados.
- */
-static QVector<ProfesorSolverConfig> parsearProfesores(const QJsonArray& arr) {
-    QVector<ProfesorSolverConfig> profesores;
-    for (const auto& item : arr) {
-        ProfesorSolverConfig p;
-        QJsonObject obj = item.toObject();
-        p.nombre               = obj["nombre"].toString();
-        p.horas_requeridas     = obj["horas_requeridas"].toInt();
-        p.horas_aula           = obj["horas_aula"].toInt();
-        p.turno                = obj["turno"].toString();
-        p.plan                 = obj["plan"].toString();
-
-        for (const auto& m : obj["materias_asignadas"].toArray()) {
-            p.materias_asignadas.append(m.toInt());
-        }
-
-        p.materias_suplente = parsearMateriasSuplentes(obj["materias_suplente"].toArray());
-        p.disponibilidad    = parsearDisponibilidad(obj["disponibilidad"].toArray());
-        profesores.append(p);
-    }
-    return profesores;
-}
-
-/**
- * @brief Parsea el array de materias globales.
- * @param arr Array JSON con objetos de materia.
- * @return Vector de materias parseadas.
- */
-static QVector<MateriaSolverConfig> parsearMaterias(const QJsonArray& arr) {
-    QVector<MateriaSolverConfig> materias;
-    for (const auto& item : arr) {
-        MateriaSolverConfig m;
-        QJsonObject obj = item.toObject();
-        m.nombre = obj["nombre"].toString();
-        materias.append(m);
-    }
-    return materias;
-}
-
-/**
- * @brief Parsea el array de aulas.
- * @param arr Array JSON con objetos de aula.
- * @return Vector de aulas parseadas.
- */
-static QVector<AulaSolverConfig> parsearAulas(const QJsonArray& arr) {
-    QVector<AulaSolverConfig> aulas;
-    for (const auto& item : arr) {
-        AulaSolverConfig a;
-        QJsonObject obj = item.toObject();
-        a.nombre    = obj["nombre"].toString();
-        a.tipo      = obj["tipo"].toString();
-        a.capacidad = obj["capacidad"].toInt();
-        aulas.append(a);
-    }
-    return aulas;
-}
-
-/**
- * @brief Parsea la sección de planificación.
- * @param obj Objeto JSON de planificación.
- * @return Estructura de planificación parseada.
- */
-static PlanificacionConfig parsearPlanificacion(const QJsonObject& obj) {
-    PlanificacionConfig p;
-    p.activa = obj["activa"].toBool();
-    return p;
-}
-
-/**
- * @brief Parsea la sección de generación.
- * @param obj Objeto JSON de generación.
- * @return Estructura de generación parseada.
- */
-static GeneracionConfig parsearGeneracion(const QJsonObject& obj) {
-    GeneracionConfig g;
-    for (const auto& item : obj["cursos_a_generar"].toArray()) {
-        g.cursos_a_generar.append(item.toInt());
-    }
-    return g;
-}
-
-/**
- * @brief Parsea la sección de penalizaciones.
- * @param obj Objeto JSON de penalizaciones.
- * @return Estructura de penalizaciones parseada.
- */
-static PenalizacionConfig parsearPenalizaciones(const QJsonObject& obj) {
-    PenalizacionConfig p;
-    p.capacidad_aula       = obj["capacidad_aula"].toInt(100);
-    p.emergencia_profesor  = obj["emergencia_profesor"].toInt(50);
-    return p;
-}
-
-/* --- Validaciones --- */
-
-/**
- * @brief Valida que un índice esté dentro del rango permitido.
- * @param indice Índice a validar.
- * @param tamano Tamaño del array de referencia.
- * @param nombreCampo Nombre del campo para el mensaje de error.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarIndice(int indice, int tamano, const QString& nombreCampo) {
-    if (indice < 0 || indice >= tamano) {
-        return QString("Error de validación: %1 (%2) fuera de rango [0, %3)")
-            .arg(nombreCampo).arg(indice).arg(tamano);
-    }
-    return {};
-}
-
-/**
- * @brief Valida las dimensiones contra los tamaños de arrays.
- * @param config Configuración parcialmente parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarDimensiones(const SolverConfig& config) {
-    const auto& d = config.dimensiones;
-
-    if (d.num_profesores != config.profesores.size()) {
-        return QString("Error de validación: dimensiones.num_profesores (%1) != profesores.size (%2)")
-            .arg(d.num_profesores).arg(config.profesores.size());
-    }
-    if (d.num_materias != config.materias.size()) {
-        return QString("Error de validación: dimensiones.num_materias (%1) != materias.size (%2)")
-            .arg(d.num_materias).arg(config.materias.size());
-    }
-    if (d.num_aulas != config.aulas.size()) {
-        return QString("Error de validación: dimensiones.num_aulas (%1) != aulas.size (%2)")
-            .arg(d.num_aulas).arg(config.aulas.size());
-    }
-    if (d.num_cursos != config.cursos.size()) {
-        return QString("Error de validación: dimensiones.num_cursos (%1) != cursos.size (%2)")
-            .arg(d.num_cursos).arg(config.cursos.size());
-    }
-    if (d.num_dias <= 0) {
-        return QString("Error de validación: dimensiones.num_dias (%1) debe ser > 0").arg(d.num_dias);
-    }
-    if (d.num_slots_dia <= 0) {
-        return QString("Error de validación: dimensiones.num_slots_dia (%1) debe ser > 0").arg(d.num_slots_dia);
-    }
-    return {};
-}
-
-/**
- * @brief Valida los turnos de cada curso.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarTurnosCursos(const SolverConfig& config) {
-    QSet<QString> turnosValidos;
-    for (const auto& t : config.turnos.turnos) {
-        turnosValidos.insert(t.nombre);
-    }
-
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        const auto& c = config.cursos[i];
-        if (!c.turno.isEmpty() && !turnosValidos.contains(c.turno)) {
-            return QString("Error de validación: curso[%1] \"%2\" tiene turno inválido \"%3\"")
-                .arg(i).arg(c.nombre).arg(c.turno);
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida las aulas fijas de cada curso.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarAulasCursos(const SolverConfig& config) {
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        const auto& c = config.cursos[i];
-        if (c.aula_fija != -1) {
-            QString error = validarIndice(c.aula_fija, config.aulas.size(),
-                QString("curso[%1] \"%2\" aula_fija").arg(i).arg(c.nombre));
-            if (!error.isEmpty()) return error;
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida los índices de materias en cursos y profesores.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarIndicesMaterias(const SolverConfig& config) {
-    // V4: Materias en cursos
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        const auto& c = config.cursos[i];
-        for (int j = 0; j < c.materias.size(); ++j) {
-            QString error = validarIndice(c.materias[j].materiaIDx, config.materias.size(),
-                QString("curso[%1] \"%2\" materia[%3]").arg(i).arg(c.nombre).arg(j));
-            if (!error.isEmpty()) return error;
-        }
-    }
-
-    // V4: Materias asignadas en profesores
-    for (int i = 0; i < config.profesores.size(); ++i) {
-        const auto& p = config.profesores[i];
-        for (int j = 0; j < p.materias_asignadas.size(); ++j) {
-            QString error = validarIndice(p.materias_asignadas[j], config.materias.size(),
-                QString("profesor[%1] \"%2\" materias_asignadas[%3]").arg(i).arg(p.nombre).arg(j));
-            if (!error.isEmpty()) return error;
-        }
-        // Materias suplentes
-        for (int j = 0; j < p.materias_suplente.size(); ++j) {
-            QString error = validarIndice(p.materias_suplente[j].materiaIDx, config.materias.size(),
-                QString("profesor[%1] \"%2\" materias_suplente[%3]").arg(i).arg(p.nombre).arg(j));
-            if (!error.isEmpty()) return error;
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida que cada curso tenga al menos una materia.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarCursosNoVacios(const SolverConfig& config) {
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        if (config.cursos[i].materias.isEmpty()) {
-            return QString("Error de validación: curso[%1] \"%2\" no tiene materias")
-                .arg(i).arg(config.cursos[i].nombre);
-        }
-        if (config.cursos[i].num_estudiantes <= 0) {
-            return QString("Error de validación: curso[%1] \"%2\" num_estudiantes (%3) debe ser > 0")
-                .arg(i).arg(config.cursos[i].nombre).arg(config.cursos[i].num_estudiantes);
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida que cada profesor tenga al menos una materia asignada.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarProfesoresNoVacios(const SolverConfig& config) {
-    for (int i = 0; i < config.profesores.size(); ++i) {
-        const auto& p = config.profesores[i];
-        if (p.materias_asignadas.isEmpty() && p.materias_suplente.isEmpty()) {
-            return QString("Error de validación: profesor[%1] \"%2\" no tiene materias asignadas ni suplentes")
-                .arg(i).arg(p.nombre);
-        }
-        if (p.horas_requeridas <= 0) {
-            return QString("Error de validación: profesor[%1] \"%2\" horas_requeridas (%3) debe ser > 0")
-                .arg(i).arg(p.nombre).arg(p.horas_requeridas);
-        }
-        if (p.horas_aula <= 0) {
-            return QString("Error de validación: profesor[%1] \"%2\" horas_aula (%3) debe ser > 0")
-                .arg(i).arg(p.nombre).arg(p.horas_aula);
-        }
-        if (p.horas_aula > p.horas_requeridas) {
-            return QString("Error de validación: profesor[%1] \"%2\" horas_aula (%3) > horas_requeridas (%4)")
-                .arg(i).arg(p.nombre).arg(p.horas_aula).arg(p.horas_requeridas);
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida que cada curso tenga un solo plan.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarUnSoloPlanPorCurso(const SolverConfig& config) {
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        const auto& c = config.cursos[i];
-        if (c.plan.isEmpty()) {
-            return QString("Error de validación: curso[%1] \"%2\" no tiene plan asignado")
-                .arg(i).arg(c.nombre);
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida que cada materia en cada curso tenga al menos 1 profesor disponible.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarCoberturaMaterias(const SolverConfig& config) {
-    for (int i = 0; i < config.cursos.size(); ++i) {
-        const auto& c = config.cursos[i];
-        for (int j = 0; j < c.materias.size(); ++j) {
-            int materiaIDx = c.materias[j].materiaIDx;
-            bool cubierta = false;
-            for (const auto& p : config.profesores) {
-                if (p.materias_asignadas.contains(materiaIDx)) {
-                    cubierta = true;
-                    break;
-                }
-                for (const auto& ms : p.materias_suplente) {
-                    if (ms.materiaIDx == materiaIDx) {
-                        cubierta = true;
-                        break;
-                    }
-                }
-                if (cubierta) break;
-            }
-            if (!cubierta) {
-                return QString("Error de validación: materia \"%1\" en curso \"%2\" no tiene profesor disponible")
-                    .arg(config.materias[materiaIDx].nombre, c.nombre);
-            }
-        }
-    }
-    return {};
-}
-
-/**
- * @brief Valida la disponibilidad de los profesores.
- * @param config Configuración parseada.
- * @return Empty string si es válido, mensaje de error si no.
- */
-static QString validarDisponibilidadProfesores(const SolverConfig& config) {
-    const int totalSlots = config.dimensiones.num_dias * config.dimensiones.num_slots_dia;
-
-    for (int i = 0; i < config.profesores.size(); ++i) {
-        const auto& p = config.profesores[i];
-        for (int j = 0; j < p.disponibilidad.size(); ++j) {
-            const auto& d = p.disponibilidad[j];
-            if (d.dia < 0 || d.dia >= config.dimensiones.num_dias) {
-                return QString("Error de validación: profesor[%1] \"%2\" disponibilidad[%3] dia (%4) fuera de rango [0, %5)")
-                    .arg(i).arg(p.nombre).arg(j).arg(d.dia).arg(config.dimensiones.num_dias);
-            }
-            for (int k = 0; k < d.slot.size(); ++k) {
-                if (d.slot[k] < 0 || d.slot[k] >= config.dimensiones.num_slots_dia) {
-                    return QString("Error de validación: profesor[%1] \"%2\" disponibilidad[%3] slot[%4] (%5) fuera de rango [0, %6)")
-                        .arg(i).arg(p.nombre).arg(j).arg(k).arg(d.slot[k]).arg(config.dimensiones.num_slots_dia);
-                }
-            }
-        }
-    }
-    return {};
-}
-
-/* --- Función principal --- */
-
-Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj) {
-    // V1: Verificar que el JSON no esté vacío
-    if (obj.isEmpty()) {
-        return Resultado<SolverConfig>::error("Error de validación: JSON vacío o no parseable");
-    }
-
-    // V1: Verificar secciones requeridas
-    QStringList seccionesRequeridas = {
-        "version", "dimensiones", "franja_horaria", "turnos", "recesos",
-        "cursos", "profesores", "materias", "aulas",
-        "planificacion", "generacion", "penalizaciones"
-    };
-    for (const auto& seccion : seccionesRequeridas) {
-        if (!obj.contains(seccion)) {
-            return Resultado<SolverConfig>::error(
-                QString("Error de validación: sección requerida \"%1\" no encontrada").arg(seccion));
-        }
-    }
-
-    SolverConfig config;
-
-    // Parsear secciones simples
-    config.version        = obj["version"].toString();
-    config.dimensiones    = parsearDimensiones(obj["dimensiones"].toObject());
-    config.franja_horaria = parsearFranjaHoraria(obj["franja_horaria"].toObject());
-    config.turnos         = parsearTurnos(obj["turnos"].toObject());
-    config.recesos        = parsearRecesos(obj["recesos"].toArray());
-    config.planificacion  = parsearPlanificacion(obj["planificacion"].toObject());
-    config.generacion     = parsearGeneracion(obj["generacion"].toObject());
-    config.penalizaciones = parsearPenalizaciones(obj["penalizaciones"].toObject());
-
-    // Parsear secciones con arrays
-    config.cursos     = parsearCursos(obj["cursos"].toArray());
-    config.profesores = parsearProfesores(obj["profesores"].toArray());
-    config.materias   = parsearMaterias(obj["materias"].toArray());
-    config.aulas      = parsearAulas(obj["aulas"].toArray());
-
-    // --- Validaciones ---
-
-    // V3: Dimensiones vs tamaños de arrays
-    QString error = validarDimensiones(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V7: Turnos de cursos
-    error = validarTurnosCursos(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V8: Aulas fijas
-    error = validarAulasCursos(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V4-V5: Índices de materias
-    error = validarIndicesMaterias(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V9-V10: Cursos no vacíos
-    error = validarCursosNoVacios(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V10: Profesores no vacíos
-    error = validarProfesoresNoVacios(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V11: Un solo plan por curso
-    error = validarUnSoloPlanPorCurso(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V12: Disponibilidad
-    error = validarDisponibilidadProfesores(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    // V13: Cobertura materias-curso
-    error = validarCoberturaMaterias(config);
-    if (!error.isEmpty()) return Resultado<SolverConfig>::error(error);
-
-    return Resultado<SolverConfig>::exito(config);
-}
-
-/* --- Serialización (inversa de fromJson) --- */
+#include <QJsonValue>
+#include <QStringList>
 
 namespace {
 
-QJsonArray intArray(const QVector<int>& valores) {
+int leerEntero(const QJsonObject& obj, const char* clave, int porDefecto = 0)
+{
+    return obj.contains(QLatin1String(clave))
+               ? obj.value(QLatin1String(clave)).toInt(porDefecto)
+               : porDefecto;
+}
+
+QString leerTexto(const QJsonObject& obj, const char* clave)
+{
+    return obj.value(QLatin1String(clave)).toString();
+}
+
+QVector<int> leerEnteros(const QJsonArray& arr)
+{
+    QVector<int> valores;
+    valores.reserve(arr.size());
+    for (const QJsonValue& valor : arr)
+        valores.append(valor.toInt());
+    return valores;
+}
+
+QJsonArray aJson(const QVector<int>& valores)
+{
     QJsonArray arr;
-    for (int v : valores) arr.append(v);
+    for (int valor : valores) arr.append(valor);
     return arr;
 }
 
-QJsonObject serializarDimensiones(const DimensionesConfig& d) {
+/* ── Dimensiones ── */
+DimensionesConfig parsearDimensiones(const QJsonObject& obj)
+{
+    DimensionesConfig d;
+    d.num_profesores = leerEntero(obj, "num_profesores");
+    d.num_materias   = leerEntero(obj, "num_materias");
+    d.num_aulas      = leerEntero(obj, "num_aulas");
+    d.num_cursos     = leerEntero(obj, "num_cursos");
+    d.num_dias       = leerEntero(obj, "num_dias");
+    d.num_slots_dia  = leerEntero(obj, "num_slots_dia");
+    return d;
+}
+QJsonObject aJson(const DimensionesConfig& d)
+{
     QJsonObject obj;
     obj["num_profesores"] = d.num_profesores;
     obj["num_materias"]   = d.num_materias;
@@ -605,144 +60,553 @@ QJsonObject serializarDimensiones(const DimensionesConfig& d) {
     return obj;
 }
 
-QJsonObject serializarFranja(const FranjaHorariaConfig& f) {
+/* ── Franja horaria ── */
+FranjaHorariaConfig parsearFranjaHoraria(const QJsonObject& obj)
+{
+    FranjaHorariaConfig f;
+    f.duracion_minutos = leerEntero(obj, "duracion_minutos");
+    f.slots_por_turno  = leerEntero(obj, "slots_por_turno");
+    return f;
+}
+QJsonObject aJson(const FranjaHorariaConfig& f)
+{
     QJsonObject obj;
     obj["duracion_minutos"] = f.duracion_minutos;
     obj["slots_por_turno"]  = f.slots_por_turno;
     return obj;
 }
 
-QJsonObject serializarTurnos(const TurnosConfig& t) {
+/* ── Turnos ── */
+TurnosConfig parsearTurnos(const QJsonObject& obj)
+{
+    TurnosConfig tc;
+    for (const QJsonValue& valor : obj["turnos"].toArray()) {
+        const QJsonObject o = valor.toObject();
+        TurnoConfig t;
+        t.nombre = leerTexto(o, "nombre");
+        t.slot   = leerEnteros(o["slot"].toArray());
+        tc.turnos.append(t);
+    }
+    return tc;
+}
+QJsonObject aJson(const TurnosConfig& tc)
+{
     QJsonArray arr;
-    for (const auto& turno : t.turnos) {
-        QJsonObject o;
-        o["nombre"] = turno.nombre;
-        o["slot"]   = intArray(turno.slot);
-        arr.append(o);
+    for (const TurnoConfig& t : tc.turnos) {
+        QJsonObject obj;
+        obj["nombre"] = t.nombre;
+        obj["slot"]   = aJson(t.slot);
+        arr.append(obj);
     }
     QJsonObject obj;
     obj["turnos"] = arr;
     return obj;
 }
 
-QJsonArray serializarRecesos(const QVector<RecesoConfig>& recesos) {
+/* ── Recesos ── */
+QVector<RecesoConfig> parsearRecesos(const QJsonArray& arr)
+{
+    QVector<RecesoConfig> recesos;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        RecesoConfig r;
+        r.turno           = leerTexto(o, "turno");
+        r.despues_de_slot = leerEntero(o, "despues_de_slot");
+        r.duracion        = leerEntero(o, "duracion");
+        r.inicio          = leerTexto(o, "inicio");
+        r.fin             = leerTexto(o, "fin");
+        recesos.append(r);
+    }
+    return recesos;
+}
+QJsonArray aJson(const QVector<RecesoConfig>& recesos)
+{
     QJsonArray arr;
-    for (const auto& r : recesos) {
-        QJsonObject o;
-        o["turno"]           = r.turno;
-        o["despues_de_slot"] = r.despues_de_slot;
-        o["duracion"]        = r.duracion;
-        o["inicio"]          = r.inicio;
-        o["fin"]             = r.fin;
-        arr.append(o);
+    for (const RecesoConfig& r : recesos) {
+        QJsonObject obj;
+        obj["turno"]           = r.turno;
+        obj["despues_de_slot"] = r.despues_de_slot;
+        obj["duracion"]        = r.duracion;
+        obj["inicio"]          = r.inicio;
+        obj["fin"]             = r.fin;
+        arr.append(obj);
     }
     return arr;
 }
 
-QJsonArray serializarCursos(const QVector<CursoSolverConfig>& cursos) {
+/* ── Planes embebidos ── */
+QVector<PlanSolverConfig> parsearPlanes(const QJsonArray& arr)
+{
+    QVector<PlanSolverConfig> planes;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        PlanSolverConfig plan;
+        plan.codigo = leerTexto(o, "codigo");
+        for (const QJsonValue& mv : o["materias"].toArray()) {
+            const QJsonObject mo = mv.toObject();
+            PlanMateriaConfig m;
+            m.materiaIDx     = leerEntero(mo, "materia_idx");
+            m.curso          = leerEntero(mo, "curso");
+            m.horasSemanales = leerEntero(mo, "horas_semanales");
+            plan.materias.append(m);
+        }
+        planes.append(plan);
+    }
+    return planes;
+}
+QJsonArray aJson(const QVector<PlanSolverConfig>& planes)
+{
     QJsonArray arr;
-    for (const auto& c : cursos) {
-        QJsonObject o;
-        o["nombre"]          = c.nombre;
-        o["turno"]           = c.turno;
-        o["aula_fija"]       = c.aula_fija;
-        o["num_estudiantes"] = c.num_estudiantes;
-        o["plan"]            = c.plan;
-
-        QJsonArray materias;
-        for (const auto& m : c.materias) {
+    for (const PlanSolverConfig& plan : planes) {
+        QJsonArray mats;
+        for (const PlanMateriaConfig& m : plan.materias) {
             QJsonObject mo;
-            mo["materia_idx"]      = m.materiaIDx;
-            mo["horas_semanales"]  = m.horasSemanales;
-            materias.append(mo);
+            mo["materia_idx"]     = m.materiaIDx;
+            mo["curso"]           = m.curso;
+            mo["horas_semanales"] = m.horasSemanales;
+            mats.append(mo);
         }
-        o["materias"] = materias;
-        arr.append(o);
+        QJsonObject obj;
+        obj["codigo"]   = plan.codigo;
+        obj["materias"] = mats;
+        arr.append(obj);
     }
     return arr;
 }
 
-QJsonArray serializarProfesores(const QVector<ProfesorSolverConfig>& profesores) {
+/* ── Cursos ── */
+QVector<CursoSolverConfig> parsearCursos(const QJsonArray& arr)
+{
+    QVector<CursoSolverConfig> cursos;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        CursoSolverConfig c;
+        c.anio            = leerEntero(o, "anio");
+        c.seccion         = leerTexto(o, "seccion");
+        c.turno           = leerTexto(o, "turno");
+        c.num_estudiantes = leerEntero(o, "num_estudiantes");
+        c.plan            = leerTexto(o, "plan");
+        c.aula            = leerEntero(o, "aula", -1);
+        cursos.append(c);
+    }
+    return cursos;
+}
+QJsonArray aJson(const QVector<CursoSolverConfig>& cursos)
+{
     QJsonArray arr;
-    for (const auto& p : profesores) {
-        QJsonObject o;
-        o["nombre"]           = p.nombre;
-        o["horas_requeridas"] = p.horas_requeridas;
-        o["horas_aula"]       = p.horas_aula;
-        o["turno"]            = p.turno;
-        o["plan"]             = p.plan;
-        o["materias_asignadas"] = intArray(p.materias_asignadas);
-
-        QJsonArray suplentes;
-        for (const auto& ms : p.materias_suplente) {
-            QJsonObject mo;
-            mo["materia_idx"] = ms.materiaIDx;
-            mo["peso"]        = ms.peso;
-            suplentes.append(mo);
-        }
-        o["materias_suplente"] = suplentes;
-
-        QJsonArray disponibilidad;
-        for (const auto& d : p.disponibilidad) {
-            QJsonObject dobj;
-            dobj["dia"]  = d.dia;
-            dobj["slot"] = intArray(d.slot);
-            disponibilidad.append(dobj);
-        }
-        o["disponibilidad"] = disponibilidad;
-        arr.append(o);
+    for (const CursoSolverConfig& c : cursos) {
+        QJsonObject obj;
+        obj["anio"]            = c.anio;
+        obj["seccion"]         = c.seccion;
+        obj["turno"]           = c.turno;
+        obj["num_estudiantes"] = c.num_estudiantes;
+        obj["plan"]            = c.plan;
+        obj["aula"]            = c.aula;
+        arr.append(obj);
     }
     return arr;
 }
 
-QJsonArray serializarMaterias(const QVector<MateriaSolverConfig>& materias) {
+/* ── Profesores ── */
+QVector<MateriaSuplente> parsearMateriasSuplentes(const QJsonArray& arr)
+{
+    QVector<MateriaSuplente> suplentes;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        MateriaSuplente m;
+        m.materiaIDx = leerEntero(o, "materia_idx");
+        m.peso       = leerEntero(o, "peso");
+        suplentes.append(m);
+    }
+    return suplentes;
+}
+QJsonArray aJson(const QVector<MateriaSuplente>& suplentes)
+{
     QJsonArray arr;
-    for (const auto& m : materias) {
-        QJsonObject o;
-        o["nombre"] = m.nombre;
-        arr.append(o);
+    for (const MateriaSuplente& m : suplentes) {
+        QJsonObject obj;
+        obj["materia_idx"] = m.materiaIDx;
+        obj["peso"]        = m.peso;
+        arr.append(obj);
+    }
+    return arr;
+}
+QVector<Disponibilidad> parsearDisponibilidad(const QJsonArray& arr)
+{
+    QVector<Disponibilidad> disp;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        Disponibilidad d;
+        d.dia  = leerEntero(o, "dia");
+        d.slot = leerEnteros(o["slot"].toArray());
+        disp.append(d);
+    }
+    return disp;
+}
+QJsonArray aJson(const QVector<Disponibilidad>& disp)
+{
+    QJsonArray arr;
+    for (const Disponibilidad& d : disp) {
+        QJsonObject obj;
+        obj["dia"]  = d.dia;
+        obj["slot"] = aJson(d.slot);
+        arr.append(obj);
+    }
+    return arr;
+}
+QVector<ProfesorSolverConfig> parsearProfesores(const QJsonArray& arr)
+{
+    QVector<ProfesorSolverConfig> profesores;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        ProfesorSolverConfig p;
+        p.nombre             = leerTexto(o, "nombre");
+        p.horas_requeridas   = leerEntero(o, "horas_requeridas");
+        p.horas_aula         = leerEntero(o, "horas_aula");
+        p.turno              = leerTexto(o, "turno");
+        p.plan               = leerTexto(o, "plan");
+        p.anios              = leerEnteros(o["anios"].toArray());
+        p.materias_asignadas = leerEnteros(o["materias_asignadas"].toArray());
+        p.materias_suplente  = parsearMateriasSuplentes(o["materias_suplente"].toArray());
+        p.disponibilidad     = parsearDisponibilidad(o["disponibilidad"].toArray());
+        profesores.append(p);
+    }
+    return profesores;
+}
+QJsonArray aJson(const QVector<ProfesorSolverConfig>& profesores)
+{
+    QJsonArray arr;
+    for (const ProfesorSolverConfig& p : profesores) {
+        QJsonObject obj;
+        obj["nombre"]             = p.nombre;
+        obj["horas_requeridas"]   = p.horas_requeridas;
+        obj["horas_aula"]         = p.horas_aula;
+        obj["turno"]              = p.turno;
+        obj["plan"]               = p.plan;
+        obj["anios"]              = aJson(p.anios);
+        obj["materias_asignadas"] = aJson(p.materias_asignadas);
+        obj["materias_suplente"]  = aJson(p.materias_suplente);
+        obj["disponibilidad"]     = aJson(p.disponibilidad);
+        arr.append(obj);
     }
     return arr;
 }
 
-QJsonArray serializarAulas(const QVector<AulaSolverConfig>& aulas) {
+/* ── Materias / Aulas ── */
+QVector<MateriaSolverConfig> parsearMaterias(const QJsonArray& arr)
+{
+    QVector<MateriaSolverConfig> materias;
+    for (const QJsonValue& valor : arr) {
+        MateriaSolverConfig m;
+        m.nombre = leerTexto(valor.toObject(), "nombre");
+        materias.append(m);
+    }
+    return materias;
+}
+QJsonArray aJson(const QVector<MateriaSolverConfig>& materias)
+{
     QJsonArray arr;
-    for (const auto& a : aulas) {
-        QJsonObject o;
-        o["nombre"]    = a.nombre;
-        o["tipo"]      = a.tipo;
-        o["capacidad"] = a.capacidad;
-        arr.append(o);
+    for (const MateriaSolverConfig& m : materias) {
+        QJsonObject obj;
+        obj["nombre"] = m.nombre;
+        arr.append(obj);
     }
     return arr;
+}
+QVector<AulaSolverConfig> parsearAulas(const QJsonArray& arr)
+{
+    QVector<AulaSolverConfig> aulas;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        AulaSolverConfig a;
+        a.nombre    = leerTexto(o, "nombre");
+        a.tipo      = leerTexto(o, "tipo");
+        a.capacidad = leerEntero(o, "capacidad");
+        aulas.append(a);
+    }
+    return aulas;
+}
+QJsonArray aJson(const QVector<AulaSolverConfig>& aulas)
+{
+    QJsonArray arr;
+    for (const AulaSolverConfig& a : aulas) {
+        QJsonObject obj;
+        obj["nombre"]    = a.nombre;
+        obj["tipo"]      = a.tipo;
+        obj["capacidad"] = a.capacidad;
+        arr.append(obj);
+    }
+    return arr;
+}
+
+/* ── Validaciones V1-V15 (RF-11). Devuelven "" si OK. ── */
+
+/// V4/V6/V12: indice dentro de [0, tamano).
+QString validarIndice(int indice, int tamano, const QString& campo)
+{
+    if (indice < 0 || indice >= tamano)
+        return QStringLiteral("%1: indice %2 fuera de rango [0,%3).")
+            .arg(campo).arg(indice).arg(tamano);
+    return {};
+}
+
+const TurnoConfig* buscarTurno(const SolverConfig& c, const QString& nombre)
+{
+    for (const TurnoConfig& t : c.turnos.turnos)
+        if (t.nombre == nombre) return &t;
+    return nullptr;
+}
+
+/// V1. Estructura: el JSON trae todas las secciones requeridas.
+QString validarEstructura(const QJsonObject& obj)
+{
+    const QStringList requeridas = {QStringLiteral("version"),      QStringLiteral("dimensiones"),
+                                    QStringLiteral("franja_horaria"), QStringLiteral("turnos"),
+                                    QStringLiteral("recesos"),       QStringLiteral("planes"),
+                                    QStringLiteral("cursos"),        QStringLiteral("profesores"),
+                                    QStringLiteral("materias"),      QStringLiteral("aulas")};
+    for (const QString& clave : requeridas)
+        if (!obj.contains(clave))
+            return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
+    return {};
+}
+
+/// V2. Tipos/rangos + peso >= 0 + duracion_minutos > 0.
+QString validarTiposYRangos(const SolverConfig& c)
+{
+    if (c.franja_horaria.duracion_minutos <= 0)
+        return QStringLiteral("V2: duracion_minutos debe ser mayor que 0.");
+    for (const ProfesorSolverConfig& p : c.profesores)
+        for (const MateriaSuplente& s : p.materias_suplente)
+            if (s.peso < 0)
+                return QStringLiteral("V2: peso negativo en una suplencia de '%1'.").arg(p.nombre);
+    return {};
+}
+
+/// V3. Las dimensiones coinciden con los tamanos de las listas.
+QString validarDimensiones(const SolverConfig& c)
+{
+    const DimensionesConfig& d = c.dimensiones;
+    if (d.num_profesores != c.profesores.size()) return QStringLiteral("V3: num_profesores no coincide.");
+    if (d.num_materias   != c.materias.size())   return QStringLiteral("V3: num_materias no coincide.");
+    if (d.num_aulas      != c.aulas.size())      return QStringLiteral("V3: num_aulas no coincide.");
+    if (d.num_cursos     != c.cursos.size())     return QStringLiteral("V3: num_cursos no coincide.");
+    return {};
+}
+
+/// V4. Indices de materias en rango (planes y docentes).
+QString validarIndicesMaterias(const SolverConfig& c)
+{
+    const int nM = c.materias.size();
+    for (const PlanSolverConfig& plan : c.planes)
+        for (const PlanMateriaConfig& m : plan.materias) {
+            const QString e = validarIndice(m.materiaIDx, nM, QStringLiteral("V4 materia del plan"));
+            if (!e.isEmpty()) return e;
+        }
+    for (const ProfesorSolverConfig& p : c.profesores) {
+        for (int idx : p.materias_asignadas) {
+            const QString e = validarIndice(idx, nM, QStringLiteral("V4 materia asignada"));
+            if (!e.isEmpty()) return e;
+        }
+        for (const MateriaSuplente& s : p.materias_suplente) {
+            const QString e = validarIndice(s.materiaIDx, nM, QStringLiteral("V4 materia suplente"));
+            if (!e.isEmpty()) return e;
+        }
+    }
+    return {};
+}
+
+/// V5. Indices de profesores en rango (sin referencias cruzadas hoy).
+QString validarIndicesProfesores(const SolverConfig&) { return {}; }
+
+/// V6. Indices de aulas en rango.
+QString validarIndicesAulas(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos)
+        if (cu.aula >= 0) {
+            const QString e = validarIndice(cu.aula, c.aulas.size(), QStringLiteral("V6 aula de curso"));
+            if (!e.isEmpty()) return e;
+        }
+    return {};
+}
+
+/// V7. El curso declara un turno y ese turno existe.
+QString validarTurnosDeCursos(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        if (cu.turno.isEmpty())
+            return QStringLiteral("V7: el curso %1%2 no declara turno.").arg(cu.anio).arg(cu.seccion);
+        if (!buscarTurno(c, cu.turno))
+            return QStringLiteral("V7: el turno '%1' del curso %2%3 no existe.")
+                .arg(cu.turno).arg(cu.anio).arg(cu.seccion);
+    }
+    return {};
+}
+
+/// V8. Con aula fija activa cada curso declara aula; inactiva, se ignora.
+QString validarAulasDeCursos(const SolverConfig& c)
+{
+    if (!c.aula_fija) return {};
+    for (const CursoSolverConfig& cu : c.cursos)
+        if (cu.aula < 0)
+            return QStringLiteral("V8: modo aula fija activo y el curso %1%2 no declara aula.")
+                .arg(cu.anio).arg(cu.seccion);
+    return {};
+}
+
+/// V9. num_estudiantes opcional: solo se rechaza si es negativo.
+QString validarNumeroEstudiantes(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos)
+        if (cu.num_estudiantes < 0)
+            return QStringLiteral("V9: num_estudiantes negativo en el curso %1%2.")
+                .arg(cu.anio).arg(cu.seccion);
+    return {};
+}
+
+/// V10. Curso con plan y materias; docente con materias.
+QString validarListasNoVacias(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        if (cu.plan.isEmpty())
+            return QStringLiteral("V10: el curso %1%2 no declara plan.").arg(cu.anio).arg(cu.seccion);
+        if (materiasDelCurso(c, cu).isEmpty())
+            return QStringLiteral("V10: el curso %1%2 no tiene materias en su plan.").arg(cu.anio).arg(cu.seccion);
+    }
+    for (const ProfesorSolverConfig& p : c.profesores)
+        if (p.materias_asignadas.isEmpty() && p.materias_suplente.isEmpty())
+            return QStringLiteral("V10: el docente '%1' no tiene materias.").arg(p.nombre);
+    return {};
+}
+
+/// V11. Cada curso referencia exactamente un plan existente.
+QString validarUnPlanPorCurso(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        int coincidencias = 0;
+        for (const PlanSolverConfig& plan : c.planes)
+            if (plan.codigo == cu.plan) ++coincidencias;
+        if (coincidencias != 1)
+            return QStringLiteral("V11: el curso %1%2 debe referenciar exactamente un plan ('%3').")
+                .arg(cu.anio).arg(cu.seccion).arg(cu.plan);
+    }
+    return {};
+}
+
+/// V12. Disponibilidad dentro de dias y slots declarados.
+QString validarDisponibilidad(const SolverConfig& c)
+{
+    for (const ProfesorSolverConfig& p : c.profesores)
+        for (const Disponibilidad& d : p.disponibilidad) {
+            if (d.dia < 0 || d.dia >= c.dimensiones.num_dias)
+                return QStringLiteral("V12: dia fuera de rango en la disponibilidad de '%1'.").arg(p.nombre);
+            for (int slot : d.slot)
+                if (slot < 0 || slot >= c.dimensiones.num_slots_dia)
+                    return QStringLiteral("V12: slot fuera de rango en la disponibilidad de '%1'.").arg(p.nombre);
+        }
+    return {};
+}
+
+/// V13. Cada materia-curso tiene al menos un candidato elegible.
+QString validarCandidatosElegibles(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(c, cu)) {
+            bool hay = false;
+            for (const ProfesorSolverConfig& p : c.profesores) {
+                bool opta = p.materias_asignadas.contains(mc.materiaIDx);
+                for (const MateriaSuplente& s : p.materias_suplente)
+                    if (s.materiaIDx == mc.materiaIDx) opta = true;
+                if (!opta) continue;
+                if (!p.turno.isEmpty() && p.turno != cu.turno) continue;
+                if (!p.plan.isEmpty()  && p.plan  != cu.plan)  continue;
+                if (!p.anios.isEmpty() && !p.anios.contains(cu.anio)) continue;
+                if (p.disponibilidad.isEmpty()) continue;
+                hay = true;
+                break;
+            }
+            if (!hay)
+                return QStringLiteral("V13: la materia %1 del curso %2%3 no tiene candidato elegible.")
+                    .arg(mc.materiaIDx).arg(cu.anio).arg(cu.seccion);
+        }
+    }
+    return {};
+}
+
+/// V14. Suma de bloques del curso <= n_dias * franjas del turno.
+QString validarFranjasUtiles(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        const TurnoConfig* turno = buscarTurno(c, cu.turno);
+        if (!turno) continue;
+        int totalBloques = 0;
+        for (const PlanMateriaConfig& mc : materiasDelCurso(c, cu))
+            totalBloques += bloques(mc.horasSemanales, c.franja_horaria.duracion_minutos);
+        const int franjasUtiles = c.dimensiones.num_dias * turno->slot.size();
+        if (totalBloques > franjasUtiles)
+            return QStringLiteral("V14: el curso %1%2 necesita %3 bloques y solo tiene %4 franjas utiles.")
+                .arg(cu.anio).arg(cu.seccion).arg(totalBloques).arg(franjasUtiles);
+    }
+    return {};
+}
+
+/// V15. Modo de aulas moviles exige que el centro tenga aulas.
+QString validarAulasMoviles(const SolverConfig& c)
+{
+    if (!c.aula_fija && c.aulas.isEmpty())
+        return QStringLiteral("V15: modo de aulas moviles sin aulas disponibles.");
+    return {};
 }
 
 } // namespace
 
-QJsonObject SolverConfig::toJson() const {
+Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
+{
+    SolverConfig config;
+    config.version        = leerTexto(obj, "version");
+    config.aula_fija      = obj.contains(QLatin1String("aula_fija"))
+                                ? obj.value(QLatin1String("aula_fija")).toBool(true)
+                                : true;
+    config.dimensiones    = parsearDimensiones(obj["dimensiones"].toObject());
+    config.franja_horaria = parsearFranjaHoraria(obj["franja_horaria"].toObject());
+    config.turnos         = parsearTurnos(obj["turnos"].toObject());
+    config.recesos        = parsearRecesos(obj["recesos"].toArray());
+    config.planes         = parsearPlanes(obj["planes"].toArray());
+    config.cursos         = parsearCursos(obj["cursos"].toArray());
+    config.profesores     = parsearProfesores(obj["profesores"].toArray());
+    config.materias       = parsearMaterias(obj["materias"].toArray());
+    config.aulas          = parsearAulas(obj["aulas"].toArray());
+
+    const QString v1 = validarEstructura(obj);
+    if (!v1.isEmpty())
+        return Resultado<SolverConfig>::error(v1);
+
+    const QStringList errores = {
+        validarTiposYRangos(config),       validarDimensiones(config),       validarIndicesMaterias(config),
+        validarIndicesProfesores(config),  validarIndicesAulas(config),      validarTurnosDeCursos(config),
+        validarAulasDeCursos(config),      validarNumeroEstudiantes(config), validarListasNoVacias(config),
+        validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCandidatosElegibles(config),
+        validarFranjasUtiles(config),      validarAulasMoviles(config)};
+    for (const QString& error : errores)
+        if (!error.isEmpty())
+            return Resultado<SolverConfig>::error(error);
+
+    return Resultado<SolverConfig>::exito(config);
+}
+
+QJsonObject SolverConfig::toJson() const
+{
     QJsonObject obj;
     obj["version"]        = version;
-    obj["dimensiones"]    = serializarDimensiones(dimensiones);
-    obj["franja_horaria"] = serializarFranja(franja_horaria);
-    obj["turnos"]         = serializarTurnos(turnos);
-    obj["recesos"]        = serializarRecesos(recesos);
-    obj["cursos"]         = serializarCursos(cursos);
-    obj["profesores"]     = serializarProfesores(profesores);
-    obj["materias"]       = serializarMaterias(materias);
-    obj["aulas"]          = serializarAulas(aulas);
-
-    QJsonObject planificacion;
-    planificacion["activa"] = this->planificacion.activa;
-    obj["planificacion"] = planificacion;
-
-    QJsonObject generacion;
-    generacion["cursos_a_generar"] = intArray(this->generacion.cursos_a_generar);
-    obj["generacion"] = generacion;
-
-    QJsonObject penalizaciones;
-    penalizaciones["capacidad_aula"]      = this->penalizaciones.capacidad_aula;
-    penalizaciones["emergencia_profesor"] = this->penalizaciones.emergencia_profesor;
-    obj["penalizaciones"] = penalizaciones;
-
+    obj["aula_fija"]      = aula_fija;
+    obj["dimensiones"]    = aJson(dimensiones);
+    obj["franja_horaria"] = aJson(franja_horaria);
+    obj["turnos"]         = aJson(turnos);
+    obj["recesos"]        = aJson(recesos);
+    obj["planes"]         = aJson(planes);
+    obj["cursos"]         = aJson(cursos);
+    obj["profesores"]     = aJson(profesores);
+    obj["materias"]       = aJson(materias);
+    obj["aulas"]          = aJson(aulas);
     return obj;
 }

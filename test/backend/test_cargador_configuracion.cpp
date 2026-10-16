@@ -73,7 +73,9 @@ private:
         profesor["anios"]              = QJsonArray{1};
         profesor["materias_asignadas"] = QJsonArray{0};
         profesor["materias_suplente"]  = QJsonArray{};
-        profesor["disponibilidad"]     = QJsonArray{};
+        // Con disponibilidad real: V13 exige que el candidato tenga bloques.
+        QJsonObject disp; disp["dia"] = 0; disp["slot"] = QJsonArray{0, 1, 2, 3, 4, 5};
+        profesor["disponibilidad"]     = QJsonArray{disp};
         o["profesores"] = QJsonArray{profesor};
 
         QJsonObject materia;

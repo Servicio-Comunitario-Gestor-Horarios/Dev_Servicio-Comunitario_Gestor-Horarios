@@ -85,6 +85,8 @@ if(TARGET backend)
 	add_qtest(test_servicio_profesor backend/test_servicio_profesor.cpp backend Qt6::Sql)
 
 	add_gtest(test_servicio_exportacion backend/test_servicio_exportacion.cpp backend)
+
+	add_qtest(test_contrato_solver backend/test_contrato_solver.cpp backend)
 endif()
 
 # ============================================================
