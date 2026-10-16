@@ -609,7 +609,9 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
 QJsonObject SolverConfig::toJson() const
 {
     QJsonObject obj;
-    obj["version"]        = version;
+    // Al PRODUCIR/serializar se sella siempre una version valida: si el origen no la declaro,
+    // se escribe "1.0" (nunca vacio). La LECTURA sigue rechazando ausente/no reconocida (RF-10).
+    obj["version"]        = version.isEmpty() ? QStringLiteral("1.0") : version;
     obj["aula_fija"]      = aula_fija;
     obj["dimensiones"]    = aJson(dimensiones);
     obj["franja_horaria"] = aJson(franja_horaria);

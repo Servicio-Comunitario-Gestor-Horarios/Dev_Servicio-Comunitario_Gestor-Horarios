@@ -193,6 +193,38 @@ private slots:
         QVERIFY(config.mensajeError.contains(QStringLiteral("1.0")));
     }
 
+    /// Al PRODUCIR una configuracion (construida en C++ sin declarar `version`) se sella "1.0".
+    void configSinVersionDeclarada_seSellaYRecarga()
+    {
+        // Configuracion valida construida en C++ a la que el origen NO declara version.
+        const auto parseada = SolverConfig::fromJson(configValida());
+        QVERIFY(parseada.ok);
+        SolverConfig config = parseada.valor;
+        config.version.clear();
+
+        // (i) al serializar sale "1.0", nunca vacio.
+        QCOMPARE(config.toJson()[QStringLiteral("version")].toString(), QStringLiteral("1.0"));
+
+        // (ii) guardar y recargar sigue siendo valida.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("preset.json"));
+        const auto guardado = CargadorConfiguracionSolver::guardar(ruta, config);
+        QVERIFY2(guardado.ok, qPrintable(guardado.mensajeError));
+
+        const auto leido = CargadorConfiguracionSolver::cargar(ruta);
+        QVERIFY2(leido.ok, qPrintable(leido.mensajeError));
+        QCOMPARE(leido.valor.version, QStringLiteral("1.0"));
+    }
+
+    /// Una configuracion por defecto (recien construida en C++) ya declara la version 1.0.
+    void configPorDefectoYaDeclaraVersion_1_0()
+    {
+        const SolverConfig config;
+        QCOMPARE(config.version, QStringLiteral("1.0"));
+        QCOMPARE(config.toJson()[QStringLiteral("version")].toString(), QStringLiteral("1.0"));
+    }
+
     void guardarCarpetaInexistente_error()
     {
         QTemporaryDir dir;

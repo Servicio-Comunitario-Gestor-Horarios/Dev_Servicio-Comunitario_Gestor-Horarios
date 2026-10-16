@@ -182,6 +182,21 @@ private slots:
         QVERIFY2(config.ok, qPrintable(config.mensajeError));
     }
 
+    /// El preset no declara `version`: la entrada construida debe salir sellada con "1.0".
+    void entradaSinVersionDeclarada_seSellaA_1_0()
+    {
+        SolverConfig p = parametros();
+        p.version.clear();   // el origen no declara version
+
+        const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 0, 0));
+        const QJsonObject json = construirJsonEntrada(dominioCompleto(), p, ahora);
+
+        QCOMPARE(json[QStringLiteral("version")].toString(), QStringLiteral("1.0"));
+        // Sigue siendo consumible por el solver (no se rechaza por version).
+        const auto config = SolverConfig::fromJson(json);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+    }
+
     void esPura_conElMismoInstanteDaElMismoJson()
     {
         const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 0, 0));

@@ -61,7 +61,7 @@ struct RecesoConfig        { QString turno; int despues_de_slot = 0, duracion = 
                              QString inicio; QString fin; };
 
 struct SolverConfig {
-    QString version;
+    QString version = QStringLiteral("1.0");   ///< version de formato producida y aceptada (RF-10)
     bool aula_fija = true;                     ///< modo GLOBAL
     DimensionesConfig dimensiones;
     FranjaHorariaConfig franja_horaria;
