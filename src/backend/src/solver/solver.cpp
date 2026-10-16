@@ -1,12 +1,16 @@
 #include "backend/solver/solver.hpp"
+#include "backend/solver/config/solver_config.hpp"
 #include "backend/solver/variables.hpp"
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
+#include "backend/solver/config/contrato_solver.hpp"
+#include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/cp_model.h"
 #include "ortools/sat/cp_model.pb.h"
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/model.h"
+#include "qvariant.h"
 #include <QElapsedTimer>
 
 using namespace operations_research::sat;
@@ -17,15 +21,24 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
 
     ResultadoSolver resultado;
     resultado.exito = false;
-
+    
     // Crear variables de decision
     vars = crearVariables(model, config);
 
     // Agregar restricciones
     agregarRestricciones(config);
 
-    // Resolver CP-SAT
+    // Objetivo
+
+    construirObjetivo(config);
+
+    // Resolver CP-SAT (parametros deterministas: RNF-1)
+    SatParameters params;
+    params.set_num_search_workers(1);
+    params.set_random_seed(0);
+
     Model sat_model;
+    sat_model.Add(NewSatParameters(params));
     const CpSolverResponse response = SolveCpModel(model.Build(), &sat_model);
 
     // Verificar status
@@ -39,6 +52,29 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     
     resultado.tiempo_ms = timer.elapsed();
     return resultado;
+}
+
+void Solver::construirObjetivo(const SolverConfig& config) {
+    LinearExpr objetivo = LinearExpr(0);
+
+    // S1: exceso de horas de aula
+    for (int p = 0; p < config.dimensiones.num_profesores; ++p) {
+        const auto eIt = vars.exceso.constFind(p);
+        if (eIt != vars.exceso.constEnd()) {
+            objetivo = objetivo + LinearExpr::Term(*eIt, ContratoSolver::PESO_HORAS);
+        }
+    }
+
+    // S2: coste fijo por asignar a un SUPLENTE
+    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd(); ++it) {
+        const auto [p, c, m] = it.key();
+        const bool titular = config.profesores[p].materias_asignadas.contains(m);
+        if (!titular) {
+            objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::COSTE_SUPLENTE);
+        }
+    }
+
+    model.Minimize(objetivo);
 }
 
 void Solver::agregarRestricciones(const SolverConfig& config) {
@@ -57,8 +93,9 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
 
         auto [p, m, c, d, s] = it.key();
 
-        int aula = config.cursos[c].aula_fija;
-        if (aula == -1) {
+        // Aula: la fija del curso (indice) en modo fijo; en movil, la asignada.
+        int aula = config.aula_fija ? config.cursos[c].aula : -1;
+        if (aula < 0) {
             for (auto itA = vars.aulaAssignment.constBegin(); itA != vars.aulaAssignment.constEnd(); ++itA) {
                 auto [ac, ad, as, aa] = itA.key();
                 if (ac == c && ad == d && as == s && SolutionBooleanValue(response, itA.value())) {
@@ -91,7 +128,7 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
             curso.dias.append(dia);
         }
 
-        horario.horarios[config.cursos[c].nombre] = curso;
+        horario.horarios[claveCurso(config.cursos[c].anio, config.cursos[c].seccion)] = curso;
     }
 
     MetadataSalida metadata;
