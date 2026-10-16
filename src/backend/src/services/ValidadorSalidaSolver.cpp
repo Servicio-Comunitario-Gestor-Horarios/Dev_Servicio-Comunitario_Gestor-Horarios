@@ -168,7 +168,7 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
         if (idx < 0 || idx >= config.profesores.size())
             continue;
         const int requeridas = config.profesores[idx].horas_requeridas;
-        if (requeridas > 0 && it.value() > requeridas)
+        if (requeridas != -1 && it.value() > requeridas)   // -1 = horas_requeridas ausente
         {
             analisis.avisos.append(
                 QStringLiteral("Exceso de horas: el docente «%1» tiene %2 de %3 horas.")

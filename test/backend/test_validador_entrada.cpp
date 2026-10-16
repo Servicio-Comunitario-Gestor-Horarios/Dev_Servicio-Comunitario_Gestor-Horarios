@@ -183,9 +183,58 @@ private slots:
 
     void v9_numeroEstudiantesNegativo_falla()
     {
-        // num_estudiantes es opcional; solo un valor negativo se rechaza.
-        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = -1; });
+        // num_estudiantes presente debe ser positivo. -1 es el centinela de AUSENTE,
+        // asi que el valor negativo probado es distinto de -1.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = -5; });
         QVERIFY(!validarEntradaSolver(j).ok);
+    }
+
+    void v9_numeroEstudiantesCero_falla()
+    {
+        // Presente pero NO positivo: la forma exigida es entero > 0 (RF-11, V9).
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = 0; });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, "num_estudiantes presente y no positivo debe rechazarse");
+    }
+
+    void v9_numeroEstudiantesPositivo_pasa()
+    {
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = 25; });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v9_numeroEstudiantesAusente_pasa()
+    {
+        // Ausente (centinela -1): el chequeo de forma se omite y la entrada no se invalida.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) {
+            c.remove(QStringLiteral("num_estudiantes"));
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void coherencia_horasAulaMayorQueRequeridas_falla()
+    {
+        // Coherencia de datos: horas_aula <= horas_requeridas cuando horas_requeridas esta presente.
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p["horas_requeridas"] = 8;
+            p["horas_aula"]       = 12;   // 12 > 8
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, "horas_aula > horas_requeridas debe rechazarse (RF-11)");
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("Ana")));
+    }
+
+    void coherencia_horasRequeridasAusente_pasa()
+    {
+        // horas_requeridas ausente (centinela -1): el chequeo se omite aunque horas_aula sea alta.
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p.remove(QStringLiteral("horas_requeridas"));
+            p["horas_aula"] = 30;
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }
 
     void v10_profesorSinMaterias_falla()

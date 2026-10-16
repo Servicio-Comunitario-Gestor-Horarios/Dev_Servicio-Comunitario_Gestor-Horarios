@@ -30,14 +30,14 @@ struct CursoSolverConfig {
     int     anio = 0;
     QString seccion;
     QString turno;                 ///< obligatorio para generar (V7)
-    int     num_estudiantes = 0;   ///< opcional
+    int     num_estudiantes = -1;  ///< opcional; -1 = ausente (V9)
     QString plan;                  ///< codigo (obligatorio)
     int     aula = -1;             ///< indice de aula (o -1); se usa con el modo global
 };
 
 struct ProfesorSolverConfig {
     QString nombre;
-    int horas_requeridas = 0;      ///< opcional: dato de dominio (coordinacion/planificacion);
+    int horas_requeridas = -1;     ///< opcional: dato de dominio; -1 = ausente;
                                    ///< el solver NO lo usa
     int horas_aula = 0;            ///< tope de horas de aula (obligatorio)
     QString turno;                 ///< "" = cualquiera

@@ -184,7 +184,7 @@ QVector<CursoSolverConfig> parsearCursos(const QJsonArray& arr)
         c.anio            = leerEntero(o, "anio");
         c.seccion         = leerTexto(o, "seccion");
         c.turno           = leerTexto(o, "turno");
-        c.num_estudiantes = leerEntero(o, "num_estudiantes");
+        c.num_estudiantes = leerEntero(o, "num_estudiantes", -1);
         c.plan            = leerTexto(o, "plan");
         c.aula            = leerEntero(o, "aula", -1);
         cursos.append(c);
@@ -261,7 +261,7 @@ QVector<ProfesorSolverConfig> parsearProfesores(const QJsonArray& arr)
         const QJsonObject o = valor.toObject();
         ProfesorSolverConfig p;
         p.nombre             = leerTexto(o, "nombre");
-        p.horas_requeridas   = leerEntero(o, "horas_requeridas");
+        p.horas_requeridas   = leerEntero(o, "horas_requeridas", -1);
         p.horas_aula         = leerEntero(o, "horas_aula");
         p.turno              = leerTexto(o, "turno");
         p.plan               = leerTexto(o, "plan");
@@ -461,13 +461,24 @@ QString validarAulasDeCursos(const SolverConfig& c)
     return {};
 }
 
-/// V9. num_estudiantes opcional: solo se rechaza si es negativo.
+/// V9. num_estudiantes opcional: si esta presente (centinela -1 = ausente) debe ser positivo.
 QString validarNumeroEstudiantes(const SolverConfig& c)
 {
     for (const CursoSolverConfig& cu : c.cursos)
-        if (cu.num_estudiantes < 0)
-            return QStringLiteral("V9: num_estudiantes negativo en el curso %1%2.")
+        if (cu.num_estudiantes != -1 && cu.num_estudiantes <= 0)
+            return QStringLiteral("V9: num_estudiantes debe ser un entero positivo en el curso %1%2.")
                 .arg(cu.anio).arg(cu.seccion);
+    return {};
+}
+
+/// Coherencia de datos (RF-11): si `horas_requeridas` esta presente (centinela -1 = ausente),
+/// `horas_aula` no debe superarla. Es un chequeo del dato de dominio, no una regla del solver.
+QString validarCoherenciaHoras(const SolverConfig& c)
+{
+    for (const ProfesorSolverConfig& p : c.profesores)
+        if (p.horas_requeridas != -1 && p.horas_aula > p.horas_requeridas)
+            return QStringLiteral("El docente '%1' tiene horas_aula (%2) mayor que horas_requeridas (%3).")
+                .arg(p.nombre).arg(p.horas_aula).arg(p.horas_requeridas);
     return {};
 }
 
@@ -586,8 +597,8 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
         validarTiposYRangos(config),       validarDimensiones(config),       validarIndicesMaterias(config),
         validarIndicesProfesores(config),  validarIndicesAulas(config),      validarTurnosDeCursos(config),
         validarAulasDeCursos(config),      validarNumeroEstudiantes(config), validarListasNoVacias(config),
-        validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCandidatosElegibles(config),
-        validarFranjasUtiles(config),      validarAulasMoviles(config)};
+        validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCoherenciaHoras(config),
+        validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config)};
     for (const QString& error : errores)
         if (!error.isEmpty())
             return Resultado<SolverConfig>::error(error);
