@@ -24,6 +24,7 @@ MateriaEnPlan MateriaEnPlan::fromJson(const QJsonObject& obj) {
 QJsonObject PlanEstudio::toJson() const {
 
     QJsonObject obj;
+    obj["codigo"] = codigo;
     obj["nombre"] = nombre;
 
     QJsonArray arreglo;
@@ -39,6 +40,7 @@ QJsonObject PlanEstudio::toJson() const {
 PlanEstudio PlanEstudio::fromJson(const QJsonObject& obj) {
 
     PlanEstudio plan_estudio;
+    plan_estudio.codigo = obj["codigo"].toString();
     plan_estudio.nombre = obj["nombre"].toString();
 
     for (const auto& aux : obj["materias"].toArray()) {

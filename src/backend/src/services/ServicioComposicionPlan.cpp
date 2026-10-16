@@ -148,6 +148,7 @@ Resultado<PlanEstudio> ServicioComposicionPlan::componerPlanCompleto(const QStri
 
     // Construir PlanEstudio struct del solver
     PlanEstudio plan;
+    plan.codigo = codigoPlan;
     plan.nombre = planQuery.value("nombre").toString();
 
     // Obtener materias con carga horaria desde PlanEstudio_Materia

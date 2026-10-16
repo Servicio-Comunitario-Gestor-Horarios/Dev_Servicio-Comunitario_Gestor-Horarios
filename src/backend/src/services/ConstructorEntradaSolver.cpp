@@ -61,6 +61,34 @@ namespace
         return -1;
     }
 
+    /// Indice de la materia con ese `nombre` en el pool global, o -1.
+    int indiceMateriaPorNombre(const QVector<MateriaDTO>& materias, const QString& nombre)
+    {
+        for (int i = 0; i < materias.size(); ++i)
+            if (materias[i].nombre == nombre)
+                return i;
+        return -1;
+    }
+
+    /// Curso del preset casado por identidad (anio+seccion), o nullptr.
+    const CursoSolverConfig* parametrosDeCurso(const SolverConfig& parametros,
+                                               int anio, const QString& seccion)
+    {
+        for (const CursoSolverConfig& c : parametros.cursos)
+            if (c.anio == anio && c.seccion == seccion)
+                return &c;
+        return nullptr;
+    }
+
+    /// Plan compuesto del dominio con ese codigo, o nullptr.
+    const PlanEstudio* planPorCodigo(const QVector<PlanEstudio>& planes, const QString& codigo)
+    {
+        for (const PlanEstudio& p : planes)
+            if (p.codigo == codigo)
+                return &p;
+        return nullptr;
+    }
+
     /// Id del docente con `nombre`, o cadena vacía. Se usa para casar el preset.
     const ProfesorSolverConfig* parametrosDeDocente(const SolverConfig& parametros,
                                                     const QString& nombre)
@@ -111,12 +139,10 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
 
     SolverConfig salida;
 
-    // Parámetros del solver que no son entidad.
+    // Parametros del solver que no son entidad.
     salida.version        = parametros.version;
+    salida.aula_fija      = parametros.aula_fija;      // modo GLOBAL (del preset)
     salida.franja_horaria = parametros.franja_horaria;
-    salida.planificacion  = parametros.planificacion;
-    salida.generacion     = parametros.generacion;
-    salida.penalizaciones = parametros.penalizaciones;
 
     // Materias: pool global en el orden de la instantánea.
     for (const MateriaDTO& m : datos.materias)
@@ -157,19 +183,43 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         }
     }
 
-    // Cursos.
+    // Cursos: de la BD (anio/seccion/turno/aula); del preset (plan/num_estudiantes).
     for (const CursoDTO& c : datos.cursos)
     {
-        // TODO(spec 005): el nombre, el plan, el numero de estudiantes, el modo de
-        // aula fija y las materias (derivadas del plan) son de la configuracion del
-        // solver. Aqui solo se traslada lo que hoy persiste el dominio.
         CursoSolverConfig curso;
-        curso.nombre          = nombreCurso(c.anio, c.seccion);
-        curso.turno           = c.turno;
-        curso.aula_fija       = indiceAula(datos.aulas, c.aula);
-        curso.num_estudiantes = 0;
-        curso.plan            = QString();
+        curso.anio    = c.anio;
+        curso.seccion = c.seccion;
+        curso.turno   = c.turno;
+        if (const CursoSolverConfig* pc = parametrosDeCurso(parametros, c.anio, c.seccion))
+        {
+            curso.plan            = pc->plan;
+            curso.num_estudiantes = pc->num_estudiantes;
+        }
+        // Aula: indice en modo fijo; -1 en modo movil (la decide el solver).
+        curso.aula = salida.aula_fija ? indiceAula(datos.aulas, c.aula) : -1;
         salida.cursos.append(curso);
+    }
+
+    // Planes EMBEBIDOS: solo los referenciados por los cursos.
+    for (const CursoSolverConfig& c : salida.cursos)
+    {
+        bool ya = false;
+        for (const PlanSolverConfig& p : salida.planes)
+            if (p.codigo == c.plan) { ya = true; break; }
+        if (ya) continue;
+
+        const PlanEstudio* plan = planPorCodigo(datos.planes, c.plan);
+        if (!plan) continue;   // V10/V11 lo rechazaran
+
+        PlanSolverConfig embebido;
+        embebido.codigo = plan->codigo;
+        for (const MateriaEnPlan& m : plan->materias)
+        {
+            const int idx = indiceMateriaPorNombre(datos.materias, m.materia.nombre);
+            if (idx >= 0)
+                embebido.materias.append(PlanMateriaConfig{idx, m.curso, m.horas});
+        }
+        salida.planes.append(embebido);
     }
 
     // Profesores: entidad del dominio + parámetros del solver casados por nombre.
@@ -184,6 +234,7 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
             prof.horas_aula       = p->horas_aula;
             prof.turno            = p->turno;
             prof.plan             = p->plan;
+            prof.anios            = p->anios;
             prof.materias_suplente = p->materias_suplente;
         }
 

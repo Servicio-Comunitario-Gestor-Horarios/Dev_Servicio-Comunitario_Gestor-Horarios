@@ -1,16 +1,18 @@
 #include "backend/services/ValidadorSalidaSolver.hpp"
 
+#include "backend/solver/config/contrato_solver.hpp"
+
 #include <QMap>
 #include <QPair>
 #include <QSet>
 
 namespace
 {
-    /// Índice del curso de `config` con ese nombre, o -1.
-    int indiceCurso(const SolverConfig& config, const QString& nombre)
+    /// Indice del curso de `config` con esa clave de identidad (`claveCurso`), o -1.
+    int indiceCurso(const SolverConfig& config, const QString& clave)
     {
         for (int i = 0; i < config.cursos.size(); ++i)
-            if (config.cursos[i].nombre == nombre)
+            if (claveCurso(config.cursos[i].anio, config.cursos[i].seccion) == clave)
                 return i;
         return -1;
     }
@@ -20,7 +22,7 @@ namespace
     {
         if (idxCurso < 0)
             return -1;
-        for (const MateriaCurso& mc : config.cursos[idxCurso].materias)
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[idxCurso]))
             if (mc.materiaIDx == materia)
                 return mc.horasSemanales;
         return -1;
@@ -139,7 +141,7 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
         if (idxCurso < 0)
             continue;
 
-        for (const MateriaCurso& mc : config.cursos[idxCurso].materias)
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[idxCurso]))
         {
             const int esperadas = mc.horasSemanales;
             const int cubiertasActual = cubiertas.value({nombreCurso, mc.materiaIDx}, 0);

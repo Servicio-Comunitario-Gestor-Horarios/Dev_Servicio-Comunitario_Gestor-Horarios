@@ -4,6 +4,8 @@
 #include <QTime>
 #include <QTest>
 
+#include <backend/data/materia.hpp>
+#include <backend/data/plan_estudio.hpp>
 #include <backend/services/ConstructorEntradaSolver.hpp>
 #include <backend/solver/config/solver_config.hpp>
 
@@ -40,6 +42,13 @@ private:
         curso.aula = 10;
         d.cursos = {curso};
 
+        // Plan compuesto (materias + horas) referenciado por el curso.
+        Materia mPlan; mPlan.nombre = QStringLiteral("Matemática");
+        MateriaEnPlan mp; mp.curso = 1; mp.horas = 5; mp.materia = mPlan;
+        PlanEstudio plan; plan.codigo = QStringLiteral("Ciencias"); plan.nombre = QStringLiteral("Ciencias");
+        plan.materias = {mp};
+        d.planes = {plan};
+
         FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(9, 0);
         DisponibilidadDTO disp; disp.id = 0; disp.franja = franja;
         MateriaAsignadaDTO asig; asig.id = 1; asig.nombre = QStringLiteral("Matemática");
@@ -61,10 +70,12 @@ private:
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
         p.franja_horaria.slots_por_turno = 6;
-        p.planificacion.activa = false;
-        p.generacion.cursos_a_generar = {0};
-        p.penalizaciones.capacidad_aula = 100;
-        p.penalizaciones.emergencia_profesor = 50;
+        p.aula_fija = true;
+
+        CursoSolverConfig curso;      // del preset: plan + num_estudiantes
+        curso.anio = 1; curso.seccion = QStringLiteral("A");
+        curso.plan = QStringLiteral("Ciencias"); curso.num_estudiantes = 20;
+        p.cursos = {curso};
 
         ProfesorSolverConfig prof;
         prof.nombre = QStringLiteral("Ana");
@@ -82,13 +93,12 @@ private slots:
         const QJsonObject json = construirJsonEntrada(dominioCompleto(), parametros(), ahora);
 
         // 13 secciones: las 12 del contrato implementado + `meta`.
-        for (const QString& seccion : {QStringLiteral("version"), QStringLiteral("meta"),
-                                       QStringLiteral("dimensiones"), QStringLiteral("franja_horaria"),
-                                       QStringLiteral("turnos"), QStringLiteral("recesos"),
+        for (const QString& seccion : {QStringLiteral("version"), QStringLiteral("aula_fija"),
+                                       QStringLiteral("meta"), QStringLiteral("dimensiones"),
+                                       QStringLiteral("franja_horaria"), QStringLiteral("turnos"),
+                                       QStringLiteral("recesos"), QStringLiteral("planes"),
                                        QStringLiteral("cursos"), QStringLiteral("profesores"),
-                                       QStringLiteral("materias"), QStringLiteral("aulas"),
-                                       QStringLiteral("planificacion"), QStringLiteral("generacion"),
-                                       QStringLiteral("penalizaciones")})
+                                       QStringLiteral("materias"), QStringLiteral("aulas")})
         {
             QVERIFY2(json.contains(seccion), qPrintable(seccion));
         }
@@ -137,9 +147,10 @@ private slots:
         const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 0, 0));
         const QJsonObject json = construirJsonEntrada(dominioCompleto(), parametros(), ahora);
 
-        // TODO(spec 005): las materias del curso se derivan de su plan; hasta
-        // entonces el curso no aporta materias a la entrada.
-        QVERIFY(json["cursos"].toArray()[0].toObject()["materias"].toArray().isEmpty());
+        // Las materias del curso viven en su plan EMBEBIDO (RF-7/RF-13).
+        QCOMPARE(json["planes"].toArray().size(), 1);
+        QCOMPARE(json["planes"].toArray()[0].toObject()["materias"].toArray()[0]
+                     .toObject()["materia_idx"].toInt(), 0);
         QCOMPARE(json["profesores"].toArray()[0].toObject()["materias_asignadas"].toArray()[0].toInt(),
                  0);
         // El docente del dominio toma sus horas del preset (casadas por nombre).
