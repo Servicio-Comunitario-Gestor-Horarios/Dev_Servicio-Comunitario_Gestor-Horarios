@@ -1,6 +1,6 @@
 # Spec 005 - Núcleo del solver y contrato de configuración
 
-Estado: aprobada
+Estado: implementada
 
 > **Revisión tras el veredicto del reviewer (2026-10-15, CAMBIOS NECESARIOS resueltos).** El usuario
 > resolvió los cinco bloqueantes y se reescribe la spec. Prioridad declarada: **un motor funcional**;
