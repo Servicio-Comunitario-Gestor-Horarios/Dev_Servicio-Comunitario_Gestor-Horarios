@@ -6,19 +6,21 @@
 
 using namespace operations_research::sat;
 
-void restriccionAulaNoSolapada (
+/// D8: un aula no aloja dos clases a la vez (moviles por `y`, fijos por `x`).
+void restriccionAulaNoSolapada(
     CpModelBuilder& model,
     const SolverConfig& config,
     const VariablesSolver& vars
 );
 
-void restriccionMateriaUnicaPorAula (
+/// D9: un curso movil ocupa exactamente un aula en cada franja con clase.
+void restriccionCursoOcupaUnAula(
     CpModelBuilder& model,
     const SolverConfig& config,
     const VariablesSolver& vars
 );
 
-void agregarRestriccionesAulas (
+void agregarRestriccionesAulas(
     CpModelBuilder& model,
     const SolverConfig& config,
     const VariablesSolver& vars

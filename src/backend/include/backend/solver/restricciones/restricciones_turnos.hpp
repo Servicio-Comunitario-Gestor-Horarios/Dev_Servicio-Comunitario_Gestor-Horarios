@@ -6,19 +6,15 @@
 
 using namespace operations_research::sat;
 
-void restriccionUnoPorTurno (
+/// D4: un curso no tiene dos clases a la vez.
+void restriccionUnoPorTurno(
     CpModelBuilder& model,
     const SolverConfig& config,
     const VariablesSolver& vars
 );
 
-void restriccionBloquesRequeridos (
-    CpModelBuilder& model,
-    const SolverConfig& config,
-    const VariablesSolver& vars
-);
-
-void restriccionHorasSemanalesProfesor (
+/// S1: tope de horas de aula del profesor + exceso penalizado (tope + e[p]).
+void restriccionTopeHorasProfesor(
     CpModelBuilder& model,
     const SolverConfig& config,
     const VariablesSolver& vars

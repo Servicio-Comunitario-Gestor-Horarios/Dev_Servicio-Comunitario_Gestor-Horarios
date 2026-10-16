@@ -14,31 +14,36 @@
 #include <tuple>
 #include "backend/solver/config/solver_config.hpp"
 #include "ortools/sat/cp_model.h"
+#include "qmap.h"
 
 using namespace operations_research::sat;
 
 /**
  * @brief Mapa de variables de decisión del solver.
  *
- * Contiene dos mapas de BoolVar:
- * - assignment: variables de asignación profesor-materia-curso-día-slot
- * - aulaAssignment: variables de asignación de aula para cursos móviles
+ * Contiene:
+ * - assignment         (x): profesor-materia-curso-dia-slot
+ * - aulaAssignment     (y): aula de cursos moviles (solo si el modo no es aula fija)
+ * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
+ * - exceso             (e): bloques por encima del tope de horas de aula (S1)
  */
 struct VariablesSolver {
     QMap<std::tuple<int, int, int, int, int>, BoolVar> assignment;  ///< [p][m][c][d][s]
     QMap<std::tuple<int, int, int, int>, BoolVar> aulaAssignment;   ///< [c][d][s][a]
+    QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;        ///< z: [p][c][m]
+    QMap<int, IntVar> exceso;                                       ///< e[p]
 };
 
 /**
  * @brief Crea las variables de decisión BoolVar para el solver.
  *
- * Recorre cursos → materias → profesores y crea BoolVar SOLO donde:
- * 1. El profesor p tiene la materia m en materias_asignadas O materias_suplente
- * 2. El curso c tiene la materia m en cursos[c].materias
- * 3. El profesor p está disponible en (d, s)
- * 4. (d, s) está dentro del turno del curso
- *
- * Para aulas móviles (aula_fija == -1), crea aulaAssignment[c][d][s][a].
+ * Recorre cursos -> materias (derivadas de su plan) -> profesores y crea `x` SOLO donde:
+ * 1. p tiene la materia m (titular o suplente),
+ * 2. p es elegible (plan/turno/anio; D6/D7/D13),
+ * 3. p esta disponible en (d, s),
+ * 4. (d, s) esta dentro del turno DEL CURSO (D11).
+ * Crea `z[p][c][m]` por candidato con al menos una `x`.
+ * `y[c][d][s][a]` solo con el modo de aulas moviles (config.aula_fija == false).
  *
  * @param model Modelo CP-SAT donde se crean las BoolVar
  * @param config Configuración completa del solver
