@@ -133,19 +133,52 @@ bool VersionEsquema::crearEsquema(QSqlDatabase& db)
     return true;
 }
 
-bool VersionEsquema::esquemaEsperado(QSqlDatabase& db)
+bool VersionEsquema::esquemaEsperado(QSqlDatabase& db, QString* motivo)
 {
+    QStringList faltantes;
+
     for (const QString& tabla : TABLAS_ESPERADAS)
         if (!tablaExiste(db, tabla))
-            return false;
+            faltantes << tabla;
 
-    for (const QString& columna : COLUMNAS_CURSOS)
-        if (!columnaExiste(db, QStringLiteral("Cursos"), columna))
-            return false;
+    QStringList columnasFaltantes;
+    if (tablaExiste(db, QStringLiteral("Cursos")))
+    {
+        for (const QString& columna : COLUMNAS_CURSOS)
+            if (!columnaExiste(db, QStringLiteral("Cursos"), columna))
+                columnasFaltantes << columna;
+    }
 
+    QStringList retiradasPresentes;
     for (const QString& retirada : TABLAS_RETIRADAS)
         if (tablaExiste(db, retirada))
-            return false;
+            retiradasPresentes << retirada;
 
-    return true;
+    if (faltantes.isEmpty() && columnasFaltantes.isEmpty() && retiradasPresentes.isEmpty())
+    {
+        if (motivo)
+            motivo->clear();
+        return true;
+    }
+
+    if (motivo)
+    {
+        QStringList piezas;
+
+        if (!faltantes.isEmpty())
+            piezas << QStringLiteral("faltan las tablas «%1»")
+                          .arg(faltantes.join(QStringLiteral("», «")));
+
+        if (!columnasFaltantes.isEmpty())
+            piezas << QStringLiteral("faltan las columnas «%1» de la tabla «Cursos»")
+                          .arg(columnasFaltantes.join(QStringLiteral("», «")));
+
+        if (!retiradasPresentes.isEmpty())
+            piezas << QStringLiteral("existe la tabla retirada «%1»")
+                          .arg(retiradasPresentes.join(QStringLiteral("», «")));
+
+        *motivo = piezas.join(QStringLiteral("; "));
+    }
+
+    return false;
 }

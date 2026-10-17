@@ -258,28 +258,13 @@ void ScheduleVisualizationWidget::onLoadScheduleClicked()
 
     // Guardar los datos cargados
     QJsonObject obj = doc.object();
-    m_hasLoadedData = false;
-    m_loadedTeacherSchedules = QJsonObject();
-    m_loadedStudentSchedules = QJsonObject();
-
-    if (obj.contains("teachers")) {
-        m_loadedTeacherSchedules = obj;
-        m_hasLoadedData = true;
-    }
-    if (obj.contains("years")) {
-        m_loadedStudentSchedules = obj;
-        m_hasLoadedData = true;
-    }
+    loadSchedules(obj);
 
     if (!m_hasLoadedData) {
         ScheduleTheme::showStyledMessage(this, "Error",
             "El archivo no contiene datos de horarios válidos (falta 'teachers' o 'years').", true);
         return;
     }
-
-    // Habilitar botones según lo que se cargó
-    m_btnTeacherSchedules->setEnabled(m_loadedTeacherSchedules.contains("teachers"));
-    m_btnStudentSchedules->setEnabled(m_loadedStudentSchedules.contains("years"));
 
     QString fileName = QFileInfo(filePath).fileName();
     QString msg = QString("Horarios cargados correctamente desde:\n%1").arg(fileName);
@@ -326,6 +311,25 @@ void ScheduleVisualizationWidget::showStudentSchedules(const QJsonObject& data)
     dialog->show();
 }
 
+void ScheduleVisualizationWidget::loadSchedules(const QJsonObject& datos)
+{
+    m_hasLoadedData = false;
+    m_loadedTeacherSchedules = QJsonObject();
+    m_loadedStudentSchedules = QJsonObject();
+
+    if (datos.contains("teachers")) {
+        m_loadedTeacherSchedules = datos;
+        m_hasLoadedData = true;
+    }
+    if (datos.contains("years")) {
+        m_loadedStudentSchedules = datos;
+        m_hasLoadedData = true;
+    }
+
+    m_btnTeacherSchedules->setEnabled(m_loadedTeacherSchedules.contains("teachers"));
+    m_btnStudentSchedules->setEnabled(m_loadedStudentSchedules.contains("years"));
+}
+
 void ScheduleVisualizationWidget::sendRequest(const QString& op, const QJsonObject& payload)
 {
     if (!m_client) return;
@@ -335,8 +339,18 @@ void ScheduleVisualizationWidget::sendRequest(const QString& op, const QJsonObje
 
 void ScheduleVisualizationWidget::onRespuestaRecibida(const QJsonObject& respuesta)
 {
+    const QString op = respuesta["op"].toString();
+
+    // Solo responder a las operaciones de esta vista; otras (p. ej. la
+    // generación de horarios) se gestionan en sus propios widgets.
+    const bool esPropia = (op == "teacher_schedules_list" ||
+                           op == "student_schedules_list" ||
+                           op == "load_test_schedules");
+    if (!esPropia) {
+        return;
+    }
+
     int code = respuesta["code"].toInt(Middleware::RESP_ERROR);
-    QString op = respuesta["op"].toString();
 
     if (code != Middleware::RESP_EXITO) {
         QString errorMsg = respuesta["message"].toString("Error desconocido");

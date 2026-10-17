@@ -64,11 +64,33 @@ namespace
         }
 
         resultado.estado = Estado::FalloEsquema;
-        resultado.detalle =
-            QStringLiteral("El esquema de «%1» no corresponde al esperado (versión %2);"
-                           " no se migra ni se modifican los datos.")
-                .arg(ruta)
-                .arg(versionArchivo);
+
+        if (decision == VersionEsquema::EstadoApertura::Abrir)
+        {
+            QString motivo;
+            VersionEsquema::esquemaEsperado(db, &motivo);
+
+            resultado.detalle =
+                QStringLiteral("El esquema de «%1» no corresponde al esperado: declara la versión"
+                               " %2, que coincide, pero su contenido no es el esperado%3."
+                               " No se migra ni se modifican los datos; puede crear una base nueva"
+                               " (se respalda la actual) o restaurar un respaldo.")
+                    .arg(ruta)
+                    .arg(versionArchivo)
+                    .arg(motivo.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(motivo));
+        }
+        else
+        {
+            resultado.detalle =
+                QStringLiteral("El esquema de «%1» no corresponde al esperado: declara la versión"
+                               " %2 y esta aplicación espera la versión %3. No se migra ni se"
+                               " modifican los datos; puede crear una base nueva (se respalda la"
+                               " actual) o restaurar un respaldo.")
+                    .arg(ruta)
+                    .arg(versionArchivo)
+                    .arg(versionEsperada);
+        }
+
         return resultado;
     }
 } // namespace

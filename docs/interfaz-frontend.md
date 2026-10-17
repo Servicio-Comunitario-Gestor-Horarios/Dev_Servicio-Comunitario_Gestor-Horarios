@@ -48,7 +48,7 @@ distinguir casos sin depender del texto.
 
 ## 2. Base de datos local (spec 001)
 
-### 2.1 `AperturaBaseDatos` — abrir, migrar y respaldar (implementado)
+### 2.1 `AperturaBaseDatos` — abrir o crear, sin migrar (implementado)
 
 `src/backend/include/backend/database/apertura_base_datos.hpp`:
 
@@ -56,64 +56,68 @@ distinguir casos sin depender del texto.
 namespace AperturaBaseDatos {
 
 enum class Estado {
-    OkCreada,        // No existía: se creó con el esquema inicial.
-    OkAbierta,       // Existía con la versión esperada: se abrió sin tocar.
-    OkMigrada,       // Existía con versión anterior: se respaldó y migró.
-    FalloAusente,    // Versión de esquema ausente o no interpretable.
-    FalloPosterior,  // Versión de esquema posterior a la esperada.
-    FalloApertura,   // No se pudo abrir la base o crear el esquema inicial.
-    FalloRespaldo,   // No se pudo respaldar: no se migró.
-    FalloMigracion   // La migración falló; la versión previa queda intacta.
+    OkCreada,        // No existía: se creó con el esquema único.
+    OkAbierta,       // Existía con versión y catálogo esperados: se abrió sin tocar.
+    FalloEsquema,    // Versión o catálogo no corresponden al esquema esperado.
+    FalloApertura    // No se pudo abrir la base o crear el esquema.
 };
 
 struct Resultado {
     Estado  estado = Estado::FalloApertura;
     QString detalle;        // texto legible para el usuario (en español)
-    QString rutaRespaldo;   // ruta del respaldo creado, si lo hubo
-    bool    ok() const;     // true solo para OkCreada | OkAbierta | OkMigrada
+    bool    ok() const;     // true solo para OkCreada | OkAbierta
 };
 
-struct Opciones { /* versionEsperada, paso, respaldo, ahora, progreso — inyectables en tests */ };
+struct Opciones { /* versionEsperada, crear, verificar — inyectables en tests */ };
 
 Resultado abrir(const QString& ruta);                 // valores de producción
 Resultado abrir(const QString& ruta, const Opciones& opciones);
 }
 ```
 
-`Opciones::progreso` es un callback `std::function<void(int versionDestino)>` que se invoca una vez
-por cada paso de migración, antes de aplicarlo (RF-1). Permite a la interfaz indicar que la
-migración está en marcha. Vacío = sin aviso.
+No hay migración por versión: si la base existe, su marca (`PRAGMA user_version`) **y** su catálogo
+deben coincidir con el esquema esperado. `detalle` identifica la causa con precisión: si la versión no
+coincide nombra la versión del archivo y la esperada; si la versión coincide pero el catálogo no,
+nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. «faltan las columnas
+«anio», «seccion», «aula» de la tabla «Cursos»; existe la tabla retirada «Curso_Materia»»).
 
 **Cómo lo trata el frontend:**
-- `ok() == true` → continuar el arranque; si `estado == OkMigrada`, puede informar del respaldo.
+- `ok() == true` → continuar el arranque.
 - `ok() == false` → diálogo de fallo RF-4 (Reintentar / Restaurar respaldo / Crear base nueva /
-  Salir). Deshabilitar «Crear base nueva» si el motivo es `FalloRespaldo`. `rutaRespaldo` no vacío
-  permite ofrecer restaurarlo.
-- Para «Crear base nueva» sobre una base dañada, usar `Respaldo::descartarBaseYCrearNueva` (ver 2.3).
+  Salir), mostrando `detalle` como causa. El arranque del cliente ya implementa ese diálogo
+  (`src/app/src/aplicacion_frontend.cpp`).
+- Para «Crear base nueva», usar `Respaldo::descartarBaseYCrearNueva` (ver 2.3): el respaldo es
+  obligatorio, así que la opción funciona aunque la base no se pueda leer.
 
-### 2.2 `VersionEsquema` — versión de esquema (implementado)
+### 2.2 `VersionEsquema` — esquema único y su marca (implementado)
 
 `src/backend/include/backend/database/version_esquema.hpp`:
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 2;   // esquema unico (sin migracion por version)
-enum class EstadoApertura { Crear, Abrir, Migrar, FalloAusente, FalloPosterior };
+constexpr int VERSION_ESQUEMA_ACTUAL = 2;   // esquema único (sin migración por versión)
+enum class EstadoApertura { Crear, Abrir, FalloEsquema };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
 bool fijarVersionEsquema(QSqlDatabase& db, int version);
-using PasoMigracion = std::function<bool(QSqlDatabase&, int versionDestino)>;
-bool aplicarHasta(QSqlDatabase& db, int versionDestino, const PasoMigracion& paso);
-bool aplicarHasta(QSqlDatabase& db, int versionDestino);   // migraciones reales
+bool crearEsquema(QSqlDatabase& db);                // catálogo entero en una transacción
+bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // catálogo y tablas retiradas
 }
 ```
 
-`decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `aplicarHasta`
-ejecuta cada paso en su propia transacción junto con `user_version`; si un paso falla, revierte y la
-versión previa queda intacta (estado conocido, sin cambios parciales).
+`decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `crearEsquema`
+aplica el catálogo completo (`Migracion::aplicarPaso`) y fija `user_version` en una sola transacción;
+si algo falla, revierte.
+
+> **Guardia anti-regresión.** `test/backend/test_version_esquema.cpp` congela la **huella SHA-256**
+> del catálogo real (`HUELLAS_CONOCIDAS`, por versión). Si se cambia el DDL hay que **subir
+> `VERSION_ESQUEMA_ACTUAL`** y registrar la huella nueva en el mismo cambio; de lo contrario el test
+> falla. Así una base creada por una compilación intermedia no queda con la marca actual y un catálogo
+> viejo (incidente del 2026-10-17: `Cursos` pasó de `nombre`/`aula_fija` a `anio`/`seccion`/`turno`/
+> `aula` sin subir la versión, y las bases existentes dejaron de abrir).
 
 **Cómo lo trata el frontend:** normalmente no lo usa directamente; `AperturaBaseDatos` ya envuelve
-la decisión.
+la decisión y la verificación del catálogo.
 
 ### 2.3 `Respaldo` — crear, validar y restaurar (implementado)
 
@@ -194,6 +198,11 @@ public:
                                       const QString& descripcion = QString());
     bool               eliminarPlan(const QString& codigo);
 
+    // Carga horaria de un plan (materias con sus horas y año) — RF-1.
+    // La vista de generación la usa para derivar las materias de cada curso.
+    // Código vacío → error; plan sin materias → vector vacío (no es error).
+    Resultado<QVector<CargaHorariaDTO>> listarCargaDePlan(const QString& codigoPlan) const;
+
     // Cursos (identidad ano+seccion; turno y aula opcionales)
     Resultado<QVector<CursoDTO>> listarCursos() const;
     Resultado<CursoDTO>      crearCurso(int anio, const QString& seccion,
@@ -231,6 +240,7 @@ public:
 | `AulaDTO` | `id`, `nombre`, `capacidad`, `edificio`, `piso` |
 | `MateriaDTO` | `id`, `nombre`, `requisitos` |
 | `PlanDTO` | `codigo`, `nombre`, `descripcion` |
+| `CargaHorariaDTO` | `id`, `codigoPlanEstudio`, `idMateria`, `curso` (año), `horas`, `nombreMateria` |
 | `CursoDTO` | `id`, `anio`, `seccion`, `turno`, `aula` (`-1` si no tiene) |
 | `TurnoDTO` | `nombre`, `inicio`, `fin`, `numSlots`, `QVector<RecesoDTO> recesos` |
 | `RecesoDTO` | `despuesDeSlot`, `duracion` (minutos), `inicio`, `fin` (pueden ser inválidos) |
@@ -418,9 +428,11 @@ El contexto vive durante toda la sesión (RAII) y se destruye al cerrar. El proc
 **Cómo lo trata el frontend:**
 - No instancia la base ni resuelve su ruta: la recibe ya abierta. La ventana guarda el
   `NucleoDatos*` inyectado (puede ser `nullptr` si el binario se compiló sin persistencia).
-- Si `abrir()` no es `ok()`, el arranque (no la ventana) muestra la causa con `Resultado::detalle`
-  y no levanta la interfaz; el diálogo de recuperación de RF-4 lo construye el frontend sobre
-  `AperturaBaseDatos::Resultado` (ver 2.1).
+- Si `abrir()` no es `ok()`, el arranque (no la ventana) muestra el **diálogo de recuperación de
+  RF-4** con `Resultado::detalle` como causa: «Reintentar», «Restaurar respaldo…», «Crear base de
+  datos nueva…» (con respaldo obligatorio y confirmación previa) y «Salir». Reintenta hasta que la
+  apertura tiene éxito o el usuario sale; implementado en
+  `src/app/src/aplicacion_frontend.cpp`. La ventana principal no se levanta hasta que la base abre.
 
 ---
 
@@ -512,6 +524,49 @@ El modo `--backend` resuelve por la ruta `solver_resolve` (JSON de entrada → `
 al cerrar se solicita apagado ordenado; el cierre continúa aunque no responda. **Frontend:** aviso
 no bloqueante al arrancar.
 
+### 3.6 Composición y envío desde el frontend (spec 005, implementado)
+
+El backend expone las piezas, pero **quien posee el dominio y la configuración es la interfaz**; por
+eso la composición vive en el frontend, en `src/frontend/src/services/` (se compilan solo si
+`GESTOR_TIENE_BACKEND`, es decir, cuando el target `backend` existe):
+
+- **`generacion_tipos.hpp`** — tipos puros compartidos (`OpcionesUI` con franja, dimensiones,
+  planificación, penalizaciones y parámetros por curso/docente; `ContextoHorario` con los nombres
+  índice→texto de la última entrada).
+- **`entrada_solver_builder.{hpp,cpp}`** — `GeneracionSolver::`:
+  - `construirEntrada(nucleo, opciones)` → `Composicion{entrada, contexto, avisos}`. Reutiliza
+    `construirJsonEntrada` (backend) y **después inyecta por curso** el `plan`, el
+    `num_estudiantes` y las `materias` (derivadas del plan y el año del curso vía
+    `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. `avisos` recoge los
+    datos incompletos (curso sin plan, plan sin materias, lecturas fallidas).
+  - `horasSugeridasPorDocente(nucleo, cursos)` → precarga válida de horas por docente.
+  - `aFormatoVisualizacion(horario, contexto)` → JSON con `teachers`/`years` (más un bloque `_meta`
+    informativo) que entienden la sección de visualización y sus diálogos. Traduce los índices del
+    `HorarioSalida` a nombres y el día del solver (`0 = lunes`) a las claves `"1".."5"`.
+- **`puerto_solver_ipc.{hpp,cpp}`** — `PuertoSolverIpc`: implementa `PuertoSolver` sobre
+  `InternalClient`, envía la op `Middleware::OP_RESOLVER_HORARIO` y correlaciona la respuesta
+  (`RESP_EXITO` → `ok && factible`; `RESP_SIN_SOLUCION` → `ok && !factible`; otro → `!ok`).
+
+**Vista `ScheduleGenerationWidget`** (`src/frontend/src/views/schedule_generation_widget.{hpp,cpp}`)
+es la vista «Generación de horario» (índice 4 del `MainWindow`). Con `GESTOR_TIENE_BACKEND` muestra:
+parámetros generales (franja, dimensiones, planificación, penalizaciones, aulas fijas), la tabla de
+**cursos** (plan + nº de estudiantes), la tabla de **docentes** (horas requeridas/en aula, turno,
+plan y materias suplentes) y botones de **preset** (`CargadorConfiguracionSolver`; el preset es la
+propia entrada de 13 secciones). Al pulsar «Generar horarios»: valida, compone la entrada, la envía
+con `ServicioGeneracion` y, si `presentable`, guarda el JSON en la carpeta de horarios y emite
+`horarioGenerado(datosVisualizacion, rutaArchivo)`. Sin backend muestra un aviso informativo.
+
+**Cableado (`MainWindow`):** el `InternalClient` se guarda como miembro y se inyecta en las vistas;
+en `setNucleoDatos` se lo reenvía a la vista de generación con el `NucleoDatos*`. Al recibir
+`horarioGenerado`, la ventana llama a `ScheduleVisualizationWidget::loadSchedules(...)` y salta a la
+sección de visualización para que el horario quede cargado y editable. La carpeta de destino se
+obtiene de `ScheduleVisualizationWidget::schedulesDirectory()`.
+
+El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_conversion`
+(`test/frontend/test_conversion_entrada.cpp`, target añadido en `test/CMakeLists.txt` cuando existen
+`frontend` y `backend`).
+
+
 ---
 
 ## 4. Resumen: elemento expuesto → acción del frontend
@@ -526,6 +581,8 @@ no bloqueante al arrancar.
 | `estadoPendienteDe` / `GestorPendientes` | Marca por fila + «Reintentar»; aviso al cerrar | RF-3, RF-6, RNF-3/4 |
 | `InstanciaUnica` | Enfocar la instancia existente; salir si no hay acuse | RF-5 |
 | `ServicioGeneracion` | Vista de generación (estados, «Generar», «datos anteriores») | RF-1, RF-3 |
+| `GeneracionSolver::construirEntrada` / `aFormatoVisualizacion` (frontend) | Componer la entrada desde la config y traducir la salida al formato de visualización | RF-1 |
+| `PuertoSolverIpc` (frontend) | Enviar `solver_resolve` por IPC y mapear la respuesta | RF-1 |
 | `AnalisisSalida` | Rejilla + panel de avisos | RF-3 |
 | `HorarioSalida` + `ServicioHorarioSalida` | Visualización y guardado como archivo JSON | RF-1, RF-4 |
 | `CargadorConfiguracionSolver` | Cargar/guardar config y presets JSON | RF-1, RF-4 |

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QSqlDatabase>
+#include <QString>
 
 /// Versión del esquema y creación del esquema único (RF-6).
 ///
@@ -36,5 +37,7 @@ namespace VersionEsquema
 
     /// Comprueba que la base tenga el catálogo del esquema único (tablas y columnas
     /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia`).
-    bool esquemaEsperado(QSqlDatabase& db);
+    /// Si se pasa `motivo`, recibe una explicación legible de lo que no cuadra
+    /// (vacía si el catálogo corresponde al esquema esperado).
+    bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr);
 }

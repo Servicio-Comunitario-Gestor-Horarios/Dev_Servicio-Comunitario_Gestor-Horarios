@@ -18,6 +18,8 @@
 #include "backend/resultado.hpp"
 #include "backend/services/GestorPendientes.hpp"
 #include "backend/services/ServicioAula.hpp"
+#include "backend/services/ServicioCargaHoraria.hpp"
+#include "backend/services/ServicioComposicionPlan.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
@@ -68,6 +70,19 @@ public:
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
                                       const QString& descripcion = QString());
     bool eliminarPlan(const QString& codigo);
+
+    /// Carga horaria (materias con sus horas y año) de un plan de estudio.
+    ///
+    /// La interfaz de generación la usa para derivar las materias de cada curso
+    /// de la entrada del solver (RF-1). Devuelve error si el código está vacío;
+    /// un plan sin materias devuelve un vector vacío (no es error).
+    Resultado<QVector<CargaHorariaDTO>> listarCargaDePlan(const QString& codigoPlan) const;
+
+    /// Compone un plan de estudio completo —materias con su año y horas— tal y
+    /// como lo espera el solver. La interfaz de generación la usa para embeber
+    /// (en la entrada) los planes referenciados por los cursos (RF-1).
+    /// Devuelve error si el plan no existe o no tiene materias.
+    Resultado<PlanEstudio> componerPlanCompleto(const QString& codigoPlan) const;
 
     // ─── Cursos ───────────────────────────────────────────────────────────
 
@@ -139,6 +154,8 @@ private:
     ServicioAula m_aula;
     ServicioMaterias m_materias;
     ServicioPlanesEstudio m_planes;
+    ServicioCargaHoraria m_carga;
+    ServicioComposicionPlan m_composicion;
     ServicioCursos m_cursos;
     ServicioTurnosRecesos m_turnos;
 

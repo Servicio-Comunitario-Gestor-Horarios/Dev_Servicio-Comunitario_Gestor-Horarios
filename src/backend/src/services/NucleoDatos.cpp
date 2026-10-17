@@ -61,6 +61,8 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_aula(db),
       m_materias(db),
       m_planes(db),
+      m_carga(db),
+      m_composicion(db),
       m_cursos(db),
       m_turnos(db) {}
 
@@ -201,6 +203,21 @@ bool NucleoDatos::eliminarPlan(const QString& codigo) {
         m_pendientes, QStringLiteral("plan"), codigo, TipoOperacion::Baja,
         QStringLiteral("Pendiente de eliminar: plan %1").arg(codigo),
         [this, codigo]() { return m_planes.eliminarPlan(codigo); });
+}
+
+Resultado<QVector<CargaHorariaDTO>> NucleoDatos::listarCargaDePlan(
+    const QString& codigoPlan) const {
+    const QString codigo = codigoPlan.trimmed();
+    if (codigo.isEmpty()) {
+        return Resultado<QVector<CargaHorariaDTO>>::error(
+            QStringLiteral("El código del plan de estudio no puede estar vacío."));
+    }
+    return Resultado<QVector<CargaHorariaDTO>>::exito(
+        m_carga.listarCargaPorPlan(codigo));
+}
+
+Resultado<PlanEstudio> NucleoDatos::componerPlanCompleto(const QString& codigoPlan) const {
+    return m_composicion.componerPlanCompleto(codigoPlan);
 }
 
 // ─── Cursos ────────────────────────────────────────────────────────────────

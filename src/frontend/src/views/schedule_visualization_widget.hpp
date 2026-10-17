@@ -23,6 +23,13 @@ public:
     explicit ScheduleVisualizationWidget(QWidget *parent = nullptr);
     void setClient(InternalClient* client);
 
+    /// Directorio donde viven los horarios (AppData/.../schedules).
+    QString schedulesDirectory() const { return m_schedulesDir; }
+
+    /// Carga en memoria un horario en formato de visualización ("teachers"
+    /// y/o "years") y habilita los botones de vista. No abre diálogos.
+    void loadSchedules(const QJsonObject& datos);
+
 private slots:
     void onTeacherSchedulesClicked();
     void onStudentSchedulesClicked();

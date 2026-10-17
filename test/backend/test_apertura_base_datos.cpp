@@ -78,6 +78,26 @@ private:
         cerrarBase(db);
     }
 
+    /// Sustituye `Cursos` por el esquema anterior a la spec 004 (nombre,
+    /// aula_fija, num_estudiantes, codigo_plan), como el de las bases creadas
+    /// antes del cambio de modelo de dominio.
+    void reemplazarCursosPorEsquemaAnterior(const QString& ruta)
+    {
+        QSqlDatabase db = abrirBase(ruta);
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("DROP TABLE Cursos")));
+        QVERIFY(query.exec(QStringLiteral("CREATE TABLE Cursos ("
+                                          "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                          "nombre TEXT NOT NULL,"
+                                          "turno TEXT,"
+                                          "aula_fija INTEGER,"
+                                          "num_estudiantes INTEGER,"
+                                          "codigo_plan TEXT,"
+                                          "fecha_creacion TEXT,"
+                                          "fecha_modificacion TEXT)")));
+        cerrarBase(db);
+    }
+
 private slots:
 
     void abrir_inexistente_creaEsquemaYVersion()
@@ -162,6 +182,48 @@ private slots:
 
         QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
+    }
+
+    void abrir_versionAnterior_detallaAmbasVersiones()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("anterior.db");
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        // El detalle nombra la versión del archivo y la que espera la app (RNF-1).
+        QVERIFY(resultado.detalle.contains(QString::number(VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1)));
+        QVERIFY(resultado.detalle.contains(QString::number(VersionEsquema::VERSION_ESQUEMA_ACTUAL)));
+    }
+
+    void abrir_catalogoViejoConMarcaActual_detallaElMotivo()
+    {
+        // Reproduce el incidente real (2026-10-17): una base creada con el DDL
+        // anterior de `Cursos` (nombre/aula_fija) y la tabla retirada
+        // Curso_Materia, pero con la marca de versión ya actual: la versión
+        // coincide y solo el catálogo la rechaza. El detalle debe nombrar
+        // exactamente lo que no cuadra para poder diagnosticarlo sin leer código.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("viejo.db");
+        crearBaseConEsquema(ruta, VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+        reemplazarCursosPorEsquemaAnterior(ruta);
+        crearTablaRetirada(ruta);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+        // Columnas nuevas que faltan en `Cursos`...
+        QVERIFY(resultado.detalle.contains(QStringLiteral("anio")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("aula")));
+        // ...y tabla retirada que sobra.
+        QVERIFY(resultado.detalle.contains(QStringLiteral("Curso_Materia")));
+        // No se migra ni se borran datos: la tabla retirada sigue ahí.
+        QVERIFY(tablaExiste(ruta, QStringLiteral("Curso_Materia")));
     }
 
     void abrir_falloEsquema_noBorraNiMigra()

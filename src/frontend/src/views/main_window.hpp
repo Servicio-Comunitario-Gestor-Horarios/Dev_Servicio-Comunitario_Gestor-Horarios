@@ -9,6 +9,8 @@ class TeacherListWidget;
 class ClassroomListWidget;
 class SubjectListWidget;
 class ScheduleVisualizationWidget;
+class ScheduleGenerationWidget;
+class InternalClient;
 class NucleoDatos;
 
 class MainWindow : public QMainWindow
@@ -53,6 +55,10 @@ private:
     ClassroomListWidget* m_classroomListWidget = nullptr;
     SubjectListWidget* m_subjectListWidget = nullptr;
     ScheduleVisualizationWidget* m_scheduleVisualizationWidget = nullptr;
+    ScheduleGenerationWidget* m_generationWidget = nullptr;
+
+    /// Cliente IPC compartido por las vistas (no se posee; padre Qt).
+    InternalClient* m_client = nullptr;
 
     /// Núcleo de datos del cliente, inyectado por el arranque (no lo posee).
     NucleoDatos* m_nucleo = nullptr;

@@ -63,10 +63,17 @@
 
 ## Siguiente paso
 
+<<<<<<< Updated upstream
 1. **Pendientes conocidos de la 005** (ver abajo) → planificar en la próxima spec del épico (**006/007**) o en una nueva.
 2. **Orden del épico solver:** 004 (persistencia) ✅ → 005 (núcleo) ✅ → 006 (turnos automáticos) → 007 (generación parcial).
 3. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
 4. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`) en `src/app`: la lógica está lista; el consumo UI↔IPC lo hace el equipo de frontend (`docs/interfaz-frontend.md` §3).
+=======
+1. **Spec 004 (persistencia de campos de curso) — aprobada:** redactar `plan.md` + `tasks.md` → implementación (didáctica: el usuario implementa).
+2. **Orden del épico solver:** 004 (persistencia) → 005 (núcleo) → 006 (turnos automáticos) → 007 (generación parcial).
+3. **Pendiente en 005 (núcleo solver, aprobada):** al redactar su `plan.md`/`tasks.md`, @planner resuelve las 4 precisiones del reviewer ("franjas útiles" de V14, `peso` negativo → chequeo de rango, nota de 002, "conserva V1–V12" vs V8). **Los huecos de numeración ya se resolvieron** (004 = RF-1..5; 005 = RF-1..12; plan sin huecos). Su plan ya está propuesto y **sin el puente D-10**.
+4. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`): **implementado en el frontend** (2026-10-17, ver Progreso): `PuertoSolverIpc` sobre `InternalClient` + vista «Generación de horario». `docs/interfaz-frontend.md` §3.6.
+>>>>>>> Stashed changes
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
@@ -94,7 +101,51 @@
   - **T7 completa** ✅ (`servicio_solver`/`resolverEntradaSolver` en `backend_solver`; `aplicacion_backend` registra `solver_resolve`; `GestorProcesoBackend` sin reinicio automático). Test `test_ipc_aislamiento_bd` (no abre BD, rechaza ops de negocio).
   - **T8 completa** ✅ (contrato de `ServicioHorarioSalida` fijado con `test_archivos_horario`: round-trip JSON y fallo de escritura sin perder el contenido).
   - **T9 completa** ✅ (`docs/interfaz-frontend.md` §3 completa: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, proceso `--backend`/salud) + `test_contrato_generacion`. **Spec 002 implementada.**
+<<<<<<< Updated upstream
 - 005: **T1–T9 completas** ✅ (T10 abierta por pendientes conocidos). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Seller: `version="1.0"` al producir/guardar.
   - **Validación del reviewer (ronda 2): APROBADA.** Bloqueantes corregidos y commiteados: `37666a2` (D1/D3 siempre publicadas + V13 cruza disponibilidad×turno), `454a53b` (RF-10 versión no reconocida), `7a7ff1b` (RF-11 centinela `-1`, coherencia de horas, V9 estricto), `4171a4d` (RF-6 categorías de causa), `f063f39` (sello `version="1.0"`).
 - Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno a la 005 y reproducible en HEAD. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
+=======
+- Tests ajenos que fallan (no tocar): `test_solver_horarios`, `test_solver_benchmark` (solver). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
+- **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de
+  `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`
+  (la marca actual), dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004
+  cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distingue una base
+  vieja de una nueva y solo la verificación de catálogo la rechaza. Medidas:
+  - `VersionEsquema::esquemaEsperado(db, QString* motivo)`: explica exactamente lo que no cuadra
+    (tablas/columnas faltantes y tablas retiradas presentes).
+  - `AperturaBaseDatos` distingue versión ≠ esperada (nombra ambas) de catálogo ≠ esperado (nombra el
+    motivo) en `detalle`; sigue sin migrar ni tocar datos (RF-6).
+  - El arranque del cliente implementa el **diálogo de recuperación RF-4** (Reintentar / Restaurar
+    respaldo / Crear base nueva con respaldo obligatorio / Salir) sobre las APIs ya probadas de
+    `Respaldo`; antes solo mostraba un `QMessageBox` fatal y salía.
+  - **Guardia anti-regresión**: `test_backend_version_esquema` congela la huella SHA-256 del catálogo
+    por versión (`HUELLAS_CONOCIDAS`); cambiar el DDL obliga a subir la versión y registrar la huella
+    nueva, o el test falla. `test_backend_apertura_base_datos` reproduce el incidente (catálogo viejo
+    con marca actual → `FalloEsquema` con motivo).
+  - Verificación en host (MSVC + Ninja + OR-Tools): suite **36/41**; los 5 rojos son los conocidos de
+    la spec 005 (`constructor_entrada`, `validador_entrada`) y los de solver/IPC (`0xc0000135` sin las
+    DLL de OR-Tools en `PATH`; ya crashean en `restriccionBloquesRequeridos` con ellas). Todos los
+    tests de BD/versión/respaldo/apertura/contexto en verde.
+  - Base del usuario recreada (estaba vacía; respaldada como `gestor_horarios.db.respaldo-20261017-090000`).
+>>>>>>> Stashed changes
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.
+- **Vista de generación en el frontend (2026-10-17, cierre parcial de 005):** implementada la vista
+  «Generación de horario» (`ScheduleGenerationWidget`, índice 4 de `MainWindow`) y su capa de servicios
+  en `src/frontend/src/services/` (`generacion_tipos.hpp`, `entrada_solver_builder`, `puerto_solver_ipc`).
+  Arma la entrada de 13 secciones reutilizando `construirJsonEntrada` e **inyectando por curso**
+  `plan`/`num_estudiantes`/`materias` (vía `NucleoDatos::listarCargaDePlan`), la envía por IPC
+  (`OP_RESOLVER_HORARIO`) con `ServicioGeneracion` y traduce el `HorarioSalida` al formato de
+  visualización (`teachers`/`years`). El preset usa el formato de la propia entrada
+  (`CargadorConfiguracionSolver`). `MainWindow` guarda el `InternalClient` como miembro, inyecta el
+  `NucleoDatos` en la vista y, al emitirse `horarioGenerado`, guarda el JSON en la carpeta de horarios,
+  lo carga en `ScheduleVisualizationWidget` (`loadSchedules`) y salta a esa sección. Se corrigió el
+  cross-talk de `ScheduleVisualizationWidget` (ahora solo responde a sus propias ops). `src/CMakeLists.txt`
+  declara `backend` **antes** que `frontend` para que la interfaz use la lógica de dominio; `frontend`
+  enlaza `backend` y define `GESTOR_TIENE_BACKEND` (sin backend, la vista muestra un aviso). Compila en
+  los presets `full` y `dev-frontend` (verificado en host MSVC+Ninja; `gestor-horarios.exe` enlaza).
+  Doc: `docs/interfaz-frontend.md` §3.6.
+  Añadido el test `test_frontend_conversion` (`test/frontend/test_conversion_entrada.cpp`) para la
+  traducción `HorarioSalida`→visualización; pasa en local (`ctest -R test_frontend_conversion`).
+  Los rojos conocidos `test_constructor_entrada`/`test_validador_entrada` siguen siendo el hueco de
+  la spec 005 (el constructor del backend deja `materias` de curso vacías; justo lo que inyecta la vista).

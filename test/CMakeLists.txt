@@ -105,3 +105,14 @@ if(TARGET backend_solver)
 	add_qtest(test_solver_benchmark backend/test_solver_benchmark.cpp backend_solver)
 	add_qtest(test_ipc_aislamiento_bd test_ipc_aislamiento_bd.cpp backend_solver middleware Qt6::Sql)
 endif()
+
+# ============================================================
+# Frontend (composición/uso del contrato del solver) — requiere `frontend` + `backend`
+# ============================================================
+if(TARGET frontend AND TARGET backend)
+	# El conversor HorarioSalida -> visualización es lógica pura del frontend; se
+	# prueba aquí porque las cabeceras viven bajo `src/frontend/src` (privadas).
+	add_qtest(test_frontend_conversion frontend/test_conversion_entrada.cpp frontend)
+	target_include_directories(test_frontend_conversion PRIVATE
+					${CMAKE_SOURCE_DIR}/src/frontend/src)
+endif()

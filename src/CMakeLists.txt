@@ -10,6 +10,12 @@
 #     ├── backend  (OR-Tools)
 #     └── middleware
 #
+# Orden de configuración: `backend` (y su persistencia) se declara antes que
+# `frontend` para que la interfaz pueda usar, en tiempo de compilación, la
+# lógica de dominio ya existente (p. ej. la composición de la entrada del
+# solver). `datos` encapsula el ciclo de vida de la base y depende de `backend`;
+# `app` depende de `frontend` y `datos`.
+#
 # ¿Cómo agregar un nuevo módulo?
 #   1. Crear directorio en src/
 #   2. Crear src/<modulo>/CMakeLists.txt
@@ -18,10 +24,14 @@
 
 add_subdirectory(common)
 add_subdirectory(middleware)
-add_subdirectory(frontend)
 
 if(BUILD_BACKEND)
     add_subdirectory(backend)
+endif()
+
+add_subdirectory(frontend)
+
+if(BUILD_BACKEND)
     # `datos` encapsula el ciclo de vida de la base del lado cliente y depende
     # de `backend`; solo existe cuando hay persistencia (BUILD_BACKEND=ON).
     add_subdirectory(datos)

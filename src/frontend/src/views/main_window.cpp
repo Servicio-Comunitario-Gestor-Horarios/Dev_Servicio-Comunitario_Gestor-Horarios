@@ -24,17 +24,22 @@
 #include "../forms/settings_dialog.hpp"
 
 #include "schedule_visualization_widget.hpp"
+#include "schedule_generation_widget.hpp"
 #include <middleware/internalclient.h>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QFrame>
+#include <QJsonObject>
 #include <QVariant>
 #include <QSettings>
 
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
     m_nucleo = nucleo;
+    if (m_generationWidget) {
+        m_generationWidget->setNucleoDatos(nucleo);
+    }
 }
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
@@ -57,11 +62,27 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setCentralWidget(centralWidget);
 
     // Crear cliente y pasar a los widgets
-    InternalClient* client = new InternalClient(this);
-    if (m_teacherListWidget) m_teacherListWidget->setClient(client);
-    if (m_classroomListWidget) m_classroomListWidget->setClient(client);
-    if (m_subjectListWidget) m_subjectListWidget->setClient(client);
-    if (m_scheduleVisualizationWidget) m_scheduleVisualizationWidget->setClient(client);
+    m_client = new InternalClient(this);
+    if (m_teacherListWidget) m_teacherListWidget->setClient(m_client);
+    if (m_classroomListWidget) m_classroomListWidget->setClient(m_client);
+    if (m_subjectListWidget) m_subjectListWidget->setClient(m_client);
+    if (m_scheduleVisualizationWidget) m_scheduleVisualizationWidget->setClient(m_client);
+    if (m_generationWidget) {
+        m_generationWidget->setClient(m_client);
+        if (m_scheduleVisualizationWidget) {
+            m_generationWidget->setSchedulesDirectory(
+                m_scheduleVisualizationWidget->schedulesDirectory());
+        }
+        // Al generar un horario, cargarlo en la sección de visualización y
+        // llevar al usuario allí para revisarlo/editarlo.
+        connect(m_generationWidget, &ScheduleGenerationWidget::horarioGenerado,
+                this, [this](const QJsonObject& datos, const QString&) {
+                    if (m_scheduleVisualizationWidget) {
+                        m_scheduleVisualizationWidget->loadSchedules(datos);
+                    }
+                    mostrarVisualizacion();
+                });
+    }
 
     // Conectar botones
     connect(m_btnInicio, &QPushButton::clicked, this, &MainWindow::mostrarInicio);
@@ -201,7 +222,8 @@ void MainWindow::setupCentralArea() {
     m_subjectListWidget = new SubjectListWidget(this);
     m_contenedorVistas->addWidget(m_subjectListWidget);
 
-    m_contenedorVistas->addWidget(new ViewPlaceholder("Generación de Horarios", this));
+    m_generationWidget = new ScheduleGenerationWidget(this);
+    m_contenedorVistas->addWidget(m_generationWidget);
     m_contenedorVistas->addWidget(new ViewPlaceholder("Visualización de Horarios", this));
 
     // Índice 5: Visualización de horarios
@@ -347,6 +369,9 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     }
     if (auto subjects = qobject_cast<SubjectListWidget*>(m_contenedorVistas->widget(3))) {
         subjects->actualizarTema(modoOscuro);
+    }
+    if (auto generacion = qobject_cast<ScheduleGenerationWidget*>(m_contenedorVistas->widget(4))) {
+        generacion->actualizarTema(modoOscuro);
     }
 }
 
