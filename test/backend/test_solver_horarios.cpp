@@ -294,6 +294,36 @@ private slots:
         QCOMPARE(total, 4);
     }
 
+    // ── Rectificación: D3 asigna exactamente horas_m bloques y S1 compara con horas_aula ──
+    // Con duracion_minutos = 45, la conversión antigua pediría ceil(2×60/45) = 3 bloques y
+    // ceil(2×60/45) = 3 de tope, volviendo el problema infeasible (solo hay 2 franjas).
+    // Con la identidad (1 hora académica = 1 bloque), una materia de 2 horas ocupa exactamente
+    // 2 bloques y el tope del docente es 2 (sin ×60), luego hay solución con 2 bloques.
+    void solver_d3_bloquesSonHoras_s1_topeSinConversion() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 2};   // 1 docente, 1 materia, 1 aula, 1 curso, 1 día, 2 franjas
+        config.franja_horaria = {45, 2};
+        config.turnos.turnos = {{"manana", {0, 1}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 2}}}};   // materia 0, 2 horas académicas
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
+        int total = 0;
+        for (const auto& dia : curso.dias)
+            total += dia.asignaciones.size();
+        QCOMPARE(total, 2);   // exactamente 2 bloques (no 3)
+    }
+
     // ── Suplente reemplaza completo ──
     void solver_suplenteReemplaza() {
         SolverConfig config;

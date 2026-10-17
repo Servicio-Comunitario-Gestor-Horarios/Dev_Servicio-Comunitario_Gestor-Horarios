@@ -10,12 +10,14 @@ class TestContratoSolver : public QObject
 
 private slots:
 
-    void bloques_redondeaHaciaArriba()
+    void bloques_esIdentidad()
     {
-        QCOMPARE(bloques(2, 60), 2);   // 120/60
-        QCOMPARE(bloques(3, 45), 4);   // 180/45
-        QCOMPARE(bloques(2, 45), 3);   // 120/45 = 2.66 -> 3
-        QCOMPARE(bloques(1, 60), 1);
+        // Rectificación (2026-10-17): 1 hora académica = 1 bloque. `duracion_minutos` no
+        // interviene en la conversión; no hay multiplicación por 60 ni redondeo.
+        QCOMPARE(bloques(3, 45), 3);   // antes 4 (ceil(180/45))
+        QCOMPARE(bloques(2, 45), 2);   // antes 3 (ceil(120/45))
+        QCOMPARE(bloques(4, 40), 4);
+        QCOMPARE(bloques(6, 60), 6);
     }
 
     void bloques_duracionInvalida_devuelveCero()
@@ -24,10 +26,12 @@ private slots:
         QCOMPARE(bloques(2, -30), 0);
     }
 
-    void bloquesAula_igualQueBloques()
+    void bloquesAula_esIdentidad()
     {
-        QCOMPARE(bloquesAula(8, 45), bloques(8, 45));
+        // El tope del docente se mide en bloques = horas_aula (S1), sin ×60 ni redondeo.
+        QCOMPARE(bloquesAula(8, 45), 8);
         QCOMPARE(bloquesAula(8, 0), 0);
+        QCOMPARE(bloquesAula(8, 45), bloques(8, 45));
     }
 
     void claveCurso_canonicaYDeterminista()
