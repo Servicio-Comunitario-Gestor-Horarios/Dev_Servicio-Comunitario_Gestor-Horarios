@@ -35,6 +35,20 @@
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
     m_nucleo = nucleo;
+
+    // Propagar la conexión al Dashboard recuperándolo del contenedor de vistas
+    if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
+        dashboard->setNucleoDatos(m_nucleo);
+    }
+    if (m_teacherListWidget) {
+        m_teacherListWidget->setNucleoDatos(m_nucleo);
+    }
+    if (m_classroomListWidget) {
+        m_classroomListWidget->setNucleoDatos(m_nucleo);
+    }
+    if (m_subjectListWidget) {
+        m_subjectListWidget->setNucleoDatos(m_nucleo);
+    }
 }
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
@@ -58,8 +72,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Crear cliente y pasar a los widgets
     InternalClient* client = new InternalClient(this);
-    if (m_teacherListWidget) m_teacherListWidget->setClient(client);
-    if (m_classroomListWidget) m_classroomListWidget->setClient(client);
+    //if (m_classroomListWidget) m_classroomListWidget->setClient(client);
     if (m_subjectListWidget) m_subjectListWidget->setClient(client);
     if (m_scheduleVisualizationWidget) m_scheduleVisualizationWidget->setClient(client);
 
@@ -237,6 +250,11 @@ void MainWindow::activarBoton(QPushButton* btn) {
 void MainWindow::mostrarInicio() {
     m_contenedorVistas->setCurrentIndex(0);
     activarBoton(m_btnInicio);
+
+
+    if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
+        dashboard->actualizarEstadisticas();
+    }
 }
 
 void MainWindow::mostrarDocentes() {
@@ -252,6 +270,10 @@ void MainWindow::mostrarAulas() {
 void MainWindow::mostrarAsignaturas() {
     m_contenedorVistas->setCurrentIndex(3);
     activarBoton(m_btnAsignaturas);
+
+    if (m_subjectListWidget) {
+        m_subjectListWidget->cargarMaterias();
+    }
 }
 
 void MainWindow::mostrarGeneracion() {

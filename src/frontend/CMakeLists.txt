@@ -51,27 +51,37 @@ set(FRONTEND_INCLUDE_DIRS
 				${CMAKE_CURRENT_SOURCE_DIR}/src/dialogs
 				${CMAKE_CURRENT_SOURCE_DIR}/src/forms
 )
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Sql)
 
 # === LIBRERÍA (modo integrado) ===
 add_library(frontend STATIC)
 target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS} resources/resources.qrc)
 
-target_include_directories(frontend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(frontend PRIVATE ${FRONTEND_INCLUDE_DIRS})
+# AQUÍ ESTÁ LA CLAVE: Hacemos PUBLIC la ruta del backend
+target_include_directories(frontend PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src/backend/include
+)
+
+target_include_directories(frontend PRIVATE
+    ${FRONTEND_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 target_link_libraries(frontend PUBLIC
-				Qt6::Core
-				Qt6::Widgets
-				Qt6::Network
-				middleware
+    Qt6::Core
+    Qt6::Widgets
+    Qt6::Network
+    Qt6::Sql
+    middleware
 )
 
 target_compile_definitions(frontend PUBLIC PROJECT_VERSION="${PROJECT_VERSION}")
 
 if(TARGET backend)
-	target_link_libraries(frontend PUBLIC backend)
+    target_link_libraries(frontend PUBLIC backend)
 endif()
 
 if(COMMAND set_project_warnings)
-	set_project_warnings(frontend)
+    set_project_warnings(frontend)
 endif()

@@ -4,6 +4,7 @@
  */
 
 #include "dashboard_widget.hpp"
+#include "backend/services/NucleoDatos.hpp"
 #include <QPainter>
 #include <QProgressBar>
 #include <QDialog>
@@ -113,7 +114,7 @@ protected:
         int spanAngle = (int)(m_value / 100.0 * 180.0 * 16.0);
         painter.drawArc(rect, 180 * 16, -spanAngle);
 
-        // Texto centrado perfectamente
+        // Texto centrado
         painter.resetTransform();
         painter.setPen(m_isDark ? Qt::white : QColor(15, 23, 42));
         QFont font = painter.font();
@@ -128,7 +129,7 @@ private:
     bool m_isDark;
 };
 
-DashboardWidget::DashboardWidget(QWidget *parent) : QWidget(parent), m_gaugeWidget(nullptr)
+DashboardWidget::DashboardWidget(QWidget *parent) : QWidget(parent)
 {
     this->setStyleSheet("background: transparent;");
     setupUi();
@@ -161,15 +162,15 @@ void DashboardWidget::setupUi()
     titleLayout->addWidget(subtitle);
     mainLayout->addLayout(titleLayout);
 
-    // Tarjetas de resumen (Fila superior ampliada)
+    // Tarjetas de resumen (Se enlazan a los punteros de datos)
     QHBoxLayout *cardsLayout = new QHBoxLayout();
     cardsLayout->setSpacing(20);
-    cardsLayout->addWidget(crearTarjetaResumen("group", "Total Docentes", "124"));
-    cardsLayout->addWidget(crearTarjetaResumen("desktop_windows", "Aulas Disponibles", "36"));
-    cardsLayout->addWidget(crearTarjetaResumen("book", "Asignaturas Activas", "58"));
+    cardsLayout->addWidget(crearTarjetaResumen("group", "Total Docentes", "...", m_lblValorDocentes));
+    cardsLayout->addWidget(crearTarjetaResumen("desktop_windows", "Aulas Disponibles", "...", m_lblValorAulas));
+    cardsLayout->addWidget(crearTarjetaResumen("book", "Asignaturas Activas", "...", m_lblValorMaterias));
     mainLayout->addLayout(cardsLayout);
 
-    // Grid de dos paneles (Fila inferior ampliada)
+    // Grid de dos paneles
     QHBoxLayout *gridLayout = new QHBoxLayout();
     gridLayout->setSpacing(20);
     gridLayout->addWidget(crearPanelGeneracion(), 1);
@@ -179,7 +180,7 @@ void DashboardWidget::setupUi()
     mainLayout->addStretch();
 }
 
-QWidget* DashboardWidget::crearTarjetaResumen(const QString &icono, const QString &label, const QString &valor)
+QWidget* DashboardWidget::crearTarjetaResumen(const QString &icono, const QString &label, const QString &valor, QLabel*& outLabel)
 {
     QFrame *card = new QFrame();
     card->setObjectName("DashboardCard");
@@ -193,7 +194,6 @@ QWidget* DashboardWidget::crearTarjetaResumen(const QString &icono, const QStrin
     QString iconText = (icono == "group") ? "👥" : (icono == "desktop_windows") ? "🖥️" : (icono == "book") ? "📚" : "📌";
 
     QLabel *iconLabel = new QLabel(iconText);
-    iconLabel->setObjectName("CardIcon");
     iconLabel->setAlignment(Qt::AlignCenter);
     iconLabel->setFixedSize(54, 54);
     iconLabel->setStyleSheet("background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 10px; font-size: 22px;");
@@ -208,6 +208,9 @@ QWidget* DashboardWidget::crearTarjetaResumen(const QString &icono, const QStrin
     QLabel *valueWidget = new QLabel(valor);
     valueWidget->setObjectName("CardValue");
     valueWidget->setStyleSheet("font-size: 28px; font-weight: 800; color: #0f172a; border: none;");
+
+    // Enlazamos para actualización dinámica
+    outLabel = valueWidget;
 
     infoLayout->addWidget(labelWidget);
     infoLayout->addWidget(valueWidget);
@@ -241,7 +244,7 @@ QWidget* DashboardWidget::crearPanelGeneracion()
 
     QVBoxLayout *gaugeContainer = new QVBoxLayout();
     gaugeContainer->addStretch();
-    m_gaugeWidget = new GaugeWidget(85);
+    m_gaugeWidget = new GaugeWidget(0);
     gaugeContainer->addWidget(m_gaugeWidget);
     gaugeContainer->addStretch();
     statusLayout->addLayout(gaugeContainer);
@@ -253,10 +256,12 @@ QWidget* DashboardWidget::crearPanelGeneracion()
     estadoLabel->setObjectName("StateTitle");
     estadoLabel->setStyleSheet("font-size: 13px; font-weight: 700; color: #0f172a; border: none;");
 
-    QLabel *estadoText = new QLabel("Generado, con ajustes manuales necesarios");
+    QLabel *estadoText = new QLabel("Verificando estado de la base de datos...");
     estadoText->setObjectName("StateDesc");
     estadoText->setStyleSheet("font-size: 13px; color: #64748b; border: none;");
     estadoText->setWordWrap(true);
+
+    m_lblEstadoGeneracion = estadoText;
 
     detailsLayout->addWidget(estadoLabel);
     detailsLayout->addWidget(estadoText);
@@ -302,137 +307,127 @@ QWidget* DashboardWidget::crearPanelNotificaciones()
     layout->setContentsMargins(28, 26, 28, 26);
     layout->setSpacing(14);
 
-    QLabel *title = new QLabel("Notificaciones Importantes");
+    QLabel *title = new QLabel("Notificaciones del Sistema");
     title->setObjectName("PanelTitle");
     title->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none;");
     layout->addWidget(title);
 
-    struct Notificacion { int numero; QString texto; bool destacada; };
-    QList<Notificacion> notificaciones = {
-        {1, "Revisar disponibilidad de la Profa. Castro", true},
-        {2, "Asignación de materia \"Matemáticas\" pendiente para aula 3B", false},
-        {3, "Asignación de materia \"Matemáticas\" pendiente para aula 3", false}
-    };
+    m_layoutListaNotificaciones = new QVBoxLayout();
+    m_layoutListaNotificaciones->setSpacing(10);
 
-    for (const auto &n : notificaciones) {
-        QFrame *item = new QFrame();
-        item->setObjectName("NotifItem");
-        item->setFixedHeight(50);
-        item->setStyleSheet(n.destacada ? "QFrame { background-color: #f8fafc; border-radius: 8px; border: none; }" : "QFrame { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; }");
-
-        QHBoxLayout *itemLayout = new QHBoxLayout(item);
-        itemLayout->setContentsMargins(16, 0, 16, 0);
-        itemLayout->setSpacing(16);
-
-        QLabel *numLabel = new QLabel(QString::number(n.numero));
-        numLabel->setObjectName("NotifNum");
-        numLabel->setFixedSize(26, 26);
-        numLabel->setAlignment(Qt::AlignCenter);
-        numLabel->setStyleSheet("background-color: #e0e7ff; color: #4338ca; border-radius: 13px; font-weight: 800; font-size: 11px; border: none;");
-
-        QLabel *textLabel = new QLabel(n.texto);
-        textLabel->setObjectName("NotifText");
-        textLabel->setStyleSheet("font-size: 13px; color: #0f172a; border: none; background: transparent;");
-        textLabel->setWordWrap(true);
-
-        itemLayout->addWidget(numLabel);
-        itemLayout->addWidget(textLabel);
-        layout->addWidget(item);
-    }
-
+    layout->addLayout(m_layoutListaNotificaciones);
     layout->addStretch();
+
     return panel;
 }
 
 // ==========================================
-// MÉTODO PARA ACTUALIZAR EL TEMA EN TIEMPO REAL
+// MÉTODOS DINÁMICOS Y CONEXIÓN BD
 // ==========================================
-void DashboardWidget::actualizarTema(bool modoOscuro) {
-    if (m_gaugeWidget) {
-        m_gaugeWidget->setDarkMode(modoOscuro);
+
+void DashboardWidget::setNucleoDatos(NucleoDatos* nucleo) {
+    m_nucleo = nucleo;
+    actualizarEstadisticas();
+}
+
+void DashboardWidget::actualizarEstadisticas() {
+    if (!m_nucleo) return;
+
+    // Consultar cantidades reales en tiempo real desde SQLite
+    auto resDocentes = m_nucleo->listarDocentes();
+    int totalDocentes = resDocentes.ok ? resDocentes.valor.size() : 0;
+    if (m_lblValorDocentes) { m_lblValorDocentes->setText(QString::number(totalDocentes)); }
+
+    auto resAulas = m_nucleo->listarAulas();
+    int totalAulas = resAulas.ok ? resAulas.valor.size() : 0;
+    if (m_lblValorAulas) { m_lblValorAulas->setText(QString::number(totalAulas)); }
+
+    auto resMaterias = m_nucleo->listarMaterias();
+    int totalMaterias = resMaterias.ok ? resMaterias.valor.size() : 0;
+    if (m_lblValorMaterias) { m_lblValorMaterias->setText(QString::number(totalMaterias)); }
+
+    // Actualizar el panel de Generación de Horario basado en los datos reales
+    if (m_gaugeWidget && m_lblEstadoGeneracion) {
+        if (totalDocentes == 0 || totalAulas == 0 || totalMaterias == 0) {
+            m_gaugeWidget->setValue(0);
+            m_lblEstadoGeneracion->setText("Faltan datos base (docentes, aulas o asignaturas) para poder generar el horario.");
+        } else {
+            m_gaugeWidget->setValue(100);
+            m_lblEstadoGeneracion->setText("Datos completos. El sistema está listo para invocar al motor de optimización.");
+        }
     }
 
-    if (modoOscuro) {
-        if (auto lbl = findChild<QLabel*>("DashboardTitle")) lbl->setStyleSheet("font-size: 24px; font-weight: 800; color: #ffffff; border: none;");
-        if (auto lbl = findChild<QLabel*>("DashboardSubtitle")) lbl->setStyleSheet("font-size: 14px; color: #aaaaaa; border: none;");
+    // Actualizar Panel de Notificaciones
+    actualizarNotificacionesReales();
+}
 
-        for (QFrame *card : findChildren<QFrame*>("DashboardCard")) {
-            card->setStyleSheet("QFrame#DashboardCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; color: white; }");
-        }
+void DashboardWidget::agregarNotificacionUI(int numero, const QString& texto, bool destacada) {
+    QFrame *item = new QFrame();
+    item->setObjectName("NotifItem");
+    item->setFixedHeight(50);
 
-        for (QLabel *lbl : findChildren<QLabel*>("PanelTitle")) {
-            lbl->setStyleSheet("font-size: 16px; font-weight: 800; color: #ffffff; border: none;");
-        }
-
-        for (QLabel *lbl : findChildren<QLabel*>("CardLabel")) {
-            lbl->setStyleSheet("font-size: 13px; font-weight: 600; color: #aaaaaa; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("CardValue")) {
-            lbl->setStyleSheet("font-size: 28px; font-weight: 800; color: #ffffff; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("StateTitle")) {
-            lbl->setStyleSheet("font-size: 13px; font-weight: 700; color: #ffffff; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("StateDesc")) {
-            lbl->setStyleSheet("font-size: 13px; color: #aaaaaa; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("NotifText")) {
-            lbl->setStyleSheet("font-size: 13px; color: #ffffff; border: none; background: transparent;");
-        }
-
-        if (m_btnVerDetalles)
-            m_btnVerDetalles->setStyleSheet("QPushButton { background-color: #2a2a2a; color: white; border: 1px solid #444444; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #333333; }");
-        if (m_btnResolverConflictos)
-            m_btnResolverConflictos->setStyleSheet("QPushButton { background-color: #3b82f6; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #2563eb; }");
-
-        for (QFrame *item : findChildren<QFrame*>("NotifItem")) {
-            item->setStyleSheet("QFrame { background-color: #252525; border-radius: 8px; border: 1px solid #333333; color: white; }");
-        }
+    bool isDark = qApp->property("isDarkMode").toBool();
+    if (isDark) {
+        item->setStyleSheet("QFrame { background-color: #252525; border-radius: 8px; border: 1px solid #333333; color: white; }");
     } else {
-        if (auto lbl = findChild<QLabel*>("DashboardTitle")) lbl->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none;");
-        if (auto lbl = findChild<QLabel*>("DashboardSubtitle")) lbl->setStyleSheet("font-size: 14px; color: #64748b; border: none;");
+        item->setStyleSheet(destacada ? "QFrame { background-color: #f8fafc; border-radius: 8px; border: none; }" : "QFrame { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; }");
+    }
 
-        for (QFrame *card : findChildren<QFrame*>("DashboardCard")) {
-            card->setStyleSheet("QFrame#DashboardCard { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }");
-        }
+    QHBoxLayout *itemLayout = new QHBoxLayout(item);
+    itemLayout->setContentsMargins(16, 0, 16, 0);
+    itemLayout->setSpacing(16);
 
-        for (QLabel *lbl : findChildren<QLabel*>("PanelTitle")) {
-            lbl->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("CardLabel")) {
-            lbl->setStyleSheet("font-size: 13px; font-weight: 600; color: #64748b; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("CardValue")) {
-            lbl->setStyleSheet("font-size: 28px; font-weight: 800; color: #0f172a; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("StateTitle")) {
-            lbl->setStyleSheet("font-size: 13px; font-weight: 700; color: #0f172a; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("StateDesc")) {
-            lbl->setStyleSheet("font-size: 13px; color: #64748b; border: none;");
-        }
-        for (QLabel *lbl : findChildren<QLabel*>("NotifText")) {
-            lbl->setStyleSheet("font-size: 13px; color: #0f172a; border: none; background: transparent;");
-        }
+    QLabel *numLabel = new QLabel(QString::number(numero));
+    numLabel->setObjectName("NotifNum");
+    numLabel->setFixedSize(26, 26);
+    numLabel->setAlignment(Qt::AlignCenter);
+    numLabel->setStyleSheet("background-color: #e0e7ff; color: #4338ca; border-radius: 13px; font-weight: 800; font-size: 11px; border: none;");
 
-        if (m_btnVerDetalles)
-            m_btnVerDetalles->setStyleSheet("QPushButton { background-color: white; color: #0f172a; border: 1px solid #cbd5e1; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #f8fafc; }");
-        if (m_btnResolverConflictos)
-            m_btnResolverConflictos->setStyleSheet("QPushButton { background-color: #0f172a; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #1e293b; }");
+    QLabel *textLabel = new QLabel(texto);
+    textLabel->setObjectName("NotifText");
+    textLabel->setStyleSheet(isDark ? "font-size: 13px; color: #ffffff; border: none; background: transparent;" : "font-size: 13px; color: #0f172a; border: none; background: transparent;");
+    textLabel->setWordWrap(true);
 
-        for (QFrame *item : findChildren<QFrame*>("NotifItem")) {
-            item->setStyleSheet("QFrame { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; }");
-        }
+    itemLayout->addWidget(numLabel);
+    itemLayout->addWidget(textLabel);
+
+    m_layoutListaNotificaciones->addWidget(item);
+}
+
+void DashboardWidget::actualizarNotificacionesReales() {
+    if (!m_nucleo || !m_layoutListaNotificaciones) return;
+
+    // Limpiar layout de notificaciones anteriores
+    QLayoutItem *child;
+    while ((child = m_layoutListaNotificaciones->takeAt(0)) != nullptr) {
+        if (child->widget()) { child->widget()->deleteLater(); }
+        delete child;
+    }
+
+    int contador = 1;
+
+    if (m_nucleo->listarDocentes().valor.isEmpty()) {
+        agregarNotificacionUI(contador++, "No hay docentes registrados. Ingrese personal para generar el horario.", true);
+    }
+    if (m_nucleo->listarAulas().valor.isEmpty()) {
+        agregarNotificacionUI(contador++, "Alerta: No se han configurado aulas disponibles en el plantel.", true);
+    }
+    if (m_nucleo->listarMaterias().valor.isEmpty()) {
+        agregarNotificacionUI(contador++, "Debe registrar el catálogo de asignaturas activas.", false);
+    }
+
+    if (contador == 1) {
+        agregarNotificacionUI(1, "Sincronizado. Todos los registros base están operativos.", false);
     }
 }
 
 // ==========================================
-// DIÁLOGOS
+// DIÁLOGOS Y CONFLICTOS
 // ==========================================
 void DashboardWidget::mostrarDetalles()
 {
     QVBoxLayout* layoutInterno = nullptr;
-    QDialog* dialog = crearDialogoFlotante(this, "📊", "Detalles de Generación", layoutInterno);
+    QDialog* dialog = crearDialogoFlotante(this, "📊", "Detalles de Base de Datos", layoutInterno);
     dialog->resize(550, 360);
 
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -440,9 +435,18 @@ void DashboardWidget::mostrarDetalles()
     QGridLayout *grid = new QGridLayout();
     grid->setSpacing(16);
 
-    QStringList labels = {"Progreso Global", "Horas Asignadas", "Aulas Utilizadas", "Conflictos Detectados"};
-    QStringList values = {"85%", "1,240 / 1,450", "34 / 36", "3"};
-    // Estilos adaptados para modo claro y oscuro
+    int aulasUsadas = m_nucleo ? m_nucleo->listarAulas().valor.size() : 0;
+    int materiasTotal = m_nucleo ? m_nucleo->listarMaterias().valor.size() : 0;
+
+    QString textoAulas = QString::number(aulasUsadas) + " registradas";
+    QString textoMaterias = QString::number(materiasTotal) + " activas";
+
+    QStringList labels = {"Estado Base de Datos", "Docentes Activos", "Aulas Configuradas", "Materias"};
+    QStringList values = {m_nucleo ? "Conectada" : "Desconectada",
+                          m_nucleo ? QString::number(m_nucleo->listarDocentes().valor.size()) : "0",
+                          textoAulas,
+                          textoMaterias};
+
     QStringList styles = isDark ?
                              QStringList{"color: #34d399;", "color: #ffffff;", "color: #ffffff;", "color: #fbbf24;"} :
                              QStringList{"color: #10b981;", "color: #0f172a;", "color: #0f172a;", "color: #f59e0b;"};
@@ -468,7 +472,7 @@ void DashboardWidget::mostrarDetalles()
     }
     layoutInterno->addLayout(grid);
 
-    QLabel *desc = new QLabel("El algoritmo genético ha completado la fase 4. Se ha maximizado la compactación del horario de los docentes, sin embargo, existen solapamientos de horas en asignaturas clave que requieren intervención manual para respetar la normativa del plantel.", dialog);
+    QLabel *desc = new QLabel("Los datos mostrados corresponden a la información en tiempo real extraída del archivo SQLite local.", dialog);
     desc->setWordWrap(true);
     desc->setAlignment(Qt::AlignLeft);
     QString descColor = isDark ? "#cccccc;" : "#64748b;";
@@ -481,12 +485,12 @@ void DashboardWidget::mostrarDetalles()
 void DashboardWidget::resolverConflictos()
 {
     QVBoxLayout* layoutInterno = nullptr;
-    QDialog* dialog = crearDialogoFlotante(this, "⚠️", "Resolver Conflictos", layoutInterno);
+    QDialog* dialog = crearDialogoFlotante(this, "⚠️", "Conflictos de Horario", layoutInterno);
     dialog->resize(600, 480);
 
     bool isDark = qApp->property("isDarkMode").toBool();
 
-    QLabel *headerDesc = new QLabel("Se encontraron los siguientes choques en la matriz de disponibilidad:", dialog);
+    QLabel *headerDesc = new QLabel("Estos conflictos provienen del motor de optimización matemática:", dialog);
     QString headerColor = isDark ? "#cccccc;" : "#334155;";
     headerDesc->setStyleSheet(QString("font-size: 14px; color: %1 border: none; background: transparent;").arg(headerColor));
     layoutInterno->addWidget(headerDesc);
@@ -495,12 +499,11 @@ void DashboardWidget::resolverConflictos()
     QList<Conflicto> conflictos = {
         {"Choque de Horario: Profa. Castro", "Asignada a Biología (Aula 2) y Química (Aula 4) el Lunes a las 08:00 AM.", "Reasignar"},
         {"Aula 3B sin capacidad", "El grupo de 4to Año tiene 45 alumnos, pero el Aula 3B tiene aforo máximo de 30.", "Cambiar\nAula"},
-        {"Disponibilidad Excedida: Prof. Méndez", "Excede en 2 horas su carga horaria semanal máxima permitida (36 hrs).", "Ajustar\nCarga"}
+        {"Disponibilidad Excedida: Prof. Méndez", "Excede en 2 horas su carga horaria semanal máxima permitida.", "Ajustar"}
     };
 
     for (const auto &c : conflictos) {
         QFrame *item = new QFrame(dialog);
-        // Si es oscuro, usamos un tono rojizo oscuro elegante (#3a1c1c con borde #5c2828); si es claro, #fff1f2 con borde #fecaca
         QString itemStyle = isDark ?
                                 "QFrame { border: 1px solid #5c2828; background-color: #2c1616; border-radius: 8px; }" :
                                 "QFrame { border: 1px solid #fecaca; background-color: #fff1f2; border-radius: 8px; }";
@@ -536,6 +539,46 @@ void DashboardWidget::resolverConflictos()
 
         layoutInterno->addWidget(item);
     }
-
     dialog->exec();
+}
+
+// ==========================================
+// TEMA
+// ==========================================
+void DashboardWidget::actualizarTema(bool modoOscuro) {
+    if (m_gaugeWidget) m_gaugeWidget->setDarkMode(modoOscuro);
+
+    if (modoOscuro) {
+        if (auto lbl = findChild<QLabel*>("DashboardTitle")) lbl->setStyleSheet("font-size: 24px; font-weight: 800; color: #ffffff; border: none;");
+        if (auto lbl = findChild<QLabel*>("DashboardSubtitle")) lbl->setStyleSheet("font-size: 14px; color: #aaaaaa; border: none;");
+
+        for (QFrame *card : findChildren<QFrame*>("DashboardCard")) { card->setStyleSheet("QFrame#DashboardCard { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; color: white; }"); }
+        for (QLabel *lbl : findChildren<QLabel*>("PanelTitle")) { lbl->setStyleSheet("font-size: 16px; font-weight: 800; color: #ffffff; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("CardLabel")) { lbl->setStyleSheet("font-size: 13px; font-weight: 600; color: #aaaaaa; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("CardValue")) { lbl->setStyleSheet("font-size: 28px; font-weight: 800; color: #ffffff; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("StateTitle")) { lbl->setStyleSheet("font-size: 13px; font-weight: 700; color: #ffffff; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("StateDesc")) { lbl->setStyleSheet("font-size: 13px; color: #aaaaaa; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("NotifText")) { lbl->setStyleSheet("font-size: 13px; color: #ffffff; border: none; background: transparent;"); }
+
+        for (QFrame *item : findChildren<QFrame*>("NotifItem")) { item->setStyleSheet("QFrame { background-color: #252525; border-radius: 8px; border: 1px solid #333333; color: white; }"); }
+
+        if (m_btnVerDetalles) m_btnVerDetalles->setStyleSheet("QPushButton { background-color: #2a2a2a; color: white; border: 1px solid #444444; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #333333; }");
+        if (m_btnResolverConflictos) m_btnResolverConflictos->setStyleSheet("QPushButton { background-color: #3b82f6; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #2563eb; }");
+    } else {
+        if (auto lbl = findChild<QLabel*>("DashboardTitle")) lbl->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none;");
+        if (auto lbl = findChild<QLabel*>("DashboardSubtitle")) lbl->setStyleSheet("font-size: 14px; color: #64748b; border: none;");
+
+        for (QFrame *card : findChildren<QFrame*>("DashboardCard")) { card->setStyleSheet("QFrame#DashboardCard { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }"); }
+        for (QLabel *lbl : findChildren<QLabel*>("PanelTitle")) { lbl->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("CardLabel")) { lbl->setStyleSheet("font-size: 13px; font-weight: 600; color: #64748b; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("CardValue")) { lbl->setStyleSheet("font-size: 28px; font-weight: 800; color: #0f172a; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("StateTitle")) { lbl->setStyleSheet("font-size: 13px; font-weight: 700; color: #0f172a; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("StateDesc")) { lbl->setStyleSheet("font-size: 13px; color: #64748b; border: none;"); }
+        for (QLabel *lbl : findChildren<QLabel*>("NotifText")) { lbl->setStyleSheet("font-size: 13px; color: #0f172a; border: none; background: transparent;"); }
+
+        for (QFrame *item : findChildren<QFrame*>("NotifItem")) { item->setStyleSheet("QFrame { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; }"); }
+
+        if (m_btnVerDetalles) m_btnVerDetalles->setStyleSheet("QPushButton { background-color: white; color: #0f172a; border: 1px solid #cbd5e1; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #f8fafc; }");
+        if (m_btnResolverConflictos) m_btnResolverConflictos->setStyleSheet("QPushButton { background-color: #0f172a; color: white; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; } QPushButton:hover { background-color: #1e293b; }");
+    }
 }

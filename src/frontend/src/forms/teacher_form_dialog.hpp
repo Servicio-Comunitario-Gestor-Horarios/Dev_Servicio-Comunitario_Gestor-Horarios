@@ -1,5 +1,4 @@
-#ifndef TEACHER_FORM_DIALOG_HPP
-#define TEACHER_FORM_DIALOG_HPP
+#pragma once
 
 #include <QDialog>
 #include <QLineEdit>
@@ -15,14 +14,16 @@ public:
     explicit TeacherFormDialog(QWidget *parent = nullptr);
     ~TeacherFormDialog() override = default;
 
-    void cargarDatos(const QString& cedula, const QString& id,
-                     const QString& nombre, const QString& email,
-                     const QString& telefono);
+    // Se eliminó 'id' y se agregó 'materias'
+    void cargarDatos(const QString& cedula, const QString& nombre,
+                     const QString& email, const QString& telefono,
+                     const QString& materias);
 
 signals:
-    void profesorGuardado(const QString& cedula, const QString& id,
-                          const QString& nombre, const QString& email,
-                          const QString& telefono);
+    // Se eliminó 'id' y se agregó 'materias' para enviar a la base de datos
+    void profesorGuardado(const QString& cedula, const QString& nombre,
+                          const QString& email, const QString& telefono,
+                          const QString& materias);
 
 private slots:
     void guardarProfesor();
@@ -31,14 +32,13 @@ private:
     bool validarCampos();
 
     QLineEdit *campoCedula;
-    QLineEdit *campoId;
     QLineEdit *campoNombre;
     QLineEdit *campoEmail;
     QLineEdit *campoTelefono;
+    QLineEdit *campoMaterias; // <-- NUEVO: Campo para la materia
+
     QPushButton *botonGuardar;
     QPushButton *botonCancelar;
 };
 
 } // namespace gestor::frontend::forms
-
-#endif // TEACHER_FORM_DIALOG_HPP
