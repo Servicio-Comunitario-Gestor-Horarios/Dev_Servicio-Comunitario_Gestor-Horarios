@@ -1,0 +1,534 @@
+#include <QDateTime>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QSet>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
+#include <QSqlRecord>
+#include <QStringList>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QVariant>
+#include <QVector>
+
+#include <algorithm>
+
+#include <backend/database/respaldo.hpp>
+#include <seed/sembrador.hpp>
+
+using namespace seed;
+
+namespace {
+
+/// Abre una conexión de solo lectura para inspeccionar una base ya creada (sin el contexto).
+QSqlDatabase abrirInspeccion(const QString& ruta, int& contador)
+{
+    const QString nombre =
+        QStringLiteral("test_seed_aplicacion_inspeccion_%1").arg(++contador);
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), nombre);
+    db.setDatabaseName(ruta);
+    db.open();
+    return db;
+}
+
+void cerrarInspeccion(QSqlDatabase& db)
+{
+    const QString nombre = db.connectionName();
+    if (db.isOpen()) {
+        db.close();
+    }
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase(nombre);
+}
+
+int contar(QSqlDatabase& db, const QString& tabla)
+{
+    QSqlQuery q(db);
+    q.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(tabla));
+    return q.next() ? q.value(0).toInt() : -1;
+}
+
+/// Vuelca una consulta como texto estable (una cadena por fila, columnas unidas por «|»),
+/// ordenada alfabéticamente, para comparar dos bases ignorando ids y marcas de auditoría.
+/// Si la consulta falla, devuelve una única entrada «__ERROR__ …» para que la comparación
+/// falle de forma visible.
+QStringList filasDe(QSqlDatabase& db, const QString& sql)
+{
+    QStringList filas;
+    QSqlQuery q(db);
+    if (!q.exec(sql)) {
+        filas.append(QStringLiteral("__ERROR__ %1").arg(q.lastError().text()));
+        return filas;
+    }
+    while (q.next()) {
+        QStringList valores;
+        const int columnas = q.record().count();
+        for (int i = 0; i < columnas; ++i) {
+            valores.append(q.value(i).toString());
+        }
+        filas.append(valores.join(QStringLiteral("|")));
+    }
+    std::sort(filas.begin(), filas.end());
+    return filas;
+}
+
+} // namespace
+
+class TestSeedAplicacion : public QObject {
+    Q_OBJECT
+
+private:
+    int m_contador = 0;
+
+private slots:
+    void creaBaseNuevaYPuebla()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+
+        // Recuentos completos del conjunto (RF-12): la variante por defecto es la holgada
+        // (65 docentes, 65 asignaciones y 325 disponibilidades = 65 × 5).
+        QCOMPARE(resultado.recuentos.turnos, 2);
+        QCOMPARE(resultado.recuentos.recesos, 2);
+        QCOMPARE(resultado.recuentos.aulas, 16);
+        QCOMPARE(resultado.recuentos.materias, 57);
+        QCOMPARE(resultado.recuentos.planes, 4);
+        QCOMPARE(resultado.recuentos.planMaterias, 210);
+        QCOMPARE(resultado.recuentos.cursos, 13);
+        QCOMPARE(resultado.recuentos.docentes, 65);
+        QCOMPARE(resultado.recuentos.asignaciones, 65);
+        QCOMPARE(resultado.recuentos.disponibilidades, 325);
+
+        // Inspección directa de la base.
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+
+        // Recesos exactos (RF-4): (Mañana, 2, 08:20, 08:30) y (Tarde, 2, 14:00, 14:10).
+        QCOMPARE(contar(db, QStringLiteral("Recesos")), 2);
+        QSqlQuery recesos(db);
+        QVERIFY(recesos.exec(
+            "SELECT turno, despues_de_slot, inicio, fin FROM Recesos ORDER BY inicio"));
+        QVector<QStringList> filas;
+        while (recesos.next()) {
+            filas.append({recesos.value(0).toString(), recesos.value(1).toString(),
+                          recesos.value(2).toString(), recesos.value(3).toString()});
+        }
+        QCOMPARE(filas.size(), 2);
+        const QStringList recesoManana{QStringLiteral("Mañana"), QStringLiteral("2"),
+                                       QStringLiteral("08:20"), QStringLiteral("08:30")};
+        const QStringList recesoTarde{QStringLiteral("Tarde"), QStringLiteral("2"),
+                                      QStringLiteral("14:00"), QStringLiteral("14:10")};
+        QCOMPARE(filas[0], recesoManana);
+        QCOMPARE(filas[1], recesoTarde);
+
+        // 13 cursos con turno NULL y un aula distinta cada uno (RF-4, RF-5).
+        QSqlQuery cursos(db);
+        QVERIFY(cursos.exec("SELECT anio, seccion, turno, aula FROM Cursos"));
+        int cursosTotal = 0;
+        int cursosSinTurno = 0;
+        QSet<int> aulas;
+        while (cursos.next()) {
+            ++cursosTotal;
+            if (cursos.value("turno").isNull()) {
+                ++cursosSinTurno;
+            }
+            const QVariant aula = cursos.value("aula");
+            QVERIFY(!aula.isNull());
+            aulas.insert(aula.toInt());
+        }
+        QCOMPARE(cursosTotal, 13);
+        QCOMPARE(cursosSinTurno, 13);
+        QCOMPARE(aulas.size(), 13);
+
+        cerrarInspeccion(db);
+    }
+
+    void baseConDatosFallaSinEscribir()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+
+        const ResultadoAplicacion primera = aplicar(opciones);
+        QVERIFY2(primera.ok(), qPrintable(primera.detalle));
+
+        // Segunda aplicación sobre la base ya poblada: falla sin escribir (RF-10).
+        const ResultadoAplicacion segunda = aplicar(opciones);
+        QCOMPARE(segunda.estado, EstadoAplicacion::BaseConDatos);
+        QVERIFY(!segunda.ok());
+        QVERIFY(!segunda.detalle.isEmpty());
+
+        // Los datos quedan intactos (ni duplicados ni borrados).
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Turnos")), 2);
+        QCOMPARE(contar(db, QStringLiteral("Recesos")), 2);
+        QCOMPARE(contar(db, QStringLiteral("Aulas")), 16);
+        QCOMPARE(contar(db, QStringLiteral("Materias")), 57);
+        QCOMPARE(contar(db, QStringLiteral("PlanEstudio_Materia")), 210);
+        QCOMPARE(contar(db, QStringLiteral("Cursos")), 13);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 65);
+        QCOMPARE(contar(db, QStringLiteral("Profesor_Materia")), 65);
+        QCOMPARE(contar(db, QStringLiteral("Disponibilidad_Profesor")), 325);
+        cerrarInspeccion(db);
+    }
+
+    void rutaVaciaEsUsoInvalido()
+    {
+        // Sin «--db» no se actúa (RF-10): la base de destino es obligatoria.
+        OpcionesAplicacion opciones;  // rutaDb vacía
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QCOMPARE(resultado.estado, EstadoAplicacion::UsoInvalido);
+        QVERIFY(!resultado.ok());
+        QVERIFY(!resultado.detalle.isEmpty());
+    }
+
+    void varianteDesconocidaEsRechazada()
+    {
+        // Una variante fuera del enum se rechaza sin tocar la base (RF-9). En la CLI la
+        // detecta el parseo (`varianteDesdeTexto`); aquí se ejercita la guarda de `aplicar()`.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = dir.filePath(QStringLiteral("centro.db"));
+        opciones.variante = static_cast<VarianteDocentes>(999);  // fuera de las cuatro válidas
+
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QCOMPARE(resultado.estado, EstadoAplicacion::VarianteDesconocida);
+        QVERIFY(!resultado.ok());
+        QVERIFY(!resultado.detalle.isEmpty());
+    }
+
+    void determinismo()
+    {
+        QTemporaryDir dirA;
+        QTemporaryDir dirB;
+        QVERIFY(dirA.isValid());
+        QVERIFY(dirB.isValid());
+        const QString rutaA = dirA.filePath(QStringLiteral("centro.db"));
+        const QString rutaB = dirB.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = rutaA;
+        const ResultadoAplicacion primera = aplicar(opciones);
+        QVERIFY2(primera.ok(), qPrintable(primera.detalle));
+        opciones.rutaDb = rutaB;
+        const ResultadoAplicacion segunda = aplicar(opciones);
+        QVERIFY2(segunda.ok(), qPrintable(segunda.detalle));
+
+        QSqlDatabase a = abrirInspeccion(rutaA, m_contador);
+        QSqlDatabase b = abrirInspeccion(rutaB, m_contador);
+        QVERIFY(a.isOpen());
+        QVERIFY(b.isOpen());
+
+        // Dos aplicaciones del mismo perfil dejan las mismas filas (nombres, ids, relaciones y
+        // las 210 cargas) salvo id/fecha_creacion/fecha_modificacion (RF-11, RNF-5).
+        const struct {
+            const char* tabla;
+            const char* sql;
+        } kComparaciones[] = {
+            {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
+            {"Recesos", "SELECT turno, despues_de_slot, duracion, inicio, fin FROM Recesos"},
+            {"Aulas", "SELECT nombre, capacidad, edificio, piso FROM Aulas"},
+            {"Materias", "SELECT nombre, requisitos FROM Materias"},
+            {"PlanEstudio", "SELECT codigo, nombre, descripcion FROM PlanEstudio"},
+            {"PlanEstudio_Materia",
+             "SELECT codigo_PlanEstudio, id_Materia, curso, horas FROM PlanEstudio_Materia"},
+            {"Cursos", "SELECT anio, seccion, turno, aula FROM Cursos"},
+            {"Profesores", "SELECT id, nombre, email, telefono FROM Profesores"},
+            {"Profesor_Materia", "SELECT id_Profesor, id_Materia FROM Profesor_Materia"},
+            {"Disponibilidad_Profesor",
+             "SELECT id_Profesor, dia, hora_inicio, hora_fin FROM Disponibilidad_Profesor"},
+        };
+        for (const auto& c : kComparaciones) {
+            const QString sql = QString::fromLatin1(c.sql);
+            const QStringList filasA = filasDe(a, sql);
+            const QStringList filasB = filasDe(b, sql);
+            QVERIFY2(filasA == filasB,
+                     qPrintable(QStringLiteral("La tabla %1 difiere entre bases.")
+                                    .arg(QString::fromLatin1(c.tabla))));
+        }
+
+        cerrarInspeccion(a);
+        cerrarInspeccion(b);
+    }
+
+    void rollbackAnteFalloTrasDocentes()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        opciones.simularFalloTrasDocentes = true;
+
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QCOMPARE(resultado.estado, EstadoAplicacion::FalloEscritura);
+        QVERIFY(!resultado.ok());
+        QVERIFY(!resultado.detalle.isEmpty());
+
+        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 10 tablas.
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        const char* const kTablas[] = {
+            "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
+            "Turnos", "Recesos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+        };
+        for (const char* tabla : kTablas) {
+            QCOMPARE(contar(db, QString::fromLatin1(tabla)), 0);
+        }
+        cerrarInspeccion(db);
+    }
+
+    void rutaRespaldoLibre_eligeRutaDisponible()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString rutaDb = dir.filePath(QStringLiteral("centro.db"));
+        const QDateTime ahora(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        // Sin colisiones: la ruta base (con la marca temporal) queda libre.
+        const QString base = Respaldo::construirNombreRespaldo(rutaDb, ahora);
+        QCOMPARE(rutaRespaldoLibre(rutaDb, ahora), base);
+
+        // Si la base está ocupada, se prueba «-2», «-3»… (función pura, sin tocar la base).
+        const QString libre2 = base + QStringLiteral("-2");
+        const QString libre3 = base + QStringLiteral("-3");
+        {
+            QFile a(base);
+            QVERIFY(a.open(QIODevice::WriteOnly));
+            a.write("ocupado");
+            a.close();
+        }
+        QCOMPARE(rutaRespaldoLibre(rutaDb, ahora), libre2);
+        {
+            QFile b(libre2);
+            QVERIFY(b.open(QIODevice::WriteOnly));
+            b.write("ocupado");
+            b.close();
+        }
+        QCOMPARE(rutaRespaldoLibre(rutaDb, ahora), libre3);
+    }
+
+    void reemplazoTotalConRespaldo()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion inicial = aplicar(opciones);
+        QVERIFY2(inicial.ok(), qPrintable(inicial.detalle));
+
+        // Reemplazo total con confirmación: deja respaldo previo válido y repuebla.
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+
+        // El respaldo existe y es una base válida (RF-10/RNF-6).
+        QVERIFY(!resultado.rutaRespaldo.isEmpty());
+        QVERIFY(QFile::exists(resultado.rutaRespaldo));
+        QString errorRespaldo;
+        QVERIFY2(Respaldo::validarRespaldo(resultado.rutaRespaldo, &errorRespaldo),
+                 qPrintable(errorRespaldo));
+
+        // Recuentos correctos tras el reemplazo (misma variante holgada por defecto).
+        QCOMPARE(resultado.recuentos.docentes, 65);
+        QCOMPARE(resultado.recuentos.asignaciones, 65);
+        QCOMPARE(resultado.recuentos.disponibilidades, 325);
+        QCOMPARE(resultado.recuentos.planMaterias, 210);
+    }
+
+    void reemplazoTotalSinConfirmacion()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion inicial = aplicar(opciones);
+        QVERIFY2(inicial.ok(), qPrintable(inicial.detalle));
+
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = false; // sin --si
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QCOMPARE(resultado.estado, EstadoAplicacion::ConfirmacionRequerida);
+        QVERIFY(!resultado.ok());
+        QVERIFY(!resultado.detalle.isEmpty());
+        // Sin respaldo ni cambios: la base conserva los datos previos.
+        QVERIFY(resultado.rutaRespaldo.isEmpty());
+        QVERIFY(!QFile::exists(Respaldo::construirNombreRespaldo(
+            ruta, QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0)))));
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 65);
+        QCOMPARE(contar(db, QStringLiteral("PlanEstudio_Materia")), 210);
+        cerrarInspeccion(db);
+    }
+
+    void soloDocentesConservaElResto()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion inicial = aplicar(opciones);
+        QVERIFY2(inicial.ok(), qPrintable(inicial.detalle));
+
+        // Fotografía del estado previo de todo lo que no son docentes.
+        QSqlDatabase antes = abrirInspeccion(ruta, m_contador);
+        QVERIFY(antes.isOpen());
+        const struct {
+            const char* tabla;
+            const char* sql;
+        } kNoDocentes[] = {
+            {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
+            {"Recesos", "SELECT turno, despues_de_slot, duracion, inicio, fin FROM Recesos"},
+            {"Aulas", "SELECT nombre, capacidad, edificio, piso FROM Aulas"},
+            {"Materias", "SELECT nombre, requisitos FROM Materias"},
+            {"PlanEstudio", "SELECT codigo, nombre, descripcion FROM PlanEstudio"},
+            {"PlanEstudio_Materia",
+             "SELECT codigo_PlanEstudio, id_Materia, curso, horas FROM PlanEstudio_Materia"},
+            {"Cursos", "SELECT anio, seccion, turno, aula FROM Cursos"},
+        };
+        QStringList antesFilas[7];
+        for (int i = 0; i < 7; ++i) {
+            antesFilas[i] = filasDe(antes, QString::fromLatin1(kNoDocentes[i].sql));
+        }
+        QCOMPARE(contar(antes, QStringLiteral("Profesores")), 65);
+        cerrarInspeccion(antes);
+
+        // Conmutación a la variante de suplentes: solo docentes/materias/disponibilidad.
+        OpcionesAplicacion conmutacion;
+        conmutacion.rutaDb = ruta;
+        conmutacion.soloDocentes = true;
+        conmutacion.confirmado = true;
+        conmutacion.variante = VarianteDocentes::Suplentes;
+        conmutacion.ahora = QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(conmutacion);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+        QCOMPARE(resultado.recuentos.docentes, 43);
+        QCOMPARE(resultado.recuentos.asignaciones, 57);
+        QCOMPARE(resultado.recuentos.disponibilidades, 215);
+
+        QSqlDatabase despues = abrirInspeccion(ruta, m_contador);
+        QVERIFY(despues.isOpen());
+        // El resto de tablas queda idéntico (incluidas las 210 cargas).
+        for (int i = 0; i < 7; ++i) {
+            const QStringList filas = filasDe(despues, QString::fromLatin1(kNoDocentes[i].sql));
+            QVERIFY2(filas == antesFilas[i],
+                     qPrintable(QStringLiteral("La tabla %1 cambió durante «--solo-docentes».")
+                                    .arg(QString::fromLatin1(kNoDocentes[i].tabla))));
+        }
+        QCOMPARE(contar(despues, QStringLiteral("PlanEstudio_Materia")), 210);
+        QCOMPARE(contar(despues, QStringLiteral("Profesores")), 43);
+        cerrarInspeccion(despues);
+    }
+
+    void atomicidadAnteFalloEnReemplazo()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion inicial = aplicar(opciones);
+        QVERIFY2(inicial.ok(), qPrintable(inicial.detalle));
+
+        QSqlDatabase antes = abrirInspeccion(ruta, m_contador);
+        QVERIFY(antes.isOpen());
+        const QStringList planMateriasAntes =
+            filasDe(antes, "SELECT codigo_PlanEstudio, id_Materia, curso, horas "
+                           "FROM PlanEstudio_Materia");
+        const QStringList profesoresAntes =
+            filasDe(antes, "SELECT id, nombre, email, telefono FROM Profesores");
+        QCOMPARE(contar(antes, QStringLiteral("Profesores")), 65);
+        QCOMPARE(contar(antes, QStringLiteral("PlanEstudio_Materia")), 210);
+        cerrarInspeccion(antes);
+
+        // Reemplazo total que falla a mitad: la base previa queda intacta (rollback).
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.variante = VarianteDocentes::Suplentes;
+        reemplazo.simularFalloTrasDocentes = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QCOMPARE(resultado.estado, EstadoAplicacion::FalloEscritura);
+        QVERIFY(!resultado.ok());
+        QVERIFY(!resultado.detalle.isEmpty());
+
+        QSqlDatabase despues = abrirInspeccion(ruta, m_contador);
+        QVERIFY(despues.isOpen());
+        QCOMPARE(contar(despues, QStringLiteral("Profesores")), 65);
+        QCOMPARE(contar(despues, QStringLiteral("PlanEstudio_Materia")), 210);
+        const QStringList planMateriasDespues =
+            filasDe(despues, "SELECT codigo_PlanEstudio, id_Materia, curso, horas "
+                             "FROM PlanEstudio_Materia");
+        const QStringList profesoresDespues =
+            filasDe(despues, "SELECT id, nombre, email, telefono FROM Profesores");
+        QVERIFY2(planMateriasDespues == planMateriasAntes,
+                 "Las 210 cargas cambiaron tras el fallo en reemplazo.");
+        QVERIFY2(profesoresDespues == profesoresAntes,
+                 "Los docentes cambiaron tras el fallo en reemplazo.");
+        cerrarInspeccion(despues);
+    }
+
+    void tiempoDeAplicacion()
+    {
+        // RNF-1: aplicar el perfil por defecto sobre una base vacía termina en menos de 15 s.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+
+        QElapsedTimer cronometro;
+        cronometro.start();
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        const qint64 transcurrido = cronometro.elapsed();
+
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QVERIFY2(transcurrido < 15000,
+                 qPrintable(QStringLiteral("La aplicación sobre una base nueva tardó %1 ms "
+                                           "(límite: 15000 ms).")
+                                .arg(transcurrido)));
+    }
+};
+
+QTEST_MAIN(TestSeedAplicacion)
+#include "test_seed_aplicacion.moc"

@@ -97,6 +97,14 @@ if(TARGET datos)
 endif()
 
 # ============================================================
+# Seed (datos de prueba del centro) — requiere el target `seed`
+# ============================================================
+if(TARGET seed)
+	add_qtest(test_seed_perfil backend/test_seed_perfil.cpp seed)
+	add_qtest(test_seed_aplicacion backend/test_seed_aplicacion.cpp seed Qt6::Sql)
+endif()
+
+# ============================================================
 # Solver CP-SAT — requiere el target `backend_solver`
 # ============================================================
 if(TARGET backend_solver)
