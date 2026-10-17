@@ -3,6 +3,7 @@
 #include <QTest>
 
 #include "backend/data/horario_salida.hpp"
+#include "backend/solver/config/contrato_solver.hpp"
 #include "services/entrada_solver_builder.hpp"
 
 /// Tests de la traducción `HorarioSalida` → formato de visualización (RF-1).
@@ -22,8 +23,8 @@ private:
         ctx.materias   = {QStringLiteral("Matemática"), QStringLiteral("Física")};
         ctx.profesores = {QStringLiteral("Ana"), QStringLiteral("Luis")};
         ctx.aulas      = {QStringLiteral("A1")};
-        ctx.cursos.insert(QStringLiteral("1ro A"), qMakePair(1, QStringLiteral("A")));
-        ctx.cursos.insert(QStringLiteral("2do B"), qMakePair(2, QStringLiteral("B")));
+        ctx.cursos.insert(claveCurso(1, QStringLiteral("A")), qMakePair(1, QStringLiteral("A")));
+        ctx.cursos.insert(claveCurso(2, QStringLiteral("B")), qMakePair(2, QStringLiteral("B")));
         return ctx;
     }
 
@@ -55,14 +56,14 @@ private slots:
         cursoA.dias = {
             DiaOutput{0, {asignacion(0, 0, 0, 0), asignacion(1, 1, 1, 0)}},
         };
-        horario.horarios.insert(QStringLiteral("1ro A"), cursoA);
+        horario.horarios.insert(claveCurso(1, QStringLiteral("A")), cursoA);
 
         CursoOutput cursoB;
         cursoB.turno = QStringLiteral("tarde");
         cursoB.dias = {
             DiaOutput{2, {asignacion(3, 0, 0, 0)}},
         };
-        horario.horarios.insert(QStringLiteral("2do B"), cursoB);
+        horario.horarios.insert(claveCurso(2, QStringLiteral("B")), cursoB);
 
         const QJsonObject root = GeneracionSolver::aFormatoVisualizacion(horario, contextoBase());
 
@@ -124,7 +125,7 @@ private slots:
             // Slot 15: fuera de rango, se omite; slot 2 es válido.
             DiaOutput{0, {asignacion(15, 1, 1, 0), asignacion(2, 0, 0, 0)}},
         };
-        horario.horarios.insert(QStringLiteral("1ro A"), curso);
+        horario.horarios.insert(claveCurso(1, QStringLiteral("A")), curso);
 
         const QJsonObject root = GeneracionSolver::aFormatoVisualizacion(horario, contextoBase());
         const QJsonArray teachers = root.value(QStringLiteral("teachers")).toArray();
