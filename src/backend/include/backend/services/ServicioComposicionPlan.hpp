@@ -9,7 +9,6 @@
 #include <backend/resultado.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/data/materia.hpp>
-
 /**
  * @brief Servicio que compone un plan de estudio completo a partir de las tablas existentes:
  *        - PlanEstudio (tabla existente)

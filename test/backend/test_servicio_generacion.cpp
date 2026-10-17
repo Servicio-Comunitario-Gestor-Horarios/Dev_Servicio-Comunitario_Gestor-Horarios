@@ -6,7 +6,10 @@
 #include <QTime>
 
 #include <backend/services/ConstructorEntradaSolver.hpp>
+#include <backend/data/materia.hpp>
+#include <backend/data/plan_estudio.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
+#include <backend/solver/config/contrato_solver.hpp>
 
 using Estado = ResultadoGeneracion::Estado;
 
@@ -60,9 +63,18 @@ private:
         curso.aula = 10;
         d.cursos = {curso};
 
+        Materia mPlan; mPlan.nombre = QStringLiteral("Matemática");
+        MateriaEnPlan mp; mp.curso = 1; mp.horas = 1; mp.materia = mPlan;   // 1 h -> 2 bloques
+        PlanEstudio plan; plan.codigo = QStringLiteral("Ciencias"); plan.nombre = QStringLiteral("Ciencias");
+        plan.materias = {mp};
+        d.planes = {plan};
+
+        FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(9, 0);
+        DisponibilidadDTO disp; disp.id = 0; disp.franja = franja;
         MateriaAsignadaDTO asig; asig.id = 1; asig.nombre = QStringLiteral("Matemática");
         ProfesorDTO prof;
         prof.id = QStringLiteral("P1"); prof.nombre = QStringLiteral("Ana");
+        prof.disponibilidad = {disp};
         prof.materias = {asig};
         d.docentes = {prof};
 
@@ -77,6 +89,10 @@ private:
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
         p.franja_horaria.slots_por_turno = 6;
+        p.aula_fija = true;
+        CursoSolverConfig curso; curso.anio = 1; curso.seccion = QStringLiteral("A");
+        curso.plan = QStringLiteral("Ciencias"); curso.num_estudiantes = 20;
+        p.cursos = {curso};
         ProfesorSolverConfig prof;
         prof.nombre = QStringLiteral("Ana");
         prof.horas_requeridas = 10;
@@ -87,22 +103,8 @@ private:
 
     QJsonObject entradaValida() const
     {
-        QJsonObject j = construirJsonEntrada(dominio(), parametros(),
-                                             QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
-        // TODO(spec 005): las materias del curso se derivan de su plan. Hasta
-        // entonces, el test las aporta a mano para que la entrada sea valida.
-        QJsonArray cursos = j["cursos"].toArray();
-        QJsonObject c = cursos[0].toObject();
-        if (c["materias"].toArray().isEmpty())
-            c["materias"] = QJsonArray{QJsonObject{{QStringLiteral("materia_idx"), 0},
-                                                   {QStringLiteral("horas_semanales"), 2}}};
-        if (!c.contains(QStringLiteral("num_estudiantes")) || c["num_estudiantes"].toInt() <= 0)
-            c[QStringLiteral("num_estudiantes")] = 1;
-        if (c["plan"].toString().isEmpty())
-            c[QStringLiteral("plan")] = QStringLiteral("IS-2026");
-        cursos[0] = c;
-        j["cursos"] = cursos;
-        return j;
+        return construirJsonEntrada(dominio(), parametros(),
+                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
     }
 
     /// Salida válida: cubre las 2 horas sin solapamientos.
@@ -115,7 +117,7 @@ private:
         dia.dia = 0;
         dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}, AsignacionOutput{1, 0, 0, 0}};
         curso.dias = {dia};
-        h.horarios[QStringLiteral("1ro A")] = curso;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
 
         RespuestaSolver r;
         r.ok = true;
@@ -138,7 +140,7 @@ private:
                                                      {"profesor", 0}, {"aula", 0}}};
         dias.append(dia);
         otro["dias"] = dias;
-        horarios["1ro B"] = otro;
+        horarios[claveCurso(1, QStringLiteral("B"))] = otro;
         salida["horarios"] = horarios;
         r.salida = salida;
         return r;

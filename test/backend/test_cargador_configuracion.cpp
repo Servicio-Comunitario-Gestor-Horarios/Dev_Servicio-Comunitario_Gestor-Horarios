@@ -19,7 +19,8 @@ private:
     QJsonObject configValida() const
     {
         QJsonObject o;
-        o["version"] = QStringLiteral("1.0");
+        o["version"]   = QStringLiteral("1.0");
+        o["aula_fija"] = true;   // GLOBAL (por defecto true)
 
         QJsonObject dim;
         dim["num_profesores"] = 1;
@@ -44,27 +45,37 @@ private:
 
         o["recesos"] = QJsonArray{};
 
+        // Planes EMBEBIDOS (materias + horas + año).
+        QJsonObject materiaPlan;
+        materiaPlan["materia_idx"]     = 0;
+        materiaPlan["curso"]           = 1;   // año al que aplica
+        materiaPlan["horas_semanales"] = 2;
+        QJsonObject plan;
+        plan["codigo"]   = QStringLiteral("Ciencias");
+        plan["materias"] = QJsonArray{materiaPlan};
+        o["planes"] = QJsonArray{plan};
+
+        // Curso por IDENTIDAD (sin `nombre`).
         QJsonObject curso;
-        curso["nombre"]          = QStringLiteral("1ro A");
+        curso["anio"]            = 1;
+        curso["seccion"]         = QStringLiteral("A");
         curso["turno"]           = QStringLiteral("manana");
-        curso["aula_fija"]       = 0;
-        curso["num_estudiantes"] = 20;
         curso["plan"]            = QStringLiteral("Ciencias");
-        QJsonObject materiaCurso;
-        materiaCurso["materia_idx"]     = 0;
-        materiaCurso["horas_semanales"] = 2;
-        curso["materias"] = QJsonArray{materiaCurso};
+        curso["num_estudiantes"] = 20;
+        curso["aula"]            = 0;
         o["cursos"] = QJsonArray{curso};
 
         QJsonObject profesor;
-        profesor["nombre"]              = QStringLiteral("Ana");
-        profesor["horas_requeridas"]    = 2;
-        profesor["horas_aula"]          = 2;
-        profesor["turno"]               = QString();
-        profesor["plan"]                = QString();
-        profesor["materias_asignadas"]  = QJsonArray{0};
-        profesor["materias_suplente"]   = QJsonArray{};
-        profesor["disponibilidad"]      = QJsonArray{};
+        profesor["nombre"]             = QStringLiteral("Ana");
+        profesor["horas_aula"]         = 2;          // `horas_requeridas` opcional (ausente)
+        profesor["turno"]              = QString();
+        profesor["plan"]               = QString();
+        profesor["anios"]              = QJsonArray{1};
+        profesor["materias_asignadas"] = QJsonArray{0};
+        profesor["materias_suplente"]  = QJsonArray{};
+        // Con disponibilidad real: V13 exige que el candidato tenga bloques.
+        QJsonObject disp; disp["dia"] = 0; disp["slot"] = QJsonArray{0, 1, 2, 3, 4, 5};
+        profesor["disponibilidad"]     = QJsonArray{disp};
         o["profesores"] = QJsonArray{profesor};
 
         QJsonObject materia;
@@ -76,19 +87,6 @@ private:
         aula["tipo"]      = QStringLiteral("regular");
         aula["capacidad"] = 30;
         o["aulas"] = QJsonArray{aula};
-
-        QJsonObject planificacion;
-        planificacion["activa"] = false;
-        o["planificacion"] = planificacion;
-
-        QJsonObject generacion;
-        generacion["cursos_a_generar"] = QJsonArray{0};
-        o["generacion"] = generacion;
-
-        QJsonObject penalizaciones;
-        penalizaciones["capacidad_aula"]      = 100;
-        penalizaciones["emergencia_profesor"] = 50;
-        o["penalizaciones"] = penalizaciones;
 
         return o;
     }
@@ -140,8 +138,91 @@ private slots:
         const auto leido = CargadorConfiguracionSolver::cargar(ruta);
         QVERIFY2(leido.ok, qPrintable(leido.mensajeError));
 
-        // Se reproduce la configuración: mismas 13 secciones y valores.
+        // El JSON serializado NO contiene `nombre` (el nombre es presentación, spec 004).
+        const QJsonObject serializado = config.valor.toJson();
+        QVERIFY(!serializado.contains(QStringLiteral("nombre")));
+
+        // Se reproduce la configuración: mismas secciones y valores.
         QCOMPARE(leido.valor.toJson(), config.valor.toJson());
+    }
+
+    void camposDesconocidos_seToleran()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("campo_extra")] = QStringLiteral("se ignora");
+        QJsonObject cursoExtra = o["cursos"].toArray()[0].toObject();
+        cursoExtra[QStringLiteral("nombre")] = QStringLiteral("1ro A"); // nombre se ignora
+        o["cursos"] = QJsonArray{cursoExtra};
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+        // Ni el campo desconocido ni `nombre` reaparecen al serializar.
+        QVERIFY(!config.valor.toJson().contains(QStringLiteral("campo_extra")));
+        QVERIFY(!config.valor.toJson().contains(QStringLiteral("nombre")));
+    }
+
+    /// RF-10: la espec produce y acepta la version `1.0`.
+    void version_1_0_pasa()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("version")] = QStringLiteral("1.0");
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+    }
+
+    /// RF-10: version ausente => rechazo (entrada invalida).
+    void versionAusente_falla()
+    {
+        QJsonObject o = configValida();
+        o.remove(QStringLiteral("version"));
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY(!config.ok);
+        QVERIFY(!config.mensajeError.isEmpty());
+    }
+
+    /// RF-10: version no reconocida (posterior) => rechazo indicando la causa.
+    void versionNoReconocida_falla()
+    {
+        QJsonObject o = configValida();
+        o[QStringLiteral("version")] = QStringLiteral("9.9");
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(!config.ok, "una version no reconocida debe rechazarse (RF-10)");
+        QVERIFY(config.mensajeError.contains(QStringLiteral("1.0")));
+    }
+
+    /// Al PRODUCIR una configuracion (construida en C++ sin declarar `version`) se sella "1.0".
+    void configSinVersionDeclarada_seSellaYRecarga()
+    {
+        // Configuracion valida construida en C++ a la que el origen NO declara version.
+        const auto parseada = SolverConfig::fromJson(configValida());
+        QVERIFY(parseada.ok);
+        SolverConfig config = parseada.valor;
+        config.version.clear();
+
+        // (i) al serializar sale "1.0", nunca vacio.
+        QCOMPARE(config.toJson()[QStringLiteral("version")].toString(), QStringLiteral("1.0"));
+
+        // (ii) guardar y recargar sigue siendo valida.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("preset.json"));
+        const auto guardado = CargadorConfiguracionSolver::guardar(ruta, config);
+        QVERIFY2(guardado.ok, qPrintable(guardado.mensajeError));
+
+        const auto leido = CargadorConfiguracionSolver::cargar(ruta);
+        QVERIFY2(leido.ok, qPrintable(leido.mensajeError));
+        QCOMPARE(leido.valor.version, QStringLiteral("1.0"));
+    }
+
+    /// Una configuracion por defecto (recien construida en C++) ya declara la version 1.0.
+    void configPorDefectoYaDeclaraVersion_1_0()
+    {
+        const SolverConfig config;
+        QCOMPARE(config.version, QStringLiteral("1.0"));
+        QCOMPARE(config.toJson()[QStringLiteral("version")].toString(), QStringLiteral("1.0"));
     }
 
     void guardarCarpetaInexistente_error()

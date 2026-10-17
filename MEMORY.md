@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** spec **004 implementada** (T1–T9: curso por `anio`+`seccion` con `turno`/`aula`, esquema único, cascadas con anulación, consola y contrato del frontend). Suite **38/43**; los 4 rojos son de la **spec 005**.
-- **Fecha:** 2026-10-15
-- **Rama:** `sdd/004-persistencia-campos-curso`
-- **Specs en curso:** `specs/004-persistencia-campos-curso` (**implementada**), `specs/005-nucleo-solver` (**aprobada**; plan/tareas pendientes)
-- **Siguiente paso:** regenerar `plan.md`/`tasks.md` de **005** e implementar el motor (objetivo, D1/D2/D9); cerrar los 4 tests rojos (constructor_entrada, validador_entrada, ipc_aislamiento_bd, solver).
+- **Fase:** spec **005 (núcleo del solver) implementada** (T1–T9; T10 abierta por pendientes conocidos). Suite **44/44** en verde.
+- **Fecha:** 2026-10-16
+- **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
+- **Specs en curso:** `specs/004-persistencia-campos-curso` (implementada), `specs/005-nucleo-solver` (**implementada**; validada por el reviewer: APROBADA en ronda 2)
+- **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo) y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
 
 ## Specs activas
 
@@ -18,7 +18,7 @@
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
 | 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9; suite 38/43) |
-| 005-nucleo-solver | aprobada | spec aprobada; plan propuesto (sin el puente D-10) |
+| 005-nucleo-solver | aprobada | **implementada** (T1–T9; T10 abierta por pendientes conocidos; suite 44/44) |
 
 > Épico **solver** (la numeración sigue el orden de trabajo): **004 (persistencia de campos) → 005 (núcleo del solver) → 006 (turnos automáticos) → 007 (generación parcial)**. 006 y 007 reservadas, sin crear.
 
@@ -58,15 +58,22 @@
   - **Contrato de configuración:** los cursos se identifican por **`anio`+`seccion`** (el nombre se **deriva**: `"1ro A"`, ordinal `{1:ro,2:do,3:ro,resto:to}`) y `aula_fija` pasa a **booleano + `aula` (índice)**; los docentes ganan **`anios`** (vacío = cualquiera). La BD `Cursos` sumará `anio`/`seccion` (**spec 004**). Validaciones **V13/V14/V15**.
   - La spec **005** supersede el contrato JSON de 002 (anotado en `specs/002-generacion-horarios-ipc/spec.md`). `docs/solver/` queda como **referencia histórica**.
   - **Años del docente: viven en el preset/config, NO en la BD** (no hay columna nueva en `docentes`). **No hay presets antiguos** → sin compatibilidad hacia atrás. La persistencia (spec 004) solo añade `anio`/`seccion` a `Cursos` y expone los campos en el dominio/DTO (el mapeo DTO→JSON es de la spec 005).
-  - **Modo didáctico:** en el solver, **el usuario implementa**; el agente explica comandos/lógica y revisa. NO usar el subagente @implementer aquí.
-  - Tests del solver que fallan (hoy 39/41 en Docker): los deja verdes la spec **005**.
+  - **Modo didáctico:** en el solver, **el usuario implementa**; el agente explica comandos/lógica y revisa. (En la implementación inicial implementó el usuario; en las correcciones de la validación se usó el subagente @implementer a petición expresa del usuario.)
+  - Tests del solver que fallaban (39/41 en Docker entonces): quedaron **verdes** al cerrar la spec **005** (suite 44/44).
 
 ## Siguiente paso
 
-1. **Spec 004 (persistencia de campos de curso) — aprobada:** redactar `plan.md` + `tasks.md` → implementación (didáctica: el usuario implementa).
-2. **Orden del épico solver:** 004 (persistencia) → 005 (núcleo) → 006 (turnos automáticos) → 007 (generación parcial).
-3. **Pendiente en 005 (núcleo solver, aprobada):** al redactar su `plan.md`/`tasks.md`, @planner resuelve las 4 precisiones del reviewer ("franjas útiles" de V14, `peso` negativo → chequeo de rango, nota de 002, "conserva V1–V12" vs V8). **Los huecos de numeración ya se resolvieron** (004 = RF-1..5; 005 = RF-1..12; plan sin huecos). Su plan ya está propuesto y **sin el puente D-10**.
+1. **Pendientes conocidos de la 005** (ver abajo) → planificar en la próxima spec del épico (**006/007**) o en una nueva.
+2. **Orden del épico solver:** 004 (persistencia) ✅ → 005 (núcleo) ✅ → 006 (turnos automáticos) → 007 (generación parcial).
+3. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
 4. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`) en `src/app`: la lógica está lista; el consumo UI↔IPC lo hace el equipo de frontend (`docs/interfaz-frontend.md` §3).
+
+### Pendientes conocidos de la 005 (diferidos y documentados)
+
+- **RF-13 — planes de los docentes:** `ConstructorEntradaSolver` embebe los planes de los **cursos** pero no los que usan los **docentes**. Sin impacto funcional hoy (el plan del docente se compara como cadena), pero es una cláusula explícita del RF.
+- **RNF-4 — cobertura de tests por regla:** faltan casos rojo→verde de V2 (`peso` negativo, `duracion_minutos ≤ 0`), V7 (turno ausente), V8 (modo inactivo), V14, V15, D13 (`anios`), S1/S2 (exceso y titular a tope), reproducibilidad (RNF-1), aula de salida como índice (fija/móvil) y `peso` en el ida y vuelta. Por esto los «Hecho cuando» de T3/T5/T7/T8 no quedan cerrados y **T10 sigue abierta**.
+- **Decisión I2 — avisos retirados:** `ValidadorSalidaSolver` sigue emitiendo los avisos de **capacidad de aula** y **horas no cubiertas**, y `test_validador_salida` los exige; la spec 005 los **retira hasta nuevo aviso**. Hay que alinear código/tests (tocando la spec si se cambia la decisión).
+- **Residuales varios:** P1/P2 de `ValidadorSalidaSolver` comparan horas vs bloques; `metadata.total_asignaciones` cuenta variables (no asignaciones); `profesores_asignados`/`tiempo_ejecucion_ms` sin rellenar; `Solver` acumula estado si se reutiliza la instancia; `.clangd` sin ignorar; no se validan materias duplicadas ni de 0 horas en un plan.
 
 ## Progreso de implementación
 
@@ -87,5 +94,7 @@
   - **T7 completa** ✅ (`servicio_solver`/`resolverEntradaSolver` en `backend_solver`; `aplicacion_backend` registra `solver_resolve`; `GestorProcesoBackend` sin reinicio automático). Test `test_ipc_aislamiento_bd` (no abre BD, rechaza ops de negocio).
   - **T8 completa** ✅ (contrato de `ServicioHorarioSalida` fijado con `test_archivos_horario`: round-trip JSON y fallo de escritura sin perder el contenido).
   - **T9 completa** ✅ (`docs/interfaz-frontend.md` §3 completa: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, proceso `--backend`/salud) + `test_contrato_generacion`. **Spec 002 implementada.**
-- Tests ajenos que fallan (no tocar): `test_solver_horarios`, `test_solver_benchmark` (solver). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
+- 005: **T1–T9 completas** ✅ (T10 abierta por pendientes conocidos). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Seller: `version="1.0"` al producir/guardar.
+  - **Validación del reviewer (ronda 2): APROBADA.** Bloqueantes corregidos y commiteados: `37666a2` (D1/D3 siempre publicadas + V13 cruza disponibilidad×turno), `454a53b` (RF-10 versión no reconocida), `7a7ff1b` (RF-11 centinela `-1`, coherencia de horas, V9 estricto), `4171a4d` (RF-6 categorías de causa), `f063f39` (sello `version="1.0"`).
+- Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno a la 005 y reproducible en HEAD. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.

@@ -10,6 +10,8 @@
 #include <middleware/internalserver.h>
 #include <middleware/messages.h>
 
+#include <backend/data/materia.hpp>
+#include <backend/data/plan_estudio.hpp>
 #include <backend/services/ConstructorEntradaSolver.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
 #include <backend/solver/servicio_solver.hpp>
@@ -45,9 +47,18 @@ private:
         curso.aula = 10;
         d.cursos = {curso};
 
+        Materia mPlan; mPlan.nombre = QStringLiteral("Matemática");
+        MateriaEnPlan mp; mp.curso = 1; mp.horas = 1; mp.materia = mPlan;
+        PlanEstudio plan; plan.codigo = QStringLiteral("Ciencias"); plan.nombre = QStringLiteral("Ciencias");
+        plan.materias = {mp};
+        d.planes = {plan};
+
+        FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(9, 0);
+        DisponibilidadDTO disp; disp.id = 0; disp.franja = franja;
         MateriaAsignadaDTO asig; asig.id = 1; asig.nombre = QStringLiteral("Matemática");
         ProfesorDTO prof;
         prof.id = QStringLiteral("P1"); prof.nombre = QStringLiteral("Ana");
+        prof.disponibilidad = {disp};
         prof.materias = {asig};
         d.docentes = {prof};
 
@@ -57,6 +68,10 @@ private:
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
         p.franja_horaria.slots_por_turno = 6;
+        p.aula_fija = true;
+        CursoSolverConfig cs; cs.anio = 1; cs.seccion = QStringLiteral("A");
+        cs.plan = QStringLiteral("Ciencias"); cs.num_estudiantes = 20;
+        p.cursos = {cs};
         ProfesorSolverConfig ps;
         ps.nombre = QStringLiteral("Ana");
         ps.horas_requeridas = 10;

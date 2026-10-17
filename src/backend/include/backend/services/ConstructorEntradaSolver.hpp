@@ -21,6 +21,7 @@
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
+#include "backend/data/plan_estudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
 #include "backend/services/ServicioTurnosRecesos.hpp"
 #include "backend/solver/config/solver_config.hpp"
@@ -31,7 +32,7 @@ struct DatosDominio
     QVector<ProfesorDTO> docentes;
     QVector<AulaDTO>     aulas;
     QVector<MateriaDTO>  materias;
-    QVector<PlanDTO>     planes;
+    QVector<PlanEstudio> planes;   ///< planes compuestos (materias + horas)
     QVector<CursoDTO>    cursos;
     QVector<TurnoDTO>    turnos;   ///< incluye sus recesos
 };

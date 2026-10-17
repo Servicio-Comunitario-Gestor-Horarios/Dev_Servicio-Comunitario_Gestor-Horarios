@@ -20,6 +20,7 @@ struct MateriaEnPlan {
 /// Value object del solver — sin id de persistencia.
 struct PlanEstudio {
     
+    QString codigo;                      ///< codigo del plan (identidad)
     QString nombre;
     QVector<MateriaEnPlan> materias;
 

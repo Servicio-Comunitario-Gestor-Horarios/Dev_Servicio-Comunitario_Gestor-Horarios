@@ -47,14 +47,18 @@ struct VariablesTest : public ::testing::Test {
         // Recesos (vacío)
         cfg.recesos = {};
 
-        // Cursos
+        // Modo de aula fija (global) + plan embebido
+        cfg.aula_fija = true;
+        cfg.planes = {{"General", {{0, 1, 4}, {0, 2, 4}}}};  // materia 0 en anios 1 y 2
+
+        // Cursos (identidad anio+seccion; aula = indice)
         CursoSolverConfig curso;
-        curso.nombre = "1ro A";
+        curso.anio = 1;
+        curso.seccion = "A";
         curso.turno = "manana";
-        curso.aula_fija = 0;
         curso.num_estudiantes = 20;
         curso.plan = "General";
-        curso.materias = {{0, 4}};  // materia_idx=0, 4h/semana
+        curso.aula = 0;
         cfg.cursos = {curso};
 
         // Profesores
@@ -74,11 +78,6 @@ struct VariablesTest : public ::testing::Test {
 
         // Aulas
         cfg.aulas = {{"A1", "regular", 30}};
-
-        // Planificación / Generación / Penalizaciones
-        cfg.planificacion = {false};
-        cfg.generacion = {{0}};
-        cfg.penalizaciones = {100, 50};
 
         return cfg;
     }
@@ -303,7 +302,6 @@ TEST_F(VariablesTest, TwoProfessorsDifferentAvailability_CorrectPruning) {
 TEST_F(VariablesTest, FixedAula_NoAulaAssignmentCreated) {
     // Arrange
     SolverConfig cfg = makeBaseConfig();
-    cfg.cursos[0].aula_fija = 0;  // Aula fija
     CpModelBuilder model;
 
     // Act
@@ -316,7 +314,7 @@ TEST_F(VariablesTest, FixedAula_NoAulaAssignmentCreated) {
 TEST_F(VariablesTest, MobileAula_CreatesAulaAssignment) {
     // Arrange
     SolverConfig cfg = makeBaseConfig();
-    cfg.cursos[0].aula_fija = -1;  // Aula móvil
+    cfg.aula_fija = false;
     CpModelBuilder model;
 
     // Act
@@ -329,7 +327,7 @@ TEST_F(VariablesTest, MobileAula_CreatesAulaAssignment) {
 TEST_F(VariablesTest, MobileAula_MultipleAulas) {
     // Arrange
     SolverConfig cfg = makeBaseConfig();
-    cfg.cursos[0].aula_fija = -1;
+    cfg.aula_fija = false;
     cfg.dimensiones.num_aulas = 3;
     cfg.aulas = {{"A1", "regular", 30}, {"A2", "lab", 25}, {"A3", "regular", 40}};
     CpModelBuilder model;
@@ -344,7 +342,7 @@ TEST_F(VariablesTest, MobileAula_MultipleAulas) {
 TEST_F(VariablesTest, MobileAula_KeysAreCorrect) {
     // Arrange
     SolverConfig cfg = makeBaseConfig();
-    cfg.cursos[0].aula_fija = -1;
+    cfg.aula_fija = false;
     CpModelBuilder model;
 
     // Act
@@ -368,12 +366,12 @@ TEST_F(VariablesTest, MultipleCourses_DifferentTurnos) {
     cfg.dimensiones.num_cursos = 2;
 
     CursoSolverConfig curso2;
-    curso2.nombre = "2do B";
+    curso2.anio = 2;
+    curso2.seccion = "B";
     curso2.turno = "tarde";
-    curso2.aula_fija = 0;
+    curso2.aula = 0;
     curso2.num_estudiantes = 25;
     curso2.plan = "General";
-    curso2.materias = {{0, 4}};
     cfg.cursos.append(curso2);
 
     // Profesor disponible todo el día
@@ -395,7 +393,7 @@ TEST_F(VariablesTest, MultipleMateriasPerCourse) {
     SolverConfig cfg = makeBaseConfig();
     cfg.dimensiones.num_materias = 2;
     cfg.materias = {{"Matemática"}, {"Español"}};
-    cfg.cursos[0].materias = {{0, 2}, {1, 2}};  // 2h cada una
+    cfg.planes = {{"General", {{0, 1, 2}, {1, 1, 2}}}};  // 2 h cada una
     cfg.profesores[0].materias_asignadas = {0, 1};
     CpModelBuilder model;
 
@@ -411,7 +409,7 @@ TEST_F(VariablesTest, ProfessorTeachesOnlyOneOfTwoMaterias) {
     SolverConfig cfg = makeBaseConfig();
     cfg.dimensiones.num_materias = 2;
     cfg.materias = {{"Matemática"}, {"Español"}};
-    cfg.cursos[0].materias = {{0, 2}, {1, 2}};
+    cfg.planes = {{"General", {{0, 1, 2}, {1, 1, 2}}}};
     cfg.profesores[0].materias_asignadas = {0};  // Solo matemática
     CpModelBuilder model;
 
@@ -428,46 +426,10 @@ TEST_F(VariablesTest, ProfessorTeachesOnlyOneOfTwoMaterias) {
     }
 }
 
-TEST_F(VariablesTest, MixedFixedAndMobileAulas) {
-    // Arrange
-    SolverConfig cfg = makeBaseConfig();
-    cfg.dimensiones.num_cursos = 2;
-    cfg.dimensiones.num_aulas = 2;
-
-    // Curso 1: aula fija
-    // (ya creado en makeBaseConfig con aula_fija=0)
-
-    // Curso 2: aula móvil
-    CursoSolverConfig curso2;
-    curso2.nombre = "2do B";
-    curso2.turno = "manana";
-    curso2.aula_fija = -1;
-    curso2.num_estudiantes = 25;
-    curso2.plan = "General";
-    curso2.materias = {{0, 4}};
-    cfg.cursos.append(curso2);
-
-    cfg.aulas = {{"A1", "regular", 30}, {"A2", "lab", 25}};
-    CpModelBuilder model;
-
-    // Act
-    VariablesSolver vars = crearVariables(model, cfg);
-
-    // Assert: aulaAssignment solo para curso 2 (móvil)
-    // 1 curso × 5 días × 6 slots × 2 aulas = 60
-    EXPECT_EQ(vars.aulaAssignment.size(), 60);
-
-    // Verificar keys: curso 0 no debería estar en aulaAssignment
-    for (const auto& key : vars.aulaAssignment.keys()) {
-        EXPECT_EQ(std::get<0>(key), 1)
-            << "aulaAssignment solo debería ser para curso 1 (móvil)";
-    }
-}
-
 TEST_F(VariablesTest, NoAulas_NoAulaAssignmentEvenIfMobile) {
     // Arrange
     SolverConfig cfg = makeBaseConfig();
-    cfg.cursos[0].aula_fija = -1;
+    cfg.aula_fija = false;
     cfg.dimensiones.num_aulas = 0;
     cfg.aulas = {};
     CpModelBuilder model;

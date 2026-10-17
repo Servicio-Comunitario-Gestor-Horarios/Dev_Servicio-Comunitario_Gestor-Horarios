@@ -10,6 +10,7 @@ private:
     SolverConfig crearConfigGrande() {
         SolverConfig config;
         config.version = "1.0";
+        config.aula_fija = true;
 
         // 10 profesores, 15 materias, 5 aulas, 8 cursos, 5 dias, 6 slots/dia
         config.dimensiones = {10, 15, 5, 8, 5, 6};
@@ -36,15 +37,27 @@ private:
         };
 
         // 8 cursos: 4 manana, 4 tarde
+        // Cursos por identidad (anio+seccion); aula = indice (modo fijo).
         config.cursos = {
-            {"1ro A", "manana", 0, 25, "General",   {{0,4}, {5,3}, {10,3}}},
-            {"1ro B", "manana", 1, 20, "General",   {{0,4}, {6,3}, {11,3}}},
-            {"2do A", "manana", -1, 22, "Ciencias", {{0,4}, {1,3}, {2,3}, {3,2}}},
-            {"2do B", "tarde",  -1, 18, "General",  {{5,4}, {7,3}, {10,3}}},
-            {"3ro A", "manana", -1, 20, "Ciencias", {{0,3}, {1,3}, {2,3}, {4,2}}},
-            {"3ro B", "tarde",  -1, 15, "General",  {{6,3}, {8,3}, {12,3}}},
-            {"4to A", "manana", 3, 20, "General",   {{5,3}, {7,3}, {13,3}}},
-            {"4to B", "tarde",  -1, 18, "Ciencias", {{0,3}, {3,3}, {14,3}}}
+            {1, "A", "manana", 25, "General",  0},
+            {1, "B", "manana", 20, "General",  1},
+            {2, "A", "manana", 22, "Ciencias", 2},
+            {2, "B", "tarde",  18, "General",  0},
+            {3, "A", "manana", 20, "Ciencias", 3},
+            {3, "B", "tarde",  15, "General",  1},
+            {4, "A", "manana", 20, "General",  4},
+            {4, "B", "tarde",  18, "Ciencias", 2}
+        };
+
+        // Planes embebidos: materias {materia_idx, curso(anio), horas}.
+        config.planes = {
+            {"General", {{0,1,4},{5,1,3},{10,1,3},
+                         {5,2,4},{7,2,3},{10,2,3},
+                         {6,3,3},{8,3,3},{12,3,3},
+                         {5,4,3},{7,4,3},{13,4,3}}},
+            {"Ciencias", {{0,2,4},{1,2,3},{2,2,3},{3,2,2},
+                          {0,3,3},{1,3,3},{2,3,3},{4,3,2},
+                          {0,4,3},{3,4,3},{14,4,3}}}
         };
 
         // 10 profesores con disponibilidad completa
@@ -54,21 +67,18 @@ private:
         }
 
         config.profesores = {
-            {"Prof 01", 16, 16, "manana", "General",   {0, 5},    {}, dispCompleta},
-            {"Prof 02", 14, 14, "manana", "Ciencias",  {0, 1},    {}, dispCompleta},
-            {"Prof 03", 14, 14, "manana", "Ciencias",  {2, 3},    {}, dispCompleta},
-            {"Prof 04", 12, 12, "",       "",          {5, 6},    {}, dispCompleta},
-            {"Prof 05", 14, 14, "",       "",          {7, 8},    {}, dispCompleta},
-            {"Prof 06", 12, 12, "tarde",  "General",   {10, 11},  {}, dispCompleta},
-            {"Prof 07", 12, 12, "",       "",          {10, 12},  {}, dispCompleta},
-            {"Prof 08", 10, 10, "",       "",          {13, 14},  {}, dispCompleta},
-            {"Prof 09", 14, 14, "manana", "General",   {0, 5, 6}, {}, dispCompleta},
-            {"Prof 10", 14, 14, "tarde",  "Ciencias",  {1, 3, 4}, {}, dispCompleta}
+            {"Prof 01", 16, 16, "manana", "General", {},   {0, 5},    {}, dispCompleta},
+            {"Prof 02", 14, 14, "manana", "Ciencias", {},  {0, 1},    {}, dispCompleta},
+            {"Prof 03", 14, 14, "manana", "Ciencias", {},  {2, 3, 4}, {}, dispCompleta},
+            {"Prof 04", 12, 12, "",       "", {},          {5, 6},    {}, dispCompleta},
+            {"Prof 05", 14, 14, "",       "", {},          {7, 8},    {}, dispCompleta},
+            {"Prof 06", 12, 12, "tarde",  "General", {},   {10, 11},  {}, dispCompleta},
+            {"Prof 07", 12, 12, "",       "", {},          {10, 12},  {}, dispCompleta},
+            {"Prof 08", 10, 10, "",       "", {},          {13, 14},  {}, dispCompleta},
+            {"Prof 09", 14, 14, "manana", "General", {},   {0, 5, 6}, {}, dispCompleta},
+            {"Prof 10", 14, 14, "tarde",  "Ciencias", {},  {0, 1, 3, 4}, {}, dispCompleta}
         };
 
-        config.planificacion = {false};
-        config.generacion = {{0, 1, 2, 3, 4, 5, 6, 7}};
-        config.penalizaciones = {100, 50};
         return config;
     }
 

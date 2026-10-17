@@ -4,6 +4,8 @@
 #include <QTime>
 #include <QTest>
 
+#include <backend/data/materia.hpp>
+#include <backend/data/plan_estudio.hpp>
 #include <backend/services/ConstructorEntradaSolver.hpp>
 #include <backend/services/ValidadorEntradaSolver.hpp>
 
@@ -38,6 +40,12 @@ private:
         curso.aula = 10;
         d.cursos = {curso};
 
+        Materia mPlan; mPlan.nombre = QStringLiteral("Matemática");
+        MateriaEnPlan mp; mp.curso = 1; mp.horas = 5; mp.materia = mPlan;
+        PlanEstudio plan; plan.codigo = QStringLiteral("Ciencias"); plan.nombre = QStringLiteral("Ciencias");
+        plan.materias = {mp};
+        d.planes = {plan};
+
         FranjaHoraria franja; franja.dia = 1; franja.inicio = QTime(7, 0); franja.fin = QTime(8, 0);
         DisponibilidadDTO disp; disp.id = 0; disp.franja = franja;
         MateriaAsignadaDTO asig; asig.id = 1; asig.nombre = QStringLiteral("Matemática");
@@ -58,6 +66,10 @@ private:
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
         p.franja_horaria.slots_por_turno = 6;
+        p.aula_fija = true;
+        CursoSolverConfig curso; curso.anio = 1; curso.seccion = QStringLiteral("A");
+        curso.plan = QStringLiteral("Ciencias"); curso.num_estudiantes = 20;
+        p.cursos = {curso};
         ProfesorSolverConfig prof;
         prof.nombre = QStringLiteral("Ana");
         prof.horas_requeridas = 10;
@@ -68,17 +80,22 @@ private:
 
     QJsonObject jsonValido() const
     {
-        QJsonObject j = construirJsonEntrada(dominio(), parametros(),
-                                             QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
-        // TODO(spec 005): las materias del curso se derivan de su plan. Hasta
-        // entonces, el test las aporta a mano para ejercitar el validador.
-        conCurso(j, [](QJsonObject& c) {
-            if (c["materias"].toArray().isEmpty())
-                c["materias"] = QJsonArray{QJsonObject{
-                    {QStringLiteral("materia_idx"), 0},
-                    {QStringLiteral("horas_semanales"), 5}}};
-        });
-        return j;
+        return construirJsonEntrada(dominio(), parametros(),
+                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+    }
+
+    /// Fija el materia_idx de la primera materia del primer plan embebido.
+    void ponerMateriaIdxPlan(QJsonObject& j, int valor) const
+    {
+        QJsonArray planes = j[QStringLiteral("planes")].toArray();
+        QJsonObject plan = planes[0].toObject();
+        QJsonArray mats = plan[QStringLiteral("materias")].toArray();
+        QJsonObject m = mats[0].toObject();
+        m[QStringLiteral("materia_idx")] = valor;
+        mats[0] = m;
+        plan[QStringLiteral("materias")] = mats;
+        planes[0] = plan;
+        j[QStringLiteral("planes")] = planes;
     }
 
     /// Devuelve el JSON con el primer curso modificado por `f`.
@@ -145,7 +162,7 @@ private slots:
 
     void v4_indiceMateriaFueraDeRango_falla()
     {
-        QJsonObject j = conCurso(jsonValido(), [this](QJsonObject& c) { ponerMateriaIdxCurso(c, 9); });
+        QJsonObject j = jsonValido(); ponerMateriaIdxPlan(j, 9);
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
@@ -157,21 +174,75 @@ private slots:
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
-    void v8_aulaFijaFueraDeRango_falla()
+    void v8_aulaDeCursoFueraDeRango_falla()
     {
-        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["aula_fija"] = 9; });
+        // Modo aula fija activo: el aula del curso debe ser un indice valido.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["aula"] = 9; });
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
-    void v9_cursoSinEstudiantes_falla()
+    void v9_numeroEstudiantesNegativo_falla()
     {
+        // num_estudiantes presente debe ser positivo. -1 es el centinela de AUSENTE,
+        // asi que el valor negativo probado es distinto de -1.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = -5; });
+        QVERIFY(!validarEntradaSolver(j).ok);
+    }
+
+    void v9_numeroEstudiantesCero_falla()
+    {
+        // Presente pero NO positivo: la forma exigida es entero > 0 (RF-11, V9).
         QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = 0; });
-        QVERIFY(!validarEntradaSolver(j).ok);
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, "num_estudiantes presente y no positivo debe rechazarse");
     }
 
-    void v10_profesorSinHoras_falla()
+    void v9_numeroEstudiantesPositivo_pasa()
     {
-        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) { p["horas_requeridas"] = 0; });
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) { c["num_estudiantes"] = 25; });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v9_numeroEstudiantesAusente_pasa()
+    {
+        // Ausente (centinela -1): el chequeo de forma se omite y la entrada no se invalida.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) {
+            c.remove(QStringLiteral("num_estudiantes"));
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void coherencia_horasAulaMayorQueRequeridas_falla()
+    {
+        // Coherencia de datos: horas_aula <= horas_requeridas cuando horas_requeridas esta presente.
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p["horas_requeridas"] = 8;
+            p["horas_aula"]       = 12;   // 12 > 8
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, "horas_aula > horas_requeridas debe rechazarse (RF-11)");
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("Ana")));
+    }
+
+    void coherencia_horasRequeridasAusente_pasa()
+    {
+        // horas_requeridas ausente (centinela -1): el chequeo se omite aunque horas_aula sea alta.
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p.remove(QStringLiteral("horas_requeridas"));
+            p["horas_aula"] = 30;
+        });
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v10_profesorSinMaterias_falla()
+    {
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p["materias_asignadas"] = QJsonArray{};
+            p["materias_suplente"]  = QJsonArray{};
+        });
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
@@ -200,6 +271,43 @@ private slots:
             p["materias_suplente"] = QJsonArray{};
         });
         QVERIFY(!validarEntradaSolver(j).ok);
+    }
+
+    /// V13 debe cruzar la disponibilidad del docente con las franjas del turno del curso:
+    /// un candidato cuyo rango no se solapa con el turno del curso no es elegible.
+    void v13_sinDisponibilidadEnElTurno_falla()
+    {
+        QJsonObject j = jsonValido();
+
+        // Se añade un turno 'tarde' (slots 6-11) y se amplía el día a 12 slots, de modo que
+        // el único candidato pueda declarar disponibilidad FUERA del turno del curso (mañana).
+        QJsonObject dim = j["dimensiones"].toObject();
+        dim["num_slots_dia"] = 12;
+        j["dimensiones"] = dim;
+
+        QJsonObject turnos = j["turnos"].toObject();
+        QJsonArray arrTurnos = turnos["turnos"].toArray();
+        QJsonObject tarde;
+        tarde["nombre"] = QStringLiteral("tarde");
+        QJsonArray slotsTarde;
+        for (int s = 6; s <= 11; ++s) slotsTarde.append(s);
+        tarde["slot"] = slotsTarde;
+        arrTurnos.append(tarde);
+        turnos["turnos"] = arrTurnos;
+        j["turnos"] = turnos;
+
+        // El único candidato solo está disponible en la tarde; el curso es de mañana.
+        j = conProfesor(j, [](QJsonObject& p) {
+            QJsonArray disp = p["disponibilidad"].toArray();
+            QJsonObject d0 = disp[0].toObject();
+            d0["slot"] = QJsonArray{6, 7};
+            disp[0] = d0;
+            p["disponibilidad"] = disp;
+        });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("V13")));
     }
 
     void jsonVacio_falla()

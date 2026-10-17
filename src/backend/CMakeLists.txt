@@ -57,6 +57,7 @@ target_sources(backend PRIVATE
 				src/services/ValidadorSalidaSolver.cpp
 				src/services/ServicioGeneracion.cpp
 				include/backend/services/ServicioGeneracion.hpp
+				src/solver/config/contrato_solver.cpp
 )
 
 target_include_directories(backend PUBLIC
