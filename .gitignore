@@ -25,3 +25,9 @@ compile_commands.json
 __pycache__/
 repomix-output.xml
 Registro.txt
+
+# Bases de datos locales de prueba (gestor-horarios-seed)
+datos-prueba/
+
+# Editor/LSP
+.clangd

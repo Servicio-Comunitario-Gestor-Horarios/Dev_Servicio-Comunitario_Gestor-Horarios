@@ -46,13 +46,19 @@
 
 El solver es la única pieza que decide el horario. Esta sección fija su contrato con el resto del programa y su comportamiento autoritativo; los documentos de `docs/solver/` quedan como **referencia histórica** y no obligan. El catálogo normativo detallado (cada restricción con su formulación, el contrato JSON y las validaciones) vive en la spec 005.
 
+> **Enmienda (2026-10-17).** La **hora académica es un bloque**, no una hora de reloj. Se sustituye la
+> conversión `bloques(horas) = ceil(horas × 60 / duracion_minutos)` por la identidad
+> `bloques(horas) = horas`; el tope del docente se mide como `bloques_aula(horas_aula) = horas_aula`; y
+> `duracion_minutos` define **solo la duración real** de la franja (rejilla horaria, receso y
+> disponibilidad). Afecta a §7.1.2 y a **V14** (§7.4); el detalle normativo queda en la spec 005.
+
 - **Frontera.** El solver no abre la base de datos ni depende de la interfaz. Recibe una configuración ya validada y devuelve una asignación o un fallo. La base aporta las entidades de dominio; el preset, los parámetros de cálculo.
 - **Comportamiento.** O encuentra una solución que respeta *todas* las restricciones duras, o declara el problema no factible con la causa. No completa ni corrige la entrada. Para la misma entrada el resultado es reproducible.
 
 ### 7.1. Qué garantiza (invariantes)
 
 1. **Un docente por materia-curso.** Cada materia de cada curso la dicta exactamente un profesor; no se reparte.
-2. **Horas de la materia-curso.** Cada materia-curso recibe exactamente sus horas semanales convertidas en bloques.
+2. **Horas de la materia-curso.** Cada materia-curso recibe exactamente sus **horas académicas semanales en bloques** (1 hora académica = 1 bloque).
 3. **Sin solapamientos.** Ni un curso, ni un profesor, ni un aula tienen dos clases a la vez.
 4. **Turno, plan y año.** Un profesor **no enseña fuera del turno, el plan ni los años que tenga definidos**; un criterio **ausente** se interpreta como **cualquiera**. (Se refiere a los filtros del **profesor**; el turno y el plan del **curso** son obligatorios para generar — ver spec 005.)
 5. **Aula.** Con el modo de aula fija **inactivo**, cada curso ocupa exactamente un aula en cada franja en que tiene clase (la decide el solver); con el modo **activo**, cada curso usa su aula fija.
@@ -78,7 +84,7 @@ El solver minimiza una penalización entera y **nunca** viola una restricción d
 
 ### 7.4. Validación previa
 
-Antes de construir el modelo se ejecutan las validaciones V1–V15; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más bloques que franjas útiles tiene su turno (`Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas.
+Antes de construir el modelo se ejecutan las validaciones V1–V15; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas.
 
 ### 7.5. Fuera de alcance de este contrato
 

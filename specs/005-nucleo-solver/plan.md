@@ -1,6 +1,8 @@
 # Plan 005 — Núcleo del solver y contrato de configuración
 
-Estado: vigente (regenerado 2026-10-15 tras aprobar la spec con el **modelo nuevo**).
+Base: f94acba455a04ae80364c82e1f07ae16d9f156ec
+
+Estado: vigente (rectificado el 2026-10-17: **hora académica = bloque**).
 Spec de referencia: `specs/005-nucleo-solver/spec.md` (**aprobada**, sin dudas abiertas).
 Constitución: §2 (spec manda), §3 (lógica/UI), §4 (tests primero), §5 (datos), §6 (idioma), §7 (contrato del solver).
 Specs relacionadas: `specs/004-persistencia-campos-curso` (**prerrequisito implementado**: aporta `Cursos(anio, seccion, turno, aula)`, esquema único y la **construcción de la entrada se movió a esta spec**); `specs/002-generacion-horarios-ipc` (su contrato JSON de curso/ modelo queda **superado** por esta spec).
@@ -36,7 +38,7 @@ Specs relacionadas: `specs/004-persistencia-campos-curso` (**prerrequisito imple
 
 | Archivo | Acción | Responsabilidad | RF |
 |---|---|---|---|
-| `src/backend/include/backend/solver/config/contrato_solver.hpp` + `src/backend/src/solver/config/contrato_solver.cpp` | **nuevo** | Funciones puras del contrato: `bloques(horas, duracion_minutos)`, `bloquesAula(horas_aula, duracion_minutos)`, `claveCurso(anio, seccion)`. Constantes del motor: `PESO_HORAS`, `COSTE_SUPLENTE` (y `COSTE_MAX_SUPLENTE`, reservada). Sin `nombreCurso` (el nombre es presentación, spec 004). Sin estado, sin E/S, sin OR-Tools. | RF-1 (D3), RF-3 (clave), RF-5 (S1/S2) |
+| `src/backend/include/backend/solver/config/contrato_solver.hpp` + `src/backend/src/solver/config/contrato_solver.cpp` | **nuevo** | Funciones puras del contrato: `bloques(horas, duracion_minutos)` (identidad: devuelve `horas`), `bloquesAula(horas_aula, duracion_minutos)` (identidad), `claveCurso(anio, seccion)`. Constantes del motor: `PESO_HORAS`, `COSTE_SUPLENTE` (y `COSTE_MAX_SUPLENTE`, reservada). Sin `nombreCurso` (el nombre es presentación, spec 004). Sin estado, sin E/S, sin OR-Tools. | RF-1 (D3), RF-3 (clave), RF-5 (S1/S2) |
 | `src/backend/include/backend/solver/config/solver_config.hpp` | **modificado** | Modelo nuevo: `SolverConfig` gana `bool aula_fija = true` (global) y `QVector<PlanSolverConfig> planes` (embebidos). `CursoSolverConfig` pasa a `{ int anio; QString seccion; QString turno; QString plan; int num_estudiantes = -1; int aula = -1; }` (se **elimina** `nombre`, `aula_fija` int y `materias`). `ProfesorSolverConfig` gana `QVector<int> anios`; `horas_requeridas = -1` = ausente. Nuevo `PlanSolverConfig { QString codigo; QVector<MateriaPlan> materias; }` y `MateriaPlan { int materiaIDx; int curso; int horasSemanales; }`. Se conserva `MateriaSuplente.peso`. | RF-7, RF-8, RF-10 |
 | `src/backend/src/solver/config/solver_config.cpp` | **modificado** | `fromJson`: parsea `aula_fija` global, `anio`/`seccion`/`plan`/`num_estudiantes`/`aula` por curso, `planes` embebidos, `anios` del docente y `peso` por par; **ignora `nombre`** si llega; **tolera campos desconocidos**; valida **versión `1.0`**; ejecuta V1–V15. `toJson`: escribe el contrato nuevo **sin `nombre`**. Ida y vuelta sin pérdida. Helper puro `materiasDelCurso(const CursoSolverConfig&)` = materias del plan del curso cuyo `curso == anio`. | RF-7, RF-8, RF-10, RF-11 |
 | `src/backend/include/backend/services/ValidadorEntradaSolver.hpp` + `.cpp` | **sin cambios** | Fachada de la validación previa; el detalle vive en `SolverConfig::fromJson`. | RF-11 |
@@ -50,7 +52,7 @@ Specs relacionadas: `specs/004-persistencia-campos-curso` (**prerrequisito imple
 |---|---|---|---|
 | `src/backend/include/backend/solver/variables.hpp` + `src/backend/src/solver/variables.cpp` | **modificado** | Crea `assignment[p,m,c,d,s]` (aplicando elegibilidad por plan/turno/**año**/disponibilidad, y materias **derivadas del plan**), `aulaAssignment[c,d,s,a]` (solo cursos móviles: `!config.aula_fija`) y la **nueva** variable de activación `asignacionDocente[p,c,m]` (docente asignado a la materia-curso). | RF-1 (D1/D2), RF-3 (D9/D10), RF-4 (D6/D7/D13) |
 | `src/backend/src/solver/restricciones/restricciones_profesores.cpp` + `.hpp` | **modificado** | Conserva D5; añade `restriccionUnDocentePorMateria` (D1+D2+D3 por `asignacionDocente`) y `restriccionDocentePorAnio` (D13). D6/D7 siguen por poda (`x = 0`). | RF-1, RF-2 (D5), RF-4 (D13) |
-| `src/backend/src/solver/restricciones/restricciones_turnos.cpp` + `.hpp` | **modificado** | Conserva D4; reescribe `restriccionBloquesRequeridos` (D3 con `bloques()`); **sustituye** la **igualdad dura** `restriccionHorasSemanalesProfesor` por `restriccionTopeHorasProfesor` (S1: tope + exceso). | RF-1 (D3), RF-2 (D4), RF-5 (S1) |
+| `src/backend/src/solver/restricciones/restricciones_turnos.cpp` + `.hpp` | **modificado** | Conserva D4; reescribe `restriccionBloquesRequeridos` (D3: `Σ x = horas_m · z`, sin conversión); **sustituye** la **igualdad dura** `restriccionHorasSemanalesProfesor` por `restriccionTopeHorasProfesor` (S1: tope + exceso). | RF-1 (D3), RF-2 (D4), RF-5 (S1) |
 | `src/backend/src/solver/restricciones/restricciones_aulas.cpp` + `.hpp` | **modificado** | Conserva D8 (aula no solapada) **incluyendo cursos de aula fija**; **elimina** `restriccionMateriaUnicaPorAula` (D12 suprimida); añade `restriccionCursoOcupaUnAula` (D9: enlace clase↔aula). | RF-2 (D8), RF-3 (D9/D10) |
 | `src/backend/include/backend/solver/solver.hpp` + `src/backend/src/solver/solver.cpp` | **modificado** | Construye el modelo, fija la **función objetivo** (S1+S2) y **parámetros deterministas**; extrae la solución indexando por la **identidad** `claveCurso(anio,seccion)` y con el **aula como índice**; mensajes de fallo en español. | RF-3, RF-5, RF-6, RF-9, RNF-1, RNF-3 |
 | `src/backend/src/solver/servicio_solver.cpp` | **sin cambios** | Adapta JSON→`SolverConfig`→`Solver`→respuesta. | RF-6 |
@@ -63,8 +65,8 @@ Regla de pureza (constitución §4): **nada lee el reloj ni el entorno**; el ins
 
 | Función | Firma | Semántica | RF | ¿Reloj? |
 |---|---|---|---|---|
-| `bloques` | `int bloques(int horas, int duracion_minutos)` | `ceil(horas × 60 / duracion_minutos)`; `0` si `duracion_minutos ≤ 0`. Conversión de horas de materia a bloques (D3). | RF-1 | no |
-| `bloquesAula` | `int bloquesAula(int horas_aula, int duracion_minutos)` | `ceil(horas_aula × 60 / duracion_minutos)`; mismo `duracion_minutos` que `bloques` (S1). | RF-5 | no |
+| `bloques` | `int bloques(int horas, int duracion_minutos)` | **Identidad:** `horas` (1 hora académica = 1 bloque). `duracion_minutos` **no** interviene; se conserva en la firma para no tocar los call sites y como **guarda defensiva**: `0` si `duracion_minutos ≤ 0` (V2 ya rechaza ese caso antes de resolver). | RF-1 | no |
+| `bloquesAula` | `int bloquesAula(int horas_aula, int duracion_minutos)` | **Identidad:** `horas_aula`; misma guarda que `bloques` (S1). | RF-5 | no |
 | `claveCurso` | `QString claveCurso(int anio, const QString& seccion)` | Identidad canónica determinista del curso, p. ej. `"1|A"`; **no** deriva el nombre. | RF-3, RF-9 | no |
 | `materiasDelCurso` | `const QVector<MateriaPlan>* materiasDelCurso(const SolverConfig&, const CursoSolverConfig&)` | Materias+horas del curso = materias del `planes[codigo==c.plan]` con `curso == c.anio`. | RF-7, RF-13 | no |
 | `construirJsonEntrada` | `QJsonObject construirJsonEntrada(const DatosDominio&, const SolverConfig&, const QDateTime& ahora)` | Pura (sin E/S); estampa `meta.fecha_modificacion` con el **instante inyectado**. | RF-13, RF-10 | **sí (`ahora`)** |
@@ -102,7 +104,7 @@ para cada docente p:
 # D1 + D2 + D3 — un docente por materia-curso, solo él la dicta, con sus horas exactas
 para cada (c, m):
     Σ_p z[p,c,m] == 1
-    para cada p: Σ_{d,s} x[p,m,c,d,s] == bloques(horas_m, duracion_minutos) · z[p,c,m]
+    para cada p: Σ_{d,s} x[p,m,c,d,s] == horas_m · z[p,c,m]          # horas académicas = bloques
 
 # D4 — un curso no tiene dos clases a la vez
 para cada (c,d,s): Σ_{p,m} x[p,m,c,d,s] ≤ 1
@@ -128,7 +130,7 @@ Minimizar(
     PESO_HORAS · Σ_p e[p]                                    # S1: exceso de horas de aula
   + Σ_{(p,c,m): p es suplente de m y no titular} COSTE_SUPLENTE · z[p,c,m]   # S2: coste fijo
 )
-con  Σ_{m,c,d,s} x[p,m,c,d,s] ≤ bloquesAula(p.horas_aula, duracion_minutos) + e[p]   # tope + exceso
+con  Σ_{m,c,d,s} x[p,m,c,d,s] ≤ p.horas_aula + e[p]   # tope + exceso (horas académicas = bloques)
 ```
 
 - Un **titular** no aporta coste (0). Todo **suplente elegible** cuesta lo mismo (`COSTE_SUPLENTE`); el `peso` del par **se acepta pero no se usa** (diferido).
@@ -171,7 +173,7 @@ Se ejecuta en `SolverConfig::fromJson`, antes de invocar al solver; si alguna fa
 - **V12. Disponibilidad en rango** de días y bloques.
 - **`horas_requeridas` (opcional):** si está presente, `horas_aula ≤ horas_requeridas`; si falta (`-1`), el chequeo se omite.
 - **V13.** Cada materia-curso tiene ≥ 1 **candidato elegible** (titular o suplente declarado ∧ plan ∧ turno ∧ año ∧ disponibilidad), evaluado sobre los contratos, **sin** capacidad de horas.
-- **V14.** `Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno(c)|`.
+- **V14.** `Σ_m horas_m ≤ nº_días × |franjas del turno(c)|` (1 hora académica = 1 bloque).
 - **V15.** Curso móvil con `num_aulas == 0` → rechazo.
 - **Versión/parseo (RF-10):** versión ausente o no reconocida (distinta de `1.0`) y fallo de parseo → causa **(1) entrada inválida**.
 
@@ -246,6 +248,7 @@ La UI la aporta otro equipo (fuera de alcance; spec §Fuera de alcance). Aquí s
 | D-12 | Validaciones **en `SolverConfig::fromJson`**, expuestas por `ValidadorEntradaSolver`. | Validar solo en el servicio de generación. | RF-11 y §7: la validación viaja con el contrato y se prueba sin UI ni BD. |
 | D-13 | Eliminar `restriccionMateriaUnicaPorAula` (D12). | Conservarla. | Redundante con D8 (aula no solapada); la spec marca D12 como eliminada. |
 | D-14 | La **clave de la salida** es `claveCurso(anio,seccion)` (p. ej. `"1|A"`). | Mantener el nombre derivado (`"1ro A"`) como clave. | El solver **no** es responsable de la presentación; la identidad es el dato estable (RF-3, RF-9). |
+| D-15 | **1 hora académica = 1 bloque**: `bloques(horas, duracion) = horas` y `bloquesAula(horas_aula, duracion) = horas_aula`. Se conserva la firma con `duracion_minutos` y la guarda `0` si `≤ 0` (defensiva; V2 la rechaza antes). | Cambiar la firma a `bloques(int horas)` y adaptar los 5 call sites. | La firma estable evita un refactor transversal sin valor; `duracion_minutos` sigue siendo dato del contrato y la guarda documenta el caso inválido. La identidad es lo que exige la enmienda de la constitución §7 (hora académica, no hora de reloj). |
 
 ---
 
@@ -261,8 +264,8 @@ Política: **tests primero** (rojo → código → verde → marcar). Un caso po
 
 | Test | Framework | Qué cubre | RF |
 |---|---|---|---|
-| `test/backend/test_contrato_solver.cpp` **(nuevo)** | Qt Test | `bloques`/`bloquesAula` con `duracion_minutos` ≠ 60 (redondeo hacia arriba), `claveCurso` canónica, constantes `PESO_HORAS > COSTE_SUPLENTE > 0`. | RF-1, RF-3, RF-5 |
-| `test/backend/test_validador_entrada.cpp` **(modificado)** | Qt Test | V1–V15: `peso` negativo, `duracion_minutos ≤ 0`, `aula_fija` global + `aula` índice (V8), `num_estudiantes` ausente/presente (V9), V7 (turno obligatorio), V10/V11 (plan obligatorio/único), V13 (sin candidato por plan/turno/año/disponibilidad), V14 (más bloques que franjas), V15 (móvil sin aulas), versión ausente/no reconocida. **Se retira la inyección `TODO(spec 005)`** (las materias ya vienen del plan). | RF-7, RF-8, RF-10, RF-11 |
+| `test/backend/test_contrato_solver.cpp` **(nuevo)** | Qt Test | `bloques`/`bloquesAula` son la **identidad** (`bloques(3,45) == 3`, `bloques(2,45) == 2`, `bloques(4,40) == 4`, `bloques(6,60) == 6`), con la guarda `0` si `duracion_minutos ≤ 0`; `claveCurso` canónica, constantes `PESO_HORAS > COSTE_SUPLENTE > 0`. | RF-1, RF-3, RF-5 |
+| `test/backend/test_validador_entrada.cpp` **(modificado)** | Qt Test | V1–V15: `peso` negativo, `duracion_minutos ≤ 0`, `aula_fija` global + `aula` índice (V8), `num_estudiantes` ausente/presente (V9), V7 (turno obligatorio), V10/V11 (plan obligatorio/único), V13 (sin candidato por plan/turno/año/disponibilidad), V14 (más horas académicas que franjas), V15 (móvil sin aulas), versión ausente/no reconocida. **Se retira la inyección `TODO(spec 005)`** (las materias ya vienen del plan). | RF-7, RF-8, RF-10, RF-11 |
 | `test/backend/test_cargador_configuracion.cpp` **(modificado)** | Qt Test | Ida y vuelta `fromJson(toJson())` con `anio`/`seccion`, `aula_fija` global, `planes` embebidos, `anios` de docente y `peso`; el JSON serializado **no** contiene `nombre`; campos desconocidos **tolerados**; versión ausente/no reconocida → rechazo. | RF-7, RF-8, RF-10 |
 | `test/backend/test_constructor_entrada.cpp` **(modificado)** | Qt Test | El JSON emitido: curso con `anio`/`seccion`/`turno`/`aula` (índice) y `plan`/`num_estudiantes`; materias del curso **derivadas del plan**; `planes` **solo** los referenciados; `aula_fija` global; **consumible** por `fromJson`; pureza con instante inyectado. **Se retira la inyección `TODO(spec 005)`**. | RF-7, RF-8, RF-10, RF-13 |
 | `test/backend/test_composicion_plan.cpp` **(verificación)** | Qt Test | Sigue en verde: la composición de planes desde `PlanEstudio_Materia` (materias+horas+año) es la fuente de los planes embebidos. | RF-13 |

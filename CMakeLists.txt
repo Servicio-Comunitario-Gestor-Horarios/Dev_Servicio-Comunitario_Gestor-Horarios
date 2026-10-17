@@ -34,6 +34,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(BUILD_BACKEND "Build backend, middleware, and solver (requires OR-Tools)" ON)
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_CONSOLA "Build the DB console tool (requires BUILD_BACKEND)" ON)
+option(BUILD_SEED "Build the test-data seeder (requires BUILD_BACKEND)" ON)
 
 # ── Dependencias externas ──
 # Qt6: framework de interfaz gráfica, base de datos e IPC

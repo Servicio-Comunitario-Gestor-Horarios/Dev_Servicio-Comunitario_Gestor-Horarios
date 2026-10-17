@@ -1,5 +1,7 @@
 # Tareas 005 — Núcleo del solver y contrato de configuración
 
+Base: f94acba455a04ae80364c82e1f07ae16d9f156ec
+
 - Spec: `specs/005-nucleo-solver/spec.md` (**aprobada**)
 - Plan: `specs/005-nucleo-solver/plan.md`
 - Depende de: `specs/004-persistencia-campos-curso` (**implementada**: `Cursos(anio, seccion, turno, aula)`, esquema único, cascadas con anulación).
@@ -60,7 +62,12 @@
     - Código: el necesario para que el escenario sea soluble en plazo (ajuste del modelo ya introducido en T5–T8; sin relajar invariantes).
     - Hecho cuando: `ctest` pasa `test_solver_benchmark` en < 60 s con salida consistente.
 
-- [ ] **T10. Cierre: suite completa en verde y limpieza.** RF-12, RNF-4
-    - Tests (verificación final): la **suite completa** pasa con el comando del contenedor; `test_constructor_entrada`, `test_validador_entrada`, `test_ipc_aislamiento_bd` y `test_solver_horarios`/`benchmark` (los 4 rojos) quedan **verdes**.
+- [ ] **T10. Suite completa en verde y limpieza.** RF-12, RNF-4
+    - Tests (verificación): la **suite completa** pasa con el comando del contenedor; `test_constructor_entrada`, `test_validador_entrada`, `test_ipc_aislamiento_bd` y `test_solver_horarios`/`benchmark` (los 4 rojos) quedan **verdes**.
     - Verificación: `grep -R "TODO(spec 005)" src test` no devuelve nada; no queda ninguna referencia a `curso.nombre`/`aula_fija` por curso en el solver.
-    - Hecho cuando: `ctest --preset full --output-on-failure` pasa al 100 %; cada RF de la spec tiene al menos una comprobación verificable (RNF-4). Actualizar `MEMORY.md` y el campo Estado de `spec.md` a **implementada**.
+    - Hecho cuando: `ctest --preset full --output-on-failure` pasa al 100 % con el modelo anterior a la rectificación. El cierre y el cambio de Estado a **implementada** se hacen en **T11** (no aquí).
+
+- [x] **T11. Rectificación en código: hora académica = bloque.** RF-1, RF-5, RF-11
+    - Tests (rojo): `test/backend/test_contrato_solver.cpp` — `bloques`/`bloquesAula` son la **identidad**: `bloques(3,45) == 3` (antes 4), `bloques(2,45) == 2` (antes 3), `bloques(4,40) == 4`, `bloques(6,60) == 6`; la guarda `0` con `duracion_minutos ≤ 0` se conserva. `test/backend/test_validador_entrada.cpp` — V14 con `Σ horas_m` (un curso con 41 h académicas se rechaza; con 40 se acepta). `test/backend/test_solver_horarios.cpp` — D3 asigna exactamente `horas_m` bloques y S1 compara con `horas_aula` sin ×60.
+    - Código: `contrato_solver.cpp` — `bloques`/`bloquesAula` devuelven `horas`/`horas_aula` (guarda `duracion ≤ 0 → 0`); revisar `solver_config.cpp` (V14), `solver.cpp` y `restricciones_*` para que no quede ninguna multiplicación por 60 ni división por `duracion_minutos` en la conversión.
+    - Hecho cuando: `cmake --preset full && cmake --build build && ctest --preset full --output-on-failure` pasa al 100 %; `grep -R "\\* 60\\|60 /" src/backend/src/solver` no devuelve conversiones de horas; cada RF sigue con comprobación verificable (RNF-4). **Cierre:** actualizar `MEMORY.md` y el campo Estado de `spec.md` a **implementada**.

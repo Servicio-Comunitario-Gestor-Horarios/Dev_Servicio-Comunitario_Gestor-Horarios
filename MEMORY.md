@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** spec **005 (núcleo del solver) implementada** (T1–T9; T10 abierta por pendientes conocidos). Suite **44/44** en verde.
-- **Fecha:** 2026-10-16
+- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). Suite **46/46** en verde.
+- **Fecha:** 2026-10-17
 - **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
-- **Specs en curso:** `specs/004-persistencia-campos-curso` (implementada), `specs/005-nucleo-solver` (**implementada**; validada por el reviewer: APROBADA en ronda 2)
-- **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo) y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
+- **Specs en curso:** `specs/005-nucleo-solver` (implementada; T10 abierta por pendientes) y `specs/008-datos-de-prueba` (implementada; APROBADA por el reviewer)
+- **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo), los menores de la 008 y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
 
 ## Specs activas
 
@@ -18,7 +18,8 @@
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
 | 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9; suite 38/43) |
-| 005-nucleo-solver | aprobada | **implementada** (T1–T9; T10 abierta por pendientes conocidos; suite 44/44) |
+| 005-nucleo-solver | aprobada | **implementada** (T1–T9 + T11; T10 abierta por pendientes conocidos; suite 46/46) |
+| 008-datos-de-prueba | aprobada | **implementada** (T1–T9; 57 materias, 4 planes, 13 cursos, 4 variantes) |
 
 > Épico **solver** (la numeración sigue el orden de trabajo): **004 (persistencia de campos) → 005 (núcleo del solver) → 006 (turnos automáticos) → 007 (generación parcial)**. 006 y 007 reservadas, sin crear.
 
@@ -61,12 +62,16 @@
   - **Modo didáctico:** en el solver, **el usuario implementa**; el agente explica comandos/lógica y revisa. (En la implementación inicial implementó el usuario; en las correcciones de la validación se usó el subagente @implementer a petición expresa del usuario.)
   - Tests del solver que fallaban (39/41 en Docker entonces): quedaron **verdes** al cerrar la spec **005** (suite 44/44).
 
+- **Hora académica = bloque (2026-10-17):** `bloques(horas) = horas` y `bloques_aula(horas_aula) = horas_aula`; `duracion_minutos` define **solo** la duración real de la franja. D3/S1/V14 sin conversión. Constitución §7 enmendada. Implementado en **005-T11**.
+- **Seed de datos de prueba (spec 008):** `gestor-horarios-seed` + librería `seed`; **solo puebla la BD, no genera presets**. Plan 31059 adaptado a **40 h académicas/año** (4 planes GEN/EXA/NAT/SOC), 57 materias-año, 210 cargas, 13 cursos **sin turno**, 16 aulas, 2 turnos de 8 franjas de 40 min con receso, 4 variantes de docentes (65/43/64/65; demanda 520, Σ topes 461). Las 210 cargas y los docentes se insertan por **SQL directo** dentro de una transacción única (no `asignarCarga`). Guía: `docs/guias/datos-prueba.md`; suite 46/46.
+
 ## Siguiente paso
 
 1. **Pendientes conocidos de la 005** (ver abajo) → planificar en la próxima spec del épico (**006/007**) o en una nueva.
-2. **Orden del épico solver:** 004 (persistencia) ✅ → 005 (núcleo) ✅ → 006 (turnos automáticos) → 007 (generación parcial).
-3. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
-4. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`) en `src/app`: la lógica está lista; el consumo UI↔IPC lo hace el equipo de frontend (`docs/interfaz-frontend.md` §3).
+2. **Orden del épico solver:** 004 (persistencia) ✅ → 005 (núcleo + T11) ✅ → 006 (turnos automáticos) → 007 (generación parcial).
+3. **Menores de la 008:** ignorar `.clangd`; confirmar la convención **1-based** de `despues_de_slot` en 004/005 (hoy asumida y verificada por las horas del receso).
+4. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
+5. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`) en `src/app`: la lógica está lista; el consumo UI↔IPC lo hace el equipo de frontend (`docs/interfaz-frontend.md` §3).
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
@@ -98,3 +103,6 @@
   - **Validación del reviewer (ronda 2): APROBADA.** Bloqueantes corregidos y commiteados: `37666a2` (D1/D3 siempre publicadas + V13 cruza disponibilidad×turno), `454a53b` (RF-10 versión no reconocida), `7a7ff1b` (RF-11 centinela `-1`, coherencia de horas, V9 estricto), `4171a4d` (RF-6 categorías de causa), `f063f39` (sello `version="1.0"`).
 - Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno a la 005 y reproducible en HEAD. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.
+
+- 008: **T1–T9 completas** ✅ (APROBADO por el reviewer; 57 materias, 4 planes, 13 cursos sin turno, 16 aulas, 4 variantes de docentes; suite 46/46).
+- 005: **T11 completa** ✅ (hora académica = bloque; `bloques`/`bloquesAula` identidad; T10 sigue abierta).

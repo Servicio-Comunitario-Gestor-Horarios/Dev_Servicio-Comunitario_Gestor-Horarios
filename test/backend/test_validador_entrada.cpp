@@ -98,6 +98,41 @@ private:
         j[QStringLiteral("planes")] = planes;
     }
 
+    /// Fija las horas_semanales de la primera materia del primer plan embebido.
+    void ponerHorasPlan(QJsonObject& j, int horas) const
+    {
+        QJsonArray planes = j[QStringLiteral("planes")].toArray();
+        QJsonObject plan = planes[0].toObject();
+        QJsonArray mats = plan[QStringLiteral("materias")].toArray();
+        QJsonObject m = mats[0].toObject();
+        m[QStringLiteral("horas_semanales")] = horas;
+        mats[0] = m;
+        plan[QStringLiteral("materias")] = mats;
+        planes[0] = plan;
+        j[QStringLiteral("planes")] = planes;
+    }
+
+    /// Reconfigura la entrada para que el curso tenga exactamente 40 franjas útiles
+    /// (num_dias = 5 × turno de 8 franjas). Sirve de frontera para V14 (40 pasa, 41 falla).
+    QJsonObject conFranjasUtiles40(QJsonObject j) const
+    {
+        QJsonObject dim = j[QStringLiteral("dimensiones")].toObject();
+        dim[QStringLiteral("num_dias")] = 5;
+        dim[QStringLiteral("num_slots_dia")] = 8;
+        j[QStringLiteral("dimensiones")] = dim;
+
+        QJsonObject turnos = j[QStringLiteral("turnos")].toObject();
+        QJsonArray arrTurnos = turnos[QStringLiteral("turnos")].toArray();
+        QJsonObject manana = arrTurnos[0].toObject();
+        QJsonArray franjas;
+        for (int s = 0; s < 8; ++s) franjas.append(s);
+        manana[QStringLiteral("slot")] = franjas;
+        arrTurnos[0] = manana;
+        turnos[QStringLiteral("turnos")] = arrTurnos;
+        j[QStringLiteral("turnos")] = turnos;
+        return j;
+    }
+
     /// Devuelve el JSON con el primer curso modificado por `f`.
     template <typename F>
     QJsonObject conCurso(QJsonObject j, F f) const
@@ -308,6 +343,27 @@ private slots:
         const auto resultado = validarEntradaSolver(j);
         QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
         QVERIFY(resultado.mensajeError.contains(QStringLiteral("V13")));
+    }
+
+    /// V14: un curso cuyas horas académicas superan sus franjas útiles se rechaza.
+    /// 1 hora académica = 1 bloque (sin ×60 ni redondeo): 41 h > 40 franjas útiles.
+    void v14_masHorasQueFranjas_falla()
+    {
+        QJsonObject j = conFranjasUtiles40(jsonValido());
+        ponerHorasPlan(j, 41);
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, "41 h académicas en 40 franjas útiles debe rechazarse (V14)");
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("V14")));
+    }
+
+    /// V14: 40 h académicas caben exactamente en 40 franjas útiles (1 hora = 1 bloque).
+    /// Con la conversión antigua (ceil(40×60/45) = 54 bloques) esto se rechazaría.
+    void v14_horasDentroDeFranjas_pasa()
+    {
+        QJsonObject j = conFranjasUtiles40(jsonValido());
+        ponerHorasPlan(j, 40);
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }
 
     void jsonVacio_falla()

@@ -3,13 +3,16 @@
 
 namespace {
     int bloquesConDuracion(int horas, int duracion_minutos) {
-        
+        // Rectificación (2026-10-17, constitución §7): la hora académica es un bloque, no una
+        // hora de reloj. La conversión es la IDENTIDAD: bloques(horas) = horas, sin multiplicar
+        // por 60 ni dividir por `duracion_minutos`. `duracion_minutos` define solo la duración
+        // real de la franja (rejilla horaria, receso y disponibilidad) y NO interviene en la
+        // conversión. Se conserva en la firma por estabilidad de los call sites y como guarda
+        // defensiva: `0` si `duracion_minutos <= 0` (V2 ya rechaza ese caso antes de resolver).
         if (duracion_minutos <= 0) {
             return 0;
         }
-        
-        const int minutos = horas * 60;
-        return (minutos + duracion_minutos - 1) / duracion_minutos;
+        return horas;
     }
 }
 
