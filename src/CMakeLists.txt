@@ -36,6 +36,11 @@ if(BUILD_BACKEND)
     # de `backend`; solo existe cuando hay persistencia (BUILD_BACKEND=ON).
     add_subdirectory(datos)
 
+    # Datos de prueba del centro (Plan 31059) — requiere `datos`.
+    if(BUILD_SEED)
+        add_subdirectory(seed)
+    endif()
+
     # Consola de prueba de la base de datos (herramienta de desarrollo).
     if(BUILD_CONSOLA)
         add_subdirectory(consola)

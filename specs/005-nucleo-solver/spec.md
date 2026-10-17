@@ -1,6 +1,25 @@
 # Spec 005 - Núcleo del solver y contrato de configuración
 
-Estado: implementada
+Estado: implementada (2026-10-17)
+
+> **Cierre.** Implementada y aprobada por el reviewer (`VEREDICTO: APROBADO`, 2026-10-17): la
+> rectificación se hizo en **T11**. La **T10** sigue **abierta** por los pendientes conocidos del
+> solver (cobertura de tests por regla, RF-13 y residuales), documentados en `estado.md` y `MEMORY.md`.
+
+> **Cambio de requisitos (2026-10-17): la hora académica es un bloque.** En Venezuela la **hora
+> académica** es una unidad **pedagógica**, no una hora de reloj: 45 minutos tradicionalmente, 35 desde
+> la Gaceta 42.505 (2022), y en Educación Media se organiza en **bloques** (80 min, 5 horas académicas
+> al día). El plan **31059 declara 44/44/46/46/46 horas académicas semanales**, no horas de reloj. La versión
+> anterior de esta spec convertía horas a bloques con `ceil(horas × 60 / duracion_minutos)`, es decir,
+> trataba `horas` como horas de reloj: **era incoherente** con el dato real y con
+> `MAX_HORAS_SEMANALES_POR_ANIO = 40` (40 bloques/semana = 8 al día × 5 días).
+>
+> Se **rectifica** el modelo: **una hora académica = un bloque**; `bloques(horas) = horas` y
+> `bloques_aula(horas_aula) = horas_aula` (sin ×60 ni redondeo). `duracion_minutos` pasa a definir
+> **solo la duración real de la franja** (rejilla horaria, receso y disponibilidad), no la conversión.
+> Se actualizan Definiciones, D3, S1, V14, RF-1, RF-5 y los casos límite. **La spec se reabrió y se
+> re-aprobó el 2026-10-17**: la rectificación obliga a revisar su plan, sus tareas y la 008, y el
+> trabajo en código se hace en la tarea T11 del plan.
 
 > **Revisión tras el veredicto del reviewer (2026-10-15, CAMBIOS NECESARIOS resueltos).** El usuario
 > resolvió los cinco bloqueantes y se reescribe la spec. Prioridad declarada: **un motor funcional**;
@@ -66,7 +85,9 @@ Estado: implementada
 > **Cierre de revisión completa (2026-10-15).** Se cierran los bloqueantes **B1–B3**, los importantes
 > **I1–I5** y los menores **M1–M7** del veredicto del reviewer:
 > - **B1.** «Franjas útiles» de un curso = `nº_días × |franjas de su turno|` (semanal); **V14** se
->   reescribe como `Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno(c)|`. Se alinean la definición,
+>   reescribe como `Σ_m horas_m ≤ nº_días × |franjas del turno(c)|` (**fórmula vigente** tras la
+>   rectificación del 2026-10-17: 1 hora académica = 1 bloque). Se alinean la
+>   definición,
 >   el catálogo, RF-11 y los casos límite.
 > - **B2.** Se **separa** el vocabulario: **elegible** = *factibilidad previa* (titular o suplente ∧
 >   plan ∧ turno ∧ año ∧ **disponibilidad**; lo que evalúa **V13**), **sin** capacidad de horas;
@@ -156,14 +177,16 @@ y no obligan.
   siquiera para mejorar su objetivo.
 - **Prioridad blanda:** preferencia que el solver optimiza; puede ceder si respetarla implicara violar
   una invariante.
-- **Franja (slot):** intervalo dentro de un día (por ejemplo, una hora de clase). Todas las franjas
-  tienen la misma duración en minutos, `duracion_minutos`.
-- **`duracion_minutos`:** duración en minutos de cada franja; dato de la configuración, **mayor que 0**.
-  Fija la equivalencia entre horas y bloques y, por tanto, influye en toda conversión de horas a
-  bloques.
-- **Bloque:** unidad mínima de clase, igual a una franja. La conversión de horas a bloques es hacia
-  arriba: `bloques(horas) = ceil(horas × 60 / duracion_minutos)`. **Toda comparación de horas se hace
-  en bloques** (nunca horas contra bloques).
+- **Franja (slot):** intervalo dentro de un día (por ejemplo, un bloque de clase). Todas las franjas
+  tienen la misma duración **real** en minutos, `duracion_minutos`.
+- **`duracion_minutos`:** duración **real** en minutos de cada franja; dato de la configuración, **mayor
+  que 0**. Define la **rejilla horaria** (inicio y fin de cada franja, recesos y traducción de la
+  disponibilidad) y **no** interviene en la conversión de horas a bloques.
+- **Hora académica:** unidad pedagógica de carga de una materia. **Una hora académica equivale a un
+  bloque**; no es una hora de reloj.
+- **Bloque:** unidad mínima de clase, igual a una franja. La conversión de horas académicas a bloques es
+  la identidad: `bloques(horas) = horas`. **Toda comparación de horas se hace en bloques** (nunca horas
+  contra bloques).
 - **Turno:** conjunto de franjas de un día (por ejemplo, «mañana» o «tarde»). El turno **del curso** es
   **obligatorio** en esta spec (RF-7); si un curso no lo declara, la entrada se **rechaza** (V7). La
   **asignación automática de turno** queda **diferida a la spec 006**.
@@ -210,7 +233,7 @@ y no obligan.
   **no** se origina en la medianoche ni en el primer registro de disponibilidad.
 - **`nº_días`:** número de días de la semana considerados en la generación; es la dimensión de días de
   la configuración (`dimensiones.num_dias`). Entra como factor **semanal** en las **franjas útiles** de
-  un curso y en **V14** (`Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno(c)|`). Los **recesos no
+  un curso y en **V14** (`Σ_m horas_m ≤ nº_días × |franjas del turno(c)|`). Los **recesos no
   lo reducen** (coherente con «el receso no las reduce»).
 - **Franjas útiles de un curso:** el número de franjas **semanales** disponibles para el curso,
   `nº_días × |franjas del turno del curso|`, donde `nº_días` es el número de días de la semana de la
@@ -234,15 +257,17 @@ y no obligan.
   horas libre** para ella. Es la noción del **objetivo** (S1/S2): con los titulares a tope (sin
   capacidad libre), el solver **prefiere** al **suplente elegible**; la preferencia **nunca** viola una
   invariante dura.
-- **Tope de horas de aula (`horas_aula`):** cantidad de horas de aula del contrato de un docente (entero
-  **≥ 0**). El solver lo compara **en bloques**: su tope es `bloques_aula(p) = ceil(horas_aula(p) × 60 /
-  duracion_minutos)`. **`horas_aula = 0` es válido** (docente sin horas de aula asignadas, por ejemplo
+- **Tope de horas de aula (`horas_aula`):** cantidad de **horas académicas** de aula del contrato de un
+  docente (entero **≥ 0**). El solver lo compara **en bloques** y, al ser 1 hora = 1 bloque, su tope es
+  `bloques_aula(p) = horas_aula(p)` (sin multiplicar por 60 ni dividir por `duracion_minutos`).
+  **`horas_aula = 0` es válido** (docente sin horas de aula asignadas, por ejemplo
   solo suplente): su tope es 0 bloques, así que **no tiene capacidad de horas libre** y **no es
   preferido**; sigue siendo **elegible** si tiene disponibilidad, y cualquier bloque que se le asigne
   cuenta como **exceso** (último recurso, S1).
-- **`horas_requeridas`:** dato de dominio **opcional** del docente (horas semanales de su contrato).
-  **El solver no lo usa**; solo cuenta `horas_aula`. Su verificación es un chequeo de coherencia del
-  dato, no una regla del solver. Si no está presente, el chequeo se omite y no invalida la entrada.
+- **`horas_requeridas`:** dato de dominio **opcional** del docente (**horas académicas** semanales de su
+  contrato). **El solver no lo usa**; solo cuenta `horas_aula`. Su verificación es un chequeo de
+  coherencia del dato, no una regla del solver. Si no está presente, el chequeo se omite y no invalida
+  la entrada.
 - **Exceso:** bloques asignados a un docente por encima de su tope de horas de aula (en bloques).
 - **Modo de aula fija (global):** parámetro **booleano y global** de la configuración que **vive en el
   preset** (por defecto **verdadero**). Activo → cada curso usa su aula fija (la referenciada en los
@@ -291,7 +316,8 @@ en el RF indicado.
 
 - **D1.** Cada materia-curso la dicta exactamente un profesor. → RF-1
 - **D2.** Solo el docente asignado a una materia-curso recibe clases de esa materia-curso. → RF-1
-- **D3.** Cada materia-curso recibe exactamente sus horas semanales en bloques. → RF-1
+- **D3.** Cada materia-curso recibe exactamente sus horas académicas semanales en bloques (1 hora = 1
+  bloque). → RF-1
 - **D4.** Un curso no tiene dos clases a la vez. → RF-2
 - **D5.** Un profesor no tiene dos clases a la vez. → RF-2
 - **D6.** Un docente no da clase fuera de su turno. → RF-4
@@ -319,7 +345,7 @@ en el RF indicado.
   plan ∧ turno ∧ año ∧ **disponibilidad**), evaluado **sobre los contratos**, antes de resolver; **no**
   incluye capacidad de horas (esa es preferencia del objetivo). → RF-11
 - **V14.** Un curso no necesita más bloques que franjas útiles tiene:
-  `Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno(c)|`. → RF-11
+  `Σ_m horas_m ≤ nº_días × |franjas del turno(c)|` (1 hora académica = 1 bloque). → RF-11
 - **V15.** Un curso móvil exige que el centro disponga de aulas. → RF-11
 
 **Reglas que NO existen en esta spec (fuera de alcance):** la capacidad de aula (antigua S2) y la
@@ -336,10 +362,9 @@ Catálogo de invariantes D1, D2 y D3 (duras):
   no se reparte.
 - **D2 → EL SISTEMA garantiza que solo el docente asignado a una materia-curso recibe clases de esa
   materia-curso:** un profesor no asignado no puede tener ninguna franja de esa materia-curso.
-- **D3 → EL SISTEMA asigna a cada materia-curso exactamente sus horas semanales convertidas en
-  bloques:** el número de bloques asignados a la materia-curso es exactamente
-  `bloques(horas_semanales) = ceil(horas_semanales × 60 / duracion_minutos)`, con la misma conversión
-  (y el mismo `duracion_minutos`) que usa el tope de horas de aula. Las horas semanales de una
+- **D3 → EL SISTEMA asigna a cada materia-curso exactamente sus horas académicas semanales en
+  bloques:** el número de bloques asignados a la materia-curso es exactamente `horas_semanales` (una
+  hora académica = un bloque; no hay multiplicación por 60 ni redondeo). Las horas semanales de una
   materia-curso provienen del plan del curso (RF-7).
 
 ### RF-2. Sin solapamientos
@@ -396,9 +421,9 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
 
 - **EL SISTEMA nunca viola una invariante dura para mejorar su función objetivo.**
 - **S1 → EL SISTEMA evita que un docente supere su tope de horas de aula:** para cada docente, los
-  bloques asignados no superan su tope **en bloques** (`bloques_aula(p) = ceil(horas_aula(p) × 60 /
-  duracion_minutos)`) más un exceso no negativo; la comparación es siempre bloques contra bloques
-  (nunca horas contra bloques) y usa el mismo `duracion_minutos` que D3. El exceso se penaliza con
+  bloques asignados no superan su tope **en bloques** (`bloques_aula(p) = horas_aula(p)`, porque 1 hora
+  académica = 1 bloque) más un exceso no negativo; la comparación es siempre bloques contra bloques
+  (nunca horas contra horas de reloj) y **no** depende de `duracion_minutos`. El exceso se penaliza con
   `PESO_HORAS` y se minimiza.
 - **SI la demanda obliga a superar el tope de horas de aula de un docente, ENTONCES EL SISTEMA
   permite el exceso, lo paga en la función objetivo y lo minimiza**, en lugar de declarar el horario
@@ -547,10 +572,10 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   resolver**, y **no** exige capacidad de horas: por eso V13 **no rechaza por horas** y el exceso sigue
   siendo el último recurso (RF-5). La capacidad de horas libre es preferencia del objetivo (S1/S2), no
   una compuerta de factibilidad.
-- **V14 → SI la suma de los bloques de las materias de un curso supera sus franjas útiles, ENTONCES EL
-  SISTEMA rechazará la entrada y no invocará al solver**, indicando la causa: la condición es
-  `Σ_m bloques(horas_m) ≤ nº_días × |franjas del turno(c)|`. Las franjas útiles se calculan sobre el
-  turno **declarado** (obligatorio) y **el receso no las reduce** (definiciones).
+- **V14 → SI la suma de las horas académicas de las materias de un curso supera sus franjas útiles,
+  ENTONCES EL SISTEMA rechazará la entrada y no invocará al solver**, indicando la causa: la condición
+  es `Σ_m horas_m ≤ nº_días × |franjas del turno(c)|` (1 hora = 1 bloque). Las franjas útiles se
+  calculan sobre el turno **declarado** (obligatorio) y **el receso no las reduce** (definiciones).
 - **V15 → SI un curso es móvil (modo de aula fija inactivo) y el centro no dispone de aulas, ENTONCES
   EL SISTEMA rechazará la entrada y no invocará al solver**, indicando la causa.
 
@@ -627,8 +652,8 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   de disponibilidad (definiciones; RF-11, V14).
 - **Curso cuyo turno no se solapa con la disposición del único candidato:** ningún candidato elegible;
   rechazo previo (RF-11, V13).
-- **Curso cuyos bloques semanales superan las franjas útiles de su turno declarado**
-  (`Σ_m bloques(horas_m) > nº_días × |franjas del turno|`): rechazo previo (RF-11, V14).
+- **Curso cuyas horas académicas semanales superan las franjas útiles de su turno declarado**
+  (`Σ_m horas_m > nº_días × |franjas del turno|`): rechazo previo (RF-11, V14).
 - **Modo de aula fija inactivo (cursos móviles) en un centro sin aulas:** rechazo previo, no se invoca
   al solver (RF-11, V15).
 - **Modo de aula fija activo y un curso sin aula válida:** rechazo previo (RF-7, V8).
@@ -651,9 +676,9 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
 - **Docente con `horas_requeridas` menor que `horas_aula`:** rechazo previo por dato incoherente; es
   un chequeo de datos, no una regla del solver (RF-11). **Si `horas_requeridas` no está presente**, el
   chequeo se omite y la entrada no se invalida (RF-11).
-- **Franjas de duración distinta de 60 minutos:** la conversión usa `duracion_minutos` y redondea
-  hacia arriba tanto para las horas de materia (D3) como para el tope del docente (S1); se comparan
-  bloques con bloques (RF-1, RF-5).
+- **Franjas de cualquier duración real (40, 45 o 60 minutos):** `duracion_minutos` solo cambia la
+  rejilla horaria; una materia de 4 horas académicas ocupa **4 bloques** en cualquier caso (D3, S1).
+  Se comparan bloques con bloques y no hay redondeo.
 - **Dos cursos con la misma aula fija en la misma franja:** la invariante de aula no solapada (D8)
   impide la solución; si no hay alternativa, el solver declara no factible con causa (RF-2, RF-6).
 - **Docente con años vacío:** apto para cualquier año (RF-4, RF-8).
@@ -734,6 +759,9 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
    (RF-13).
 6. Existe comprobación verificable en pruebas para cada RF antes de dar la spec por implementada
    (RNF-4).
+7. La carga se mide en **horas académicas = bloques**: `bloques(horas) = horas`,
+   `bloques_aula(horas_aula) = horas_aula` y `duracion_minutos` solo afecta a la rejilla horaria; V14 se
+   evalúa sobre `Σ_m horas_m` (RF-1, RF-5, RF-11).
 
 ## Dudas abiertas
 
