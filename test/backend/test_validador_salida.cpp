@@ -14,7 +14,7 @@ private:
         SolverConfig config;
         config.aula_fija = true;
         config.turnos.turnos = {TurnoConfig{QStringLiteral("manana"), {0, 1, 2, 3}}};
-        config.recesos = {RecesoConfig{QStringLiteral("manana"), 1, 10, QStringLiteral("08:20"), QStringLiteral("08:30")}};
+        config.recesos = {RecesoConfig{QStringLiteral("manana"), 2, 10, QStringLiteral("08:20"), QStringLiteral("08:30")}};
         config.materias = {MateriaSolverConfig{QStringLiteral("Matemática")}};
         config.aulas = {AulaSolverConfig{QStringLiteral("A1"), QStringLiteral("regular"), 30}};
         config.planes = {PlanSolverConfig{QStringLiteral("Ciencias"),

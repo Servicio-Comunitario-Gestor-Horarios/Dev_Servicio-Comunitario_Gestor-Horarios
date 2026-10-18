@@ -106,19 +106,16 @@ QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<Rec
               });
 
     // 3. Cortar slots por recesos
-    // El campo `despues_de_slot` en RecesoConfig es un índice ABSOLUTO del día (0-15).
-    // Hay que convertirlo a índice RELATIVO dentro del array de slots del turno.
+    // `despues_de_slot` es 1-based y RELATIVO al turno: 2 significa "tras la
+    // segunda franja del turno". Se convierte a índice 0-based relativo.
     if (turno.slot.isEmpty()) {
         return {};
     }
-    int slotBase = turno.slot.first();  // primer slot absoluto del turno
 
     QVector<QVector<int>> segmentos;
     int inicioRel = 0;  // índice relativo dentro de turno.slot
     for (const RecesoConfig& r : recesosTurno) {
-        // Convertir despues_de_slot absoluto a índice relativo
-        int corteAbs = r.despues_de_slot;
-        int corteRel = corteAbs - slotBase;
+        int corteRel = r.despues_de_slot - 1;   // 1-based → 0-based
         if (corteRel >= 0 && corteRel < turno.slot.size() && inicioRel <= corteRel) {
             QVector<int> seg;
             for (int i = inicioRel; i <= corteRel; ++i)

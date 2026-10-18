@@ -406,7 +406,7 @@ private slots:
         config.dimensiones = {1, 1, 1, 1, 1, 4};
         config.franja_horaria = {40, 4};
         config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
-        config.recesos = {{"manana", 1, 10, "08:20", "08:30"}};  // rompe entre 1 y 2
+        config.recesos = {{"manana", 2, 10, "08:20", "08:30"}};  // rompe entre 1 y 2
         config.materias = {{"Matematica"}};
         config.aulas = {{"Aula 1", "regular", 30}};
         config.planes = {{"Plan General", {{0, 1, 2}}}};

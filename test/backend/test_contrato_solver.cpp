@@ -69,8 +69,8 @@ private slots:
             TurnoConfig{QStringLiteral("Tarde"), {8,9,10,11,12,13,14,15}}
         };
         cfg.recesos = {
-            RecesoConfig{QStringLiteral("Mañana"), 1, 10, QStringLiteral("08:20"), QStringLiteral("08:30")},
-            RecesoConfig{QStringLiteral("Tarde"), 9, 10, QStringLiteral("14:00"), QStringLiteral("14:10")}
+            RecesoConfig{QStringLiteral("Mañana"), 2, 10, QStringLiteral("08:20"), QStringLiteral("08:30")},
+            RecesoConfig{QStringLiteral("Tarde"), 2, 10, QStringLiteral("14:00"), QStringLiteral("14:10")}
         };
         return cfg;
     }
@@ -118,7 +118,7 @@ private slots:
     {
         TurnoConfig t{QStringLiteral("Test"), {0,1,2,3,4,5,6,7}};
         QVector<RecesoConfig> recesos = {
-            RecesoConfig{QStringLiteral("Test"), 7, 10, QString(), QString()}
+            RecesoConfig{QStringLiteral("Test"), 8, 10, QString(), QString()}
         };
         QVector<QVector<int>> segs = segmentosTurno(t, recesos);
         QCOMPARE(segs.size(), 1);
