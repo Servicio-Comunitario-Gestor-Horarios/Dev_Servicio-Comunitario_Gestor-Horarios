@@ -59,6 +59,10 @@ if(BUILD_BACKEND)
                 "C:/ortools-v9.15-vs2022")
             if(EXISTS "${_ortools_root}/lib/cmake/ortools")
                 set(ortools_DIR "${_ortools_root}/lib/cmake/ortools")
+                # El paquete precompilado de Windows trae zlib y bzip2 propios;
+                # su raíz va al prefijo para que find_dependency(ZLIB/BZip2) los
+                # localice sin indicar rutas a mano.
+                list(APPEND CMAKE_PREFIX_PATH "${_ortools_root}")
                 break()
             endif()
         endforeach()
