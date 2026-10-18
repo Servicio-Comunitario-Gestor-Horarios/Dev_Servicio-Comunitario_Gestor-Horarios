@@ -101,6 +101,13 @@ inline QString blockSummary(const Block& b)
     return QString("%1 · %2 · %3").arg(b.materia, b.profesor, b.aula);
 }
 
+/** Identidad de un bloque: dos franjas seguidas son la misma clase si coincide. */
+inline QString firmaBloque(const Block& b)
+{
+    return b.materia + QChar(0x1F) + b.profesor + QChar(0x1F) + b.aula
+         + QChar(0x1F) + b.curso;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Acceso a una rejilla (schedule = day -> slot -> block)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -251,29 +258,88 @@ inline QVector<Conflict> findConflicts(const QJsonObject& root, const Ref& self,
 // Planificación y aplicación de un movimiento
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Una franja movida: origen, destino y lo que ocupaba cada extremo. */
+/** Traslado elemental: la clase que está en (dayFrom, slotFrom) pasa a (dayTo, slotTo). */
 struct SlotMove {
     int dayFrom = 0, slotFrom = 0;
     int dayTo = 0, slotTo = 0;
-    Block moved;        ///< Bloque que se mueve.
-    Block displaced;    ///< Bloque que ocupaba el destino (puede estar vacío).
 };
 
 struct MovePlan {
-    bool valid = false;         ///< Hay una materia para mover
+    bool valid = false;         ///< Hay una clase para mover
     bool hasConflict = false;
+    bool rotation = false;      ///< El destino solapa el propio tramo: se desplaza
     int dayFrom = 0, slotFrom = 0;
     int dayTo = 0, slotTo = 0;
-    Block moved;                ///< Bloque arrastrado (primera franja del tramo)
-    Block displaced;            ///< Bloque que ocupaba el destino (primera franja)
-    QVector<SlotMove> moves;    ///< Una entrada por franja del bloque (≥ 1)
+    int franjas = 1;            ///< Franjas que ocupa la clase arrastrada (≥ 1)
+    Block moved;                ///< Clase arrastrada (primera franja del tramo)
+    Block displaced;            ///< Clase que ocupaba el destino (primera franja)
+    QVector<SlotMove> moves;    ///< Traslados elementales (biyección de franjas)
     QVector<Conflict> conflicts;
 };
 
 /**
- * Planifica mover el bloque que empieza en (dayFrom, slotFrom) y ocupa `largo`
+ * Traslados elementales del tramo que empieza en (dayFrom, slotFrom) y ocupa
+ * `largo` franjas hacia (dayTo, slotTo).
+ *
+ * Si los dos tramos no se solapan (o son de días distintos) es el intercambio
+ * completo de ambos, como siempre. Si el destino solapa el propio tramo —se
+ * arrastra la clase una o dos franjas—, el tramo se desplaza y las clases que
+ * ocupaban las franjas ganadas pasan a las que el tramo deja libres: ninguna
+ * clase se pierde y el tramo conserva su tamaño.
+ *
+ * La lista es una biyección sobre las franjas afectadas: se leen todas las
+ * franjas de origen antes de escribir (véase `applyMove`).
+ */
+inline QVector<SlotMove> tramoMovimientos(int dayFrom, int slotFrom, int largo,
+                                          int dayTo, int slotTo)
+{
+    QVector<SlotMove> out;
+    for (int i = 0; i < largo; ++i) {
+        SlotMove mv;
+        mv.dayFrom = dayFrom; mv.slotFrom = slotFrom + i;
+        mv.dayTo = dayTo;     mv.slotTo = slotTo + i;
+        out.append(mv);
+    }
+
+    if (dayFrom != dayTo) {
+        // Otro día: lo que ocupaba el destino vuelve al origen entero.
+        for (int i = 0; i < largo; ++i) {
+            SlotMove mv;
+            mv.dayFrom = dayTo;   mv.slotFrom = slotTo + i;
+            mv.dayTo = dayFrom;   mv.slotTo = slotFrom + i;
+            out.append(mv);
+        }
+        return out;
+    }
+
+    // Mismo día: las franjas del destino ajenas al tramo pasan a las franjas que
+    // el tramo libera (el orden conserva la posición relativa de cada clase).
+    QVector<int> ganadas;   // franjas del destino que no son del propio tramo
+    QVector<int> libres;    // franjas del origen fuera del destino
+    for (int i = 0; i < largo; ++i) {
+        const int ganada = slotTo + i;
+        if (ganada < slotFrom || ganada >= slotFrom + largo) ganadas.append(ganada);
+    }
+    for (int i = 0; i < largo; ++i) {
+        const int libre = slotFrom + i;
+        if (libre < slotTo || libre >= slotTo + largo) libres.append(libre);
+    }
+    for (int i = 0; i < ganadas.size() && i < libres.size(); ++i) {
+        SlotMove mv;
+        mv.dayFrom = dayFrom; mv.slotFrom = ganadas.at(i);
+        mv.dayTo = dayFrom;   mv.slotTo = libres.at(i);
+        out.append(mv);
+    }
+    return out;
+}
+
+/**
+ * Planifica mover la clase que empieza en (dayFrom, slotFrom) y ocupa `largo`
  * franjas seguidas: una materia de dos horas académicas viaja entera, no por
  * mitades. Con `largo = 1` es el movimiento simple de una franja.
+ *
+ * No comprueba que el destino no corte otra clase por la mitad: eso lo decide
+ * `parteUnaClase`, que ha de consultarse antes de aplicar el plan.
  */
 inline MovePlan planMoveRun(const QJsonObject& root, const Ref& self,
                             int dayFrom, int slotFrom, int largo,
@@ -282,29 +348,36 @@ inline MovePlan planMoveRun(const QJsonObject& root, const Ref& self,
     MovePlan plan;
     plan.dayFrom = dayFrom; plan.slotFrom = slotFrom;
     plan.dayTo = dayTo;     plan.slotTo = slotTo;
+    plan.franjas = largo;
     if (largo < 1 || (dayFrom == dayTo && slotFrom == slotTo)) return plan;
 
     const QJsonObject s = scheduleOf(root, self);
     plan.moved = getBlock(s, dayFrom, slotFrom);
     if (plan.moved.isEmpty()) return plan;
 
-    for (int i = 0; i < largo; ++i) {
-        SlotMove mv;
-        mv.dayFrom = dayFrom; mv.slotFrom = slotFrom + i;
-        mv.dayTo = dayTo;     mv.slotTo = slotTo + i;
-        mv.moved = getBlock(s, mv.dayFrom, mv.slotFrom);
-        if (mv.moved.isEmpty()) return MovePlan{};   // tramo inconsistente
-        mv.displaced = getBlock(s, mv.dayTo, mv.slotTo);
-        plan.moves.append(mv);
+    // El tramo debe ser homogéneo: sus `largo` franjas son la misma clase.
+    const QString firma = firmaBloque(plan.moved);
+    for (int i = 1; i < largo; ++i) {
+        const Block b = getBlock(s, dayFrom, slotFrom + i);
+        if (b.isEmpty() || firmaBloque(b) != firma) return MovePlan{};
     }
 
-    plan.valid = true;
-    plan.displaced = plan.moves.first().displaced;
+    const int salto = dayFrom == dayTo ? slotTo - slotFrom : largo;
+    plan.rotation = dayFrom == dayTo && salto != 0
+                 && (salto < 0 ? -salto : salto) < largo;
+    plan.displaced = getBlock(s, dayTo, slotTo);
+    plan.moves = tramoMovimientos(dayFrom, slotFrom, largo, dayTo, slotTo);
+    plan.valid = !plan.moves.isEmpty();
+    if (!plan.valid) return plan;
 
+    // Un choque solo cuenta si el traslado cambia lo que hay en la franja: en un
+    // desplazamiento, las franjas que la clase ya ocupaba no cambian.
     for (const SlotMove& mv : plan.moves) {
-        plan.conflicts += findConflicts(root, self, mv.dayTo, mv.slotTo, mv.moved);
-        if (!mv.displaced.isEmpty())
-            plan.conflicts += findConflicts(root, self, mv.dayFrom, mv.slotFrom, mv.displaced);
+        const Block entra = getBlock(s, mv.dayFrom, mv.slotFrom);
+        if (entra.isEmpty()) continue;
+        if (firmaBloque(entra) == firmaBloque(getBlock(s, mv.dayTo, mv.slotTo)))
+            continue;
+        plan.conflicts += findConflicts(root, self, mv.dayTo, mv.slotTo, entra);
     }
     plan.hasConflict = !plan.conflicts.isEmpty();
     return plan;
@@ -318,40 +391,35 @@ inline MovePlan planMove(const QJsonObject& root, const Ref& self,
 }
 
 /**
- * Aplica el movimiento dentro del horario `self`. Si `swapOthers` es true,
- * también intercambia las franjas implicadas en cada horario en conflicto, de
- * modo que las clases que chocaban pasan a las franjas de origen (actualización
- * global).
+ * Aplica el movimiento. Los traslados se leen todos del estado original antes de
+ * escribir, de modo que un desplazamiento (destino sobre el propio tramo) no
+ * pise clases a medio mover. Si `swapOthers` es true, el mismo traslado se
+ * aplica a cada horario en conflicto, para que las clases que chocaban pasen a
+ * las franjas que la clase arrastrada deja libres.
  */
 inline void applyMove(QJsonObject& root, const Ref& self, const MovePlan& plan, bool swapOthers)
 {
     if (!plan.valid || plan.moves.isEmpty()) return;
 
-    QJsonObject s = scheduleOf(root, self);
-    for (const SlotMove& mv : plan.moves) {
-        setBlock(s, mv.dayTo, mv.slotTo, mv.moved);
-        setBlock(s, mv.dayFrom, mv.slotFrom, mv.displaced);
-    }
-    setSchedule(root, self, s);
+    auto aplicar = [&](const Ref& ref) {
+        const QJsonObject antes = scheduleOf(root, ref);
+        QJsonObject despues = antes;
+        for (const SlotMove& mv : plan.moves)
+            setBlock(despues, mv.dayTo, mv.slotTo, getBlock(antes, mv.dayFrom, mv.slotFrom));
+        setSchedule(root, ref, despues);
+    };
 
+    aplicar(self);
     if (!swapOthers) return;
 
     QVector<Ref> done;
     for (const Conflict& c : plan.conflicts) {
         if (sameRef(c.other, self)) continue;
         bool already = false;
-        for (const Ref& d : done) { if (sameRef(d, c.other)) { already = true; break; } }
+        for (const Ref& d : done) if (sameRef(d, c.other)) { already = true; break; }
         if (already) continue;
         done.append(c.other);
-
-        QJsonObject t = scheduleOf(root, c.other);
-        for (const SlotMove& mv : plan.moves) {
-            const Block atTo   = getBlock(t, mv.dayTo, mv.slotTo);
-            const Block atFrom = getBlock(t, mv.dayFrom, mv.slotFrom);
-            setBlock(t, mv.dayTo, mv.slotTo, atFrom);
-            setBlock(t, mv.dayFrom, mv.slotFrom, atTo);
-        }
-        setSchedule(root, c.other, t);
+        aplicar(c.other);
     }
 }
 
@@ -560,13 +628,6 @@ inline QVector<RowDef> rowsFor(const QJsonObject& root, const Ref& ref)
 // Tramos: materias que ocupan más de una franja académica
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Identidad de un bloque: dos franjas seguidas son la misma clase si coincide. */
-inline QString firmaBloque(const Block& b)
-{
-    return b.materia + QChar(0x1F) + b.profesor + QChar(0x1F) + b.aula
-         + QChar(0x1F) + b.curso;
-}
-
 /**
  * Franjas que abarca la clase que empieza en la fila `r0` del día `day`: filas
  * seguidas del mismo turno (sin receso en medio) con la misma clase. La fila de
@@ -583,8 +644,11 @@ inline int largoDeTramo(const QJsonObject& schedule, const QVector<RowDef>& rows
     int largo = 1;
     while (r0 + largo < rows.size()) {
         const RowDef& fila = rows[r0 + largo];
+        // Franjas seguidas del mismo turno, sin receso en medio y consecutivas
+        // también por número (el movimiento del tramo opera con `slot + k`).
         if (fila.recess || fila.turno != rows[r0].turno
-            || fila.indiceTurno != rows[r0].indiceTurno + largo)
+            || fila.indiceTurno != rows[r0].indiceTurno + largo
+            || fila.slot != rows[r0].slot + largo)
             break;
         const Block siguiente = getBlock(schedule, day, fila.slot);
         if (siguiente.isEmpty() || firmaBloque(siguiente) != firma) break;
@@ -604,7 +668,8 @@ inline bool franjasSeguidas(const QVector<RowDef>& rows, int slot, int largo)
     for (int i = 1; i < largo; ++i) {
         const int r = r0 + i;
         if (r >= rows.size() || rows[r].recess || rows[r].turno != rows[r0].turno
-            || rows[r].indiceTurno != rows[r0].indiceTurno + i)
+            || rows[r].indiceTurno != rows[r0].indiceTurno + i
+            || rows[r].slot != slot + i)
             return false;
     }
     return true;
@@ -618,6 +683,102 @@ inline int largoDeTramoEn(const QJsonObject& schedule, const QVector<RowDef>& ro
         if (!rows[i].recess && rows[i].slot == slot)
             return largoDeTramo(schedule, rows, i, day);
     return 1;
+}
+
+/**
+ * Franja inicial y largo de la clase (tramo) que contiene (day, slot), aunque la
+ * franja esté en medio del tramo. Se apoya en las mismas reglas que
+ * `largoDeTramo` (mismo turno, sin receso en medio y franjas consecutivas).
+ */
+inline void tramoQueContiene(const QJsonObject& schedule, const QVector<RowDef>& rows,
+                             int day, int slot, int& inicio, int& largo)
+{
+    inicio = slot;
+    largo = 1;
+
+    int r = -1;
+    for (int i = 0; i < rows.size(); ++i)
+        if (!rows[i].recess && rows[i].slot == slot) { r = i; break; }
+    if (r < 0) return;
+
+    const Block b = getBlock(schedule, day, rows.at(r).slot);
+    if (b.isEmpty()) return;
+    const QString firma = firmaBloque(b);
+
+    int primero = r;
+    while (primero - 1 >= 0) {
+        const RowDef& f = rows.at(primero - 1);
+        if (f.recess || f.turno != rows.at(primero).turno
+            || f.indiceTurno != rows.at(primero).indiceTurno - 1
+            || f.slot != rows.at(primero).slot - 1
+            || firmaBloque(getBlock(schedule, day, f.slot)) != firma)
+            break;
+        --primero;
+    }
+    int ultimo = r;
+    while (ultimo + 1 < rows.size()) {
+        const RowDef& f = rows.at(ultimo + 1);
+        if (f.recess || f.turno != rows.at(ultimo).turno
+            || f.indiceTurno != rows.at(ultimo).indiceTurno + 1
+            || f.slot != rows.at(ultimo).slot + 1
+            || firmaBloque(getBlock(schedule, day, f.slot)) != firma)
+            break;
+        ++ultimo;
+    }
+    inicio = rows.at(primero).slot;
+    largo = ultimo - primero + 1;
+}
+
+/** Clase que un movimiento dejaría partida por la mitad (si la hay). */
+struct ParticionClase {
+    bool parte = false;
+    Block culpable;     ///< Clase que quedaría cortada
+    int inicio = 0;     ///< Primera franja que ocupa esa clase
+    int franjas = 0;    ///< Franjas seguidas que ocupa
+};
+
+/**
+ * ¿Soltar en (dayTo, slotTo) el tramo de `largo` franjas que empieza en
+ * (dayFrom, slotFrom) partiría alguna de las clases que ya ocupan el destino?
+ *
+ * Las franjas del propio tramo no cuentan (viajan enteras). Cualquier otra clase
+ * que toque el destino ha de caber entera dentro de él: si una clase se extiende
+ * fuera del destino, mover solo su parte la dejaría cortada (una materia de dos
+ * horas quedaría de una). En ese caso el movimiento no es admisible tal cual:
+ * hay que mover entera la clase del destino o elegir franjas libres.
+ */
+inline ParticionClase parteUnaClase(const QJsonObject& root, const Ref& self,
+                                    int dayFrom, int slotFrom, int largo,
+                                    int dayTo, int slotTo)
+{
+    ParticionClase out;
+    if (largo < 1) return out;
+
+    const QJsonObject s = scheduleOf(root, self);
+    const Block movido = getBlock(s, dayFrom, slotFrom);
+    if (movido.isEmpty()) return out;
+    const QString firma = firmaBloque(movido);
+    const QVector<RowDef> rows = rowsFor(root, self);
+
+    for (int i = 0; i < largo; ++i) {
+        const int franja = slotTo + i;
+        if (dayFrom == dayTo && franja >= slotFrom && franja < slotFrom + largo)
+            continue;   // franja del propio tramo: viaja entera
+        const Block b = getBlock(s, dayTo, franja);
+        if (b.isEmpty() || firmaBloque(b) == firma) continue;
+
+        int inicio = franja;
+        int cuantas = 1;
+        tramoQueContiene(s, rows, dayTo, franja, inicio, cuantas);
+        if (inicio < slotTo || inicio + cuantas > slotTo + largo) {
+            out.parte = true;
+            out.culpable = b;
+            out.inicio = inicio;
+            out.franjas = cuantas;
+            return out;
+        }
+    }
+    return out;
 }
 
 /** Nº de clases que se pintan (las franjas seguidas de una misma clase cuentan una). */

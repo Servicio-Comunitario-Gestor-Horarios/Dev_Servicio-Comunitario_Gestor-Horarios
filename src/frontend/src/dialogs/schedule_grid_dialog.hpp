@@ -46,9 +46,11 @@ signals:
 
 public:
     /**
-     * Mueve (o intercambia) un bloque de una franja a otra del horario actual.
-     * Es el mismo camino que usa el arrastrar/soltar, expuesto para pruebas y
-     * para accesibilidad.
+     * Mueve (o intercambia) la clase que empieza en (fromDay, fromSlot) a
+     * (toDay, toSlot) del horario actual. Las clases de varias franjas seguidas
+     * viajan enteras y, si el destino solapa su propio tramo, se desplazan sin
+     * perder ninguna clase. Es el mismo camino que usa el arrastrar/soltar,
+     * expuesto para pruebas y para accesibilidad.
      */
     void moveBlock(int fromDay, int fromSlot, int toDay, int toSlot);
 

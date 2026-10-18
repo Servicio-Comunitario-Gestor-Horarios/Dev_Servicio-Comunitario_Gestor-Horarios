@@ -166,12 +166,37 @@
     entero (`planMoveRun`); un receso en medio corta la unión. Si el documento no trae `_cuadricula`
     (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se usa la plantilla
     histórica de 12×45 min + receso de 30.
+  - **Mover un tramo sobre su propio espacio (fix 2026-10-18).** Se reportó que al intercambiar una clase
+    de dos horas con dos clases del destino el tramo se volvía de tres horas y las otras dos «de dos
+    horas». La causa era el solape: al soltar el bloque una o dos franjas más arriba, el destino incluía
+    una franja del propio tramo y `applyMove` (que escribía par a par, en orden) pisaba una clase y
+    **alargaba** el tramo (y el lado que miraba hacia abajo se ignoraba en silencio). Ahora el movimiento
+    se calcula como una **lista de traslados elementales** (`tramoMovimientos` → `SlotMove`) que es una
+    biyección sobre las franjas afectadas y se aplica **leyendo todo el origen antes de escribir**:
+    solape → el tramo se **desplaza** y las clases ganadas pasan a las franjas libres (`plan.rotation`);
+    sin solape/días distintos → intercambio. Ninguna clase se pierde ni el tramo cambia de tamaño.
+  - **Ninguna clase se parte y el bloque cae donde se ve (fix 2026-10-18, 2.ª vuelta).** Se reportó que
+    soltar una materia de una franja sobre una de dos horas la convertía en una (el destino cortaba la
+    clase grande), y que intercambiar la grande con dos pequeñas parecía no producirse. Ahora
+    `parteUnaClase` (apoyada en `tramoQueContiene`, con las mismas reglas que `largoDeTramo`) detecta si
+    alguna clase del destino quedaría **partida** porque no cabe entera en él: el diálogo avisa («El
+    destino partiría una clase») y **no mueve nada** — hay que mover entera la clase del destino o soltar
+    la arrastrada sobre franjas libres. El intercambio de una grande (dos franjas) con dos pequeñas (una
+    cada una) **sí** se permite y conserva los tamaños de todas. Además, el arrastre anota la franja
+    agarrada (`grab`) y al soltar se calcula `toSlot = franja del puntero en la celda − grab`, así el
+    bloque cae donde se ve (antes, agarrarlo por su segunda franja lo dejaba una franja más abajo y el
+    intercambio parecía no ocurrir).
   - **Leyenda y subtítulos.** La leyenda se arma con las materias reales del horario (ordenadas por peso,
     en una tira desplazable) y los subtítulos muestran turno, clases pintadas y horas académicas.
-  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos y movimiento del
-    bloque completo), `test_frontend_conversion` actualizada (conserva la tarde, emite `_cuadricula` y el
-    turno) y `test_generacion_seed` ampliada (el documento de visualización conserva las 520 clases,
-    incluidas las de la tarde). **Suite 47/47 en verde.** Verificado a ojo con capturas de las ventanas.
+  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos, movimiento del
+    bloque completo, **desplazamiento sobre su propio espacio** hacia arriba y hacia abajo, intercambio
+    con conflicto conservando todas las clases, **intercambio de la grande con dos chicas** conservando
+    tamaños y **detección de clase partida** al soltar una chica sobre una grande o una grande junto a
+    otra), `test_frontend_conversion` actualizada (conserva la
+    tarde, emite `_cuadricula` y el turno) y `test_generacion_seed` ampliada (el documento de
+    visualización conserva las 520 clases, incluidas las de la tarde). **Suite 47/47 en verde.**
+    Verificado con un barrido de los 86 destinos posibles sobre un horario de prueba (0 clases perdidas
+    o duplicadas) y a ojo con capturas de las ventanas.
 
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
   probó el flujo completo de la vista «Generación de horario» con la base sembrada
