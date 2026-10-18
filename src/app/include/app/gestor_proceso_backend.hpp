@@ -54,8 +54,10 @@ signals:
      * @brief Se emite cuando el backend crashea.
      *
      * Si se alcanzó el máximo de reintentos, este es el evento final.
+     * @param codigo Código de salida del proceso (0 si el fallo no lo aporta).
+     *               En Windows, `0xC0000374` delata corrupción de memoria.
      */
-    void backendColapsado();
+    void backendColapsado(int codigo);
 
     /**
      * @brief Se emite antes de cada reintento de reinicio.

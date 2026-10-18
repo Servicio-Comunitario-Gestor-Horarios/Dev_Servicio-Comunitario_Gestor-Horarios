@@ -524,6 +524,14 @@ El modo `--backend` resuelve por la ruta `solver_resolve` (JSON de entrada → `
 al cerrar se solicita apagado ordenado; el cierre continúa aunque no responda. **Frontend:** aviso
 no bloqueante al arrancar.
 
+> **Windows/MSVC — generar en Release.** Las DLL de OR-Tools precompiladas usan la CRT de release
+> (`/MD`). Un binario **Debug** (`/MDd`) mezcla el *heap* y el proceso de cálculo **colapsa al
+> resolver** con `0xC0000374` (corrupción de memoria); además, `test_solver_horarios` falla igual en
+> Debug. Por eso la generación de horarios se prueba y se usa en un build **Release**
+> (`-DCMAKE_BUILD_TYPE=Release`) con el directorio `bin` de OR-Tools en el `PATH`; el `CMakeLists`
+> raíz avisa al configurar y la vista explica el código en el diálogo de caída. El preset `full`
+> (`build/`) está pensado para **Docker**, donde no aplica este desajuste.
+
 ### 3.6 Composición y envío desde el frontend (spec 005, implementado)
 
 El backend expone las piezas, pero **quien posee el dominio y la configuración es la interfaz**; por

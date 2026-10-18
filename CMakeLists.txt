@@ -52,6 +52,18 @@ if(BUILD_BACKEND)
     # Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
     find_package(ortools CONFIG REQUIRED)
     message(STATUS "OR-Tools found - backend and solver enabled")
+
+    # En Windows/MSVC las DLL de OR-Tools precompiladas usan la CRT de release
+    # (/MD). Un binario Debug (/MDd) mezcla el heap y el motor corrompe la memoria
+    # al resolver (código 0xC0000374): las pruebas y la generación solo funcionan
+    # en un build Release. Se avisa aquí para evitar la caída en tiempo de ejecución.
+    if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(WARNING
+            "BUILD_BACKEND=ON con CMAKE_BUILD_TYPE=Debug sobre MSVC: el solver "
+            "colapsará con 0xC0000374 al generar horarios (CRT /MDd del proyecto "
+            "frente a /MD de las DLL de OR-Tools). Configura el proyecto en Release "
+            "(-DCMAKE_BUILD_TYPE=Release) para generar horarios.")
+    endif()
 else()
     message(STATUS "BUILD_BACKEND=OFF - backend and OR-Tools disabled")
 endif()

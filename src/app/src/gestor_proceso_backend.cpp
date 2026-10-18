@@ -140,7 +140,7 @@ void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus e
 
     if (estado == QProcess::CrashExit) {
         qWarning() << "GestorProcesoBackend: backend COLAPSÓ con código" << codigo;
-        emit backendColapsado();
+        emit backendColapsado(codigo);
     } else {
         qDebug() << "GestorProcesoBackend: backend terminó normalmente, código" << codigo;
     }
@@ -154,7 +154,7 @@ void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus e
 void GestorProcesoBackend::alOcurrirErrorProceso(QProcess::ProcessError error)
 {
     qCritical() << "GestorProcesoBackend: error en QProcess:" << error;
-    emit backendColapsado();
+    emit backendColapsado(0);
 }
 
 /**

@@ -106,6 +106,29 @@ namespace
 } // namespace
 #endif
 
+namespace
+{
+    /// Mensaje para la caída del proceso de cálculo. El código `0xC0000374`
+    /// (corrupción de memoria) es el síntoma en Windows de mezclar un binario
+    /// Debug (`/MDd`) con las DLL de OR-Tools en release (`/MD`); la salida es
+    /// generar con un build en Release.
+    QString detalleColapsoBackend(int codigo)
+    {
+        QString detalle = QStringLiteral("El proceso de cálculo dejó de responder.");
+        if (codigo != 0)
+            detalle += QStringLiteral(" Código de salida: 0x%1.")
+                           .arg(static_cast<quint32>(codigo), 8, 16, QLatin1Char('0'));
+#if defined(Q_OS_WIN) && defined(_DEBUG)
+        if (static_cast<quint32>(codigo) == 0xC0000374u)
+            detalle += QStringLiteral(
+                "\n\nEste ejecutable es de depuración (Debug) y las DLL de OR-Tools son de "
+                "release, así que el motor corrompe la memoria al resolver. Compila y ejecuta "
+                "la aplicación en Release (CMAKE_BUILD_TYPE=Release) para generar horarios.");
+#endif
+        return detalle;
+    }
+} // namespace
+
 int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instanciaUnica)
 {
     Q_UNUSED(argc);
@@ -135,9 +158,9 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
     QObject::connect(&gestor, &GestorProcesoBackend::backendListo, []() {
         qDebug() << "[frontend] Backend listo";
     });
-    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado, []() {
-        QMessageBox::critical(nullptr, "Backend",
-                              "El backend dejó de responder.");
+    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado, [](int codigo) {
+        QMessageBox::critical(nullptr, QStringLiteral("Backend"),
+                              detalleColapsoBackend(codigo));
     });
 
     gestor.iniciar();
