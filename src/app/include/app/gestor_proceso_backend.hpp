@@ -95,9 +95,11 @@ private:
     // Constantes de configuración
     static constexpr int INTERVALO_VERIFICACION_MS = 5000; ///< Cada 5s se verifica salud
     static constexpr int ESPERA_INICIAL_MS = 1500;         ///< Espera inicial tras lanzar backend
+    static constexpr int MAX_INTENTOS_VERIFICACION = 3;    ///< Reintentos de salud antes de rendirse
 
     QProcess *m_proceso = nullptr;                    ///< Proceso backend hijo
     QTimer *m_timerVerificacion = nullptr;              ///< Timer periódico de salud
     InternalClient *m_clienteVerificacion = nullptr;    ///< Cliente IPC para health-check
     QString m_ejecutableBackend;                        ///< Ruta al propio binario
+    int m_intentosVerificacion = 0;                     ///< Reintentos de salud consumidos
 };

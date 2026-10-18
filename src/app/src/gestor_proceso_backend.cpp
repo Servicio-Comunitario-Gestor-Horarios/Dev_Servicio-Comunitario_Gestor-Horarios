@@ -95,6 +95,7 @@ void GestorProcesoBackend::lanzarProceso()
     QStringList args;
     args << QStringLiteral("--backend");
 
+    m_intentosVerificacion = 0;
     qDebug() << "GestorProcesoBackend: lanzando" << m_ejecutableBackend << args;
     m_proceso->start(m_ejecutableBackend, args);
 }
@@ -116,12 +117,22 @@ void GestorProcesoBackend::alIniciarProceso()
                 this, [this](bool exito) {
             if (exito) {
                 qDebug() << "GestorProcesoBackend: backend listo (verificación OK)";
+                m_intentosVerificacion = 0;
                 m_timerVerificacion->start(INTERVALO_VERIFICACION_MS);
                 emit backendListo();
-            } else {
-                qWarning() << "GestorProcesoBackend: verificación falló, reintentando...";
+            } else if (++m_intentosVerificacion < MAX_INTENTOS_VERIFICACION) {
+                qWarning() << "GestorProcesoBackend: verificación falló, reintentando"
+                           << "(" << m_intentosVerificacion << "/" << MAX_INTENTOS_VERIFICACION
+                           << ")";
                 QTimer::singleShot(ESPERA_INICIAL_MS, m_clienteVerificacion,
                                    &InternalClient::sendHealthCheck);
+            } else {
+                // El backend no responde (p. ej. colapsó): se deja de reintentar para
+                // no girar en vacío. La caída ya se reporta con `backendColapsado`
+                // desde el cierre del proceso.
+                qWarning() << "GestorProcesoBackend: sin respuesta tras"
+                           << MAX_INTENTOS_VERIFICACION << "intentos; se detiene la verificación";
+                m_timerVerificacion->stop();
             }
         });
         m_clienteVerificacion->sendHealthCheck();
