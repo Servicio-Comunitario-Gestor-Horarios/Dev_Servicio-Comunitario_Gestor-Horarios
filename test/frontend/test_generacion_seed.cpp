@@ -1,3 +1,5 @@
+#include <QFile>
+#include <QJsonDocument>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QString>
@@ -5,6 +7,7 @@
 #include <QTest>
 #include <QVector>
 
+#include <backend/services/CargadorConfiguracionSolver.hpp>
 #include <backend/services/NucleoDatos.hpp>
 #include <backend/services/ServicioCursos.hpp>
 #include <backend/services/ValidadorEntradaSolver.hpp>
@@ -17,8 +20,9 @@
 
 /// Verificación de integración: con los datos de prueba sembrados (Plan 31059,
 /// variante holgada) y un reparto plan/turno por curso, la composición del
-/// frontend produce una entrada VÁLIDA para el solver y el motor encuentra un
-/// horario. Reproduce el flujo de la vista «Generación de horario».
+/// frontend produce una entrada VÁLIDA para el solver, esa entrada se puede
+/// guardar y recargar como preset (JSON) y el motor encuentra un horario.
+/// Reproduce el flujo de la vista «Generación de horario».
 class TestGeneracionSeed : public QObject
 {
     Q_OBJECT
@@ -107,6 +111,26 @@ private slots:
 
             const Resultado<SolverConfig> validacion = validarEntradaSolver(comp.entrada);
             QVERIFY2(validacion.ok, qPrintable(validacion.mensajeError));
+
+            // Round-trip de preset: la misma entrada, guardada como JSON, debe
+            // recargarse con el cargador que usa «Cargar preset…» de la vista.
+            const QString rutaPreset = dir.filePath(QStringLiteral("preset.json"));
+            {
+                QFile archivo(rutaPreset);
+                QVERIFY2(archivo.open(QIODevice::WriteOnly | QIODevice::Truncate),
+                         qPrintable(archivo.errorString()));
+                archivo.write(QJsonDocument(comp.entrada).toJson(QJsonDocument::Indented));
+                archivo.close();
+            }
+            const Resultado<SolverConfig> recargado = CargadorConfiguracionSolver::cargar(rutaPreset);
+            QVERIFY2(recargado.ok, qPrintable(recargado.mensajeError));
+            QCOMPARE(recargado.valor.cursos.size(), 13);
+            QCOMPARE(recargado.valor.profesores.size(), 65);
+            QCOMPARE(recargado.valor.franja_horaria.duracion_minutos, 40);
+            for (const CursoSolverConfig& curso : recargado.valor.cursos) {
+                QVERIFY2(!curso.plan.isEmpty(), "el preset debe conservar el plan de cada curso");
+                QVERIFY2(!curso.turno.isEmpty(), "el preset debe conservar el turno de cada curso");
+            }
 
             Solver solver;
             const Solver::ResultadoSolver res = solver.resolver(validacion.valor);
