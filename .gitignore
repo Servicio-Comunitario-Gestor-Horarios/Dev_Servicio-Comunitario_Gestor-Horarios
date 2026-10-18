@@ -11,6 +11,9 @@ docs/timelapses/*.mp4
 .vendor/
 compile_commands.json
 
+# Presets locales del usuario (rutas de Qt/OR-Tools de cada máquina; ver CMAKE_GUIDE.md)
+CMakeUserPresets.json
+
 # Editors / IDE
 .vscode/
 .idea/

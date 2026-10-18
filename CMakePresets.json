@@ -15,13 +15,22 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": { "BUILD_BACKEND": "ON", "BUILD_TESTING": "ON" }
+    },
+    {
+      "name": "full-release",
+      "displayName": "Build completo en Release (host, con OR-Tools)",
+      "inherits": "full",
+      "binaryDir": "${sourceDir}/build-rel",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     }
   ],
   "buildPresets": [
     { "name": "dev-frontend", "configurePreset": "dev-frontend" },
-    { "name": "full", "configurePreset": "full" }
+    { "name": "full", "configurePreset": "full" },
+    { "name": "full-release", "configurePreset": "full-release" }
   ],
   "testPresets": [
-    { "name": "full", "configurePreset": "full", "output": { "outputOnFailure": true } }
+    { "name": "full", "configurePreset": "full", "output": { "outputOnFailure": true } },
+    { "name": "full-release", "configurePreset": "full-release", "output": { "outputOnFailure": true } }
   ]
 }

@@ -527,10 +527,12 @@ no bloqueante al arrancar.
 > **Windows/MSVC — generar en Release.** Las DLL de OR-Tools precompiladas usan la CRT de release
 > (`/MD`). Un binario **Debug** (`/MDd`) mezcla el *heap* y el proceso de cálculo **colapsa al
 > resolver** con `0xC0000374` (corrupción de memoria); además, `test_solver_horarios` falla igual en
-> Debug. Por eso la generación de horarios se prueba y se usa en un build **Release**
-> (`-DCMAKE_BUILD_TYPE=Release`) con el directorio `bin` de OR-Tools en el `PATH`; el `CMakeLists`
-> raíz avisa al configurar y la vista explica el código en el diálogo de caída. El preset `full`
-> (`build/`) está pensado para **Docker**, donde no aplica este desajuste.
+> Debug. Por eso la generación se prueba y se usa en un build **Release**: el preset `full-release`
+> (`build-rel/`, `CMAKE_BUILD_TYPE=Release`) con el `bin` de OR-Tools en el `PATH`. `CMakeLists`
+> avisa al configurar en Debug y, en esa combinación, define `GESTOR_SOLVER_REQUIERE_RELEASE`:
+> «Generar horarios» **no envía** la petición y explica la salida (mejor que llegar a la caída),
+> además de traducir el código `0xC0000374` en el diálogo del backend. El preset `full` (`build/`)
+> está pensado para **Docker**, donde no aplica este desajuste (ver `docs/guias/desarrollo/CMAKE_GUIDE.md`).
 
 ### 3.6 Composición y envío desde el frontend (spec 005, implementado)
 

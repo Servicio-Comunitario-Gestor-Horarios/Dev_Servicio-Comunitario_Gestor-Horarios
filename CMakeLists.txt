@@ -63,6 +63,9 @@ if(BUILD_BACKEND)
             "colapsará con 0xC0000374 al generar horarios (CRT /MDd del proyecto "
             "frente a /MD de las DLL de OR-Tools). Configura el proyecto en Release "
             "(-DCMAKE_BUILD_TYPE=Release) para generar horarios.")
+        # La vista de generación bloquea el envío y explica por qué (ver
+        # `schedule_generation_widget.cpp`): así no se llega a corromper la memoria.
+        add_compile_definitions(GESTOR_SOLVER_REQUIERE_RELEASE)
     endif()
 else()
     message(STATUS "BUILD_BACKEND=OFF - backend and OR-Tools disabled")

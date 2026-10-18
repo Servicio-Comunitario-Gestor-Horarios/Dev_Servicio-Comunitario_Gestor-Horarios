@@ -118,7 +118,7 @@ namespace
         if (codigo != 0)
             detalle += QStringLiteral(" Código de salida: 0x%1.")
                            .arg(static_cast<quint32>(codigo), 8, 16, QLatin1Char('0'));
-#if defined(Q_OS_WIN) && defined(_DEBUG)
+#if defined(GESTOR_SOLVER_REQUIERE_RELEASE)
         if (static_cast<quint32>(codigo) == 0xC0000374u)
             detalle += QStringLiteral(
                 "\n\nEste ejecutable es de depuración (Debug) y las DLL de OR-Tools son de "

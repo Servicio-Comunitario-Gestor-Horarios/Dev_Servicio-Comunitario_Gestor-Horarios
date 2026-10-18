@@ -726,6 +726,20 @@ void ScheduleGenerationWidget::onGenerarClicked()
     if (m_servicio->enCurso())
         return;
 
+#if defined(GESTOR_SOLVER_REQUIERE_RELEASE)
+    // Build Debug de MSVC con OR-Tools en release: resolver corrompe el heap del
+    // proceso de cálculo (0xC0000374). Se evita el envío y se explica la salida
+    // (CMake define esta macro solo en esa combinación; ver CMakeLists raíz).
+    const QString avisoRelease = QStringLiteral(
+        "Esta compilación es de depuración (Debug) y las DLL de OR-Tools son de release; "
+        "resolver corrompería la memoria del proceso de cálculo. Compila y ejecuta la "
+        "aplicación en Release (CMAKE_BUILD_TYPE=Release) para generar horarios.");
+    establecerEstado(avisoRelease, true);
+    ScheduleTheme::showStyledMessage(this, QStringLiteral("Generación requiere Release"),
+                                      avisoRelease, true);
+    return;
+#endif
+
     const GeneracionSolver::OpcionesUI opciones = leerOpciones();
 
     QString error;

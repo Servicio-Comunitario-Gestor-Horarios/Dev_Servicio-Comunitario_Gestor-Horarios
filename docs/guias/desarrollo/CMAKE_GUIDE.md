@@ -66,6 +66,62 @@ cmake --build build --target clean
 rm -rf build && cmake -S . -B build -G Ninja
 ```
 
+## Presets (CMakePresets.json)
+
+| Preset | Para qué | Directorio |
+|--------|----------|------------|
+| `dev-frontend` | Solo interfaz (sin OR-Tools ni tests) | `build-fe/` |
+| `full` | Build completo en **Docker** (Linux) | `build/` |
+| `full-release` | Build completo en **Release** para el **host** | `build-rel/` |
+
+```bash
+cmake --preset full-release
+cmake --build --preset full-release
+ctest --preset full-release
+```
+
+### Windows/MSVC: la generación de horarios exige Release
+
+Las DLL de OR-Tools precompiladas usan la CRT de release (`/MD`). Un binario **Debug**
+(`/MDd`) mezcla el *heap* y el proceso de cálculo (`gestor-horarios --backend`) **colapsa al
+resolver** con `0xC0000374` (corrupción de memoria). Por eso:
+
+- `CMakeLists` **avisa** al configurar MSVC + `CMAKE_BUILD_TYPE=Debug` + `BUILD_BACKEND=ON`, y
+  define `GESTOR_SOLVER_REQUIERE_RELEASE`.
+- Con esa macro, la vista de generación **no envía** la petición y explica que hay que compilar
+  en Release (mejor que llegar a la caída). El diálogo de caída del backend también traduce el
+  código `0xC0000374`.
+
+En el host usa el preset **`full-release`**, poniendo el directorio `bin` de OR-Tools en el `PATH`
+(o basta con dejar sus DLL junto al ejecutable).
+
+### `CMakeUserPresets.json` (local, no versionado)
+
+Las rutas de Qt, OR-Tools y Eigen son de cada máquina. En lugar de ensuciar `CMakePresets.json`
+—que es del proyecto—, se declaran en `CMakeUserPresets.json` (ignorado por git), heredando del
+preset del proyecto:
+
+```json
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "full-release-host",
+      "inherits": "full-release",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.11.1/msvc2022_64;C:/ortools;C:/eigen3-install",
+        "ortools_DIR": "C:/ortools/lib/cmake/ortools",
+        "ZLIB_LIBRARY_RELEASE": "C:/ortools/lib/zlib.lib",
+        "BZIP2_LIBRARY_RELEASE": "C:/ortools/lib/bz2.lib"
+      }
+    }
+  ]
+}
+```
+
+En **Qt Creator** los presets aparecen como configuraciones de build: elige **`full-release`**
+(o el que herede de él) y pulsa *Run*. El preset `full` (Debug en Windows) no sirve para generar.
+
 ## Flujo de trabajo diario
 
 ```bash
