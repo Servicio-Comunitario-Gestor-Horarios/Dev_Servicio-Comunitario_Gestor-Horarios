@@ -202,7 +202,7 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     SatParameters params;
     params.set_num_search_workers(1);
     params.set_random_seed(0);
-    params.set_max_time_in_seconds(30);
+    params.set_max_time_in_seconds(10);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
