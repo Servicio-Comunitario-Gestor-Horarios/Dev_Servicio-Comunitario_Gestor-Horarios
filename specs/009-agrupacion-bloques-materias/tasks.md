@@ -30,22 +30,22 @@ Plan: `specs/009-agrupacion-bloques-materias/plan.md`
     - Código: `solver.cpp::construirObjetivo` — añadir término `PESO_AGRUPACION · Σ start · f(len, horasDia)`. `horasDia[m,c,d] = Σ_{seg,s} Σ_p x[p,m,c,d,s]`. `f` usa `calcularPenalizacionGrupo` (o lógica inline equivalente). Verificar que parámetros deterministas (`num_search_workers=1`, `random_seed=0`) siguen activos.
     - Hecho cuando: `ctest` pasa AC-2, AC-5, AC-6; objetivo incluye S3 y no rompe reproducibilidad.
 
-- [ ] **T5. Tests de penalización exacta (AC-1, AC-3, AC-4, AC-9).** RF-2, RF-3
+- [x] **T5. Tests de penalización exacta (AC-1, AC-3, AC-4, AC-9).** RF-2, RF-3
     - Tests (rojo): `test/backend/test_solver_horarios.cpp` — AC-1: 4h/semana (1h×2días + 2h×1día) → grupos de 2 en día de 2h. AC-3: 1h/semana → pen 0; 3h/día 2+1 → pen 1. AC-4: 5h en un día/segmento → pen 2. AC-9: cross-segmento (1 slot en {0,1} + 1 en {2..7}) → 2 arranques, horas día=2 → pen 2.
     - Código: fixtures en `test_solver_horarios.cpp` que configuran disponibilidad y cursos para permitir/forzar cada patrón; comprobar `ValidadorSalidaSolver` reporta penalizaciones esperadas.
     - Hecho cuando: `ctest` pasa AC-1, AC-3, AC-4, AC-9.
 
-- [ ] **T6. Validador de salida: análisis de grupos y penalizaciones.** AC-1..AC-9
+- [x] **T6. Validador de salida: análisis de grupos y penalizaciones.** AC-1..AC-9
     - Tests (rojo): `test/backend/test_validador_salida.cpp` — `analizarSalidaSolver` devuelve mapa `(curso,materia,día,segmento) → {grupos: [{inicio, fin, tamaño, penalización}], penalización_total_día}`; verificar contra fixture conocido.
     - Código: `ValidadorSalidaSolver.cpp` — en `analizarSalidaSolver`, recorrer asignaciones por (curso,materia,día), agrupar por segmento (usando `segmentosTurno`), detectar arranques contiguos, calcular `tamaño`, `penalización` con `calcularPenalizacionGrupo`, sumar. Añadir a `AnalisisSalida` campo opcional `agrupacion` (no rompe compatibilidad).
     - Hecho cuando: `ctest` pasa `test_validador_salida` con fixtures AC-1..AC-9.
 
-- [ ] **T7. Integración completa con datos de prueba (AC-7, AC-8).** RF-5, RF-6, RF-8
+- [x] **T7. Integración completa con datos de prueba (AC-7, AC-8).** RF-5, RF-6, RF-8
     - Tests (rojo): `test/backend/test_solver_horarios.cpp` y `test/backend/test_solver_benchmark.cpp` — generar horario con preset holgada (13 cursos, 520 clases); verificar: (a) tiempo ≤ 5 s; (b) ningún grupo de 1 injustificado (solo 1h/día); (c) ningún grupo >3 sin penalización contabilizada; (d) D1–D13 intactas (usar `ValidadorSalidaSolver`); (e) objetivo S1/S2 no empeora vs run sin S3 (comparar en fixture controlado).
     - Código: ajustes finos en formulación si hay regresión de rendimiento; asegurar que variables auxiliares no explotan.
     - Hecho cuando: `ctest` pasa `test_solver_horarios` (integración) y `test_solver_benchmark` (< 5 s, D1–D13 OK, S1/S2 no empeoran).
 
-- [ ] **T8. Suite completa en verde y limpieza.** RF-1..RF-8, RNF-1..RNF-3
+- [x] **T8. Suite completa en verde y limpieza.** RF-1..RF-8, RNF-1..RNF-3
     - Tests (verificación): suite completa `ctest --preset full-release --output-on-failure` pasa al 100%. `grep -R "TODO(spec 009)" src test` no devuelve nada.
     - Verificación: `cmake --build build-rel` sin warnings nuevos; constantes en `contrato_solver.hpp`; sin cambios en `solver_config.hpp` ni JSON.
     - Hecho cuando: suite verde; código compila limpio; spec 009 marcada `implementada` en `MEMORY.md` y `spec.md` → `Estado: implementada (2026-10-18)` tras veredicto reviewer.
