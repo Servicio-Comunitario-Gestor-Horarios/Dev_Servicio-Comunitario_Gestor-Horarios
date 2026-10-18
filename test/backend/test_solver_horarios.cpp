@@ -3,8 +3,19 @@
 #include <QPair>
 #include <QMap>
 #include <backend/solver/config/contrato_solver.hpp>
+#include <backend/data/horario_salida.hpp>
 #include <backend/solver/config/solver_config.hpp>
 #include <backend/solver/solver.hpp>
+
+/// Helper: franjas en las que se imparte una materia en un curso.
+static QVector<int> franjasDeMateria(const CursoOutput& curso, int materia) {
+    QVector<int> franjas;
+    for (const auto& dia : curso.dias)
+        for (const auto& asig : dia.asignaciones)
+            if (asig.materia == materia) franjas.append(asig.slot);
+    std::sort(franjas.begin(), franjas.end());
+    return franjas;
+}
 
 /// Tests del solver CP-SAT con el contrato nuevo (spec 005).
 /// El curso se identifica por anio+seccion; sus materias salen del plan.
@@ -355,6 +366,91 @@ private slots:
             }
         QCOMPARE(slotsA, 0);
         QCOMPARE(slotsB, 4);
+    }
+
+    // ── T5: Agrupación de bloques (S3) ──
+
+    // AC-3: una materia de 2 h en un solo día debe ir en 2 franjas CONTIGUAS,
+    // no en 2 grupos de 1 (la penalización de S3 desincentiva el segundo arranque).
+    void solver_agrupacion_dosHorasContiguas() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 4};   // 1 día, 4 franjas
+        config.franja_horaria = {40, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 2}}}};   // 2 horas
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
+        const QVector<int> franjas = franjasDeMateria(curso, 0);
+        QCOMPARE(franjas.size(), 2);
+        // Contiguas: la diferencia entre los dos slots debe ser 1.
+        QCOMPARE(franjas[1] - franjas[0], 1);
+    }
+
+    // AC-9: el receso rompe la contigüidad. Con un receso entre las franjas 1 y 2,
+    // una materia de 2 h debe ir en {0,1} o {2,3}, nunca en {1,2}.
+    void solver_agrupacion_recesoRompeContiguedad() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 4};
+        config.franja_horaria = {40, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.recesos = {{"manana", 1, 10, "08:20", "08:30"}};  // rompe entre 1 y 2
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 2}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
+        const QVector<int> franjas = franjasDeMateria(curso, 0);
+        QCOMPARE(franjas.size(), 2);
+        // No deben ser {1,2} (cruzando el receso). Válidas: {0,1} o {2,3}.
+        const bool mismoSegmento = (franjas[0] == 0 && franjas[1] == 1) ||
+                                   (franjas[0] == 2 && franjas[1] == 3);
+        QVERIFY2(mismoSegmento,
+                 qPrintable(QString("Slots %1,%2 cruzan el receso").arg(franjas[0]).arg(franjas[1])));
+    }
+
+    // AC-4: una materia de 4 h en un día de 4 franjas ocupa 4 contiguas (un solo grupo).
+    void solver_agrupacion_cuatroHorasUnGrupo() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 1, 4};
+        config.franja_horaria = {40, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof A", 4, 4, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
+        const QVector<int> franjas = franjasDeMateria(curso, 0);
+        QCOMPARE(franjas.size(), 4);
+        QCOMPARE(franjas, (QVector<int>{0, 1, 2, 3}));
     }
 };
 
