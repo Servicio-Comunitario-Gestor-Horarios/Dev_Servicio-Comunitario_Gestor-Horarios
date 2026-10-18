@@ -460,6 +460,11 @@ void ScheduleGridDialog::startDrag(QFrame* cell, const QPoint& pos)
     QJsonObject payload;
     payload["day"] = cell->property("day").toInt();
     payload["slot"] = cell->property("slot").toInt();
+    // Franja del bloque que se agarró (0 = la primera). El bloque se dibuja
+    // entero bajo el puntero, así que al soltarlo ha de caer donde se ve.
+    const int paso = kRowH + m_scheduleGrid->spacing();
+    const int span = qMax(1, (cell->height() + m_scheduleGrid->spacing()) / paso);
+    payload["grab"] = qBound(0, pos.y() / paso, span - 1);
 
     auto* mime = new QMimeData();
     mime->setData(kDragMime, QJsonDocument(payload).toJson(QJsonDocument::Compact));
@@ -528,8 +533,16 @@ bool ScheduleGridDialog::eventFilter(QObject* watched, QEvent* event)
                 QJsonDocument::fromJson(de->mimeData()->data(kDragMime)).object();
             const int fromDay = payload.value("day").toInt();
             const int fromSlot = payload.value("slot").toInt();
+            const int grab = payload.value("grab").toInt(0);
             const int toDay = cell->property("day").toInt();
-            const int toSlot = cell->property("slot").toInt();
+            // La franja bajo el puntero dentro de la celda destino (0 si es una
+            // franja suelta) menos la franja agarrada da la primera franja del
+            // bloque: así el bloque cae donde se ve al soltarlo, no en la franja
+            // del puntero (que en un bloque de dos horas desalineaba el
+            // intercambio en una franja).
+            const int paso = kRowH + m_scheduleGrid->spacing();
+            const int caida = static_cast<int>(de->position().y()) / paso;
+            const int toSlot = cell->property("slot").toInt() + caida - grab;
             moveBlock(fromDay, fromSlot, toDay, toSlot);
             de->acceptProposedAction();
             return true;
@@ -563,6 +576,28 @@ void ScheduleGridDialog::moveBlock(int fromDay, int fromSlot, int toDay, int toS
                     "elegida no caben (un receso o el fin del turno las corta). Elige "
                     "una franja con espacio suficiente.")
                 .arg(largo), true);
+        return;
+    }
+
+    // Soltar la clase sobre franjas de OTRAS clases solo vale si esas clases caben
+    // enteras en el destino; si alguna se extiende fuera, quedaría cortada (una
+    // materia de dos horas pasaría a una). Se avisa y no se mueve nada.
+    const ScheduleModel::Block movida = ScheduleModel::getBlock(schedule, fromDay, fromSlot);
+    const ScheduleModel::ParticionClase corta =
+        ScheduleModel::parteUnaClase(m_data, self, fromDay, fromSlot, largo, toDay, toSlot);
+    if (corta.parte) {
+        ScheduleTheme::showStyledMessage(
+            this, "El destino partiría una clase",
+            QString("\"%1\" (%2 franja(s)) no cabe ahí: la franja de destino forma "
+                    "parte de \"%3\", que ocupa %4 franjas seguidas, así que al mover "
+                    "\"%1\" esa clase quedaría cortada.\n\n"
+                    "Para desocupar el espacio, mueve primero \"%3\" entera, o suelta "
+                    "\"%1\" sobre franjas libres.")
+                .arg(movida.materia)
+                .arg(largo)
+                .arg(corta.culpable.materia)
+                .arg(corta.franjas),
+            true);
         return;
     }
 

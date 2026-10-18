@@ -337,6 +337,9 @@ inline QVector<SlotMove> tramoMovimientos(int dayFrom, int slotFrom, int largo,
  * Planifica mover la clase que empieza en (dayFrom, slotFrom) y ocupa `largo`
  * franjas seguidas: una materia de dos horas académicas viaja entera, no por
  * mitades. Con `largo = 1` es el movimiento simple de una franja.
+ *
+ * No comprueba que el destino no corte otra clase por la mitad: eso lo decide
+ * `parteUnaClase`, que ha de consultarse antes de aplicar el plan.
  */
 inline MovePlan planMoveRun(const QJsonObject& root, const Ref& self,
                             int dayFrom, int slotFrom, int largo,
@@ -680,6 +683,102 @@ inline int largoDeTramoEn(const QJsonObject& schedule, const QVector<RowDef>& ro
         if (!rows[i].recess && rows[i].slot == slot)
             return largoDeTramo(schedule, rows, i, day);
     return 1;
+}
+
+/**
+ * Franja inicial y largo de la clase (tramo) que contiene (day, slot), aunque la
+ * franja esté en medio del tramo. Se apoya en las mismas reglas que
+ * `largoDeTramo` (mismo turno, sin receso en medio y franjas consecutivas).
+ */
+inline void tramoQueContiene(const QJsonObject& schedule, const QVector<RowDef>& rows,
+                             int day, int slot, int& inicio, int& largo)
+{
+    inicio = slot;
+    largo = 1;
+
+    int r = -1;
+    for (int i = 0; i < rows.size(); ++i)
+        if (!rows[i].recess && rows[i].slot == slot) { r = i; break; }
+    if (r < 0) return;
+
+    const Block b = getBlock(schedule, day, rows.at(r).slot);
+    if (b.isEmpty()) return;
+    const QString firma = firmaBloque(b);
+
+    int primero = r;
+    while (primero - 1 >= 0) {
+        const RowDef& f = rows.at(primero - 1);
+        if (f.recess || f.turno != rows.at(primero).turno
+            || f.indiceTurno != rows.at(primero).indiceTurno - 1
+            || f.slot != rows.at(primero).slot - 1
+            || firmaBloque(getBlock(schedule, day, f.slot)) != firma)
+            break;
+        --primero;
+    }
+    int ultimo = r;
+    while (ultimo + 1 < rows.size()) {
+        const RowDef& f = rows.at(ultimo + 1);
+        if (f.recess || f.turno != rows.at(ultimo).turno
+            || f.indiceTurno != rows.at(ultimo).indiceTurno + 1
+            || f.slot != rows.at(ultimo).slot + 1
+            || firmaBloque(getBlock(schedule, day, f.slot)) != firma)
+            break;
+        ++ultimo;
+    }
+    inicio = rows.at(primero).slot;
+    largo = ultimo - primero + 1;
+}
+
+/** Clase que un movimiento dejaría partida por la mitad (si la hay). */
+struct ParticionClase {
+    bool parte = false;
+    Block culpable;     ///< Clase que quedaría cortada
+    int inicio = 0;     ///< Primera franja que ocupa esa clase
+    int franjas = 0;    ///< Franjas seguidas que ocupa
+};
+
+/**
+ * ¿Soltar en (dayTo, slotTo) el tramo de `largo` franjas que empieza en
+ * (dayFrom, slotFrom) partiría alguna de las clases que ya ocupan el destino?
+ *
+ * Las franjas del propio tramo no cuentan (viajan enteras). Cualquier otra clase
+ * que toque el destino ha de caber entera dentro de él: si una clase se extiende
+ * fuera del destino, mover solo su parte la dejaría cortada (una materia de dos
+ * horas quedaría de una). En ese caso el movimiento no es admisible tal cual:
+ * hay que mover entera la clase del destino o elegir franjas libres.
+ */
+inline ParticionClase parteUnaClase(const QJsonObject& root, const Ref& self,
+                                    int dayFrom, int slotFrom, int largo,
+                                    int dayTo, int slotTo)
+{
+    ParticionClase out;
+    if (largo < 1) return out;
+
+    const QJsonObject s = scheduleOf(root, self);
+    const Block movido = getBlock(s, dayFrom, slotFrom);
+    if (movido.isEmpty()) return out;
+    const QString firma = firmaBloque(movido);
+    const QVector<RowDef> rows = rowsFor(root, self);
+
+    for (int i = 0; i < largo; ++i) {
+        const int franja = slotTo + i;
+        if (dayFrom == dayTo && franja >= slotFrom && franja < slotFrom + largo)
+            continue;   // franja del propio tramo: viaja entera
+        const Block b = getBlock(s, dayTo, franja);
+        if (b.isEmpty() || firmaBloque(b) == firma) continue;
+
+        int inicio = franja;
+        int cuantas = 1;
+        tramoQueContiene(s, rows, dayTo, franja, inicio, cuantas);
+        if (inicio < slotTo || inicio + cuantas > slotTo + largo) {
+            out.parte = true;
+            out.culpable = b;
+            out.inicio = inicio;
+            out.franjas = cuantas;
+            return out;
+        }
+    }
+    return out;
 }
 
 /** Nº de clases que se pintan (las franjas seguidas de una misma clase cuentan una). */

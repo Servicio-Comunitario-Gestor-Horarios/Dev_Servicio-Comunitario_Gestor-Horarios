@@ -369,6 +369,95 @@ private slots:
         const QJsonObject sec = ScheduleModel::scheduleOf(doc, refSeccion());
         QCOMPARE(ScheduleModel::horasAsignadas(sec), 2);
     }
+
+    /// Intercambiar la clase grande (dos franjas) con dos clases de una franja:
+    /// la grande pasa a ocupar las dos franjas y las pequeñas, a las que la
+    /// grande deja libres. Ninguna cambia de tamaño.
+    void elIntercambioDeLaGrandeConDosChicasConservaLasClases()
+    {
+        QJsonObject sched = horario({{1, 3}, {1, 4}}, bloque("Matemática", "A1"));
+        poner(sched, 5, bloque("Física", "A2"));
+        poner(sched, 6, bloque("Química", "A3"));
+        QJsonObject doc = conSeccion(documentoBase(), QStringLiteral("Mañana"), sched);
+        const ScheduleModel::Ref ref = refSeccion();
+
+        const QVector<ScheduleModel::RowDef> rows = ScheduleModel::rowsFor(doc, ref);
+        const QJsonObject antes = ScheduleModel::scheduleOf(doc, ref);
+        QCOMPARE(ScheduleModel::largoDeTramoEn(antes, rows, 1, 3), 2);
+        QCOMPARE(ScheduleModel::horasAsignadas(antes), 4);
+
+        // El destino no parte ninguna clase: las dos pequeñas caben enteras.
+        QVERIFY(!ScheduleModel::parteUnaClase(doc, ref, 1, 3, 2, 1, 5).parte);
+
+        const ScheduleModel::MovePlan plan =
+            ScheduleModel::planMoveRun(doc, ref, 1, 3, 2, 1, 5);
+        QVERIFY(plan.valid);
+        QCOMPARE(plan.franjas, 2);
+        QCOMPARE(plan.moves.size(), 4);
+        ScheduleModel::applyMove(doc, ref, plan, /*swapOthers=*/false);
+
+        const QJsonObject despues = ScheduleModel::scheduleOf(doc, ref);
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 5).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 6).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 3).materia, QStringLiteral("Física"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 4).materia, QStringLiteral("Química"));
+        QCOMPARE(ScheduleModel::horasAsignadas(despues), 4);
+
+        const QVector<ScheduleModel::RowDef> tras = ScheduleModel::rowsFor(doc, ref);
+        QCOMPARE(ScheduleModel::largoDeTramo(despues, tras,
+                                             filaDelSlot(tras, 5), 1), 2);
+    }
+
+    /// Soltar una clase de una franja sobre una de dos franjas partiría la clase
+    /// grande en una de una hora: el destino no es admisible y se detecta.
+    void soltarUnaChicaSobreLaGrandePartiriaLaClase()
+    {
+        QJsonObject sched = horario({{1, 3}, {1, 4}}, bloque("Matemática", "A1"));
+        poner(sched, 5, bloque("Física", "A2"));
+        QJsonObject doc = conSeccion(documentoBase(), QStringLiteral("Mañana"), sched);
+        const ScheduleModel::Ref ref = refSeccion();
+        const QVector<ScheduleModel::RowDef> rows = ScheduleModel::rowsFor(doc, ref);
+
+        // Sobre la primera franja de la grande.
+        const ScheduleModel::ParticionClase una =
+            ScheduleModel::parteUnaClase(doc, ref, 1, 5, 1, 1, 3);
+        QVERIFY(una.parte);
+        QCOMPARE(una.culpable.materia, QStringLiteral("Matemática"));
+        QCOMPARE(una.inicio, 3);
+        QCOMPARE(una.franjas, 2);
+
+        // Y sobre su segunda franja también.
+        QVERIFY(ScheduleModel::parteUnaClase(doc, ref, 1, 5, 1, 1, 4).parte);
+
+        // La franja que contiene la clase se reconoce desde cualquiera de sus franjas.
+        int inicio = 0;
+        int cuantas = 0;
+        ScheduleModel::tramoQueContiene(ScheduleModel::scheduleOf(doc, ref), rows, 1, 4,
+                                        inicio, cuantas);
+        QCOMPARE(inicio, 3);
+        QCOMPARE(cuantas, 2);
+
+        // En una franja libre no se parte nada.
+        QVERIFY(!ScheduleModel::parteUnaClase(doc, ref, 1, 5, 1, 1, 6).parte);
+    }
+
+    /// Soltar una clase grande junto a otra grande cortaría la segunda: tampoco
+    /// es admisible, porque solo se movería la mitad de la clase ajena.
+    void soltarUnaGrandeJuntoAOtraGrandePartiriaLaClase()
+    {
+        QJsonObject sched = horario({{1, 2}, {1, 3}}, bloque("Matemática", "A1"));
+        poner(sched, 5, bloque("Física", "A2"));
+        poner(sched, 6, bloque("Física", "A2"));
+        QJsonObject doc = conSeccion(documentoBase(), QStringLiteral("Mañana"), sched);
+        const ScheduleModel::Ref ref = refSeccion();
+
+        // Destino 4 y 5: la franja 5 es la primera de la Física (5 y 6).
+        const ScheduleModel::ParticionClase corta =
+            ScheduleModel::parteUnaClase(doc, ref, 1, 2, 2, 1, 4);
+        QVERIFY(corta.parte);
+        QCOMPARE(corta.culpable.materia, QStringLiteral("Física"));
+        QCOMPARE(corta.franjas, 2);
+    }
 };
 
 QTEST_APPLESS_MAIN(TestCuadriculaHorario)
