@@ -13,7 +13,7 @@
 #include <backend/services/ValidadorEntradaSolver.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 #include <backend/solver/config/solver_config.hpp>
-#include <backend/solver/solver.hpp>
+#include <backend/solver/servicio_solver.hpp>
 #include <seed/sembrador.hpp>
 
 #include "services/entrada_solver_builder.hpp"
@@ -132,10 +132,12 @@ private slots:
                 QVERIFY2(!curso.turno.isEmpty(), "el preset debe conservar el turno de cada curso");
             }
 
-            Solver solver;
-            const Solver::ResultadoSolver res = solver.resolver(validacion.valor);
-            QVERIFY2(res.exito, qPrintable(res.errores.join(QStringLiteral("; "))));
-            qInfo() << "Horario generado en" << res.tiempo_ms << "ms";
+            // Mismo camino que el proceso de cálculo: el backend registra
+            // `solver_resolve` sobre `resolverEntradaSolver` (JSON -> HorarioSalida).
+            const RespuestaSolver respuesta = resolverEntradaSolver(comp.entrada);
+            QVERIFY2(respuesta.ok, qPrintable(respuesta.error));
+            QVERIFY2(respuesta.factible, qPrintable(respuesta.error));
+            QCOMPARE(respuesta.salida.value(QStringLiteral("horarios")).toObject().size(), 13);
         }
         QSqlDatabase::removeDatabase(conexion);
     }
