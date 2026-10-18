@@ -13,6 +13,8 @@ private:
     {
         SolverConfig config;
         config.aula_fija = true;
+        config.turnos.turnos = {TurnoConfig{QStringLiteral("manana"), {0, 1, 2, 3}}};
+        config.recesos = {RecesoConfig{QStringLiteral("manana"), 1, 10, QStringLiteral("08:20"), QStringLiteral("08:30")}};
         config.materias = {MateriaSolverConfig{QStringLiteral("Matemática")}};
         config.aulas = {AulaSolverConfig{QStringLiteral("A1"), QStringLiteral("regular"), 30}};
         config.planes = {PlanSolverConfig{QStringLiteral("Ciencias"),
@@ -21,9 +23,11 @@ private:
         CursoSolverConfig cursoA;
         cursoA.anio = 1; cursoA.seccion = QStringLiteral("A");
         cursoA.num_estudiantes = 20; cursoA.plan = QStringLiteral("Ciencias"); cursoA.aula = 0;
+        cursoA.turno = QStringLiteral("manana");
         CursoSolverConfig cursoB;
         cursoB.anio = 1; cursoB.seccion = QStringLiteral("B");
         cursoB.num_estudiantes = 20; cursoB.plan = QStringLiteral("Ciencias"); cursoB.aula = 0;
+        cursoB.turno = QStringLiteral("manana");
         config.cursos = {cursoA, cursoB};
 
         ProfesorSolverConfig prof;
@@ -150,6 +154,65 @@ private slots:
         const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
         QVERIFY(a.presentable());
         QVERIFY(!a.avisos.isEmpty());
+    }
+
+    // ── S3: análisis de agrupación ──
+
+    void agrupacion_dosFranjasContiguas_penalizacionCero()
+    {
+        // Materia en slots 0 y 1 (mismo segmento) → grupo de 2, penalización 0.
+        HorarioSalida h;
+        CursoOutput curso;
+        curso.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}, AsignacionOutput{1, 0, 0, 0}};
+        curso.dias = {dia};
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
+
+        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
+        QCOMPARE(a.grupos.size(), 1);
+        QCOMPARE(a.grupos[0].tamano, 2);
+        QCOMPARE(a.grupos[0].penalizacion, 0);
+        QCOMPARE(a.penalizacionAgrupacion, 0);
+    }
+
+    void agrupacion_cruzandoReceso_dosGruposDeUno()
+    {
+        // Materia en slots 1 y 2 (cruzan el receso) → dos grupos de 1, horas día = 2
+        // → penalización 1 + 1 = 2.
+        HorarioSalida h;
+        CursoOutput curso;
+        curso.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        dia.asignaciones = {AsignacionOutput{1, 0, 0, 0}, AsignacionOutput{2, 0, 0, 0}};
+        curso.dias = {dia};
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
+
+        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
+        QCOMPARE(a.grupos.size(), 2);
+        QCOMPARE(a.grupos[0].tamano, 1);
+        QCOMPARE(a.grupos[1].tamano, 1);
+        QCOMPARE(a.penalizacionAgrupacion, 2);
+    }
+
+    void agrupacion_unaSolaHoraDia_perdonada()
+    {
+        // Materia con 1 sola franja en el día → grupo de 1 pero perdonado (D-4).
+        HorarioSalida h;
+        CursoOutput curso;
+        curso.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}};
+        curso.dias = {dia};
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
+
+        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
+        QCOMPARE(a.grupos.size(), 1);
+        QCOMPARE(a.grupos[0].tamano, 1);
+        QCOMPARE(a.penalizacionAgrupacion, 0);
     }
 };
 
