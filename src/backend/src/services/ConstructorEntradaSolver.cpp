@@ -100,23 +100,30 @@ namespace
     }
 
     /// Slots (absolutos del día) cubiertos por una franja de disponibilidad.
+    ///
+    /// La franja declara el horario de reloj en que el docente está disponible y
+    /// puede abarcar VARIOS turnos (p. ej. 07:00–18:00 cubre mañana y tarde). Se
+    /// emite cada bloque —anclado en el `inicio` de su turno y avanzando en pasos
+    /// de `duracionMinutos`, sin que el receso desplace bloques— que cae
+    /// ÍNTEGRAMENTE dentro de la franja. Es la misma semántica que usa la
+    /// cobertura del seed («la franja contiene un bloque completo»).
     QVector<int> slotsDeFranja(const FranjaHoraria& franja,
                                const QVector<TurnoOrdenado>& turnos,
                                int duracionMinutos)
     {
         QVector<int> listaSlots;
-        if (duracionMinutos <= 0)
+        if (duracionMinutos <= 0 || !franja.inicio.isValid() || !franja.fin.isValid())
             return listaSlots;
 
+        const int paso = duracionMinutos * 60;
         for (const TurnoOrdenado& t : turnos)
         {
-            if (franja.inicio >= t.inicio && franja.fin <= t.fin)
+            for (int k = 0; k < t.numSlots; ++k)
             {
-                const int desde = t.inicio.secsTo(franja.inicio) / (duracionMinutos * 60);
-                const int cuantos = franja.inicio.secsTo(franja.fin) / (duracionMinutos * 60);
-                for (int k = 0; k < cuantos; ++k)
-                    listaSlots.append(t.offset + desde + k);
-                return listaSlots;
+                const QTime bloqueInicio = t.inicio.addSecs(k * paso);
+                const QTime bloqueFin    = bloqueInicio.addSecs(paso);
+                if (bloqueInicio >= franja.inicio && bloqueFin <= franja.fin)
+                    listaSlots.append(t.offset + k);
             }
         }
         return listaSlots;
@@ -189,11 +196,16 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         CursoSolverConfig curso;
         curso.anio    = c.anio;
         curso.seccion = c.seccion;
-        curso.turno   = c.turno;
+        curso.turno   = c.turno;   // base (spec 005 I1); el preset puede sobrescribirlo
         if (const CursoSolverConfig* pc = parametrosDeCurso(parametros, c.anio, c.seccion))
         {
             curso.plan            = pc->plan;
             curso.num_estudiantes = pc->num_estudiantes;
+            // El turno del curso puede aportarse desde el preset (guía de datos de
+            // prueba del frontend, §4: los cursos del centro se siembran sin turno).
+            // Si el preset no lo declara, se conserva el de la base (spec 005 I1).
+            if (!pc->turno.isEmpty())
+                curso.turno = pc->turno;
         }
         // Aula: indice en modo fijo; -1 en modo movil (la decide el solver).
         curso.aula = salida.aula_fija ? indiceAula(datos.aulas, c.aula) : -1;
