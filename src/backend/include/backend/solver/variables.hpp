@@ -26,7 +26,9 @@ using namespace operations_research::sat;
  * - aulaAssignment     (y): aula de cursos moviles (solo si el modo no es aula fija)
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
  * - exceso             (e): bloques por encima del tope de horas de aula (S1)
- * - start              (s): arranque de grupo por (m,c,d,seg,s) para S3
+ * - hay                (h): presencia de la materia en (m,c,d,seg,s) para S3
+ * - isolated           (i): grupo de 1 (penaliza)
+
  */
 struct VariablesSolver {
     QMap<std::tuple<int, int, int, int, int>, BoolVar> assignment;          ///< [p][m][c][d][s]
@@ -35,9 +37,12 @@ struct VariablesSolver {
     QMap<int, IntVar> exceso;                                              ///< e[p]
 
     // --- S3: Agrupación de bloques ---
-    // start[m][c][d][seg][s] = 1 si hay un arranque de grupo de la materia m
-    // en el curso c, día d, segmento seg, en la franja s.
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> start;               ///< [m][c][d][seg][s]
+    // hay[m][c][d][seg][s] = 1 si la materia tiene clase en esa franja.
+    // isolated[m][c][d][seg][s] = 1 si la franja es un grupo de 1 (penaliza 1).
+    // longGroup[m][c][d][seg][s] = 1 si la franja es la 4.ª+ consecutiva (penaliza 1).
+    QMap<std::tuple<int, int, int, int, int>, BoolVar> hay;                 ///< [m][c][d][seg][s]
+    QMap<std::tuple<int, int, int, int, int>, BoolVar> isolated;            ///< [m][c][d][seg][s]
+    QMap<std::tuple<int, int, int, int, int>, BoolVar> longGroup;           ///< [m][c][d][seg][s]
 
 };
 

@@ -70,7 +70,8 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
                         }
                         if (!hayX) continue;
 
-                        vars.start[{m, c, d, seg, s}] = model.NewBoolVar();
+                        vars.hay[{m, c, d, seg, s}] = model.NewBoolVar();
+                        vars.isolated[{m, c, d, seg, s}] = model.NewBoolVar();
                     }
                 }
             }

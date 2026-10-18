@@ -12,6 +12,7 @@
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/model.h"
 #include "qvariant.h"
+#include <cstdio>
 #include <QElapsedTimer>
 #include <QMap>
 #include <QSet>
@@ -242,55 +243,13 @@ void Solver::construirObjetivo(const SolverConfig& config) {
     }
 
     // S3: penalización por fragmentación (agrupación de bloques) - RF-2
-    // Penalización = PESO_AGRUPACION * Σ start * f(len)
-    // f(len):
-    //   len == 1  → 1 (si horasDia > 1) o 0 (si horasDia == 1, D-4)
-    //   len == 2,3 → 0
-    //   len >= 4   → len - 3
-    //   len <= 0   → 0
-    //
-    // En esta implementación simplificada (T4), usamos start como proxy de fragmentación:
-    // cada arranque de grupo (start = 1) contribuye a la penalización.
-    // La formulación exacta con f(len) y horasDia se completará en T5/T6.
-
-    // Pre-calcular segmentos por turno
-    QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
-    for (const TurnoConfig& t : config.turnos.turnos) {
-        QVector<RecesoConfig> recesosTurno;
-        for (const RecesoConfig& r : config.recesos)
-            if (r.turno == t.nombre) recesosTurno.append(r);
-        segmentosPorTurno[t.nombre] = segmentosTurno(TurnoConfig{t.nombre, t.slot}, config.recesos);
-    }
-
-    for (int m = 0; m < config.dimensiones.num_materias; ++m) {
-        for (int c = 0; c < config.dimensiones.num_cursos; ++c) {
-            const CursoSolverConfig& curso = config.cursos[c];
-            const QVector<QVector<int>>& segs = segmentosPorTurno.value(curso.turno);
-            if (segs.isEmpty()) continue;
-
-            for (int d = 0; d < config.dimensiones.num_dias; ++d) {
-                for (int seg = 0; seg < segs.size(); ++seg) {
-                    const QVector<int>& slotsSeg = segs[seg];
-                    if (slotsSeg.isEmpty()) continue;
-
-                    for (int s : slotsSeg) {
-                        const auto startKey = std::make_tuple(m, c, d, seg, s);
-                        auto startIt = vars.start.constFind(startKey);
-                        if (startIt == vars.start.constEnd())
-                            continue;
-
-                        BoolVar startVar = startIt.value();
-
-                        // Penalización simplificada: cada arranque de grupo (start = 1)
-                        // contribuye a la fragmentación. La formulación exacta con f(len)
-                        // y horasDia se implementará en T5/T6.
-                        // S3 objective
-                        objetivo = objetivo + LinearExpr::Term(startVar, ContratoSolver::PESO_AGRUPACION);
-                    }
-                }
-            }
-        }
-    }
+    // Penalización = PESO_AGRUPACION · Σ (isolated + longGroup)
+    //   isolated  → grupo de 1          (1 unidad)
+    //   longGroup → 4.ª franja o más    (1 unidad por franja extra)
+    //   grupos de 2–3 → 0
+    // Esto equivale a f(len): 1 → 1, 2–3 → 0, ≥4 → len − 3.
+    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
+        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
 
     model.Minimize(objetivo);
 }

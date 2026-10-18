@@ -452,6 +452,42 @@ private slots:
         QCOMPARE(franjas.size(), 4);
         QCOMPARE(franjas, (QVector<int>{0, 1, 2, 3}));
     }
+
+    // Cinco horas semanales de una materia en un curso sin acoplamiento docente:
+    // el solver DEBE agruparlas en 2+3 (ningún grupo de 1).
+    void solver_agrupacion_cincoHorasFormaDosMasTres() {
+        SolverConfig config;
+        config.version = "1.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 5, 8};
+        config.franja_horaria = {40, 8};
+        config.turnos.turnos = {{"manana", {0,1,2,3,4,5,6,7}}};
+        config.materias = {{"Matematica"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 5}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        QVector<Disponibilidad> disp;
+        for (int d = 0; d < 5; ++d) disp.append({d, {0,1,2,3,4,5,6,7}});
+        config.profesores = {
+            {"Prof A", 5, 5, "manana", "Plan General", {}, {0}, {}, disp}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
+        // Contar grupos por día: 5 horas deben repartirse en grupos de 2 y 3,
+        // nunca en 5 días de 1 hora (5 grupos de 1).
+        int gruposDeUno = 0, gruposDeDosTres = 0;
+        for (const auto& dia : curso.dias) {
+            if (dia.asignaciones.isEmpty()) continue;
+            const int n = dia.asignaciones.size();
+            if (n == 1) ++gruposDeUno;
+            else if (n == 2 || n == 3) ++gruposDeDosTres;
+        }
+        QCOMPARE(gruposDeUno, 0);
+        QVERIFY(gruposDeDosTres >= 2);
+    }
 };
 
 QTEST_MAIN(TestSolverHorarios)

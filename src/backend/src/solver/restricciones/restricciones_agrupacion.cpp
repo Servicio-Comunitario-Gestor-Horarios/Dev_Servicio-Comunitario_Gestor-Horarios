@@ -8,19 +8,16 @@
 using namespace operations_research::sat;
 
 /**
- * @brief Agrega las restricciones para la agrupación de bloques (S3).
+ * @brief Restricciones de agrupación S3.
  *
- * Formulación completa (T3/T4):
- * - start[m,c,d,seg,s] (BoolVar): arranque de grupo en s
- * - len[m,c,d,seg,s] (IntVar): longitud del grupo que arranca en s (0..maxLen)
+ * Formulación eficiente y exacta de la penalización por fragmentación:
+ *   - isolated[s] = 1  ⇔  hay clase en s y NO en s-1 ni en s+1 (grupo de 1).
+ *   - longGroup[s] = 1 ⇔  hay clase en s, s-1, s-2 y s-3 (4.ª franja o posterior).
  *
- * Reglas:
- * - start = 1  ⇔  hay clase en s Y (idx==0 O no hay clase en s-1)
- * - len = 0 si start = 0
- * - len = 1 + lenNext si start=1 y startNext=0
- * - len = 1 si start=1 y startNext=1
- * - Último slot del segmento: si start=1 → len = 1
- * - start=0 → len = 0
+ * El objetivo suma `isolated + longGroup`, que equivale a f(len) de RF-2:
+ *   len == 1 → 1; len == 2,3 → 0; len >= 4 → len − 3.
+ *
+ * Los vecinos que no existen (sin ninguna x) se tratan como ausencia de clase.
  */
 void agregarRestriccionesAgrupacion(
     CpModelBuilder& model,
@@ -28,70 +25,70 @@ void agregarRestriccionesAgrupacion(
     const VariablesSolver& vars) {
     const auto& dim = config.dimensiones;
 
-    // Pre-computar segmentos por turno
     QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
-    for (const TurnoConfig& t : config.turnos.turnos) {
-        QVector<RecesoConfig> recesosTurno;
-        for (const RecesoConfig& r : config.recesos)
-            if (r.turno == t.nombre) recesosTurno.append(r);
-        segmentosPorTurno[t.nombre] = segmentosTurno(TurnoConfig{t.nombre, t.slot}, config.recesos);
-    }
+    for (const TurnoConfig& t : config.turnos.turnos)
+        segmentosPorTurno[t.nombre] = segmentosTurno(t, config.recesos);
 
-    // Para cada materia-curso-día-segmento
-    for (int m = 0; m < config.dimensiones.num_materias; ++m) {
-        for (int c = 0; c < dim.num_cursos; ++c) {
-            const CursoSolverConfig& curso = config.cursos[c];
-            const QVector<QVector<int>>& segs = segmentosPorTurno.value(curso.turno);
-            if (segs.isEmpty()) continue;
+    for (int c = 0; c < dim.num_cursos; ++c) {
+        const CursoSolverConfig& curso = config.cursos[c];
+        const QVector<QVector<int>>& segs = segmentosPorTurno.value(curso.turno);
+        if (segs.isEmpty()) continue;
+
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
+            const int m = mc.materiaIDx;
 
             for (int d = 0; d < dim.num_dias; ++d) {
                 for (int seg = 0; seg < segs.size(); ++seg) {
-                    const QVector<int>& slotsSeg = segs[seg];
-                    if (slotsSeg.isEmpty()) continue;
+                    const QVector<int>& franjas = segs[seg];
+                    if (franjas.isEmpty()) continue;
 
-                    for (int idx = 0; idx < slotsSeg.size(); ++idx) {
-                        int s = slotsSeg[idx];
+                    // ── hay[s] = OR de las x de la materia en esa franja ──
+                    QVector<BoolVar> hays(franjas.size());
+                    QVector<bool> existe(franjas.size(), false);
 
-                        // ──── start ⇔ x ────
-                        std::vector<LinearExpr> xEnS;
-                        for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
-                            const auto [p, mX, cX, dX, sX] = it.key();
-                            if (mX == m && cX == c && dX == d && sX == s) {
-                                xEnS.push_back(LinearExpr(it.value()));
-                            }
+                    for (int i = 0; i < franjas.size(); ++i) {
+                        const int s = franjas[i];
+                        const auto key = std::make_tuple(m, c, d, seg, s);
+                        auto it = vars.hay.constFind(key);
+                        if (it == vars.hay.constEnd()) continue;
+
+                        std::vector<LinearExpr> xVars;
+                        for (auto itX = vars.assignment.constBegin();
+                             itX != vars.assignment.constEnd(); ++itX) {
+                            const auto [p, mX, cX, dX, sX] = itX.key();
+                            if (mX == m && cX == c && dX == d && sX == s)
+                                xVars.push_back(LinearExpr(itX.value()));
                         }
-                        if (xEnS.empty()) continue;
-
-                        BoolVar hayClaseEnS = model.NewBoolVar();
-                        model.AddMaxEquality(hayClaseEnS, xEnS);
-
-                        BoolVar noHayClaseEnAnterior = model.NewBoolVar();
-                        if (idx == 0) {
-                            model.AddEquality(noHayClaseEnAnterior, true);
+                        BoolVar hay = it.value();
+                        if (xVars.empty()) {
+                            model.AddEquality(hay, false);
                         } else {
-                            int sPrev = slotsSeg[idx - 1];
-                            std::vector<LinearExpr> xEnPrev;
-                            for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
-                                const auto [p, mX, cX, dX, sX] = it.key();
-                                if (mX == m && cX == c && dX == d && sX == sPrev) {
-                                    xEnPrev.push_back(LinearExpr(it.value()));
-                                }
-                            }
-                            if (xEnPrev.empty()) {
-                                model.AddEquality(noHayClaseEnAnterior, true);
-                            } else {
-                                BoolVar hayClaseEnPrev = model.NewBoolVar();
-                                model.AddMaxEquality(hayClaseEnPrev, xEnPrev);
-                                BoolVar notHayClaseEnPrev = model.NewBoolVar();
-                                model.AddEquality(notHayClaseEnPrev, LinearExpr(1) - hayClaseEnPrev);
-                                model.AddEquality(noHayClaseEnAnterior, notHayClaseEnPrev);
-                            }
+                            model.AddMaxEquality(hay, xVars);
                         }
+                        hays[i] = hay;
+                        existe[i] = true;
+                    }
 
-                        BoolVar startVar = vars.start[{m, c, d, seg, s}];
-                        model.AddBoolAnd({hayClaseEnS, noHayClaseEnAnterior}).OnlyEnforceIf(startVar);
-                        model.AddBoolOr({~hayClaseEnS, ~noHayClaseEnAnterior}).OnlyEnforceIf(~startVar);
+                    // ── isolated y longGroup por franja ──
+                    for (int i = 0; i < franjas.size(); ++i) {
+                        if (!existe[i]) continue;
+                        const auto key = std::make_tuple(m, c, d, seg, franjas[i]);
+                        BoolVar hay = hays[i];
+                        BoolVar iso = vars.isolated[key];
 
+                        // isolated ⇒ hay
+                        model.AddImplication(iso, hay);
+                        // isolated ⇒ ¬prev (si existe)
+                        if (i > 0 && existe[i - 1]) model.AddImplication(iso, ~hays[i - 1]);
+                        // isolated ⇒ ¬next (si existe)
+                        if (i + 1 < franjas.size() && existe[i + 1]) model.AddImplication(iso, ~hays[i + 1]);
+                        // (hay ∧ ¬prev ∧ ¬next) ⇒ isolated
+                        {
+                            std::vector<BoolVar> rev = {~hay, iso};
+                            if (i > 0 && existe[i - 1]) rev.push_back(hays[i - 1]);
+                            if (i + 1 < franjas.size() && existe[i + 1]) rev.push_back(hays[i + 1]);
+                            model.AddBoolOr(rev);
+                        }
 
                     }
                 }
