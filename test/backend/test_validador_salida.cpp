@@ -93,6 +93,34 @@ private slots:
         QVERIFY(!a.presentable());
     }
 
+    void dosCursosMismoDiaYSlot_distintoDocenteYAula_esPresentable()
+    {
+        // Regresión: dos cursos en la misma franja con docentes y aulas
+        // distintos NO son un solapamiento. La clave de ocupación debe incluir
+        // la entidad (docente/aula), no solo (día, slot).
+        SolverConfig config = configBase();
+        ProfesorSolverConfig luis;
+        luis.nombre = QStringLiteral("Luis");
+        luis.horas_requeridas = 4;
+        luis.horas_aula = 4;
+        config.profesores.append(luis);
+        config.aulas.append(AulaSolverConfig{QStringLiteral("A2"), QStringLiteral("regular"), 30});
+
+        HorarioSalida h = horarioValido();  // curso 1A: docente 0 en aula 0
+        CursoOutput otro;
+        otro.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        // Curso 1B en el mismo día y slots, con otro docente y otra aula.
+        dia.asignaciones = {AsignacionOutput{0, 0, 1, 1}, AsignacionOutput{1, 0, 1, 1}};
+        otro.dias = {dia};
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = otro;
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY(a.conflictos.isEmpty());
+        QVERIFY(a.presentable());
+    }
+
     void horasNoCubiertas_generaAviso()
     {
         // El curso debería tener 2 horas; solo se asigna 1.

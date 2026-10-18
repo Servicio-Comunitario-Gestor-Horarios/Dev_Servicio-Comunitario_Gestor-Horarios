@@ -54,3 +54,80 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 - En `ConstructorEntradaSolver.cpp` (`src/backend/src/services/`, **fuera** del directorio `src/backend/src/solver/`) sigue existiendo `duracionMinutos * 60` en `slotsDeFranja`, pero es la traducción de una franja de **reloj** a índices de slot (rejilla horaria/disponibilidad), no la conversión de horas académicas a bloques; queda fuera del alcance de T11 y es correcta según la definición de `duracion_minutos` («duración real de la franja»).
 - La identidad del tope S1 (`bloquesAula = horas_aula`) no es observable de forma aislada de D3 (comparten la misma fórmula de conversión), por lo que se cubre explícitamente en `test_contrato_solver.cpp` (`bloquesAula_esIdentidad`) y de forma end-to-end en el test D3 del solver.
 - El «Cierre» de la tarea (actualizar `MEMORY.md` y el campo Estado de `spec.md` a **implementada**) **no** se ejecuta en esta pasada por instrucción explícita del coordinador (no modificar `spec.md`/`plan.md`/`estado.md`); queda pendiente para una pasada posterior.
+
+---
+
+## Corrección puntual — P4: clave de ocupación por entidad (docente/aula)
+
+**Fecha:** 2026-10-18
+
+### Qué se hizo
+
+- `analizarSalidaSolver` usaba `QMap<QPair<int,int>, QString>` con clave `(día, slot)` para la ocupación de docentes y aulas, así que **cualquier** segunda clase en la misma franja se marcaba como solapamiento aunque fuese otro docente en otra aula. Con datos reales (13 cursos, 520 clases, 80 casillas) producía 880 conflictos falsos y `presentable()` devolvía `false`, rechazando en la UI un horario válido del solver.
+- La clave pasa a `std::tuple<int,int,int>`:
+  - `ocupacionProfesor{asig.profesor, dia.dia, asig.slot}`
+  - `ocupacionAula{asig.aula, dia.dia, asig.slot}`
+- Guardas: no se comprueba ni registra ocupación cuando `asig.profesor < 0` ni cuando `asig.aula < 0` (evita agrupar todos los «sin asignar» bajo la misma clave). El chequeo D4 de curso (`slotsDelCurso`) queda intacto, igual que los mensajes en español, los conteos P1/P2 y la validación P3.
+
+### Archivos tocados
+
+- `src/backend/src/services/ValidadorSalidaSolver.cpp` — `#include <tuple>`, claves compuestas y guardas de `-1`.
+- `test/backend/test_validador_salida.cpp` — test de regresión `dosCursosMismoDiaYSlot_distintoDocenteYAula_esPresentable` (config local con segundo docente «Luis» y segunda aula «A2»; ambos cursos en día 0, slots 0 y 1).
+
+### Verificación (rojo → verde)
+
+1. **Rojo** (test nuevo contra el validador sin arreglar):
+   ```
+   FAIL!  : TestValidadorSalida::dosCursosMismoDiaYSlot_distintoDocenteYAula_esPresentable()
+           'a.conflictos.isEmpty()' returned FALSE.
+   Totals: 8 passed, 1 failed, 0 skipped
+   ```
+2. **Verde** (`cmake --build build-rel --target test_validador_salida` + ejecución):
+   ```
+   Totals: 9 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+   ```
+   Incluye los tests previos de solapamiento real (`solapamientoDeProfesor_noPresentable`, `solapamientoDeAula_noPresentable`), que siguen detectando el conflicto.
+3. **Suites relacionadas** (consumidores del validador):
+   - `test_backend_contrato_interfaz` → `Totals: 12 passed, 0 failed`.
+   - `test_servicio_generacion` → `Totals: 12 passed, 0 failed`.
+   - `test_contrato_generacion` → `Totals: 7 passed, 0 failed`.
+
+### Hallazgos y notas
+
+- Aviso de compilación preexistente y ajeno: `horasEsperadas` declarada y no usada en `ValidadorSalidaSolver.cpp` (línea 21). No se elimina.
+- `src/backend/src/solver/solver.cpp` (`metadata.total_asignaciones`) y el frontend quedan fuera de esta corrección; `src/frontend/src/views/classroom_list_widget.hpp` ya tenía cambios sin commitear en el árbol de trabajo y no se ha tocado.
+
+---
+
+## Corrección puntual — `metadata.total_asignaciones` cuenta clases, no variables
+
+**Fecha:** 2026-10-18
+
+### Qué se hizo
+
+- `Solver::extraerSolucion` asignaba `metadata.total_asignaciones = vars.assignment.size()`, es decir el número de **variables booleanas** del modelo (5 840 con los datos de prueba), no de **clases** extraídas (520). La UI mostraba ese metadato.
+- Ahora se acumula `totalAsignaciones` en el mismo bucle que construye `porCursoDia`, incrementando solo cuando `SolutionBooleanValue(response, it.value())` es cierto (sin recorridos extra).
+- `metadata.cursos_generados` y `metadata.profesores_asignados` quedan intactos, igual que el resto de la extracción.
+
+### Archivos tocados
+
+- `src/backend/src/solver/solver.cpp` — contador `totalAsignaciones` + comentario en la asignación del metadato.
+- `test/frontend/test_generacion_seed.cpp` — invariante: `metadata.total_asignaciones` del JSON `respuesta.salida` == suma de `asignaciones` de todos los `dias` de los 13 `horarios` (incluye `<QJsonArray>`, `<QJsonObject>`).
+
+### Verificación (rojo → verde)
+
+1. **Rojo** (test del invariante con el solver anterior):
+   ```
+   FAIL!  : TestGeneracionSeed::componeYResuelveHorarioConDatosSembrados() Compared values are not the same
+      Actual   (totalMetadato)     : 5840
+      Expected (asignacionesReales): 520
+   ```
+2. **Verde**:
+   ```
+   LD_LIBRARY_PATH="$HOME/.local/ortools/lib" ./build-rel/test/test_solver_horarios
+   → Totals: 16 passed, 0 failed
+   LD_LIBRARY_PATH="$HOME/.local/ortools/lib" ./build-rel/test/test_generacion_seed
+   → Totals: 3 passed, 0 failed
+   ```
+   Los mismos datos de 13 cursos pasan de 5 840 a 520 asignaciones, coincidiendo con la suma real del horario.
+3. **Regresión relacionada**: `test_servicio_generacion` → `Totals: 12 passed, 0 failed`.

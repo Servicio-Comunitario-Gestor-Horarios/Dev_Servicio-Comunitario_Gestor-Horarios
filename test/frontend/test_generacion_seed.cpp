@@ -1,5 +1,7 @@
 #include <QFile>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QString>
@@ -138,6 +140,24 @@ private slots:
             QVERIFY2(respuesta.ok, qPrintable(respuesta.error));
             QVERIFY2(respuesta.factible, qPrintable(respuesta.error));
             QCOMPARE(respuesta.salida.value(QStringLiteral("horarios")).toObject().size(), 13);
+
+            // El metadato debe contar CLASES asignadas, no variables del modelo:
+            // invariante contra la suma de asignaciones realmente extraídas.
+            const QJsonObject salida = respuesta.salida;
+            const QJsonObject horarios = salida.value(QStringLiteral("horarios")).toObject();
+            int asignacionesReales = 0;
+            for (auto itCurso = horarios.constBegin(); itCurso != horarios.constEnd(); ++itCurso) {
+                const QJsonArray dias =
+                    itCurso.value().toObject().value(QStringLiteral("dias")).toArray();
+                for (const QJsonValue& dia : dias)
+                    asignacionesReales +=
+                        dia.toObject().value(QStringLiteral("asignaciones")).toArray().size();
+            }
+            const int totalMetadato =
+                salida.value(QStringLiteral("metadata")).toObject()
+                    .value(QStringLiteral("total_asignaciones")).toInt();
+            QVERIFY(asignacionesReales > 0);
+            QCOMPARE(totalMetadato, asignacionesReales);
         }
         QSqlDatabase::removeDatabase(conexion);
     }

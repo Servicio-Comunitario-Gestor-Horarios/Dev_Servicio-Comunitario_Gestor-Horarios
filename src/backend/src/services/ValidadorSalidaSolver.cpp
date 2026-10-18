@@ -6,6 +6,8 @@
 #include <QPair>
 #include <QSet>
 
+#include <tuple>
+
 namespace
 {
     /// Indice del curso de `config` con esa clave de identidad (`claveCurso`), o -1.
@@ -33,9 +35,11 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
 {
     AnalisisSalida analisis;
 
-    // Ocupación por (día, slot) para detectar solapamientos (P4).
-    QMap<QPair<int, int>, QString> ocupacionProfesor;  // -> nombre de curso
-    QMap<QPair<int, int>, QString> ocupacionAula;
+    // Ocupación por (entidad, día, slot) para detectar solapamientos (P4).
+    // La clave incluye el docente o el aula: dos clases en la misma franja no
+    // colisionan si las imparten docentes distintos en aulas distintas.
+    QMap<std::tuple<int, int, int>, QString> ocupacionProfesor;  // -> nombre de curso
+    QMap<std::tuple<int, int, int>, QString> ocupacionAula;
 
     // Conteos para P1 y P2.
     // (curso, materia) -> nº de asignaciones
@@ -55,8 +59,6 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
 
             for (const AsignacionOutput& asig : dia.asignaciones)
             {
-                const QPair<int, int> clave{dia.dia, asig.slot};
-
                 // P4: el mismo curso, dos veces en el mismo slot.
                 if (slotsDelCurso.contains(asig.slot))
                 {
@@ -68,42 +70,52 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                 }
                 slotsDelCurso.insert(asig.slot);
 
-                // P4: profesor en dos sitios a la vez.
-                if (ocupacionProfesor.contains(clave))
+                // P4: profesor en dos sitios a la vez. Un profesor sin asignar
+                // (-1) no ocupa ninguna entidad real: no se comprueba ni registra.
+                if (asig.profesor >= 0)
                 {
-                    const int idx = asig.profesor;
-                    const QString nombreProf =
-                        (idx >= 0 && idx < config.profesores.size())
-                            ? config.profesores[idx].nombre
-                            : QStringLiteral("(desconocido)");
-                    analisis.conflictos.append(
-                        QStringLiteral("El docente «%1» está en dos clases a la vez (día %2, slot %3).")
-                            .arg(nombreProf)
-                            .arg(dia.dia)
-                            .arg(asig.slot));
-                }
-                else
-                {
-                    ocupacionProfesor[clave] = nombreCurso;
+                    const std::tuple<int, int, int> claveProfesor{asig.profesor, dia.dia, asig.slot};
+                    if (ocupacionProfesor.contains(claveProfesor))
+                    {
+                        const int idx = asig.profesor;
+                        const QString nombreProf =
+                            (idx >= 0 && idx < config.profesores.size())
+                                ? config.profesores[idx].nombre
+                                : QStringLiteral("(desconocido)");
+                        analisis.conflictos.append(
+                            QStringLiteral("El docente «%1» está en dos clases a la vez (día %2, slot %3).")
+                                .arg(nombreProf)
+                                .arg(dia.dia)
+                                .arg(asig.slot));
+                    }
+                    else
+                    {
+                        ocupacionProfesor[claveProfesor] = nombreCurso;
+                    }
                 }
 
-                // P4: aula en dos sitios a la vez.
-                if (ocupacionAula.contains(clave))
+                // P4: aula en dos sitios a la vez. Un aula sin asignar (-1) no
+                // se comprueba ni registra.
+                if (asig.aula >= 0)
                 {
-                    const int idx = asig.aula;
-                    const QString nombreAula =
-                        (idx >= 0 && idx < config.aulas.size())
-                            ? config.aulas[idx].nombre
-                            : QStringLiteral("(desconocida)");
-                    analisis.conflictos.append(
-                        QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
-                            .arg(nombreAula)
-                            .arg(dia.dia)
-                            .arg(asig.slot));
-                }
-                else
-                {
-                    ocupacionAula[clave] = nombreCurso;
+                    const std::tuple<int, int, int> claveAula{asig.aula, dia.dia, asig.slot};
+                    if (ocupacionAula.contains(claveAula))
+                    {
+                        const int idx = asig.aula;
+                        const QString nombreAula =
+                            (idx >= 0 && idx < config.aulas.size())
+                                ? config.aulas[idx].nombre
+                                : QStringLiteral("(desconocida)");
+                        analisis.conflictos.append(
+                            QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
+                                .arg(nombreAula)
+                                .arg(dia.dia)
+                                .arg(asig.slot));
+                    }
+                    else
+                    {
+                        ocupacionAula[claveAula] = nombreCurso;
+                    }
                 }
 
                 // Conteos P1/P2.
