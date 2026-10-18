@@ -45,9 +45,11 @@ Añadir una **prioridad blanda S3** que penalice la fragmentación de cada mater
 
 | Tamaño del grupo | Penalización (en unidades de `PESO_AGRUPACION`) |
 |------------------|-------------------------------------------------|
-| **1**            | **1** si las **horas del día > 1** para esa materia-curso; **0** si las horas del día = **1** (inevitable, decisión D-4 → B). |
+| **1**            | **1** (grupo aislado: es lo que se quiere evitar). |
 | **2 o 3**        | **0** (objetivo cumplido). |
-| **≥ 4**          | **tamaño − 3** (cada franja que exceda 3 penaliza 1 unidad; decisión D-2 → A). |
+| **≥ 4**          | **0 en el motor** (no se penaliza para no encarecer la búsqueda); el validador sí lo reporta como `tamaño − 3`. |
+
+> **Cambio (2026-10-18, prioridad del usuario):** «es imperativo que prefiera los bloques de 2–3 contiguos». El motor penaliza **todo grupo de 1** (incluidos los días de 1 h) y **no** penaliza los grupos ≥4, para concentrar el esfuerzo en evitar la dispersión y mantener el tiempo de resolución acotado. El validador mantiene la métrica completa `f(len)`.
 
 La penalización total de agrupación para una materia-curso en un día es la suma de las penalizaciones de todos sus arranques en ese día. La penalización global `Σ penalizaciones_agrupacion` es la suma sobre todas las materias-curso y todos los días.
 

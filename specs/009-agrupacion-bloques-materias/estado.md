@@ -44,5 +44,14 @@
 - **Penalización exacta `f(len, horasDia)` en el solver**: el motor usa `Σ start` como proxy; el validador sí calcula la penalización exacta. Requiere una formulación eficiente de `len`.
 - **Veredicto formal del reviewer** pendiente.
 
+## Reenfoque S3 (2026-10-18, prioridad del usuario)
+- El proxy «cada arranque penaliza» no discriminaba 2–3 (los penalizaba igual). Se sustituyó por la formulación exacta de **grupos aislados**:
+  - `isolated[s] = 1 ⇔ hay clase en s y no en s−1 ni s+1` → penaliza 1.
+  - Grupos de 2–3 → 0.
+  - Grupos ≥4 → 0 en el motor (el validador los reporta con `f(len)`).
+- Efecto medido (13 cursos/520 clases): **359** grupos de 1 (antes 391), **76** de 2 (antes 52), **3** de 3; **~10 s** (antes ~14 s).
+- Test nuevo: 5 h en un curso sin acoplamiento → 2+3, sin grupos de 1.
+- `max_deterministic_time(2.0)` mantiene la reproducibilidad (RF-6).
+
 ## Próximo paso
 Validación QA final (reviewer) y cierre definitivo de la spec.
