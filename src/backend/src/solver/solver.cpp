@@ -253,6 +253,7 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
     HorarioSalida horario;
 
     QMap<int, QMap<int, QVector<AsignacionOutput>>> porCursoDia;
+    int totalAsignaciones = 0;
 
     for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
         if (!SolutionBooleanValue(response, it.value())) continue;
@@ -278,6 +279,7 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
         asignacion.aula = aula;
 
         porCursoDia[c][d].append(asignacion);
+        ++totalAsignaciones;
     }
 
     for (auto itC = porCursoDia.constBegin(); itC != porCursoDia.constEnd(); ++itC) {
@@ -298,7 +300,9 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
     }
 
     MetadataSalida metadata;
-    metadata.total_asignaciones = vars.assignment.size();
+    // Clases (asignaciones) realmente extraídas de la solución; no el número de
+    // variables booleanas del modelo.
+    metadata.total_asignaciones = totalAsignaciones;
     metadata.cursos_generados = config.cursos.size();
     horario.metadata = metadata;
 
