@@ -26,12 +26,19 @@ using namespace operations_research::sat;
  * - aulaAssignment     (y): aula de cursos moviles (solo si el modo no es aula fija)
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
  * - exceso             (e): bloques por encima del tope de horas de aula (S1)
+ * - start              (s): arranque de grupo por (m,c,d,seg,s) para S3
  */
 struct VariablesSolver {
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> assignment;  ///< [p][m][c][d][s]
-    QMap<std::tuple<int, int, int, int>, BoolVar> aulaAssignment;   ///< [c][d][s][a]
-    QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;        ///< z: [p][c][m]
-    QMap<int, IntVar> exceso;                                       ///< e[p]
+    QMap<std::tuple<int, int, int, int, int>, BoolVar> assignment;          ///< [p][m][c][d][s]
+    QMap<std::tuple<int, int, int, int>, BoolVar> aulaAssignment;           ///< [c][d][s][a]
+    QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;               ///< z: [p][c][m]
+    QMap<int, IntVar> exceso;                                              ///< e[p]
+
+    // --- S3: Agrupación de bloques ---
+    // start[m][c][d][seg][s] = 1 si hay un arranque de grupo de la materia m
+    // en el curso c, día d, segmento seg, en la franja s.
+    QMap<std::tuple<int, int, int, int, int>, BoolVar> start;               ///< [m][c][d][seg][s]
+
 };
 
 /**

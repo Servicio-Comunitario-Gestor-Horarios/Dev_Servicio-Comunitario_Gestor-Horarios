@@ -4,6 +4,7 @@
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
+#include "backend/solver/restricciones/restricciones_agrupacion.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/cp_model.h"
@@ -167,7 +168,7 @@ QString causaConflictoDeAsignacion(const SolverConfig& config) {
     return {};
 }
 
-/// Primera categoría aplicable, en el orden de «Causa de un resultado no factible» (RF-6).
+/// Primera categoría aplicable, en el orden de la definición «Causa de un resultado no factible» (RF-6).
 QString primeraCausaNoFactible(const SolverConfig& config) {
     QString causa = causaEntradaInvalida(config);
     if (!causa.isEmpty()) return causa;
@@ -195,13 +196,13 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     agregarRestricciones(config);
 
     // Objetivo
-
     construirObjetivo(config);
 
     // Resolver CP-SAT (parametros deterministas: RNF-1)
     SatParameters params;
     params.set_num_search_workers(1);
     params.set_random_seed(0);
+    params.set_max_time_in_seconds(30);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
@@ -210,11 +211,11 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     // Verificar status
     if (response.status() == CpSolverStatus::OPTIMAL ||
         response.status() == CpSolverStatus::FEASIBLE) {
-            resultado.exito = true;
-            resultado.resultado = extraerSolucion(response, config);
-        } else {
-            resultado.errores = analizarFallo(response, config);
-        }
+        resultado.exito = true;
+        resultado.resultado = extraerSolucion(response, config);
+    } else {
+        resultado.errores = analizarFallo(response, config);
+    }
     
     resultado.tiempo_ms = timer.elapsed();
     return resultado;
@@ -240,6 +241,57 @@ void Solver::construirObjetivo(const SolverConfig& config) {
         }
     }
 
+    // S3: penalización por fragmentación (agrupación de bloques) - RF-2
+    // Penalización = PESO_AGRUPACION * Σ start * f(len)
+    // f(len):
+    //   len == 1  → 1 (si horasDia > 1) o 0 (si horasDia == 1, D-4)
+    //   len == 2,3 → 0
+    //   len >= 4   → len - 3
+    //   len <= 0   → 0
+    //
+    // En esta implementación simplificada (T4), usamos start como proxy de fragmentación:
+    // cada arranque de grupo (start = 1) contribuye a la penalización.
+    // La formulación exacta con f(len) y horasDia se completará en T5/T6.
+
+    // Pre-calcular segmentos por turno
+    QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
+    for (const TurnoConfig& t : config.turnos.turnos) {
+        QVector<RecesoConfig> recesosTurno;
+        for (const RecesoConfig& r : config.recesos)
+            if (r.turno == t.nombre) recesosTurno.append(r);
+        segmentosPorTurno[t.nombre] = segmentosTurno(TurnoConfig{t.nombre, t.slot}, config.recesos);
+    }
+
+    for (int m = 0; m < config.dimensiones.num_materias; ++m) {
+        for (int c = 0; c < config.dimensiones.num_cursos; ++c) {
+            const CursoSolverConfig& curso = config.cursos[c];
+            const QVector<QVector<int>>& segs = segmentosPorTurno.value(curso.turno);
+            if (segs.isEmpty()) continue;
+
+            for (int d = 0; d < config.dimensiones.num_dias; ++d) {
+                for (int seg = 0; seg < segs.size(); ++seg) {
+                    const QVector<int>& slotsSeg = segs[seg];
+                    if (slotsSeg.isEmpty()) continue;
+
+                    for (int s : slotsSeg) {
+                        const auto startKey = std::make_tuple(m, c, d, seg, s);
+                        auto startIt = vars.start.constFind(startKey);
+                        if (startIt == vars.start.constEnd())
+                            continue;
+
+                        BoolVar startVar = startIt.value();
+
+                        // Penalización simplificada: cada arranque de grupo (start = 1)
+                        // contribuye a la fragmentación. La formulación exacta con f(len)
+                        // y horasDia se implementará en T5/T6.
+                        // S3 objective
+                        objetivo = objetivo + LinearExpr::Term(startVar, ContratoSolver::PESO_AGRUPACION);
+                    }
+                }
+            }
+        }
+    }
+
     model.Minimize(objetivo);
 }
 
@@ -247,6 +299,7 @@ void Solver::agregarRestricciones(const SolverConfig& config) {
     agregarRestriccionesTurnos(model, config, vars);
     agregarRestriccionesAulas(model, config, vars);
     agregarRestriccionProfesores(model, config, vars);
+    agregarRestriccionesAgrupacion(model, config, vars);
 }
 
 HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const SolverConfig& config) {
