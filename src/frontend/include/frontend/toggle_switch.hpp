@@ -1,6 +1,7 @@
 #pragma once
 #include <QCheckBox>
 #include <QPainter>
+#include <QEvent>
 
 class ToggleSwitch : public QCheckBox {
     Q_OBJECT
@@ -11,6 +12,11 @@ public:
     }
 
 protected:
+    // Redefine el área de clic para que abarque todo el dibujo
+    bool hitButton(const QPoint &pos) const override {
+        return rect().contains(pos);
+    }
+
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);

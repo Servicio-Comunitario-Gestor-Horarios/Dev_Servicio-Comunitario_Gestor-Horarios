@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QStandardPaths>
 #include <QDir>
+#include <QTimer>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Configuración del Sistema");
@@ -53,11 +54,23 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     m_darkModeSwitch->setChecked(m_temaInicial);
 
     // CONEXIÓN: Al mover el switch, SOLO actualiza vista previa (no guarda)
-    // Usamos una lambda para evitar bucles con el stylesheet global
     connect(m_darkModeSwitch, &QCheckBox::toggled, this, [this](bool checked) {
-        if (!m_updatingFromSettings) {
-            emit themeChanged(checked);
-        }
+        if (m_updatingFromSettings) return; // Si el cambio viene del sistema, lo ignoramos
+
+        // 1. BLOQUEO: Desactivamos el botón temporalmente para evitar que el usuario haga "spam" de clics
+        m_darkModeSwitch->setEnabled(false);
+
+        // 2. DIBUJO INMEDIATO: Forzamos al botón a actualizar su propia bolita a la nueva posición
+        m_darkModeSwitch->repaint();
+
+        // 3. PAUSA RESPONSIVA: Le damos a Windows 50 milisegundos (aprox 3 fotogramas)
+        // para que empuje el dibujo del botón a la pantalla ANTES de congelar el programa cargando el modo oscuro.
+        QTimer::singleShot(50, this, [this, checked]() {
+            emit themeChanged(checked); // Aplica todo el código pesado de los colores
+
+            // 4. LIBERACIÓN: El modo oscuro ya cargó, volvemos a habilitar el botón
+            m_darkModeSwitch->setEnabled(true);
+        });
     });
 
     themeRow->addLayout(themeTextLayout);

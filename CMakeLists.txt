@@ -13,10 +13,10 @@
 #   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 #
 # Dependencias externas requeridas (instaladas en el contenedor Docker):
-#   - OR-Tools v9.15+  → find_package(ortools CONFIG)
-#   - Qt6              → find_package(Qt6 COMPONENTS Core Sql)
-#   - CMake 3.24+      → mínimo requerido por OR-Tools
-#   - Ninja            → generador del build
+#   - OR-Tools v9.15+   → find_package(ortools CONFIG)
+#   - Qt6               → find_package(Qt6 COMPONENTS Core Sql)
+#   - CMake 3.24+       → mínimo requerido por OR-Tools
+#   - Ninja             → generador del build
 
 cmake_minimum_required(VERSION 3.24)
 project(Gestor-Horarios
@@ -49,7 +49,20 @@ find_package(Qt6 REQUIRED COMPONENTS ${GESTOR_QT_COMPONENTS})
 
 if(BUILD_BACKEND)
     # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
-    # Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
+    # Las rutas de Qt/OR-Tools/Eigen de cada máquina se aportan por preset
+    # (CMakePresets.json / CMakeUserPresets.json; ver docs/guias/desarrollo/CMAKE_GUIDE.md).
+    # Si no se han indicado, se intenta la instalación local del paquete
+    # precompilado de Windows antes de dejar que CMake la busque por sí mismo.
+    if(NOT ortools_DIR)
+        foreach(_ortools_root
+                "C:/ortools-v9.15-vs2022/or-tools_x64_VisualStudio2022_cpp_v9.15.6755"
+                "C:/ortools-v9.15-vs2022")
+            if(EXISTS "${_ortools_root}/lib/cmake/ortools")
+                set(ortools_DIR "${_ortools_root}/lib/cmake/ortools")
+                break()
+            endif()
+        endforeach()
+    endif()
     find_package(ortools CONFIG REQUIRED)
     message(STATUS "OR-Tools found - backend and solver enabled")
 
@@ -70,7 +83,7 @@ if(BUILD_BACKEND)
 else()
     message(STATUS "BUILD_BACKEND=OFF - backend and OR-Tools disabled")
 endif()
-    
+
 
 # ── Opciones de compilación ──
 include(cmake/CompilerWarnings.cmake)

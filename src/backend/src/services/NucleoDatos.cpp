@@ -103,6 +103,24 @@ bool NucleoDatos::eliminarDocente(const QString& id) {
         [this, id]() { return m_profesor.eliminarProfesor(id); });
 }
 
+bool NucleoDatos::asignarMateriaPorNombre(const QString& idProfesor, const QString& nombreMateria) {
+    return conPendienteBool(
+        m_pendientes, QStringLiteral("docente_materia"), idProfesor, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de asignar materia %1 al docente %2").arg(nombreMateria, idProfesor),
+        [this, idProfesor, nombreMateria]() {
+            return m_profesor.asignarMateriaPorNombre(idProfesor, nombreMateria);
+        });
+}
+
+bool NucleoDatos::limpiarMaterias(const QString& idProfesor) {
+    return conPendienteBool(
+        m_pendientes, QStringLiteral("docente_materia"), idProfesor, TipoOperacion::Baja,
+        QStringLiteral("Pendiente de limpiar materias del docente %1").arg(idProfesor),
+        [this, idProfesor]() {
+            return m_profesor.limpiarMaterias(idProfesor);
+        });
+}
+
 // ─── Aulas ─────────────────────────────────────────────────────────────────
 
 Resultado<QVector<AulaDTO>> NucleoDatos::listarAulas() const {

@@ -42,6 +42,10 @@ public:
                                              const QString& telefono = QString());
     bool eliminarDocente(const QString& id);
 
+    // NUEVO: Manejo de materias asignadas a un docente
+    bool asignarMateriaPorNombre(const QString& idProfesor, const QString& nombreMateria);
+    bool limpiarMaterias(const QString& idProfesor);
+
     // ─── Aulas ────────────────────────────────────────────────────────────
 
     Resultado<QVector<AulaDTO>> listarAulas() const;

@@ -37,6 +37,19 @@
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
     m_nucleo = nucleo;
+    // Propagar la conexión al Dashboard recuperándolo del contenedor de vistas
+    if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
+        dashboard->setNucleoDatos(m_nucleo);
+    }
+    if (m_teacherListWidget) {
+        m_teacherListWidget->setNucleoDatos(m_nucleo);
+    }
+    if (m_classroomListWidget) {
+        m_classroomListWidget->setNucleoDatos(m_nucleo);
+    }
+    if (m_subjectListWidget) {
+        m_subjectListWidget->setNucleoDatos(m_nucleo);
+    }
     if (m_generationWidget) {
         m_generationWidget->setNucleoDatos(nucleo);
     }
@@ -63,8 +76,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Crear cliente y pasar a los widgets
     m_client = new InternalClient(this);
-    if (m_teacherListWidget) m_teacherListWidget->setClient(m_client);
-    if (m_classroomListWidget) m_classroomListWidget->setClient(m_client);
+    // Docentes y Aulas ya no usan IPC: leen y escriben en SQLite vía NucleoDatos.
     if (m_subjectListWidget) m_subjectListWidget->setClient(m_client);
     if (m_scheduleVisualizationWidget) m_scheduleVisualizationWidget->setClient(m_client);
     if (m_generationWidget) {
@@ -259,6 +271,11 @@ void MainWindow::activarBoton(QPushButton* btn) {
 void MainWindow::mostrarInicio() {
     m_contenedorVistas->setCurrentIndex(0);
     activarBoton(m_btnInicio);
+
+
+    if (auto dashboard = qobject_cast<DashboardWidget*>(m_contenedorVistas->widget(0))) {
+        dashboard->actualizarEstadisticas();
+    }
 }
 
 void MainWindow::mostrarDocentes() {
@@ -274,6 +291,10 @@ void MainWindow::mostrarAulas() {
 void MainWindow::mostrarAsignaturas() {
     m_contenedorVistas->setCurrentIndex(3);
     activarBoton(m_btnAsignaturas);
+
+    if (m_subjectListWidget) {
+        m_subjectListWidget->cargarMaterias();
+    }
 }
 
 void MainWindow::mostrarGeneracion() {
@@ -290,25 +311,25 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     qApp->setProperty("isDarkMode", modoOscuro);
 
     if (modoOscuro) {
-        // === TEMA OSCURO GLOBAL (Incluyendo modales y formularios) ===
+        // === TEMA OSCURO GLOBAL ===
         qApp->setStyleSheet(
-            // Fondo general y textos
-            "QWidget { background-color: #121212; color: #ffffff; }"
+            // 1. CORRECCIÓN: Solo aplicar fondo base a las ventanas contenedoras, no a todo QWidget
+            "QMainWindow, QDialog { background-color: #121212; color: #ffffff; }"
 
-            // Paneles, tarjetas, tablas y DIÁLOGOS EMERGENTES en gris oscuro (#1e1e1e)
-            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: #1e1e1e; color: #ffffff; border: 1px solid #333333; border-radius: 8px; }"
+            // Paneles, tarjetas, tablas y áreas
+            "QFrame, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: #1e1e1e; color: #ffffff; border: 1px solid #333333; border-radius: 8px; }"
 
-            // Cajas de texto y selects en los formularios de registro
+            // Cajas de texto y selects en los formularios
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; border-radius: 6px; padding: 6px; }"
             "QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }"
 
-            // Excepciones estructurales de la ventana principal
+            // Excepciones estructurales
             "#FondoPrincipal { background-color: #121212; border: none; }"
             "#Sidebar { background-color: #121212; border-right: 1px solid #333333; border-radius: 0px; }"
             "#TopHeader { background-color: #121212; border-bottom: 1px solid #333333; border-radius: 0px; }"
             "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
 
-            // Textos legibles en blanco
+            // Textos
             "QLabel { background: transparent; color: #ffffff; border: none; }"
             "QHeaderView::section { background-color: #252525; color: #ffffff; border: none; border-bottom: 1px solid #333333; padding: 12px; }"
 
@@ -326,8 +347,10 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
     } else {
         // === TEMA CLARO ORIGINAL ===
         qApp->setStyleSheet(
-            "QWidget { background-color: #f4f5f7; color: #334155; }"
-            "QFrame, QDialog, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
+            // CORRECCIÓN PARA EL TEMA CLARO
+            "QMainWindow, QDialog { background-color: #f4f5f7; color: #334155; }"
+
+            "QFrame, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }"
 
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"

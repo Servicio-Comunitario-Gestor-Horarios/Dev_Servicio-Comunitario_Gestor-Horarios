@@ -34,10 +34,6 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoCedula->setStyleSheet(inputStyle);
     campoCedula->setPlaceholderText("Ej. 12345678");
 
-    campoId = new QLineEdit(this);
-    campoId->setStyleSheet(inputStyle);
-    campoId->setPlaceholderText("ID interno (ej. T001)");
-
     campoNombre = new QLineEdit(this);
     campoNombre->setStyleSheet(inputStyle);
     campoNombre->setPlaceholderText("Nombre completo");
@@ -49,6 +45,11 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoTelefono = new QLineEdit(this);
     campoTelefono->setStyleSheet(inputStyle);
     campoTelefono->setPlaceholderText("Opcional: 0412-1234567");
+
+    // NUEVO: Campo de Materias
+    campoMaterias = new QLineEdit(this);
+    campoMaterias->setStyleSheet(inputStyle);
+    campoMaterias->setPlaceholderText("Ej. Física, Matemáticas");
 
     botonCancelar = new QPushButton("Cancelar", this);
     botonCancelar->setStyleSheet(isDark ?
@@ -75,11 +76,11 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     formLayout->setSpacing(15);
 
     QString labelStyle = QString("<span style='font-weight:bold; color:%1; font-size: 13px;'>").arg(labelColor);
-    formLayout->addRow(labelStyle + "Cédula:</span>", campoCedula);
-    formLayout->addRow(labelStyle + "ID:</span>", campoId);
+    formLayout->addRow(labelStyle + "Cédula / ID:</span>", campoCedula);
     formLayout->addRow(labelStyle + "Nombre:</span>", campoNombre);
     formLayout->addRow(labelStyle + "Email:</span>", campoEmail);
     formLayout->addRow(labelStyle + "Teléfono:</span>", campoTelefono);
+    formLayout->addRow(labelStyle + "Materias:</span>", campoMaterias);
 
     QHBoxLayout *botonesLayout = new QHBoxLayout();
     botonesLayout->addStretch();
@@ -108,19 +109,14 @@ bool TeacherFormDialog::validarCampos() {
                                  ).arg(isDark ? "#444444" : "#d1d5db", isDark ? "#2a2a2a" : "white", isDark ? "#ffffff" : "#374151");
 
     campoCedula->setStyleSheet(baseInputStyle);
-    campoId->setStyleSheet(baseInputStyle);
     campoNombre->setStyleSheet(baseInputStyle);
     campoEmail->setStyleSheet(baseInputStyle);
     campoTelefono->setStyleSheet(baseInputStyle);
+    campoMaterias->setStyleSheet(baseInputStyle);
 
     if (campoCedula->text().trimmed().isEmpty()) {
         errores += "• Cédula es obligatoria.\n";
         campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
-        ok = false;
-    }
-    if (campoId->text().trimmed().isEmpty()) {
-        errores += "• ID es obligatorio.\n";
-        campoId->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
     if (campoNombre->text().trimmed().isEmpty()) {
@@ -156,22 +152,22 @@ void TeacherFormDialog::guardarProfesor() {
 
     emit profesorGuardado(
         campoCedula->text().trimmed(),
-        campoId->text().trimmed(),
         campoNombre->text().trimmed(),
         campoEmail->text().trimmed(),
-        campoTelefono->text().trimmed()
+        campoTelefono->text().trimmed(),
+        campoMaterias->text().trimmed()
         );
     accept();
 }
 
-void TeacherFormDialog::cargarDatos(const QString& cedula, const QString& id,
-                                    const QString& nombre, const QString& email,
-                                    const QString& telefono) {
+void TeacherFormDialog::cargarDatos(const QString& cedula, const QString& nombre,
+                                    const QString& email, const QString& telefono,
+                                    const QString& materias) {
     campoCedula->setText(cedula);
-    campoId->setText(id);
     campoNombre->setText(nombre);
     campoEmail->setText(email);
     campoTelefono->setText(telefono);
+    campoMaterias->setText(materias);
 }
 
 } // namespace gestor::frontend::forms

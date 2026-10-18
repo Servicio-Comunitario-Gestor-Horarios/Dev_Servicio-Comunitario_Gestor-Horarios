@@ -1,17 +1,13 @@
-/* Proyecto:       Sistema de Gestión de Horarios
+/* Proyecto:      Sistema de Gestión de Horarios
  * Archivo:         [classroom_list_widget.cpp]
  * Autor:           Paola Peña
- * Fecha:           19 de Julio de 2026
  * Descripción:     Implementación de la interfaz gráfica (Frontend) utilizando
- *                  C++ y Qt6 para el módulo de gestión de aulas. Incluye el
- *                  diseño de la vista principal, la tabla de listado, botones CRUD
- *                  y el panel lateral de resumen de instalaciones.
+ *                  C++ y Qt6 para el módulo de gestión de aulas conectado a NucleoDatos.
  */
 
 #include "classroom_list_widget.hpp"
 #include "../forms/classroom_form_dialog.hpp"
-#include "../../../middleware/include/middleware/internalclient.h"
-#include "../../../middleware/include/middleware/messages.h"
+#include "backend/services/NucleoDatos.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -23,10 +19,9 @@ ClassroomListWidget::ClassroomListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
 }
 
-void ClassroomListWidget::setClient(InternalClient* client) {
-    m_client = client;
-    connect(m_client, &InternalClient::respuestaRecibida,
-            this, &ClassroomListWidget::onRespuestaRecibida);
+void ClassroomListWidget::setNucleoDatos(NucleoDatos* nucleo) {
+    m_nucleo = nucleo;
+    cargarAulas();
 }
 
 void ClassroomListWidget::setupUi() {
@@ -108,7 +103,7 @@ void ClassroomListWidget::setupUi() {
     rightLayout->addWidget(resumenTitulo);
     rightLayout->addSpacing(10);
 
-    auto crearTarjeta = [rightPanel](const QString& iconoTxt, const QString& texto, const QString& cantidad) -> QFrame* {
+    auto crearTarjeta = [rightPanel](const QString& iconoTxt, const QString& texto, QLabel*& outBadge) -> QFrame* {
         QFrame *card = new QFrame(rightPanel);
         card->setObjectName("CardInstalacion");
         card->setStyleSheet("QFrame { background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; }");
@@ -124,24 +119,24 @@ void ClassroomListWidget::setupUi() {
         nombre->setObjectName("CardNombre");
         nombre->setStyleSheet("font-size: 14px; font-weight: bold; color: #111827; border: none; background: transparent;");
 
-        QLabel *badge = new QLabel(cantidad, card);
-        badge->setObjectName("CardBadge");
-        badge->setAlignment(Qt::AlignCenter);
-        badge->setFixedSize(32, 24);
-        badge->setStyleSheet("background-color: #e5e7eb; border-radius: 12px; font-weight: bold; color: #374151; border: none; font-size: 12px;");
+        outBadge = new QLabel("0", card);
+        outBadge->setObjectName("CardBadge");
+        outBadge->setAlignment(Qt::AlignCenter);
+        outBadge->setFixedSize(32, 24);
+        outBadge->setStyleSheet("background-color: #e5e7eb; border-radius: 12px; font-weight: bold; color: #374151; border: none; font-size: 12px;");
 
         cardLayout->addWidget(icono);
         cardLayout->addSpacing(10);
         cardLayout->addWidget(nombre);
         cardLayout->addStretch();
-        cardLayout->addWidget(badge);
+        cardLayout->addWidget(outBadge);
 
         return card;
     };
 
-    rightLayout->addWidget(crearTarjeta("🏢", "Aula Teórica", "12"));
-    rightLayout->addWidget(crearTarjeta("🔬", "Laboratorio", "4"));
-    rightLayout->addWidget(crearTarjeta("🏀", "Cancha", "2"));
+    rightLayout->addWidget(crearTarjeta("🏢", "Aula Teórica", m_badgeAulasTeoricas));
+    rightLayout->addWidget(crearTarjeta("🔬", "Laboratorio", m_badgeLaboratorios));
+    rightLayout->addWidget(crearTarjeta("🏀", "Cancha", m_badgeCanchas));
 
     contentLayout->addWidget(rightPanel, 3);
 
@@ -152,7 +147,123 @@ void ClassroomListWidget::setupUi() {
 }
 
 // ==========================================
-// FUNCIÓN PARA ACTUALIZAR EL TEMA EN TIEMPO REAL
+// CARGAR Y LISTAR DESDE NUCLEO DATOS
+// ==========================================
+void ClassroomListWidget::cargarAulas() {
+    if (!m_nucleo) return;
+
+    m_table->setRowCount(0);
+    auto res = m_nucleo->listarAulas();
+
+    if (!res.ok) {
+        QMessageBox::warning(this, "Error BD", "No se pudo cargar la lista de aulas.");
+        return;
+    }
+
+    int contadorTeoricas = 0;
+    int contadorLabs = 0;
+    int contadorCanchas = 0;
+
+    for (const auto& aula : res.valor) {
+        int fila = m_table->rowCount();
+        m_table->insertRow(fila);
+
+        auto crearItemCentrado = [](const QString& texto) {
+            QTableWidgetItem* item = new QTableWidgetItem(texto);
+            item->setTextAlignment(Qt::AlignCenter);
+            return item;
+        };
+
+        m_table->setItem(fila, 0, crearItemCentrado(aula.nombre));
+        m_table->setItem(fila, 1, crearItemCentrado(QString::number(aula.capacidad)));
+        m_table->setItem(fila, 2, crearItemCentrado(aula.edificio.isEmpty() ? "N/A" : aula.edificio));
+        m_table->setItem(fila, 3, crearItemCentrado(aula.piso.isEmpty() ? "N/A" : aula.piso));
+
+        // Clasificar tipos para el resumen
+        QString nombreLower = aula.nombre.toLower();
+        if (nombreLower.contains("lab") || nombreLower.contains("laboratorio")) {
+            contadorLabs++;
+        } else if (nombreLower.contains("cancha") || nombreLower.contains("deporte")) {
+            contadorCanchas++;
+        } else {
+            contadorTeoricas++;
+        }
+
+        // Panel de Acciones (Editar / Eliminar)
+        QWidget *panelAcciones = new QWidget();
+        QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
+        layoutAcciones->setContentsMargins(0, 0, 0, 0);
+        layoutAcciones->setSpacing(10);
+
+        QPushButton *btnEditar = new QPushButton("✏️ Editar");
+        btnEditar->setStyleSheet("color: #2563eb; background: transparent; border: none; font-weight: bold;");
+        btnEditar->setCursor(Qt::PointingHandCursor);
+
+        QPushButton *btnEliminar = new QPushButton("🗑️ Eliminar");
+        btnEliminar->setStyleSheet("color: #dc2626; background: transparent; border: none; font-weight: bold;");
+        btnEliminar->setCursor(Qt::PointingHandCursor);
+
+        layoutAcciones->addStretch();
+        layoutAcciones->addWidget(btnEditar);
+        layoutAcciones->addWidget(btnEliminar);
+        layoutAcciones->addStretch();
+
+        m_table->setCellWidget(fila, 4, panelAcciones);
+
+        int aulaId = aula.id;
+
+        connect(btnEliminar, &QPushButton::clicked, this, [this, aulaId]() {
+            if (QMessageBox::question(this, "Confirmar eliminación", "¿Estás seguro de eliminar esta aula?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+                if (m_nucleo->eliminarAula(aulaId)) {
+                    cargarAulas();
+                } else {
+                    QMessageBox::warning(this, "Error", "No se pudo eliminar el aula de la base de datos.");
+                }
+            }
+        });
+
+        connect(btnEditar, &QPushButton::clicked, this, [this, aulaId, aula]() {
+            gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+            dialogo.setWindowTitle("Editar Aula");
+            dialogo.cargarDatos(aula.nombre, aula.capacidad, aula.edificio, aula.piso);
+
+            connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
+                    this, [this, aulaId](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
+                        auto resultado = m_nucleo->actualizarAula(aulaId, nNombre, nCapacidad, nEdificio, nPiso);
+                        if (!resultado.ok) {
+                            QMessageBox::warning(this, "Error", "No se pudo actualizar el aula: " + resultado.mensajeError);
+                        } else {
+                            cargarAulas();
+                        }
+                    });
+            dialogo.exec();
+        });
+    }
+
+    // Actualizar los contadores visuales del panel derecho
+    if (m_badgeAulasTeoricas) m_badgeAulasTeoricas->setText(QString::number(contadorTeoricas));
+    if (m_badgeLaboratorios) m_badgeLaboratorios->setText(QString::number(contadorLabs));
+    if (m_badgeCanchas) m_badgeCanchas->setText(QString::number(contadorCanchas));
+}
+
+void ClassroomListWidget::abrirFormularioNuevo() {
+    if (!m_nucleo) return;
+
+    gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+    connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
+            this, [this](const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
+                auto resultado = m_nucleo->crearAula(nombre, capacidad, edificio, piso);
+                if (!resultado.ok) {
+                    QMessageBox::warning(this, "Error", "No se pudo crear el aula: " + resultado.mensajeError);
+                } else {
+                    cargarAulas();
+                }
+            });
+    dialogo.exec();
+}
+
+// ==========================================
+// TEMA VISUAL (Modo Oscuro / Claro)
 // ==========================================
 void ClassroomListWidget::actualizarTema(bool modoOscuro) {
     if (modoOscuro) {
@@ -182,7 +293,6 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
                 );
         }
     } else {
-        // Restaurar Tema Claro
         if (auto t = findChild<QLabel*>("ClassroomTitle")) t->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827; border: none;");
         if (auto s = findChild<QLabel*>("ClassroomSub")) s->setStyleSheet("font-size: 14px; color: #6b7280; border: none;");
         if (auto rt = findChild<QLabel*>("ResumenTitulo")) rt->setStyleSheet("font-size: 16px; font-weight: bold; color: #111827; border: none;");
@@ -209,156 +319,4 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
                 );
         }
     }
-}
-
-// ==========================================
-// RESTO DE MÉTODOS CRUD (Sin cambios)
-// ==========================================
-void ClassroomListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
-    QString op = respuesta["op"].toString();
-    if (op != m_pendiente.op) return;
-
-    if (respuesta["status"].toString() == "ok") {
-        QJsonObject data = m_pendiente.data;
-        if (op == Middleware::OP_CREAR_AULA) {
-            insertarAulaEnTabla(data["nombre"].toString(),
-                                data["capacidad"].toInt(),
-                                data["edificio"].toString(),
-                                data["piso"].toString());
-        } else if (op == Middleware::OP_ACTUALIZAR_AULA) {
-            int f = m_pendiente.fila;
-            m_table->item(f, 0)->setText(data["nombre"].toString());
-            m_table->item(f, 1)->setText(QString::number(data["capacidad"].toInt()));
-            m_table->item(f, 2)->setText(data["edificio"].toString().isEmpty() ? "N/A" : data["edificio"].toString());
-            m_table->item(f, 3)->setText(data["piso"].toString().isEmpty() ? "N/A" : data["piso"].toString());
-        } else if (op == Middleware::OP_ELIMINAR_AULA) {
-            m_table->removeRow(m_pendiente.fila);
-        }
-    } else {
-        QMessageBox::warning(this, "Error", "No se pudo completar la operación: " + respuesta["data"].toString());
-    }
-    m_pendiente = SolicitudPendiente();
-}
-
-void ClassroomListWidget::enviarCrearAula(const QString& nombre, int capacidad,
-                                          const QString& edificio, const QString& piso) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["nombre"] = nombre;
-    payload["capacidad"] = capacidad;
-    payload["edificio"] = edificio;
-    payload["piso"] = piso;
-    m_pendiente = {Middleware::OP_CREAR_AULA, payload, -1};
-    m_client->enviarSolicitud(Middleware::OP_CREAR_AULA, payload);
-}
-
-void ClassroomListWidget::enviarActualizarAula(int fila, const QString& nombreOriginal,
-                                               const QString& nombre, int capacidad,
-                                               const QString& edificio, const QString& piso) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["id"] = nombreOriginal;
-    payload["nombre"] = nombre;
-    payload["capacidad"] = capacidad;
-    payload["edificio"] = edificio;
-    payload["piso"] = piso;
-    m_pendiente = {Middleware::OP_ACTUALIZAR_AULA, payload, fila};
-    m_client->enviarSolicitud(Middleware::OP_ACTUALIZAR_AULA, payload);
-}
-
-void ClassroomListWidget::enviarEliminarAula(int fila, const QString& nombre) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["id"] = nombre;
-    m_pendiente = {Middleware::OP_ELIMINAR_AULA, payload, fila};
-    m_client->enviarSolicitud(Middleware::OP_ELIMINAR_AULA, payload);
-}
-
-void ClassroomListWidget::insertarAulaEnTabla(const QString& nombre, int capacidad,
-                                              const QString& edificio, const QString& piso) {
-    int fila = m_table->rowCount();
-    m_table->insertRow(fila);
-
-    QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
-    itemNombre->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(fila, 0, itemNombre);
-
-    QTableWidgetItem *itemCapacidad = new QTableWidgetItem(QString::number(capacidad));
-    itemCapacidad->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(fila, 1, itemCapacidad);
-
-    QTableWidgetItem *itemEdificio = new QTableWidgetItem(edificio.isEmpty() ? "N/A" : edificio);
-    itemEdificio->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(fila, 2, itemEdificio);
-
-    QTableWidgetItem *itemPiso = new QTableWidgetItem(piso.isEmpty() ? "N/A" : piso);
-    itemPiso->setTextAlignment(Qt::AlignCenter);
-    m_table->setItem(fila, 3, itemPiso);
-
-    QWidget *panelAcciones = new QWidget();
-    QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
-    layoutAcciones->setContentsMargins(0, 0, 0, 0);
-    layoutAcciones->setSpacing(10);
-
-    QPushButton *btnEditar = new QPushButton("✏️ Editar");
-    btnEditar->setStyleSheet("color: #2563eb; background: transparent; border: none; font-weight: bold;");
-    btnEditar->setCursor(Qt::PointingHandCursor);
-
-    QPushButton *btnEliminar = new QPushButton("🗑️ Eliminar");
-    btnEliminar->setStyleSheet("color: #dc2626; background: transparent; border: none; font-weight: bold;");
-    btnEliminar->setCursor(Qt::PointingHandCursor);
-
-    layoutAcciones->addStretch();
-    layoutAcciones->addWidget(btnEditar);
-    layoutAcciones->addWidget(btnEliminar);
-    layoutAcciones->addStretch();
-
-    m_table->setCellWidget(fila, 4, panelAcciones);
-
-    connect(btnEliminar, &QPushButton::clicked, this, [this, panelAcciones]() {
-        if (QMessageBox::question(this, "Confirmar eliminación", "¿Estás seguro de eliminar esta aula?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-            for (int i = 0; i < m_table->rowCount(); ++i) {
-                if (m_table->cellWidget(i, 4) == panelAcciones) {
-                    QString nombre = m_table->item(i, 0)->text();
-                    enviarEliminarAula(i, nombre);
-                    break;
-                }
-            }
-        }
-    });
-
-    connect(btnEditar, &QPushButton::clicked, this, [this, panelAcciones]() {
-        int filaEditar = -1;
-        for (int i = 0; i < m_table->rowCount(); ++i) {
-            if (m_table->cellWidget(i, 4) == panelAcciones) {
-                filaEditar = i;
-                break;
-            }
-        }
-        if (filaEditar != -1) {
-            QString vNombre = m_table->item(filaEditar, 0)->text();
-            int vCapacidad = m_table->item(filaEditar, 1)->text().toInt();
-            QString vEdificio = m_table->item(filaEditar, 2)->text();
-            QString vPiso = m_table->item(filaEditar, 3)->text();
-
-            gestor::frontend::forms::ClassroomFormDialog dialogo(this);
-            dialogo.setWindowTitle("Editar Aula");
-            dialogo.cargarDatos(vNombre, vCapacidad, vEdificio, vPiso);
-
-            connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-                    this, [this, filaEditar, vNombre](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
-                        enviarActualizarAula(filaEditar, vNombre, nNombre, nCapacidad, nEdificio, nPiso);
-                    });
-            dialogo.exec();
-        }
-    });
-}
-
-void ClassroomListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::ClassroomFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-            this, [this](const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
-                enviarCrearAula(nombre, capacidad, edificio, piso);
-            });
-    dialogo.exec();
 }
