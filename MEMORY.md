@@ -166,12 +166,24 @@
     entero (`planMoveRun`); un receso en medio corta la unión. Si el documento no trae `_cuadricula`
     (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se usa la plantilla
     histórica de 12×45 min + receso de 30.
+  - **Mover un tramo sobre su propio espacio (fix 2026-10-18).** Se reportó que al intercambiar una clase
+    de dos horas con dos clases del destino el tramo se volvía de tres horas y las otras dos «de dos
+    horas». La causa era el solape: al soltar el bloque una o dos franjas más arriba, el destino incluía
+    una franja del propio tramo y `applyMove` (que escribía par a par, en orden) pisaba una clase y
+    **alargaba** el tramo (y el lado que miraba hacia abajo se ignoraba en silencio). Ahora el movimiento
+    se calcula como una **lista de traslados elementales** (`tramoMovimientos` → `SlotMove`) que es una
+    biyección sobre las franjas afectadas y se aplica **leyendo todo el origen antes de escribir**:
+    solape → el tramo se **desplaza** y las clases ganadas pasan a las franjas libres (`plan.rotation`);
+    sin solape/días distintos → intercambio. Ninguna clase se pierde ni el tramo cambia de tamaño.
   - **Leyenda y subtítulos.** La leyenda se arma con las materias reales del horario (ordenadas por peso,
     en una tira desplazable) y los subtítulos muestran turno, clases pintadas y horas académicas.
-  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos y movimiento del
-    bloque completo), `test_frontend_conversion` actualizada (conserva la tarde, emite `_cuadricula` y el
-    turno) y `test_generacion_seed` ampliada (el documento de visualización conserva las 520 clases,
-    incluidas las de la tarde). **Suite 47/47 en verde.** Verificado a ojo con capturas de las ventanas.
+  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos, movimiento del
+    bloque completo, **desplazamiento sobre su propio espacio** hacia arriba y hacia abajo e intercambio
+    con conflicto conservando todas las clases), `test_frontend_conversion` actualizada (conserva la
+    tarde, emite `_cuadricula` y el turno) y `test_generacion_seed` ampliada (el documento de
+    visualización conserva las 520 clases, incluidas las de la tarde). **Suite 47/47 en verde.**
+    Verificado con un barrido de los 86 destinos posibles sobre un horario de prueba (0 clases perdidas
+    o duplicadas) y a ojo con capturas de las ventanas.
 
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
   probó el flujo completo de la vista «Generación de horario» con la base sembrada

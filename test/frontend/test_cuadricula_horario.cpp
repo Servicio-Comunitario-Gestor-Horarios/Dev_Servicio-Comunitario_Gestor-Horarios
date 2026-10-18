@@ -256,7 +256,10 @@ private slots:
         const ScheduleModel::MovePlan plan =
             ScheduleModel::planMoveRun(doc, ref, 1, 0, 2, 2, 4);
         QVERIFY(plan.valid);
-        QCOMPARE(plan.moves.size(), 2);
+        QVERIFY(!plan.rotation);
+        QCOMPARE(plan.franjas, 2);
+        // Dos traslados del tramo y dos de lo que ocupaba el destino (intercambio).
+        QCOMPARE(plan.moves.size(), 4);
         ScheduleModel::applyMove(doc, ref, plan, /*swapOthers=*/false);
 
         const QJsonObject despues = ScheduleModel::scheduleOf(doc, ref);
@@ -265,6 +268,106 @@ private slots:
         QCOMPARE(ScheduleModel::getBlock(despues, 2, 4).materia, QStringLiteral("Matemática"));
         QCOMPARE(ScheduleModel::getBlock(despues, 2, 5).materia, QStringLiteral("Matemática"));
         QCOMPARE(ScheduleModel::horasAsignadas(despues), 2);
+    }
+
+    /// Añade (o reemplaza) un bloque en una franja del día 1 del horario.
+    static void poner(QJsonObject& schedule, int slot, const QJsonObject& b)
+    {
+        QJsonObject dia = schedule.value(QStringLiteral("1")).toObject();
+        dia.insert(QString::number(slot), b);
+        schedule.insert(QStringLiteral("1"), dia);
+    }
+
+    /// Soltar el tramo encima de sí mismo (una franja más arriba) lo desplaza sin
+    /// deformarlo: antes el tramo crecía a tres franjas y la clase de en medio
+    /// desaparecía.
+    void desplazarElTramoSobreSuPropioEspacioNoLoDeforma()
+    {
+        const ScheduleModel::Ref ref = refSeccion();
+        QJsonObject horarioSeccion =
+            horario({{1, 3}, {1, 4}}, bloque("Matemática", "A1"));
+        poner(horarioSeccion, 5, bloque("Física", "A2"));
+        QJsonObject doc =
+            conSeccion(documentoBase(), QStringLiteral("Mañana"), horarioSeccion);
+
+        const QVector<ScheduleModel::RowDef> rows = ScheduleModel::rowsFor(doc, ref);
+        const QJsonObject antes = ScheduleModel::scheduleOf(doc, ref);
+        QCOMPARE(ScheduleModel::largoDeTramoEn(antes, rows, 1, 3), 2);
+        QCOMPARE(ScheduleModel::horasAsignadas(antes), 3);
+
+        // Destino: franjas 4 y 5 (la 4 ya es del propio tramo).
+        const ScheduleModel::MovePlan plan =
+            ScheduleModel::planMoveRun(doc, ref, 1, 3, 2, 1, 4);
+        QVERIFY(plan.valid);
+        QVERIFY(plan.rotation);
+        ScheduleModel::applyMove(doc, ref, plan, /*swapOthers=*/false);
+
+        const QJsonObject despues = ScheduleModel::scheduleOf(doc, ref);
+        // La clase vecina pasa a la franja que el tramo deja libre...
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 3).materia, QStringLiteral("Física"));
+        // ...y el tramo queda igual de largo, sin crecer ni perder franjas.
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 4).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 5).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::horasAsignadas(despues), 3);
+        QCOMPARE(ScheduleModel::largoDeTramo(despues, rows,
+                                             filaDelSlot(rows, 4), 1), 2);
+    }
+
+    /// El mismo desplazamiento hacia abajo (el destino empieza una franja después).
+    void desplazarElTramoHaciaAbajo()
+    {
+        const ScheduleModel::Ref ref = refSeccion();
+        QJsonObject sched = horario({{1, 11}, {1, 12}}, bloque("Matemática", "A1"));
+        poner(sched, 13, bloque("Física", "A2"));
+        QJsonObject doc =
+            conSeccion(documentoBase(), QStringLiteral("Tarde"), sched);
+
+        const ScheduleModel::MovePlan plan =
+            ScheduleModel::planMoveRun(doc, ref, 1, 11, 2, 1, 12);
+        QVERIFY(plan.valid);
+        QVERIFY(plan.rotation);
+        ScheduleModel::applyMove(doc, ref, plan, /*swapOthers=*/false);
+
+        const QJsonObject despues = ScheduleModel::scheduleOf(doc, ref);
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 11).materia, QStringLiteral("Física"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 12).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::getBlock(despues, 1, 13).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::horasAsignadas(despues), 3);
+    }
+
+    /// Un desplazamiento con conflicto recoloca las clases en el otro horario
+    /// sin perder ninguna.
+    void elIntercambioGlobalConservaTodasLasClases()
+    {
+        // Docente: Matemática en 3,4 y Física en 5.
+        QJsonObject docente = horario({{1, 3}, {1, 4}}, bloque("Matemática", "A1"));
+        poner(docente, 5, bloque("Física", "A1"));
+        // Sección: clases en la misma aula, en las franjas afectadas.
+        QJsonObject seccion = horario({{1, 3}}, bloque("Historia", "A1"));
+        poner(seccion, 5, bloque("Química", "A1"));
+
+        QJsonObject doc = conDocente(
+            conSeccion(documentoBase(), QStringLiteral("Mañana"), seccion), docente);
+        ScheduleModel::Ref ref;   // el docente
+        ref.kind = ScheduleModel::OwnerKind::Teacher;
+        ref.teacherIndex = 0;
+
+        const ScheduleModel::MovePlan plan =
+            ScheduleModel::planMoveRun(doc, ref, 1, 3, 2, 1, 4);
+        QVERIFY(plan.valid);
+        QVERIFY(plan.hasConflict);
+        ScheduleModel::applyMove(doc, ref, plan, /*swapOthers=*/true);
+
+        // El docente desplaza el tramo y la Física pasa a la franja libre.
+        const QJsonObject docD = ScheduleModel::scheduleOf(doc, ref);
+        QCOMPARE(ScheduleModel::horasAsignadas(docD), 3);
+        QCOMPARE(ScheduleModel::getBlock(docD, 1, 3).materia, QStringLiteral("Física"));
+        QCOMPARE(ScheduleModel::getBlock(docD, 1, 4).materia, QStringLiteral("Matemática"));
+        QCOMPARE(ScheduleModel::getBlock(docD, 1, 5).materia, QStringLiteral("Matemática"));
+
+        // Y la otra vista tampoco pierde ninguna de sus clases.
+        const QJsonObject sec = ScheduleModel::scheduleOf(doc, refSeccion());
+        QCOMPARE(ScheduleModel::horasAsignadas(sec), 2);
     }
 };
 

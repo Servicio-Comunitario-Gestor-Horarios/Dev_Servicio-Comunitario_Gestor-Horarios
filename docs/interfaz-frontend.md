@@ -597,6 +597,15 @@ usa la plantilla histórica de 12 franjas de 45 min con receso de 30 min. `largo
 franjas seguidas de la misma clase (misma materia, profesor y aula) en **un solo bloque**, que se
 pinta con `rowSpan` y se arrastra entero (`planMoveRun`); un receso en medio corta la unión.
 
+**Mover un bloque.** `planMoveRun` traduce el arrastre a una lista de **traslados elementales**
+(`SlotMove`) y `applyMove` los aplica leyendo todas las franjas de origen del estado original antes de
+escribir (una biyección sobre las franjas afectadas). Si el destino y el origen no se solapan —o son de
+días distintos— es el intercambio de siempre: lo que ocupaba el destino pasa a las franjas de origen. Si
+el destino **solapa el propio tramo** (se suelta la clase una o dos franjas más arriba o más abajo), el
+tramo se **desplaza** y las clases que ocupaban las franjas ganadas pasan a las que el tramo deja libres:
+la clase conserva su tamaño y ninguna otra desaparece (`plan.rotation`). Con `swapOthers` (el usuario
+aceptó el aviso de conflicto) la misma lista de traslados se aplica a cada horario en conflicto.
+
 El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_conversion`
 (`test/frontend/test_conversion_entrada.cpp`, target añadido en `test/CMakeLists.txt` cuando existen
 `frontend` y `backend`). La rejilla (filas por turno, receso, horas y tramos) por

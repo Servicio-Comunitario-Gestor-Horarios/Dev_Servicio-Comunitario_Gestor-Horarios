@@ -555,14 +555,13 @@ void ScheduleGridDialog::moveBlock(int fromDay, int fromSlot, int toDay, int toS
     // Una clase puede ocupar varias franjas seguidas (materia de dos horas
     // académicas): se mueve entera, así que el destino necesita hueco para todo.
     const int largo = ScheduleModel::largoDeTramoEn(schedule, rows, fromDay, fromSlot);
-    if (fromDay == toDay && toSlot > fromSlot && toSlot < fromSlot + largo)
-        return;   // se suelta encima del propio bloque
 
     if (!ScheduleModel::franjasSeguidas(rows, toSlot, largo)) {
         ScheduleTheme::showStyledMessage(
             this, "Sin hueco para el bloque",
             QString("Esta clase ocupa %1 franjas académicas seguidas y desde la franja "
-                    "elegida no caben. Elige una franja con espacio suficiente.")
+                    "elegida no caben (un receso o el fin del turno las corta). Elige "
+                    "una franja con espacio suficiente.")
                 .arg(largo), true);
         return;
     }
@@ -597,6 +596,9 @@ void ScheduleGridDialog::moveBlock(int fromDay, int fromSlot, int toDay, int toS
                  slotLabel(toSlot));
         if (largo > 1)
             intro += QString("\nLa clase ocupa %1 franjas seguidas.").arg(largo);
+        if (plan.rotation)
+            intro += "\nEl destino solapa a la propia clase: se desplazará y las clases "
+                     "de en medio se recolocarán en las franjas que queden libres.";
 
         if (!askSwapConflict(this, "Conflicto de horario", intro, details)) {
             return;   // Cancelar
