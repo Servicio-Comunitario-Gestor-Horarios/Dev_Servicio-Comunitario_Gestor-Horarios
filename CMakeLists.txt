@@ -102,3 +102,8 @@ if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(test)
 endif()
+
+# ── Empaquetado portable (ZIP) ──
+# Reglas de instalación + CPack para distribuir el ejecutable con todas sus
+# dependencias. Solo se activa en Windows (ver cmake/Packaging.cmake).
+include(cmake/Packaging.cmake)

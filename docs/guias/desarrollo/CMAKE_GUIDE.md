@@ -122,6 +122,37 @@ preset del proyecto:
 En **Qt Creator** los presets aparecen como configuraciones de build: elige **`full-release`**
 (o el que herede de él) y pulsa *Run*. El preset `full` (Debug en Windows) no sirve para generar.
 
+## Empaquetado portable (Windows)
+
+`cmake/Packaging.cmake` (incluido desde el `CMakeLists.txt` raíz) deja un paquete
+**autocontenido**: el ejecutable, las DLL y plugins de Qt, el runtime de Visual C++ y las DLL de
+OR-Tools. No requiere instalación ni permisos de administrador, y los datos del usuario siguen en
+`%APPDATA%\LiceoRobertSerra\GestorHorarios` (fuera del paquete).
+
+```bat
+:: 1. Entorno de Visual Studio: hace falta para windeployqt y las DLL del CRT
+call "C:\...\VC\Auxiliary\Build\vcvars64.bat"
+
+:: 2. Solo la carpeta de distribución (sin comprimir)
+cmake --install build-rel --prefix dist\GestorHorarios
+
+:: 3. ZIP portable -> build-rel\GestorHorarios-<version>-win64-portable.zip
+cmake --build build-rel --target package
+```
+
+Cosas a tener en cuenta:
+
+- Exige un build **Release** (las DLL de OR-Tools usan `/MD`; ver arriba) y `vcvars64.bat` activo,
+  porque se copian `windeployqt` y las DLL del CRT desde `VCToolsRedistDir`.
+- Las dependencias van **junto al ejecutable**, que es donde Windows busca primero: el paquete
+  funciona sin tocar el `PATH` (necesario, porque la aplicación se relanza con `--backend`).
+- Se descartan las DLL que Qt trae para Quick/D3D11 (`opengl32sw`, `dxcompiler`, `dxil`) y los
+  drivers SQL que no sean SQLite: la interfaz solo usa Widgets/Network/Sql y solo `QSQLITE`.
+- **ICU no se empaqueta**: lo aporta Windows (`%SystemRoot%\System32\icuuc.dll`).
+- Tamaño de referencia (Qt 6.11 + OR-Tools 9.15): ~120 MB expandido, ~38 MB el ZIP.
+- Solo se genera en Windows; en Linux/Docker la regla se omite sin afectar al build.
+- Un instalador (Inno Setup, NSIS…) puede envolver ese ZIP más adelante.
+
 ## Flujo de trabajo diario
 
 ```bash

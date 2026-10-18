@@ -1,0 +1,28 @@
+Gestor de Horarios - Liceo Nacional Robert Serra
+================================================
+
+COMO EJECUTAR
+  Haz doble clic en "gestor-horarios.exe", que esta en esta misma carpeta.
+  No requiere instalacion ni permisos de administrador: todo lo que necesita
+  (Qt, OR-Tools y el runtime de Visual C++) viaja incluido aqui.
+
+  Para llevar la aplicacion a otro equipo, copia la CARPETA COMPLETA. Las
+  bibliotecas (.dll) deben quedar junto al ejecutable; no muevas el .exe solo.
+
+DONDE SE GUARDAN LOS DATOS
+  La base de datos y los horarios generados se guardan por usuario en:
+
+      %APPDATA%\LiceoRobertSerra\GestorHorarios\
+
+  (normalmente C:\Users\<usuario>\AppData\Roaming\LiceoRobertSerra\GestorHorarios)
+
+  Cada usuario del equipo tiene sus propios datos. Para respaldarlos o
+  trasladarlos, copia esa carpeta.
+
+GENERACION DE HORARIOS
+  Usa siempre esta version: es una compilacion Release. Una version de
+  depuracion (Debug) no puede generar horarios con estas bibliotecas.
+
+SOPORTE
+  Ante cualquier fallo, anota el mensaje exacto que muestra el programa y
+  enviasele al equipo de desarrollo.

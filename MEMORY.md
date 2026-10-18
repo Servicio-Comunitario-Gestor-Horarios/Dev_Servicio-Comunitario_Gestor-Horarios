@@ -64,6 +64,7 @@
 
 - **Hora académica = bloque (2026-10-17):** `bloques(horas) = horas` y `bloques_aula(horas_aula) = horas_aula`; `duracion_minutos` define **solo** la duración real de la franja. D3/S1/V14 sin conversión. Constitución §7 enmendada. Implementado en **005-T11**.
 - **Seed de datos de prueba (spec 008):** `gestor-horarios-seed` + librería `seed`; **solo puebla la BD, no genera presets**. Plan 31059 adaptado a **40 h académicas/año** (4 planes GEN/EXA/NAT/SOC), 57 materias-año, 210 cargas, 13 cursos **sin turno**, 16 aulas, 2 turnos de 8 franjas de 40 min con receso, 4 variantes de docentes (65/43/64/65; demanda 520, Σ topes 461). Las 210 cargas y los docentes se insertan por **SQL directo** dentro de una transacción única (no `asignarCarga`). Guía: `docs/guias/datos-prueba.md`; suite 46/46.
+- **Empaquetado portable (2026-10-18):** `cmake/Packaging.cmake` (incluido desde el `CMakeLists.txt` raíz) añade `install()` + CPack (`ZIP`) para distribuir el ejecutable con todas sus dependencias, **sin instalación ni administrador**. Las DLL y plugins de Qt los copia `windeployqt` (`--no-translations`, `--no-system-d3d-compiler`, `--no-system-dxc-compiler`, `--no-opengl-sw` y sin los drivers SQL distintos de SQLite, porque la interfaz solo usa Widgets/Network/Sql y solo `QSQLITE`); las de OR-Tools se copian desde `<ortools_DIR>/../../../bin`; el runtime de Visual C++ se instala **app-local** desde `VCToolsRedistDir` en vez de arrastrar `vc_redist.x64.exe`. ICU no se empaqueta: lo aporta Windows (`System32\icuuc.dll`). Se genera solo en Windows y solo en Release; en Docker se omite. Guía: `docs/guias/desarrollo/CMAKE_GUIDE.md` §Empaquetado. Verificado en el host: 44 archivos, 119,6 MB expandido / 38,1 MB el ZIP; `--version` y `--backend` (6 s) con el `PATH` limpio; sonda `QSQLITE` dentro del ZIP descomprimido; auditoría `dumpbin` sin dependencias sin resolver.
 
 ## Siguiente paso
 
@@ -72,6 +73,7 @@
 3. **Menores de la 008:** ignorar `.clangd`; confirmar la convención **1-based** de `despues_de_slot` en 004/005 (hoy asumida y verificada por las horas del receso).
 4. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
 5. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`): **implementado en el frontend** (2026-10-17, ver Progreso): `PuertoSolverIpc` sobre `InternalClient` + vista «Generación de horario». `docs/interfaz-frontend.md` §3.6.
+6. **Distribución:** el **ZIP portable ya se genera** (`cmake --build build-rel --target package`, ver `docs/guias/desarrollo/CMAKE_GUIDE.md` §Empaquetado). Falta lo que venga después: un instalador (Inno Setup o NSIS) que envuelva ese ZIP, y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
