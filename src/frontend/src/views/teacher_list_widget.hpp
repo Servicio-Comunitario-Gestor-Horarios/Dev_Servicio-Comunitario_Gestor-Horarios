@@ -1,10 +1,17 @@
+/**
+ * @file teacher_list_widget.hpp
+ * @brief Widget para el listado y gestión de docentes
+ */
+
 #pragma once
 
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
-#include <QJsonObject>
+#include <QLabel>
 
+// Declaración adelantada
+class NucleoDatos;
 class InternalClient;
 
 class TeacherListWidget : public QWidget
@@ -12,35 +19,35 @@ class TeacherListWidget : public QWidget
     Q_OBJECT
 public:
     explicit TeacherListWidget(QWidget *parent = nullptr);
-    void setClient(InternalClient* client);
+    ~TeacherListWidget() = default;
 
-    void actualizarTema(bool modoOscuro); // <--- FUNCIÓN AÑADIDA PARA EL MODO OSCURO
+    void setNucleoDatos(NucleoDatos* nucleo);
+    void setClient(InternalClient* client);
+    void actualizarTema(bool modoOscuro);
+
+public slots:
+    void cargarDocentes();
 
 private slots:
-    void onRespuestaRecibida(const QJsonObject& respuesta);
     void abrirFormularioNuevo();
+    void abrirFormularioEditar(int fila);
+    void eliminarDocente(int fila);
+
+    // Función que detecta el clic en un profesor
+    void onDocenteSeleccionado();
 
 private:
     void setupUi();
-    void insertarProfesorEnTabla(const QString& cedula, const QString& id,
-                                 const QString& nombre, const QString& email,
-                                 const QString& telefono);
 
-    void enviarCrearProfesor(const QString& cedula, const QString& id,
-                             const QString& nombre, const QString& email,
-                             const QString& telefono);
-    void enviarActualizarProfesor(int fila, const QString& cedula,
-                                  const QString& id, const QString& nombre,
-                                  const QString& email, const QString& telefono);
-    void enviarEliminarProfesor(int fila, const QString& cedula);
-
-    struct SolicitudPendiente {
-        QString op;
-        QJsonObject data;
-        int fila = -1;
-    } m_pendiente;
-
+    // Punteros de interfaz izquierda
     QTableWidget* m_table = nullptr;
     QPushButton* m_registerButton = nullptr;
+
+    // Punteros de interfaz derecha (Panel de Detalles)
+    QTableWidget* m_gridDisponibilidad = nullptr;
+    QLabel* m_detalleNombre = nullptr;
+
+    // Punteros de datos
+    NucleoDatos* m_nucleo = nullptr;
     InternalClient* m_client = nullptr;
 };

@@ -1,10 +1,11 @@
 /**
  * @file subject_list_widget.cpp
- * @brief Implementación del widget de gestión de asignaturas con cabecera de acciones centrada
+ * @brief Implementación del widget de gestión de asignaturas conectado a NucleoDatos y panel dinámico
  */
 
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
+#include "backend/services/NucleoDatos.hpp"
 #include "../../../middleware/include/middleware/internalclient.h"
 #include "../../../middleware/include/middleware/messages.h"
 #include <QHBoxLayout>
@@ -14,6 +15,7 @@
 #include <QMessageBox>
 #include <QFrame>
 #include <QProgressBar>
+#include <QApplication>
 
 SubjectListWidget::SubjectListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
@@ -21,8 +23,15 @@ SubjectListWidget::SubjectListWidget(QWidget *parent) : QWidget(parent) {
 
 void SubjectListWidget::setClient(InternalClient* client) {
     m_client = client;
-    connect(m_client, &InternalClient::respuestaRecibida,
-            this, &SubjectListWidget::onRespuestaRecibida);
+    if (m_client) {
+        connect(m_client, &InternalClient::respuestaRecibida,
+                this, &SubjectListWidget::onRespuestaRecibida);
+    }
+}
+
+void SubjectListWidget::setNucleoDatos(NucleoDatos* nucleo) {
+    m_nucleo = nucleo;
+    cargarMaterias();
 }
 
 void SubjectListWidget::setupUi() {
@@ -46,7 +55,7 @@ void SubjectListWidget::setupUi() {
     titulo->setObjectName("SubjectTitle");
     titulo->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
 
-    QLabel *subtitulo = new QLabel("Administra las asignaturas y su tipo de aula requerido", this);
+    QLabel *subtitulo = new QLabel("Administra las asignaturas y sus requisitos académicos", this);
     subtitulo->setObjectName("SubjectSub");
     subtitulo->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
 
@@ -69,7 +78,7 @@ void SubjectListWidget::setupUi() {
     // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
     m_table->setObjectName("SubjectTable");
-    m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Nombre", "Requisitos", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; color: #0f172a; }"
         "QHeaderView::section { background-color: #f8fafc; font-weight: 700; color: #475569; "
@@ -97,7 +106,7 @@ void SubjectListWidget::setupUi() {
     leftContentLayout->addWidget(m_table);
 
     // ==========================================
-    // COLUMNA DERECHA: PANEL LATERAL DE RESUMEN
+    // COLUMNA DERECHA: PANEL LATERAL DINÁMICO
     // ==========================================
     QFrame *sidePanel = new QFrame(this);
     sidePanel->setObjectName("SubjectSidePanel");
@@ -120,25 +129,25 @@ void SubjectListWidget::setupUi() {
     occLabel->setObjectName("OccLabel");
     occLabel->setStyleSheet("font-size: 13px; color: #475569; border: none; background: transparent; font-weight: 600; line-height: 1.2;");
 
-    QLabel *occVal = new QLabel("65%", sidePanel);
-    occVal->setObjectName("OccVal");
-    occVal->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
-    occVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_occValLabel = new QLabel("0%", sidePanel);
+    m_occValLabel->setObjectName("OccVal");
+    m_occValLabel->setStyleSheet("font-size: 16px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
+    m_occValLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     occupancyLayout->addWidget(occLabel);
     occupancyLayout->addStretch();
-    occupancyLayout->addWidget(occVal);
+    occupancyLayout->addWidget(m_occValLabel);
     sideLayout->addLayout(occupancyLayout);
 
-    QProgressBar *progressBar = new QProgressBar(sidePanel);
-    progressBar->setObjectName("SubjectProgressBar");
-    progressBar->setValue(65);
-    progressBar->setFixedHeight(8);
-    progressBar->setTextVisible(false);
-    progressBar->setStyleSheet(
+    m_progressBar = new QProgressBar(sidePanel);
+    m_progressBar->setObjectName("SubjectProgressBar");
+    m_progressBar->setValue(0);
+    m_progressBar->setFixedHeight(8);
+    m_progressBar->setTextVisible(false);
+    m_progressBar->setStyleSheet(
         "QProgressBar { background-color: #e2e8f0; border-radius: 4px; border: none; }"
         "QProgressBar::chunk { background-color: #1e3a8a; border-radius: 4px; }");
-    sideLayout->addWidget(progressBar);
+    sideLayout->addWidget(m_progressBar);
 
     QFrame *lineDiv = new QFrame(sidePanel);
     lineDiv->setObjectName("SubjectLineDiv");
@@ -151,31 +160,10 @@ void SubjectListWidget::setupUi() {
     notifTitle->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
     sideLayout->addWidget(notifTitle);
 
-    auto createNotifItem = [sidePanel](const QString& titleText, const QString& timeText) -> QWidget* {
-        QWidget *itemWidget = new QWidget(sidePanel);
-        itemWidget->setObjectName("NotifItemWidget");
-        itemWidget->setStyleSheet("background: transparent; border: none;");
-        QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
-        itemLayout->setContentsMargins(0, 6, 0, 6);
-        itemLayout->setSpacing(3);
-
-        QLabel *lblTitle = new QLabel(titleText, itemWidget);
-        lblTitle->setObjectName("NotifItemTitle");
-        lblTitle->setWordWrap(true);
-        lblTitle->setStyleSheet("font-size: 12px; font-weight: 700; color: #1e293b; border: none; background: transparent;");
-
-        QLabel *lblTime = new QLabel(timeText, itemWidget);
-        lblTime->setObjectName("NotifItemTime");
-        lblTime->setStyleSheet("font-size: 11px; color: #64748b; border: none; background: transparent;");
-
-        itemLayout->addWidget(lblTitle);
-        itemLayout->addWidget(lblTime);
-        return itemWidget;
-    };
-
-    sideLayout->addWidget(createNotifItem("Aula 201: Matemáticas en curso", "7 hours ago"));
-    sideLayout->addWidget(createNotifItem("Nuevo registro: Historia", "2 hours ago"));
-    sideLayout->addWidget(createNotifItem("Mantenimiento en Lab-3", "2 hours ago"));
+    // Contenedor dinámico de notificaciones
+    m_notifLayout = new QVBoxLayout();
+    m_notifLayout->setSpacing(8);
+    sideLayout->addLayout(m_notifLayout);
     sideLayout->addStretch();
 
     masterLayout->addLayout(leftContentLayout, 3);
@@ -185,7 +173,224 @@ void SubjectListWidget::setupUi() {
 }
 
 // ==========================================
-// FUNCIÓN PARA ACTUALIZAR EL TEMA EN TIEMPO REAL
+// CARGAR DESDE NUCLEO DATOS Y ACTUALIZAR PANEL
+// ==========================================
+void SubjectListWidget::cargarMaterias() {
+    if (!m_nucleo) return;
+
+    m_table->setRowCount(0);
+    auto res = m_nucleo->listarMaterias();
+
+    if (!res.ok) {
+        QMessageBox::warning(this, "Error BD", "No se pudo cargar la lista de asignaturas.");
+        return;
+    }
+
+    for (const auto& materia : res.valor) {
+        insertarMateriaEnTabla(materia.id, materia.nombre, materia.requisitos);
+    }
+
+    // Actualizar dinámicamente el panel lateral con datos reales de aulas y materias
+    actualizarPanelLateral();
+}
+
+void SubjectListWidget::actualizarPanelLateral() {
+    if (!m_nucleo) return;
+
+    auto resAulas = m_nucleo->listarAulas();
+    auto resMaterias = m_nucleo->listarMaterias();
+
+    int totalAulas = resAulas.ok ? resAulas.valor.size() : 0;
+    int totalMaterias = resMaterias.ok ? resMaterias.valor.size() : 0;
+
+    int aulasOcupadasEstimadas = 0;
+
+    // Lógica de emparejamiento inteligente (Estimación de compatibilidad)
+    if (totalAulas > 0 && totalMaterias > 0) {
+        // Hacemos una copia temporal de las aulas para no contar la misma dos veces
+        auto aulasDisponibles = resAulas.valor;
+
+        for (const auto& materia : resMaterias.valor) {
+            QString req = materia.requisitos.toLower().trimmed();
+
+            for (int i = 0; i < aulasDisponibles.size(); ++i) {
+                QString nombreAula = aulasDisponibles[i].nombre.toLower().trimmed();
+
+                // Si el requisito coincide con el nombre del aula (ej. "cancha" con "cancha")
+                // o si es un aula general (Aula de estudio) y el aula no es especializada
+                bool coincidenciaDirecta = (!req.isEmpty() && (nombreAula.contains(req) || req.contains(nombreAula)));
+                bool coincidenciaGeneral = (req.contains("estudio") || req.isEmpty()) &&
+                                           !nombreAula.contains("cancha") && !nombreAula.contains("lab");
+
+                if (coincidenciaDirecta || coincidenciaGeneral) {
+                    aulasOcupadasEstimadas++;
+                    aulasDisponibles.removeAt(i); // Marcamos esta aula como usada para la estimación
+                    break; // Pasamos a la siguiente materia
+                }
+            }
+        }
+    }
+
+    int porcentajeOcupacion = 0;
+    if (totalAulas > 0) {
+        porcentajeOcupacion = qMin(100, (aulasOcupadasEstimadas * 100) / totalAulas);
+    }
+
+    if (m_occValLabel) m_occValLabel->setText(QString::number(porcentajeOcupacion) + "%");
+    if (m_progressBar) m_progressBar->setValue(porcentajeOcupacion);
+
+    // Refrescar Notificaciones Recientes dinámicamente
+    QLayoutItem *child;
+    while ((child = m_notifLayout->takeAt(0)) != nullptr) {
+        if (child->widget()) { child->widget()->deleteLater(); }
+        delete child;
+    }
+
+    bool isDark = qApp->property("isDarkMode").toBool();
+    auto crearItemNotif = [this, isDark](const QString& titulo, const QString& tiempo) {
+        QWidget *itemWidget = new QWidget(this);
+        QVBoxLayout *itemLayout = new QVBoxLayout(itemWidget);
+        itemLayout->setContentsMargins(0, 4, 0, 4);
+        itemLayout->setSpacing(2);
+
+        QLabel *lblTitle = new QLabel(titulo, itemWidget);
+        lblTitle->setObjectName("NotifItemTitle");
+        lblTitle->setWordWrap(true);
+        QString titleColor = isDark ? "#ffffff;" : "#1e293b;";
+        lblTitle->setStyleSheet(QString("font-size: 12px; font-weight: 700; color: %1 border: none; background: transparent;").arg(titleColor));
+
+        QLabel *lblTime = new QLabel(tiempo, itemWidget);
+        lblTime->setObjectName("NotifItemTime");
+        QString timeColor = isDark ? "#aaaaaa;" : "#64748b;";
+        lblTime->setStyleSheet(QString("font-size: 11px; color: %1 border: none; background: transparent;").arg(timeColor));
+
+        itemLayout->addWidget(lblTitle);
+        itemLayout->addWidget(lblTime);
+        m_notifLayout->addWidget(itemWidget);
+    };
+
+    crearItemNotif(QString("Catálogo activo: %1 materias").arg(totalMaterias), "Evaluando compatibilidad");
+    crearItemNotif(QString("Infraestructura: %1 aulas registradas").arg(totalAulas),
+                   totalAulas > 0 ? QString("%1 espacios pre-asignables").arg(aulasOcupadasEstimadas) : "⚠️ Sin aulas registradas");
+}
+
+void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, const QString& requisitos) {
+    int fila = m_table->rowCount();
+    m_table->insertRow(fila);
+
+    QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
+    QTableWidgetItem *itemReq = new QTableWidgetItem(requisitos.isEmpty() ? "Ninguno" : requisitos);
+
+    itemNombre->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    itemReq->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    m_table->setItem(fila, 0, itemNombre);
+    m_table->setItem(fila, 1, itemReq);
+
+    QWidget *panelAcciones = new QWidget();
+    QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
+    layoutAcciones->setContentsMargins(0, 0, 0, 0);
+    layoutAcciones->setSpacing(10);
+    layoutAcciones->setAlignment(Qt::AlignCenter);
+
+    QPushButton *btnEditar = new QPushButton("✏️ Editar");
+    btnEditar->setFixedSize(90, 34);
+    btnEditar->setStyleSheet(
+        "QPushButton { color: #2563eb; background: #eff6ff; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
+        "QPushButton:hover { background-color: #dbeafe; }");
+    btnEditar->setCursor(Qt::PointingHandCursor);
+
+    QPushButton *btnEliminar = new QPushButton("🗑️ Eliminar");
+    btnEliminar->setFixedSize(100, 34);
+    btnEliminar->setStyleSheet(
+        "QPushButton { color: #dc2626; background: #ffeeec; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
+        "QPushButton:hover { background-color: #fee2e2; }");
+    btnEliminar->setCursor(Qt::PointingHandCursor);
+
+    layoutAcciones->addWidget(btnEditar);
+    layoutAcciones->addWidget(btnEliminar);
+
+    int materiaId = id;
+
+    connect(btnEliminar, &QPushButton::clicked, this, [this, materiaId, nombre]() {
+        if (QMessageBox::question(this, "Confirmar eliminación",
+                                  "¿Está seguro de eliminar la asignatura '" + nombre + "'?") == QMessageBox::Yes) {
+            if (m_nucleo->eliminarMateria(materiaId)) {
+                cargarMaterias();
+            } else {
+                QMessageBox::warning(this, "Acción Bloqueada",
+                                     "No se puede eliminar esta asignatura porque actualmente está vinculada a un docente registrado.\n\n"
+                                     "Por favor, edite o elimine al docente correspondiente antes de borrar esta materia del catálogo.");
+            }
+        }
+    });
+
+    connect(btnEditar, &QPushButton::clicked, this, [this, materiaId, nombre, requisitos]() {
+        gestor::frontend::forms::SubjectFormDialog dialogo(this);
+        dialogo.setWindowTitle("Editar Asignatura");
+        dialogo.cargarDatos(nombre, requisitos);
+
+        connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
+                this, [this, materiaId](const QString& nNombre, const QString& nRequisitos) {
+                    auto resultado = m_nucleo->actualizarMateria(materiaId, nNombre, nRequisitos);
+                    if (!resultado.ok) {
+                        QMessageBox::warning(this, "Error", "No se pudo actualizar la asignatura: " + resultado.mensajeError);
+                    } else {
+                        cargarMaterias();
+                    }
+                });
+        dialogo.exec();
+    });
+
+    m_table->setCellWidget(fila, 2, panelAcciones);
+}
+
+void SubjectListWidget::abrirFormularioNuevo() {
+    if (!m_nucleo) return;
+
+    gestor::frontend::forms::SubjectFormDialog dialogo(this);
+    connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
+            this, [this](const QString& nombre, const QString& requisitos) {
+                auto resultado = m_nucleo->crearMateria(nombre, requisitos);
+                if (!resultado.ok) {
+                    QMessageBox::warning(this, "Error", "No se pudo crear la asignatura: " + resultado.mensajeError);
+                } else {
+                    cargarMaterias();
+                }
+            });
+    dialogo.exec();
+}
+
+void SubjectListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
+    Q_UNUSED(respuesta);
+}
+
+void SubjectListWidget::enviarCrearMateria(const QString& nombre, const QString& requisitos) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["nombre"] = nombre;
+    payload["requisitos"] = requisitos;
+    m_client->enviarSolicitud("crear_materia", payload);
+}
+
+void SubjectListWidget::enviarActualizarMateria(int id, const QString& nombre, const QString& requisitos) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = id;
+    payload["nombre"] = nombre;
+    payload["requisitos"] = requisitos;
+    m_client->enviarSolicitud("actualizar_materia", payload);
+}
+
+void SubjectListWidget::enviarEliminarMateria(int id) {
+    if (!m_client) return;
+    QJsonObject payload;
+    payload["id"] = id;
+    m_client->enviarSolicitud("eliminar_materia", payload);
+}
+
+// ==========================================
+// TEMA
 // ==========================================
 void SubjectListWidget::actualizarTema(bool modoOscuro) {
     if (modoOscuro) {
@@ -221,7 +426,6 @@ void SubjectListWidget::actualizarTema(bool modoOscuro) {
                 "QTableWidget::item { border: none; border-bottom: 1px solid #2a2a2a; padding: 10px 20px; color: #ffffff; font-size: 13px; }");
         }
     } else {
-        // Restaurar Tema Claro
         if (auto t = findChild<QLabel*>("SubjectTitle")) t->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
         if (auto s = findChild<QLabel*>("SubjectSub")) s->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
         if (auto st = findChild<QLabel*>("SummaryTitle")) st->setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
@@ -254,144 +458,4 @@ void SubjectListWidget::actualizarTema(bool modoOscuro) {
                 "QTableWidget::item { border: none; border-bottom: 1px solid #f1f5f9; padding: 10px 20px; color: #0f172a; font-size: 13px; }");
         }
     }
-}
-
-// ==========================================
-// RESTO DE MÉTODOS CRUD (Sin cambios)
-// ==========================================
-void SubjectListWidget::onRespuestaRecibida(const QJsonObject& respuesta) {
-    QString op = respuesta["op"].toString();
-    if (op != m_pendiente.op) return;
-
-    if (respuesta["status"].toString() == "ok") {
-        QJsonObject data = m_pendiente.data;
-        if (op == Middleware::OP_CREAR_MATERIA) {
-            insertarMateriaEnTabla(data["nombre"].toString(), data["tipoAula"].toString());
-        } else if (op == Middleware::OP_ACTUALIZAR_MATERIA) {
-            int f = m_pendiente.fila;
-            m_table->item(f, 0)->setText(data["nombre"].toString());
-            m_table->item(f, 1)->setText(data["tipoAula"].toString());
-        } else if (op == Middleware::OP_ELIMINAR_MATERIA) {
-            m_table->removeRow(m_pendiente.fila);
-        }
-    } else {
-        QMessageBox::warning(this, "Error", "No se pudo completar la operación: " + respuesta["data"].toString());
-    }
-    m_pendiente = SolicitudPendiente();
-}
-
-void SubjectListWidget::enviarCrearMateria(const QString& nombre, const QString& tipoAula) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["nombre"] = nombre;
-    payload["tipoAula"] = tipoAula;
-    m_pendiente = {Middleware::OP_CREAR_MATERIA, payload, -1};
-    m_client->enviarSolicitud(Middleware::OP_CREAR_MATERIA, payload);
-}
-
-void SubjectListWidget::enviarActualizarMateria(int fila, const QString& nombreOriginal,
-                                                const QString& nombre, const QString& tipoAula) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["id"] = nombreOriginal;
-    payload["nombre"] = nombre;
-    payload["tipoAula"] = tipoAula;
-    m_pendiente = {Middleware::OP_ACTUALIZAR_MATERIA, payload, fila};
-    m_client->enviarSolicitud(Middleware::OP_ACTUALIZAR_MATERIA, payload);
-}
-
-void SubjectListWidget::enviarEliminarMateria(int fila, const QString& nombre) {
-    if (!m_client) return;
-    QJsonObject payload;
-    payload["id"] = nombre;
-    m_pendiente = {Middleware::OP_ELIMINAR_MATERIA, payload, fila};
-    m_client->enviarSolicitud(Middleware::OP_ELIMINAR_MATERIA, payload);
-}
-
-void SubjectListWidget::insertarMateriaEnTabla(const QString& nombre, const QString& tipoAula) {
-    int fila = m_table->rowCount();
-    m_table->insertRow(fila);
-
-    QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
-    QTableWidgetItem *itemTipo = new QTableWidgetItem(tipoAula);
-
-    itemNombre->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    itemTipo->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-
-    m_table->setItem(fila, 0, itemNombre);
-    m_table->setItem(fila, 1, itemTipo);
-
-    // Contenedor de Acciones perfectamente centrado
-    QWidget *panelAcciones = new QWidget();
-    QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
-    layoutAcciones->setContentsMargins(0, 0, 0, 0);
-    layoutAcciones->setSpacing(10);
-    layoutAcciones->setAlignment(Qt::AlignCenter);
-
-    QPushButton *btnEditar = new QPushButton("✏️ Editar");
-    btnEditar->setFixedSize(90, 34);
-    btnEditar->setStyleSheet(
-        "QPushButton { color: #2563eb; background: #eff6ff; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
-        "QPushButton:hover { background-color: #dbeafe; }");
-    btnEditar->setCursor(Qt::PointingHandCursor);
-
-    QPushButton *btnEliminar = new QPushButton("🗑️ Eliminar");
-    btnEliminar->setFixedSize(100, 34);
-    btnEliminar->setStyleSheet(
-        "QPushButton { color: #dc2626; background: #ffeeec; border: none; font-weight: 700; font-size: 12px; border-radius: 6px; }"
-        "QPushButton:hover { background-color: #fee2e2; }");
-    btnEliminar->setCursor(Qt::PointingHandCursor);
-
-    layoutAcciones->addWidget(btnEditar);
-    layoutAcciones->addWidget(btnEliminar);
-
-    // Lógica de Eliminación
-    connect(btnEliminar, &QPushButton::clicked, this, [this, panelAcciones]() {
-        if (QMessageBox::question(this, "Confirmar eliminación",
-                                  "¿Está seguro de eliminar esta asignatura?") == QMessageBox::Yes) {
-            for (int i = 0; i < m_table->rowCount(); ++i) {
-                if (m_table->cellWidget(i, 2) == panelAcciones) {
-                    QString nombre = m_table->item(i, 0)->text();
-                    enviarEliminarMateria(i, nombre);
-                    break;
-                }
-            }
-        }
-    });
-
-    // Lógica de Edición
-    connect(btnEditar, &QPushButton::clicked, this, [this, panelAcciones]() {
-        int filaEditar = -1;
-        for (int i = 0; i < m_table->rowCount(); ++i) {
-            if (m_table->cellWidget(i, 2) == panelAcciones) {
-                filaEditar = i;
-                break;
-            }
-        }
-        if (filaEditar == -1) return;
-
-        QString nombre = m_table->item(filaEditar, 0)->text();
-        QString tipo = m_table->item(filaEditar, 1)->text();
-
-        gestor::frontend::forms::SubjectFormDialog dialogo(this);
-        dialogo.setWindowTitle("Editar Asignatura");
-        dialogo.cargarDatos(nombre, tipo);
-
-        connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-                this, [this, filaEditar, nombre](const QString& nNombre, const QString& nTipo) {
-                    enviarActualizarMateria(filaEditar, nombre, nNombre, nTipo);
-                });
-        dialogo.exec();
-    });
-
-    m_table->setCellWidget(fila, 2, panelAcciones);
-}
-
-void SubjectListWidget::abrirFormularioNuevo() {
-    gestor::frontend::forms::SubjectFormDialog dialogo(this);
-    connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-            this, [this](const QString& nombre, const QString& tipoAula) {
-                enviarCrearMateria(nombre, tipoAula);
-            });
-    dialogo.exec();
 }

@@ -4,17 +4,27 @@
 #include <QTableWidget>
 #include <QPushButton>
 #include <QJsonObject>
+#include <QLabel>
+#include <QProgressBar>
+#include <QVBoxLayout>
 
 class InternalClient;
+class NucleoDatos;
 
 class SubjectListWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit SubjectListWidget(QWidget *parent = nullptr);
-    void setClient(InternalClient* client);
+    ~SubjectListWidget() = default;
 
-    void actualizarTema(bool modoOscuro); // <--- FUNCIÓN AÑADIDA PARA EL MODO OSCURO
+    void setClient(InternalClient* client);
+    void setNucleoDatos(NucleoDatos* nucleo);
+
+    void actualizarTema(bool modoOscuro);
+
+public slots:
+    void cargarMaterias();
 
 private slots:
     void onRespuestaRecibida(const QJsonObject& respuesta);
@@ -22,12 +32,12 @@ private slots:
 
 private:
     void setupUi();
-    void insertarMateriaEnTabla(const QString& nombre, const QString& tipoAula);
+    void actualizarPanelLateral(); // <-- NUEVO: Para refrescar ocupación y notificaciones dinámicamente
+    void insertarMateriaEnTabla(int id, const QString& nombre, const QString& requisitos);
 
-    void enviarCrearMateria(const QString& nombre, const QString& tipoAula);
-    void enviarActualizarMateria(int fila, const QString& nombreOriginal,
-                                 const QString& nombre, const QString& tipoAula);
-    void enviarEliminarMateria(int fila, const QString& nombre);
+    void enviarCrearMateria(const QString& nombre, const QString& requisitos);
+    void enviarActualizarMateria(int id, const QString& nombre, const QString& requisitos);
+    void enviarEliminarMateria(int id);
 
     struct SolicitudPendiente {
         QString op;
@@ -38,4 +48,10 @@ private:
     QTableWidget* m_table = nullptr;
     QPushButton* m_registerButton = nullptr;
     InternalClient* m_client = nullptr;
+    NucleoDatos* m_nucleo = nullptr;
+
+    // Punteros para los elementos dinámicos del panel derecho
+    QLabel* m_occValLabel = nullptr;
+    QProgressBar* m_progressBar = nullptr;
+    QVBoxLayout* m_notifLayout = nullptr;
 };

@@ -13,10 +13,10 @@
 #   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 #
 # Dependencias externas requeridas (instaladas en el contenedor Docker):
-#   - OR-Tools v9.15+  → find_package(ortools CONFIG)
-#   - Qt6              → find_package(Qt6 COMPONENTS Core Sql)
-#   - CMake 3.24+      → mínimo requerido por OR-Tools
-#   - Ninja            → generador del build
+#   - OR-Tools v9.15+   → find_package(ortools CONFIG)
+#   - Qt6               → find_package(Qt6 COMPONENTS Core Sql)
+#   - CMake 3.24+       → mínimo requerido por OR-Tools
+#   - Ninja             → generador del build
 
 cmake_minimum_required(VERSION 3.24)
 project(Gestor-Horarios
@@ -49,13 +49,14 @@ find_package(Qt6 REQUIRED COMPONENTS ${GESTOR_QT_COMPONENTS})
 
 if(BUILD_BACKEND)
     # OR-Tools: biblioteca de optimización (CP-SAT, rutas, asignación, etc.)
-    # Se encuentra automáticamente porque está instalada en /usr/local/lib/cmake/ortools/
+    set(CMAKE_PREFIX_PATH "C:/ortools-v9.15-vs2022")
+    set(ortools_DIR "C:/ortools-v9.15-vs2022/lib/cmake/ortools")
     find_package(ortools CONFIG REQUIRED)
     message(STATUS "OR-Tools found - backend and solver enabled")
 else()
     message(STATUS "BUILD_BACKEND=OFF - backend and OR-Tools disabled")
 endif()
-    
+
 
 # ── Opciones de compilación ──
 include(cmake/CompilerWarnings.cmake)
