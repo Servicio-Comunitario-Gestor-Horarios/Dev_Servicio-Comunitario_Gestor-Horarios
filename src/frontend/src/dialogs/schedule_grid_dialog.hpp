@@ -4,9 +4,15 @@
  * @file schedule_grid_dialog.hpp
  * @brief Base compartida por los diálogos de horarios de profesores y alumnos.
  *
- * Aporta la rejilla (Lunes–Viernes, franjas de mañana y tarde y una fila de
- * receso de 30 min), el arrastrar/soltar de bloques, la detección de conflictos
+ * Aporta la rejilla, el arrastrar/soltar de bloques, la detección de conflictos
  * entre todos los horarios y el diálogo estilizado Cancelar/Intercambiar.
+ *
+ * La rejilla se dibuja con los datos que dejó la generación en el documento
+ * (`_cuadricula`): días, franjas de cada turno, duración del bloque y recesos
+ * (posición y duración). Un curso solo ve las franjas de su turno; un docente,
+ * las de todos. Las clases que ocupan varias franjas seguidas se pintan como un
+ * único bloque. Si el documento no describe su rejilla, se usa la plantilla
+ * histórica (véase `schedule_model.hpp`).
  *
  * Las subclases sólo definen la navegación (docentes o años/secciones) y el
  * `currentRef()` que indica qué horario se está editando.
@@ -57,6 +63,8 @@ protected:
     void     rebuildGrid();
     void     resetGridScroll();
     int      blockCount() const;
+    int      visualBlockCount() const;
+    QString  currentTurno() const;
     void     emitModified() { emit scheduleModified(m_data); }
 
     // Contrato de las subclases
@@ -72,7 +80,8 @@ protected:
     QLabel* m_subtitleLabel = nullptr;
 
 private:
-    QFrame* createBlockCell(int day, int slot, const ScheduleModel::Block& block);
+    QFrame* createBlockCell(int day, int slot, const ScheduleModel::Block& block,
+                            int span, const QString& rangoHoras);
     void    startDrag(QFrame* cell, const QPoint& pos);
 
     QScrollArea* m_gridScroll = nullptr;

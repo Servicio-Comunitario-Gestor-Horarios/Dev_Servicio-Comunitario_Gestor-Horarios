@@ -4,7 +4,7 @@
 
 ## Fase actual
 
-- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). Suite **46/46** en verde.
+- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor). Suite **47/47** en verde.
 - **Fecha:** 2026-10-17
 - **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
 - **Specs en curso:** `specs/005-nucleo-solver` (implementada; T10 abierta por pendientes) y `specs/008-datos-de-prueba` (implementada; APROBADA por el reviewer)
@@ -148,6 +148,30 @@
 
 - 008: **T1–T9 completas** ✅ (APROBADO por el reviewer; 57 materias, 4 planes, 13 cursos sin turno, 16 aulas, 4 variantes de docentes; suite 46/46).
 - 005: **T11 completa** ✅ (hora académica = bloque; `bloques`/`bloquesAula` identidad; T10 sigue abierta).
+
+- **Visualización dirigida por datos (2026-10-18):** la rejilla de horarios (ventanas de profesores y de
+  alumnos) deja de suponer 12 franjas de 45 min y un receso de 30 min y se dibuja con lo que el motor
+  recibe. Hallazgos y cambios:
+  - **`aFormatoVisualizacion` descartaba las franjas de la tarde.** El filtro era `slot > 11` (plantilla
+    antigua): con el contrato actual (16 franjas/día, mañana 0..7 y tarde 8..15) los cursos de la tarde
+    perdían sus clases en la vista. Ahora el rango válido lo declara la configuración
+    (`num_slots_dia`/`num_dias`) y el filtro es `slot >= numSlotsDia`.
+  - **La rejilla viaja en el horario (`_cuadricula`).** `aFormatoVisualizacion` emite duración del bloque,
+    días, franjas por turno (con su hora de inicio) y recesos (posición y duración), leídos de la propia
+    entrada ya construida (`leerCuadricula`), así que la vista no adivina: si mañana el bloque es de
+    50 min o el receso de 15, se ve tal cual. Cada sección declara además su `turno`.
+  - **Rejilla por turno y con varias franjas.** Un curso ve solo las franjas de su turno (con su receso);
+    un docente, las de todos (puede dar clase en ambos). Una clase que ocupa franjas seguidas (misma
+    materia, profesor y aula) se pinta como **un solo bloque** («12:40 - 14:00 · 2 h») y se arrastra
+    entero (`planMoveRun`); un receso en medio corta la unión. Si el documento no trae `_cuadricula`
+    (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se usa la plantilla
+    histórica de 12×45 min + receso de 30.
+  - **Leyenda y subtítulos.** La leyenda se arma con las materias reales del horario (ordenadas por peso,
+    en una tira desplazable) y los subtítulos muestran turno, clases pintadas y horas académicas.
+  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos y movimiento del
+    bloque completo), `test_frontend_conversion` actualizada (conserva la tarde, emite `_cuadricula` y el
+    turno) y `test_generacion_seed` ampliada (el documento de visualización conserva las 520 clases,
+    incluidas las de la tarde). **Suite 47/47 en verde.** Verificado a ojo con capturas de las ventanas.
 
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
   probó el flujo completo de la vista «Generación de horario» con la base sembrada

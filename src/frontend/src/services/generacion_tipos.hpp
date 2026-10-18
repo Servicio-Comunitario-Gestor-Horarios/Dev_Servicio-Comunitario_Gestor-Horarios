@@ -62,6 +62,50 @@ struct OpcionesUI {
 };
 
 /**
+ * @brief Franjas que ocupa un turno en la rejilla temporal.
+ *
+ * Los turnos se numeran sobre una misma recta de slots por día (p. ej. mañana
+ * 0..7 y tarde 8..15), así que cada turno declara los suyos.
+ */
+struct TurnoVisual {
+    QString nombre;        ///< Nombre del turno ("Mañana", "Tarde").
+    QVector<int> franjas;  ///< Índices de slot del turno, en orden.
+    QString inicio;        ///< Hora de inicio del turno ("HH:mm"), si se conoce.
+};
+
+/**
+ * @brief Receso declarado para un turno.
+ *
+ * La duración no es fija (los datos de prueba usan 10 min, pero puede ser otra):
+ * la visualización lee de aquí cuándo va y cuánto dura.
+ */
+struct RecesoVisual {
+    QString turno;             ///< Turno al que pertenece.
+    int despuesDeSlot = 0;     ///< Se inserta tras esa cantidad de franjas del turno.
+    int duracion = 0;          ///< Minutos.
+    QString inicio;            ///< "HH:mm" según el dominio, si se conoce.
+    QString fin;               ///< "HH:mm" según el dominio, si se conoce.
+};
+
+/**
+ * @brief Rejilla temporal con la que se generó el horario (RF-1).
+ *
+ * La sección de visualización dibuja la cuadrícula con estos datos en lugar de
+ * una plantilla fija: duración real del bloque académico, franjas de cada turno
+ * y recesos (posición y duración), tal como viajaron al solver.
+ */
+struct CuadriculaVisual {
+    int duracionMinutos = 0;   ///< Duración de cada franja académica (min).
+    int numDias = 5;           ///< Días planificados.
+    int numSlotsDia = 0;       ///< Franjas por día.
+    QVector<TurnoVisual> turnos;
+    QVector<RecesoVisual> recesos;
+
+    /// ¿Trae suficiente información para dibujar la rejilla?
+    bool valida() const { return duracionMinutos > 0 && !turnos.isEmpty(); }
+};
+
+/**
  * @brief Contexto de nombres/índices de la última entrada construida.
  *
  * El HorarioSalida del solver referencia materias, profesores y aulas por
@@ -74,6 +118,9 @@ struct ContextoHorario {
 
     /// Clave de curso del solver (`claveCurso`, "año|sección") -> (año, sección).
     QMap<QString, QPair<int, QString>> cursos;
+
+    /// Rejilla real (franjas y recesos) para la visualización.
+    CuadriculaVisual cuadricula;
 };
 
 } // namespace GeneracionSolver

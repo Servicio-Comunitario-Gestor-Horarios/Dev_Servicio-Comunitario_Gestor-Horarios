@@ -124,6 +124,12 @@ if(TARGET frontend AND TARGET backend)
 	target_include_directories(test_frontend_conversion PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
 
+	# La rejilla dirigida por datos (turnos, recesos y bloques de varias franjas)
+	# es lógica pura del modelo de la visualización.
+	add_qtest(test_cuadricula_horario frontend/test_cuadricula_horario.cpp frontend)
+	target_include_directories(test_cuadricula_horario PRIVATE
+					${CMAKE_SOURCE_DIR}/src/frontend/src)
+
 	# Integración: composición de la entrada + solver con los datos sembrados.
 	if(TARGET backend_solver AND TARGET seed)
 		add_qtest(test_generacion_seed frontend/test_generacion_seed.cpp

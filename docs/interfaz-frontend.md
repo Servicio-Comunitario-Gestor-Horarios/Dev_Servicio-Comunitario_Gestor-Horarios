@@ -554,8 +554,11 @@ eso la composición vive en el frontend, en `src/frontend/src/services/` (se com
     plan, plan sin materias, lecturas fallidas).
   - `horasSugeridasPorDocente(nucleo, cursos)` → precarga válida de horas por docente.
   - `aFormatoVisualizacion(horario, contexto)` → JSON con `teachers`/`years` (más un bloque `_meta`
-    informativo) que entienden la sección de visualización y sus diálogos. Traduce los índices del
-    `HorarioSalida` a nombres y el día del solver (`0 = lunes`) a las claves `"1".."5"`.
+    informativo y un bloque `_cuadricula` con la rejilla usada: duración del bloque, turnos y recesos)
+    que entienden la sección de visualización y sus diálogos. Traduce los índices del
+    `HorarioSalida` a nombres y el día del solver (`0 = lunes`) a las claves `"1".."5"`; las franjas
+    válidas son las de la configuración (`num_slots_dia`), no una plantilla fija, y cada sección
+    declara su `turno`.
 - **`puerto_solver_ipc.{hpp,cpp}`** — `PuertoSolverIpc`: implementa `PuertoSolver` sobre
   `InternalClient`, envía la op `Middleware::OP_RESOLVER_HORARIO` y correlaciona la respuesta
   (`RESP_EXITO` → `ok && factible`; `RESP_SIN_SOLUCION` → `ok && !factible`; otro → `!ok`).
@@ -582,9 +585,22 @@ en `setNucleoDatos` se lo reenvía a la vista de generación con el `NucleoDatos
 sección de visualización para que el horario quede cargado y editable. La carpeta de destino se
 obtiene de `ScheduleVisualizationWidget::schedulesDirectory()`.
 
+**Visualización dirigida por datos (`dialogs/`):** el documento que consumen los diálogos de horarios
+lleva, además de `teachers`/`years` y `_meta`, un bloque **`_cuadricula`** con la rejilla con la que se
+generó: `duracion_minutos`, `num_dias`, `num_slots_dia`, `turnos` (nombre, franjas `slot` y hora de
+`inicio`) y `recesos` (`turno`, `despues_de_slot`, `duracion`, `inicio`, `fin`). Cada sección declara
+además su `turno`. `ScheduleModel::rowsFor` construye las filas de cada horario con esos datos: las
+franjas del turno del curso (o de todos los turnos si es un docente), la hora de cada bloque
+(`inicio + k·duración + recesos previos`) y una fila de receso con su duración real. Si el documento
+no trae `_cuadricula` (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se
+usa la plantilla histórica de 12 franjas de 45 min con receso de 30 min. `largoDeTramo` une las
+franjas seguidas de la misma clase (misma materia, profesor y aula) en **un solo bloque**, que se
+pinta con `rowSpan` y se arrastra entero (`planMoveRun`); un receso en medio corta la unión.
+
 El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_conversion`
 (`test/frontend/test_conversion_entrada.cpp`, target añadido en `test/CMakeLists.txt` cuando existen
-`frontend` y `backend`).
+`frontend` y `backend`). La rejilla (filas por turno, receso, horas y tramos) por
+`test_cuadricula_horario` (`test/frontend/test_cuadricula_horario.cpp`).
 
 La integración completa (sembrar una base de prueba, componer la entrada desde el frontend con un
 reparto plan/turno por curso, validarla y **resolverla** con el motor) está cubierta por

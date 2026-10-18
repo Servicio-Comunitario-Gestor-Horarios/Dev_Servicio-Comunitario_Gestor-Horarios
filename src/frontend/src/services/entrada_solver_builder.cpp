@@ -59,6 +59,87 @@ DatosDominio leerDominio(const NucleoDatos& nucleo, Composicion& comp)
     return datos;
 }
 
+/// Rejilla real con la que se generó el horario, leída de la entrada ya
+/// construida (evita duplicar la lógica del contrato). El inicio de cada turno
+/// no viaja al solver, así que se toma del dominio por nombre.
+CuadriculaVisual leerCuadricula(const QJsonObject& entrada, const QVector<TurnoDTO>& turnos)
+{
+    CuadriculaVisual c;
+    c.duracionMinutos = entrada.value(QStringLiteral("franja_horaria")).toObject()
+                            .value(QStringLiteral("duracion_minutos")).toInt(0);
+    const QJsonObject dimensiones = entrada.value(QStringLiteral("dimensiones")).toObject();
+    c.numDias = dimensiones.value(QStringLiteral("num_dias")).toInt(5);
+    c.numSlotsDia = dimensiones.value(QStringLiteral("num_slots_dia")).toInt(0);
+
+    QMap<QString, QString> inicioPorTurno;
+    for (const TurnoDTO& t : turnos)
+        if (t.inicio.isValid())
+            inicioPorTurno.insert(t.nombre, t.inicio.toString(QStringLiteral("HH:mm")));
+
+    const QJsonArray turnosJson = entrada.value(QStringLiteral("turnos")).toObject()
+                                      .value(QStringLiteral("turnos")).toArray();
+    for (const QJsonValue& v : turnosJson) {
+        const QJsonObject o = v.toObject();
+        TurnoVisual t;
+        t.nombre = o.value(QStringLiteral("nombre")).toString();
+        const QJsonArray franjas = o.value(QStringLiteral("slot")).toArray();
+        for (const QJsonValue& s : franjas)
+            t.franjas.append(s.toInt());
+        t.inicio = inicioPorTurno.value(t.nombre);
+        c.turnos.append(t);
+    }
+
+    const QJsonArray recesosJson = entrada.value(QStringLiteral("recesos")).toArray();
+    for (const QJsonValue& v : recesosJson) {
+        const QJsonObject o = v.toObject();
+        RecesoVisual r;
+        r.turno = o.value(QStringLiteral("turno")).toString();
+        r.despuesDeSlot = o.value(QStringLiteral("despues_de_slot")).toInt(0);
+        r.duracion = o.value(QStringLiteral("duracion")).toInt(0);
+        r.inicio = o.value(QStringLiteral("inicio")).toString();
+        r.fin = o.value(QStringLiteral("fin")).toString();
+        c.recesos.append(r);
+    }
+
+    return c;
+}
+
+/// Serializa la rejilla para que la visualización la lea del propio horario.
+QJsonObject cuadriculaAJson(const CuadriculaVisual& c)
+{
+    QJsonObject out;
+    out.insert(QStringLiteral("duracion_minutos"), c.duracionMinutos);
+    out.insert(QStringLiteral("num_dias"), c.numDias);
+    out.insert(QStringLiteral("num_slots_dia"), c.numSlotsDia);
+
+    QJsonArray turnos;
+    for (const TurnoVisual& t : c.turnos) {
+        QJsonObject obj;
+        obj.insert(QStringLiteral("nombre"), t.nombre);
+        QJsonArray franjas;
+        for (int slot : t.franjas)
+            franjas.append(slot);
+        obj.insert(QStringLiteral("slot"), franjas);
+        if (!t.inicio.isEmpty())
+            obj.insert(QStringLiteral("inicio"), t.inicio);
+        turnos.append(obj);
+    }
+    out.insert(QStringLiteral("turnos"), turnos);
+
+    QJsonArray recesos;
+    for (const RecesoVisual& r : c.recesos) {
+        QJsonObject obj;
+        obj.insert(QStringLiteral("turno"), r.turno);
+        obj.insert(QStringLiteral("despues_de_slot"), r.despuesDeSlot);
+        obj.insert(QStringLiteral("duracion"), r.duracion);
+        if (!r.inicio.isEmpty()) obj.insert(QStringLiteral("inicio"), r.inicio);
+        if (!r.fin.isEmpty())    obj.insert(QStringLiteral("fin"), r.fin);
+        recesos.append(obj);
+    }
+    out.insert(QStringLiteral("recesos"), recesos);
+    return out;
+}
+
 } // namespace
 
 /// ¿El plan `codigo` (ya compuesto) tiene materias para el año `anio`?
@@ -175,6 +256,10 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
         comp.contexto.cursos.insert(claveCurso(c.anio, c.seccion),
                                     qMakePair(c.anio, c.seccion));
 
+    // Rejilla real (franjas, duración y recesos) para que la visualización se
+    // dibuje con los datos del motor y no con una plantilla fija.
+    comp.contexto.cuadricula = leerCuadricula(comp.entrada, datos.turnos);
+
     return comp;
 }
 
@@ -222,6 +307,11 @@ QMap<QString, int> horasSugeridasPorDocente(
 QJsonObject aFormatoVisualizacion(const HorarioSalida& horario,
                                   const ContextoHorario& contexto)
 {
+    // Rango válido: el declarado por la configuración (la entrada del solver), no
+    // una plantilla fija. Así las franjas de la tarde (slots 12+) no se pierden.
+    const int numDias = contexto.cuadricula.numDias > 0 ? contexto.cuadricula.numDias : 5;
+    const int numSlotsDia = contexto.cuadricula.numSlotsDia;
+
     // Un horario por docente (mismo orden que el contexto) y uno por curso.
     QVector<QJsonObject> horarioPorDocente(contexto.profesores.size());
     QMap<QString, QJsonObject> horarioPorCurso;
@@ -241,11 +331,13 @@ QJsonObject aFormatoVisualizacion(const HorarioSalida& horario,
 
         for (const DiaOutput& dia : curso.dias) {
             const int diaVisual = dia.dia + 1; // solver: 0=lunes -> visual: 1=lunes
-            if (diaVisual < 1 || diaVisual > 5)
+            if (diaVisual < 1 || diaVisual > numDias)
                 continue;
 
             for (const AsignacionOutput& a : dia.asignaciones) {
-                if (a.slot < 0 || a.slot > 11)
+                if (a.slot < 0)
+                    continue;
+                if (numSlotsDia > 0 && a.slot >= numSlotsDia)
                     continue;
 
                 const QString materia = contexto.materias.value(a.materia);
@@ -286,6 +378,10 @@ QJsonObject aFormatoVisualizacion(const HorarioSalida& horario,
         QJsonObject sec;
         sec.insert(QStringLiteral("name"), nombreCurso(anio, seccion));
         sec.insert(QStringLiteral("schedule"), horarioPorCurso.value(it.key()));
+        // El turno del curso decide qué franjas se dibujan en su rejilla.
+        const auto cursoSalida = horario.horarios.constFind(it.key());
+        if (cursoSalida != horario.horarios.constEnd() && !cursoSalida->turno.isEmpty())
+            sec.insert(QStringLiteral("turno"), cursoSalida->turno);
         seccionesPorAnio[anio].append(sec);
     }
 
@@ -307,6 +403,11 @@ QJsonObject aFormatoVisualizacion(const HorarioSalida& horario,
     meta.insert(QStringLiteral("total_asignaciones"), horario.metadata.total_asignaciones);
     meta.insert(QStringLiteral("cursos_generados"), horario.metadata.cursos_generados);
     root.insert(QStringLiteral("_meta"), meta);
+
+    // Rejilla temporal real: la visualización la usa para pintar las franjas
+    // (duración del bloque), los turnos y sus recesos.
+    if (contexto.cuadricula.valida())
+        root.insert(QStringLiteral("_cuadricula"), cuadriculaAJson(contexto.cuadricula));
 
     return root;
 }

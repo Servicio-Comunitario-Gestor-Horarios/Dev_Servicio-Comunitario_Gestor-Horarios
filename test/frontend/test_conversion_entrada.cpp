@@ -28,6 +28,41 @@ private:
         return ctx;
     }
 
+    /// Contexto con la rejilla real: 16 franjas por día, mañana 0..7 y tarde
+    /// 8..15, con un receso de 10 min tras la segunda franja de cada turno.
+    GeneracionSolver::ContextoHorario contextoConRejilla() const
+    {
+        GeneracionSolver::ContextoHorario ctx = contextoBase();
+        ctx.cuadricula.duracionMinutos = 40;
+        ctx.cuadricula.numDias = 5;
+        ctx.cuadricula.numSlotsDia = 16;
+
+        GeneracionSolver::TurnoVisual manana;
+        manana.nombre = QStringLiteral("Mañana");
+        manana.inicio = QStringLiteral("07:00");
+        GeneracionSolver::TurnoVisual tarde;
+        tarde.nombre = QStringLiteral("Tarde");
+        tarde.inicio = QStringLiteral("12:40");
+        for (int s = 0; s < 8; ++s) {
+            manana.franjas.append(s);
+            tarde.franjas.append(s + 8);
+        }
+        ctx.cuadricula.turnos = {manana, tarde};
+
+        GeneracionSolver::RecesoVisual recesoManana;
+        recesoManana.turno = manana.nombre;
+        recesoManana.despuesDeSlot = 2;
+        recesoManana.duracion = 10;
+        recesoManana.inicio = QStringLiteral("08:20");
+        recesoManana.fin = QStringLiteral("08:30");
+        GeneracionSolver::RecesoVisual recesoTarde = recesoManana;
+        recesoTarde.turno = tarde.nombre;
+        recesoTarde.inicio = QStringLiteral("14:00");
+        recesoTarde.fin = QStringLiteral("14:10");
+        ctx.cuadricula.recesos = {recesoManana, recesoTarde};
+        return ctx;
+    }
+
     static AsignacionOutput asignacion(int slot, int materia, int profesor, int aula)
     {
         AsignacionOutput a;
@@ -109,33 +144,68 @@ private slots:
         QCOMPARE(int(secciones.size()), 1);
         const QJsonObject seccion = secciones.at(0).toObject();
         QCOMPARE(seccion.value(QStringLiteral("name")).toString(), QStringLiteral("1ro A"));
+        // El turno del curso viaja con la sección: decide qué franjas se dibujan.
+        QCOMPARE(seccion.value(QStringLiteral("turno")).toString(), QStringLiteral("manana"));
         const QJsonObject scheduleCurso = seccion.value(QStringLiteral("schedule")).toObject();
         QCOMPARE(bloque(scheduleCurso, QStringLiteral("1"), QStringLiteral("0"))
                      .value(QStringLiteral("materia")).toString(),
                  QStringLiteral("Matemática"));
     }
 
-    void omiteDiasYSlotsFueraDeRango()
+    void omiteDiasFueraDeRangoYConservaLaTarde()
     {
         HorarioSalida horario;
         CursoOutput curso;
         curso.dias = {
             // Día del solver 5 → "6": fuera de rango, se omite.
             DiaOutput{5, {asignacion(0, 0, 0, 0)}},
-            // Slot 15: fuera de rango, se omite; slot 2 es válido.
-            DiaOutput{0, {asignacion(15, 1, 1, 0), asignacion(2, 0, 0, 0)}},
+            // Franjas 2 y 15 (esta última de la tarde): ambas válidas.
+            DiaOutput{0, {asignacion(15, 0, 0, 0), asignacion(2, 1, 1, 0)}},
         };
         horario.horarios.insert(claveCurso(1, QStringLiteral("A")), curso);
 
-        const QJsonObject root = GeneracionSolver::aFormatoVisualizacion(horario, contextoBase());
+        const QJsonObject root =
+            GeneracionSolver::aFormatoVisualizacion(horario, contextoConRejilla());
         const QJsonArray teachers = root.value(QStringLiteral("teachers")).toArray();
         const QJsonObject scheduleAna = teachers.at(0).toObject()
                                             .value(QStringLiteral("schedule")).toObject();
 
         QVERIFY(!scheduleAna.contains(QStringLiteral("6")));
-        QVERIFY(!scheduleAna.contains(QStringLiteral("1"))
-                || !scheduleAna.value(QStringLiteral("1")).toObject().contains(QStringLiteral("15")));
-        QVERIFY(!bloque(scheduleAna, QStringLiteral("1"), QStringLiteral("2")).isEmpty());
+        // La franja 15 es de la tarde y antes se descartaba en silencio.
+        QVERIFY(!bloque(scheduleAna, QStringLiteral("1"), QStringLiteral("15")).isEmpty());
+        // La franja 2 la imparte Luis, así que no aparece en el horario de Ana.
+        QVERIFY(bloque(scheduleAna, QStringLiteral("1"), QStringLiteral("2")).isEmpty());
+    }
+
+    void declaraLaRejillaConLaQueSeGenero()
+    {
+        HorarioSalida horario;
+        CursoOutput curso;
+        curso.turno = QStringLiteral("Tarde");
+        curso.dias = {DiaOutput{0, {asignacion(8, 0, 0, 0)}}};
+        horario.horarios.insert(claveCurso(1, QStringLiteral("A")), curso);
+
+        const QJsonObject root =
+            GeneracionSolver::aFormatoVisualizacion(horario, contextoConRejilla());
+
+        // La rejilla viaja en el documento: la visualización no adivina la
+        // duración del bloque, las franjas de cada turno ni los recesos.
+        const QJsonObject rejilla = root.value(QStringLiteral("_cuadricula")).toObject();
+        QCOMPARE(rejilla.value(QStringLiteral("duracion_minutos")).toInt(), 40);
+        QCOMPARE(rejilla.value(QStringLiteral("num_dias")).toInt(), 5);
+        QCOMPARE(rejilla.value(QStringLiteral("num_slots_dia")).toInt(), 16);
+        const QJsonArray turnos = rejilla.value(QStringLiteral("turnos")).toArray();
+        QCOMPARE(int(turnos.size()), 2);
+        QCOMPARE(turnos.at(1).toObject().value(QStringLiteral("nombre")).toString(),
+                 QStringLiteral("Tarde"));
+        QCOMPARE(turnos.at(1).toObject().value(QStringLiteral("inicio")).toString(),
+                 QStringLiteral("12:40"));
+        QCOMPARE(int(turnos.at(1).toObject().value(QStringLiteral("slot")).toArray().size()), 8);
+
+        const QJsonArray recesos = rejilla.value(QStringLiteral("recesos")).toArray();
+        QCOMPARE(int(recesos.size()), 2);
+        QCOMPARE(recesos.at(0).toObject().value(QStringLiteral("duracion")).toInt(), 10);
+        QCOMPARE(recesos.at(0).toObject().value(QStringLiteral("despues_de_slot")).toInt(), 2);
     }
 
     void incluyeMeta()

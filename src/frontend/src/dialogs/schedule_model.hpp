@@ -15,8 +15,14 @@
  *                                     "aula": "Aula 1",
  *                                     "curso": "1°A" } } }
  *
- * Se utiliza "day" 1..5 (Lunes..Viernes) y "slot" 0..11, con una fila visual de
- * receso entre las franjas de la mañana.
+ * La rejilla (franjas, duración del bloque y recesos) la describe el propio
+ * documento en `_cuadricula`, que la generación copia de la configuración que se
+ * envió al solver: días, franjas de cada turno y recesos (posición y duración).
+ * Si el documento no la trae (horarios antiguos), se usa la plantilla histórica
+ * de 12 franjas de 45 min con un receso de 30 min.
+ *
+ * Una clase puede ocupar varias franjas seguidas (una materia de dos horas
+ * académicas): se pintan como un solo bloque y se mueven enteras.
  */
 
 #include <QJsonArray>
@@ -245,50 +251,87 @@ inline QVector<Conflict> findConflicts(const QJsonObject& root, const Ref& self,
 // Planificación y aplicación de un movimiento
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Una franja movida: origen, destino y lo que ocupaba cada extremo. */
+struct SlotMove {
+    int dayFrom = 0, slotFrom = 0;
+    int dayTo = 0, slotTo = 0;
+    Block moved;        ///< Bloque que se mueve.
+    Block displaced;    ///< Bloque que ocupaba el destino (puede estar vacío).
+};
+
 struct MovePlan {
     bool valid = false;         ///< Hay una materia para mover
     bool hasConflict = false;
     int dayFrom = 0, slotFrom = 0;
     int dayTo = 0, slotTo = 0;
-    Block moved;                ///< Bloque arrastrado (origen)
-    Block displaced;            ///< Bloque que ocupaba el destino (puede estar vacío)
+    Block moved;                ///< Bloque arrastrado (primera franja del tramo)
+    Block displaced;            ///< Bloque que ocupaba el destino (primera franja)
+    QVector<SlotMove> moves;    ///< Una entrada por franja del bloque (≥ 1)
     QVector<Conflict> conflicts;
 };
 
-inline MovePlan planMove(const QJsonObject& root, const Ref& self,
-                         int dayFrom, int slotFrom, int dayTo, int slotTo)
+/**
+ * Planifica mover el bloque que empieza en (dayFrom, slotFrom) y ocupa `largo`
+ * franjas seguidas: una materia de dos horas académicas viaja entera, no por
+ * mitades. Con `largo = 1` es el movimiento simple de una franja.
+ */
+inline MovePlan planMoveRun(const QJsonObject& root, const Ref& self,
+                            int dayFrom, int slotFrom, int largo,
+                            int dayTo, int slotTo)
 {
     MovePlan plan;
     plan.dayFrom = dayFrom; plan.slotFrom = slotFrom;
     plan.dayTo = dayTo;     plan.slotTo = slotTo;
-    if (dayFrom == dayTo && slotFrom == slotTo) return plan;
+    if (largo < 1 || (dayFrom == dayTo && slotFrom == slotTo)) return plan;
 
     const QJsonObject s = scheduleOf(root, self);
     plan.moved = getBlock(s, dayFrom, slotFrom);
     if (plan.moved.isEmpty()) return plan;
-    plan.valid = true;
-    plan.displaced = getBlock(s, dayTo, slotTo);
 
-    plan.conflicts = findConflicts(root, self, dayTo, slotTo, plan.moved);
-    if (!plan.displaced.isEmpty()) {
-        plan.conflicts += findConflicts(root, self, dayFrom, slotFrom, plan.displaced);
+    for (int i = 0; i < largo; ++i) {
+        SlotMove mv;
+        mv.dayFrom = dayFrom; mv.slotFrom = slotFrom + i;
+        mv.dayTo = dayTo;     mv.slotTo = slotTo + i;
+        mv.moved = getBlock(s, mv.dayFrom, mv.slotFrom);
+        if (mv.moved.isEmpty()) return MovePlan{};   // tramo inconsistente
+        mv.displaced = getBlock(s, mv.dayTo, mv.slotTo);
+        plan.moves.append(mv);
+    }
+
+    plan.valid = true;
+    plan.displaced = plan.moves.first().displaced;
+
+    for (const SlotMove& mv : plan.moves) {
+        plan.conflicts += findConflicts(root, self, mv.dayTo, mv.slotTo, mv.moved);
+        if (!mv.displaced.isEmpty())
+            plan.conflicts += findConflicts(root, self, mv.dayFrom, mv.slotFrom, mv.displaced);
     }
     plan.hasConflict = !plan.conflicts.isEmpty();
     return plan;
 }
 
+/** Movimiento de una sola franja (compatibilidad con la vista anterior). */
+inline MovePlan planMove(const QJsonObject& root, const Ref& self,
+                         int dayFrom, int slotFrom, int dayTo, int slotTo)
+{
+    return planMoveRun(root, self, dayFrom, slotFrom, 1, dayTo, slotTo);
+}
+
 /**
  * Aplica el movimiento dentro del horario `self`. Si `swapOthers` es true,
- * también intercambia las dos franjas en cada horario en conflicto, de modo que
- * la clase que chocaba pasa a la franja de origen (actualización global).
+ * también intercambia las franjas implicadas en cada horario en conflicto, de
+ * modo que las clases que chocaban pasan a las franjas de origen (actualización
+ * global).
  */
 inline void applyMove(QJsonObject& root, const Ref& self, const MovePlan& plan, bool swapOthers)
 {
-    if (!plan.valid) return;
+    if (!plan.valid || plan.moves.isEmpty()) return;
 
     QJsonObject s = scheduleOf(root, self);
-    setBlock(s, plan.dayTo, plan.slotTo, plan.moved);
-    setBlock(s, plan.dayFrom, plan.slotFrom, plan.displaced);
+    for (const SlotMove& mv : plan.moves) {
+        setBlock(s, mv.dayTo, mv.slotTo, mv.moved);
+        setBlock(s, mv.dayFrom, mv.slotFrom, mv.displaced);
+    }
     setSchedule(root, self, s);
 
     if (!swapOthers) return;
@@ -302,10 +345,12 @@ inline void applyMove(QJsonObject& root, const Ref& self, const MovePlan& plan, 
         done.append(c.other);
 
         QJsonObject t = scheduleOf(root, c.other);
-        const Block atTo   = getBlock(t, plan.dayTo, plan.slotTo);
-        const Block atFrom = getBlock(t, plan.dayFrom, plan.slotFrom);
-        setBlock(t, plan.dayTo, plan.slotTo, atFrom);
-        setBlock(t, plan.dayFrom, plan.slotFrom, atTo);
+        for (const SlotMove& mv : plan.moves) {
+            const Block atTo   = getBlock(t, mv.dayTo, mv.slotTo);
+            const Block atFrom = getBlock(t, mv.dayFrom, mv.slotFrom);
+            setBlock(t, mv.dayTo, mv.slotTo, atFrom);
+            setBlock(t, mv.dayFrom, mv.slotFrom, atTo);
+        }
         setSchedule(root, c.other, t);
     }
 }
@@ -315,35 +360,293 @@ inline void applyMove(QJsonObject& root, const Ref& self, const MovePlan& plan, 
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct RowDef {
-    bool recess;
-    int slot;        ///< -1 si la fila es el receso
-    QString label;   ///< Etiqueta de hora (o texto del receso)
-    QString turno;   ///< "Mañana" / "Tarde" / subtítulo del receso
+    bool recess = false;
+    int slot = -1;          ///< -1 si la fila es el receso
+    QString label;          ///< Etiqueta de hora ("07:00 - 07:40") o "RECESO"
+    QString turno;          ///< "Mañana" / "Tarde"
+    QString detalle;        ///< Detalle del receso ("08:20 - 08:30 · 10 min")
+    QString horaInicio;     ///< "07:00" (vacío si el turno no declara inicio)
+    QString horaFin;        ///< "07:40"
+    int minutos = 0;        ///< Duración de la franja académica (min)
+    int indiceTurno = -1;   ///< Posición dentro del turno (-1 en los recesos)
 };
 
 inline QStringList dayNames()
 {
-    return { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes" };
+    return { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo" };
 }
 
-/** Filas de la rejilla: 12 franjas (0..11) y una fila de receso de 30 min. */
+/**
+ * Plantilla histórica: 12 franjas de 45 min y un receso de 30 min.
+ *
+ * Solo se usa con documentos que no declaran su propia rejilla (`_cuadricula`),
+ * como el archivo de ejemplo integrado o los horarios guardados por versiones
+ * anteriores.
+ */
 inline QVector<RowDef> rowDefs()
 {
     return {
-        { false, 0,  "07:00 - 07:45", "Mañana" },
-        { false, 1,  "07:45 - 08:30", "Mañana" },
-        { false, 2,  "08:30 - 09:15", "Mañana" },
-        { true, -1,  "RECESO",        "09:15 - 09:45 (30 min)" },
-        { false, 3,  "09:45 - 10:30", "Mañana" },
-        { false, 4,  "10:30 - 11:15", "Mañana" },
-        { false, 5,  "11:15 - 12:00", "Mañana" },
-        { false, 6,  "12:30 - 13:15", "Tarde"  },
-        { false, 7,  "13:15 - 14:00", "Tarde"  },
-        { false, 8,  "14:00 - 14:45", "Tarde"  },
-        { false, 9,  "14:45 - 15:30", "Tarde"  },
-        { false, 10, "15:30 - 16:15", "Tarde"  },
-        { false, 11, "16:15 - 17:00", "Tarde"  },
+        { false, 0,  "07:00 - 07:45", "Mañana", {}, "07:00", "07:45", 45, 0 },
+        { false, 1,  "07:45 - 08:30", "Mañana", {}, "07:45", "08:30", 45, 1 },
+        { false, 2,  "08:30 - 09:15", "Mañana", {}, "08:30", "09:15", 45, 2 },
+        { true,  -1, "RECESO",        "Mañana", "09:15 - 09:45 (30 min)", {}, {}, 30, -1 },
+        { false, 3,  "09:45 - 10:30", "Mañana", {}, "09:45", "10:30", 45, 3 },
+        { false, 4,  "10:30 - 11:15", "Mañana", {}, "10:30", "11:15", 45, 4 },
+        { false, 5,  "11:15 - 12:00", "Mañana", {}, "11:15", "12:00", 45, 5 },
+        { false, 6,  "12:30 - 13:15", "Tarde",  {}, "12:30", "13:15", 45, 0 },
+        { false, 7,  "13:15 - 14:00", "Tarde",  {}, "13:15", "14:00", 45, 1 },
+        { false, 8,  "14:00 - 14:45", "Tarde",  {}, "14:00", "14:45", 45, 2 },
+        { false, 9,  "14:45 - 15:30", "Tarde",  {}, "14:45", "15:30", 45, 3 },
+        { false, 10, "15:30 - 16:15", "Tarde",  {}, "15:30", "16:15", 45, 4 },
+        { false, 11, "16:15 - 17:00", "Tarde",  {}, "16:15", "17:00", 45, 5 },
     };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rejilla declarada por el documento ("_cuadricula")
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct RecesoGrid {
+    int despuesDeSlot = 0;   ///< Se inserta tras esa cantidad de franjas del turno.
+    int duracion = 0;        ///< Minutos.
+};
+
+struct TurnoGrid {
+    QString nombre;
+    QVector<int> franjas;    ///< Franjas por día del turno, en orden.
+    QString inicio;          ///< "HH:mm" o vacío si el dominio no lo declara.
+    QVector<RecesoGrid> recesos;
+};
+
+struct GridSpec {
+    bool valida = false;     ///< ¿El documento describe su rejilla?
+    int duracionMinutos = 0;
+    int numDias = 5;
+    int numSlotsDia = 0;
+    QVector<TurnoGrid> turnos;
+};
+
+/** Lee la rejilla que la generación dejó en el documento (si la hay). */
+inline GridSpec parseGrid(const QJsonObject& root)
+{
+    GridSpec g;
+    const QJsonObject c = root.value("_cuadricula").toObject();
+    if (c.isEmpty()) return g;
+
+    g.duracionMinutos = c.value("duracion_minutos").toInt(0);
+    g.numDias = c.value("num_dias").toInt(5);
+    g.numSlotsDia = c.value("num_slots_dia").toInt(0);
+
+    const QJsonArray turnos = c.value("turnos").toArray();
+    for (const QJsonValue& v : turnos) {
+        const QJsonObject o = v.toObject();
+        TurnoGrid t;
+        t.nombre = o.value("nombre").toString();
+        const QJsonArray slotsJson = o.value("slot").toArray();
+        for (const QJsonValue& s : slotsJson)
+            t.franjas.append(s.toInt());
+        t.inicio = o.value("inicio").toString();
+        if (t.nombre.isEmpty() || t.franjas.isEmpty()) continue;
+        g.turnos.append(t);
+    }
+
+    const QJsonArray recesos = c.value("recesos").toArray();
+    for (const QJsonValue& v : recesos) {
+        const QJsonObject o = v.toObject();
+        const QString turno = o.value("turno").toString();
+        RecesoGrid r;
+        r.despuesDeSlot = o.value("despues_de_slot").toInt(0);
+        r.duracion = o.value("duracion").toInt(0);
+        for (TurnoGrid& t : g.turnos)
+            if (t.nombre == turno) t.recesos.append(r);
+    }
+
+    g.valida = g.duracionMinutos > 0 && !g.turnos.isEmpty();
+    return g;
+}
+
+/** Turno declarado por el curso/sección del horario `ref`, si lo hay. */
+inline QString turnoDe(const QJsonObject& root, const Ref& ref)
+{
+    if (ref.kind != OwnerKind::Section) return QString();
+    const QJsonArray ys = root.value("years").toArray();
+    if (ref.yearIndex < 0 || ref.yearIndex >= ys.size()) return QString();
+    const QJsonArray ss = ys.at(ref.yearIndex).toObject().value("sections").toArray();
+    if (ref.sectionIndex < 0 || ref.sectionIndex >= ss.size()) return QString();
+    return ss.at(ref.sectionIndex).toObject().value("turno").toString();
+}
+
+/**
+ * Turnos que se dibujan para `ref`: para un curso, el suyo (sus clases se
+ * planifican dentro de su turno); para un docente, todos, porque puede dar
+ * clase en cualquiera de ellos.
+ */
+inline QVector<TurnoGrid> turnosVisibles(const GridSpec& g, const QJsonObject& root,
+                                         const Ref& ref)
+{
+    const QString nombre = turnoDe(root, ref);
+    if (ref.kind == OwnerKind::Section && !nombre.isEmpty()) {
+        for (const TurnoGrid& t : g.turnos)
+            if (t.nombre == nombre) return { t };
+    }
+    return g.turnos;
+}
+
+/** Hora "HH:mm" resultante de sumar `minutos` a `inicio`; vacío si no hay inicio. */
+inline QString horaDesde(const QString& inicio, int minutos)
+{
+    if (inicio.isEmpty()) return QString();
+    const QStringList partes = inicio.split(QLatin1Char(':'));
+    if (partes.size() < 2) return QString();
+    int h = partes.at(0).toInt();
+    int m = partes.at(1).toInt() + minutos;
+    h += m / 60;
+    m %= 60;
+    return QString("%1:%2").arg(h % 24, 2, 10, QLatin1Char('0'))
+                           .arg(m, 2, 10, QLatin1Char('0'));
+}
+
+/**
+ * Filas de la rejilla del horario `ref`: franjas y recesos de sus turnos, con
+ * las horas calculadas desde el inicio del turno, la duración del bloque y los
+ * recesos que van por delante (el receso desplaza las franjas siguientes).
+ */
+inline QVector<RowDef> rowsFor(const QJsonObject& root, const Ref& ref)
+{
+    const GridSpec g = parseGrid(root);
+    if (!g.valida) return rowDefs();
+
+    QVector<RowDef> rows;
+    for (const TurnoGrid& t : turnosVisibles(g, root, ref)) {
+        int reloj = 0;   // minutos desde el inicio del turno (recesos incluidos)
+        for (int k = 0; k <= t.franjas.size(); ++k) {
+            for (const RecesoGrid& r : t.recesos) {
+                if (r.despuesDeSlot != k) continue;
+                RowDef fila;
+                fila.recess = true;
+                fila.turno = t.nombre;
+                fila.minutos = r.duracion;
+                fila.horaInicio = horaDesde(t.inicio, reloj);
+                fila.horaFin = horaDesde(t.inicio, reloj + r.duracion);
+                fila.label = QStringLiteral("RECESO");
+                fila.detalle = fila.horaInicio.isEmpty()
+                                   ? QString("%1 min").arg(r.duracion)
+                                   : QString("%1 - %2  ·  %3 min")
+                                         .arg(fila.horaInicio, fila.horaFin)
+                                         .arg(r.duracion);
+                rows.append(fila);
+                reloj += r.duracion;
+            }
+            if (k == t.franjas.size()) break;
+
+            RowDef fila;
+            fila.slot = t.franjas.at(k);
+            fila.turno = t.nombre;
+            fila.indiceTurno = k;
+            fila.minutos = g.duracionMinutos;
+            fila.horaInicio = horaDesde(t.inicio, reloj);
+            fila.horaFin = horaDesde(t.inicio, reloj + g.duracionMinutos);
+            fila.label = fila.horaInicio.isEmpty()
+                             ? QString("Franja %1").arg(k + 1)
+                             : QString("%1 - %2").arg(fila.horaInicio, fila.horaFin);
+            rows.append(fila);
+            reloj += g.duracionMinutos;
+        }
+    }
+    return rows.isEmpty() ? rowDefs() : rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tramos: materias que ocupan más de una franja académica
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Identidad de un bloque: dos franjas seguidas son la misma clase si coincide. */
+inline QString firmaBloque(const Block& b)
+{
+    return b.materia + QChar(0x1F) + b.profesor + QChar(0x1F) + b.aula
+         + QChar(0x1F) + b.curso;
+}
+
+/**
+ * Franjas que abarca la clase que empieza en la fila `r0` del día `day`: filas
+ * seguidas del mismo turno (sin receso en medio) con la misma clase. La fila de
+ * un receso corta el tramo aunque los slots sean consecutivos.
+ */
+inline int largoDeTramo(const QJsonObject& schedule, const QVector<RowDef>& rows,
+                        int r0, int day)
+{
+    if (r0 < 0 || r0 >= rows.size() || rows[r0].recess) return 1;
+    const Block b = getBlock(schedule, day, rows[r0].slot);
+    if (b.isEmpty()) return 1;
+
+    const QString firma = firmaBloque(b);
+    int largo = 1;
+    while (r0 + largo < rows.size()) {
+        const RowDef& fila = rows[r0 + largo];
+        if (fila.recess || fila.turno != rows[r0].turno
+            || fila.indiceTurno != rows[r0].indiceTurno + largo)
+            break;
+        const Block siguiente = getBlock(schedule, day, fila.slot);
+        if (siguiente.isEmpty() || firmaBloque(siguiente) != firma) break;
+        ++largo;
+    }
+    return largo;
+}
+
+/** ¿Caben `largo` franjas seguidas a partir del slot `slot`? */
+inline bool franjasSeguidas(const QVector<RowDef>& rows, int slot, int largo)
+{
+    int r0 = -1;
+    for (int i = 0; i < rows.size(); ++i)
+        if (!rows[i].recess && rows[i].slot == slot) { r0 = i; break; }
+    if (r0 < 0) return false;
+
+    for (int i = 1; i < largo; ++i) {
+        const int r = r0 + i;
+        if (r >= rows.size() || rows[r].recess || rows[r].turno != rows[r0].turno
+            || rows[r].indiceTurno != rows[r0].indiceTurno + i)
+            return false;
+    }
+    return true;
+}
+
+/** Largo del tramo que contiene la franja (day, slot). */
+inline int largoDeTramoEn(const QJsonObject& schedule, const QVector<RowDef>& rows,
+                          int day, int slot)
+{
+    for (int i = 0; i < rows.size(); ++i)
+        if (!rows[i].recess && rows[i].slot == slot)
+            return largoDeTramo(schedule, rows, i, day);
+    return 1;
+}
+
+/** Nº de clases que se pintan (las franjas seguidas de una misma clase cuentan una). */
+inline int bloquesVisuales(const QJsonObject& schedule, const QVector<RowDef>& rows,
+                           int numDias)
+{
+    int total = 0;
+    for (int day = 1; day <= numDias; ++day) {
+        int r = 0;
+        while (r < rows.size()) {
+            if (rows[r].recess) { ++r; continue; }
+            const int largo = largoDeTramo(schedule, rows, r, day);
+            if (!getBlock(schedule, day, rows[r].slot).isEmpty()) ++total;
+            r += largo;
+        }
+    }
+    return total;
+}
+
+/** Nº de franjas académicas ocupadas (una por clase/hora asignada). */
+inline int horasAsignadas(const QJsonObject& schedule)
+{
+    int total = 0;
+    for (auto it = schedule.constBegin(); it != schedule.constEnd(); ++it) {
+        const QJsonObject dia = it.value().toObject();
+        for (auto jt = dia.constBegin(); jt != dia.constEnd(); ++jt)
+            if (!parseBlock(jt.value()).isEmpty()) ++total;
+    }
+    return total;
 }
 
 } // namespace ScheduleModel

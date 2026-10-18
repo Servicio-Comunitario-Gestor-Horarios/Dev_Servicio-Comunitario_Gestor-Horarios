@@ -231,9 +231,14 @@ void StudentScheduleDialog::onScheduleChanged()
     const QString sectionName = year.sectionNames.value(si);
 
     m_titleLabel->setText(year.name);
-    m_subtitleLabel->setText(QString("Sección %1  ·  %2 bloques asignados")
-                                 .arg(sectionName)
-                                 .arg(blockCount()));
+    QString subtitulo = QString("Sección %1").arg(sectionName);
+    const QString turno = currentTurno();
+    if (!turno.isEmpty())
+        subtitulo += QString("  ·  Turno %1").arg(turno);
+    subtitulo += QString("  ·  %1 clases  ·  %2 horas académicas")
+                     .arg(visualBlockCount())
+                     .arg(blockCount());
+    m_subtitleLabel->setText(subtitulo);
 }
 
 ScheduleModel::Ref StudentScheduleDialog::currentRef() const

@@ -18,6 +18,8 @@
 #include <backend/solver/servicio_solver.hpp>
 #include <seed/sembrador.hpp>
 
+#include "backend/data/horario_salida.hpp"
+#include "dialogs/schedule_model.hpp"
 #include "services/entrada_solver_builder.hpp"
 
 /// Verificación de integración: con los datos de prueba sembrados (Plan 31059,
@@ -158,6 +160,47 @@ private slots:
                     .value(QStringLiteral("total_asignaciones")).toInt();
             QVERIFY(asignacionesReales > 0);
             QCOMPARE(totalMetadato, asignacionesReales);
+
+            // ── Visualización (RF-1) ─────────────────────────────────────────
+            // El documento que consume la sección de horarios declara su rejilla
+            // (turnos, franjas y recesos) y conserva TODAS las clases, incluidas
+            // las de la tarde (franjas 12+), que antes se descartaban.
+            const HorarioSalida horarioSalida = HorarioSalida::fromJson(salida);
+            const QJsonObject documento =
+                GeneracionSolver::aFormatoVisualizacion(horarioSalida, comp.contexto);
+
+            const QJsonObject rejilla =
+                documento.value(QStringLiteral("_cuadricula")).toObject();
+            QCOMPARE(rejilla.value(QStringLiteral("num_slots_dia")).toInt(), totalSlots);
+            QCOMPARE(rejilla.value(QStringLiteral("duracion_minutos")).toInt(), duracion);
+            QCOMPARE(int(rejilla.value(QStringLiteral("turnos")).toArray().size()), 2);
+            QVERIFY(int(rejilla.value(QStringLiteral("recesos")).toArray().size()) >= 2);
+
+            int clasesDocumento = 0;
+            int clasesTarde = 0;
+            const QJsonArray years = documento.value(QStringLiteral("years")).toArray();
+            QCOMPARE(int(years.size()), 5);
+            for (const QJsonValue& yv : years) {
+                const QJsonArray secciones = yv.toObject().value(QStringLiteral("sections")).toArray();
+                for (const QJsonValue& sv : secciones) {
+                    const QJsonObject seccion = sv.toObject();
+                    QVERIFY2(!seccion.value(QStringLiteral("turno")).toString().isEmpty(),
+                             "cada curso del documento debe declarar su turno");
+                    const QJsonObject schedule = seccion.value(QStringLiteral("schedule")).toObject();
+                    for (auto itDia = schedule.constBegin(); itDia != schedule.constEnd(); ++itDia) {
+                        const QJsonObject dia = itDia.value().toObject();
+                        for (auto itSlot = dia.constBegin(); itSlot != dia.constEnd(); ++itSlot) {
+                            if (ScheduleModel::parseBlock(itSlot.value()).isEmpty())
+                                continue;
+                            ++clasesDocumento;
+                            if (itSlot.key().toInt() >= 12)
+                                ++clasesTarde;
+                        }
+                    }
+                }
+            }
+            QCOMPARE(clasesDocumento, asignacionesReales);
+            QVERIFY2(clasesTarde > 0, "las franjas de la tarde (12+) deben conservarse");
         }
         QSqlDatabase::removeDatabase(conexion);
     }
