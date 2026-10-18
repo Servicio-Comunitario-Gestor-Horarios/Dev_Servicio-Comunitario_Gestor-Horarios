@@ -18,6 +18,8 @@ namespace GeneracionSolver {
 /// Parámetros por curso que el usuario configura en la vista de generación.
 struct ParametrosCurso {
     QString plan;             ///< Código del plan de estudio ("" = sin plan).
+    QString turno;            ///< Turno del curso ("" = sin turno). Obligatorio para el solver (V7);
+                              ///< se aporta por el preset (la base es solo el respaldo).
     int numEstudiantes = 0;   ///< Número de estudiantes del curso.
 };
 

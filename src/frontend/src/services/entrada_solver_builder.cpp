@@ -109,8 +109,8 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     preset.dimensiones.num_dias = opciones.numDias;
     preset.dimensiones.num_slots_dia = opciones.numSlotsDia;
 
-    // Cursos: identidad (año/sección) del dominio + plan y estudiantes de la UI.
-    // El turno y el aula los toma el constructor desde la base.
+    // Cursos: identidad (año/sección) del dominio + plan/turno/estudiantes de la
+    // UI. El aula la toma el constructor desde la base (modo global de aulas fijas).
     for (const CursoDTO& c : datos.cursos) {
         const QString nombre = nombreCurso(c.anio, c.seccion);
         const ParametrosCurso pc = opciones.cursos.value(nombre);
@@ -119,6 +119,7 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
         curso.anio = c.anio;
         curso.seccion = c.seccion;
         curso.plan = pc.plan;
+        curso.turno = pc.turno;
         curso.num_estudiantes = pc.numEstudiantes;
         preset.cursos.append(curso);
 

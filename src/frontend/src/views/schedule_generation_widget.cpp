@@ -138,9 +138,10 @@ void ScheduleGenerationWidget::recargarDesdeNucleo()
     poblarCursos();
     poblarDocentes();
 
-    // En la primera carga, alinear los slots por día con los turnos de la base:
-    // nº de slots por día = suma de los slots de todos los turnos (los slots de
-    // cada turno ya vienen definidos por la base; no se configuran aparte).
+    // En la primera carga, alinear los slots por día y la duración del bloque con
+    // los turnos de la base: nº de slots/día = suma de los slots de los turnos, y
+    // duración del bloque = (franja del turno − recesos) / nº de slots. Los slots
+    // de cada turno ya vienen definidos por la base; no se configuran aparte.
     if (!m_defaultsApplied && m_nucleo) {
         if (const auto turnos = m_nucleo->listarTurnos(); turnos.ok && !turnos.valor.isEmpty()) {
             int total = 0;
@@ -148,6 +149,22 @@ void ScheduleGenerationWidget::recargarDesdeNucleo()
                 total += qMax(0, turno.numSlots);
             if (total > 0 && m_spinSlotsDia)
                 m_spinSlotsDia->setValue(qBound(1, total, 24));
+
+            if (m_spinDuracion) {
+                for (const TurnoDTO& turno : turnos.valor) {
+                    if (turno.numSlots <= 0 || !turno.inicio.isValid() || !turno.fin.isValid())
+                        continue;
+                    int recesoMin = 0;
+                    for (const RecesoDTO& receso : turno.recesos)
+                        recesoMin += qMax(0, receso.duracion);
+                    const int spanMin = turno.inicio.secsTo(turno.fin) / 60;
+                    const int duracion = (spanMin - recesoMin) / turno.numSlots;
+                    if (duracion > 0)
+                        m_spinDuracion->setValue(qBound(m_spinDuracion->minimum(), duracion,
+                                                        m_spinDuracion->maximum()));
+                    break;
+                }
+            }
         }
         m_defaultsApplied = true;
     }
@@ -231,8 +248,9 @@ void ScheduleGenerationWidget::construirUi()
         QFrame* tarjeta = crearTarjeta(QStringLiteral("Cursos"), contenido, contenedor);
 
         contenido->addWidget(crearAyuda(
-            QStringLiteral("Elige el plan de estudio y el número de estudiantes de cada "
-                           "curso. Las materias y sus horas se derivan del plan."),
+            QStringLiteral("Elige el turno, el plan de estudio y el número de estudiantes de "
+                           "cada curso. El solver exige turno y plan; los datos de prueba "
+                           "sembrados dejan el turno sin asignar."),
             tarjeta));
 
         m_tablaCursos = new QTableWidget(tarjeta);
@@ -447,11 +465,17 @@ void ScheduleGenerationWidget::poblarPlanes()
 void ScheduleGenerationWidget::poblarCursos()
 {
     m_cursosNombres.clear();
+    m_turnosNombres.clear();
     if (!m_tablaCursos)
         return;
     m_tablaCursos->setRowCount(0);
     if (!m_nucleo)
         return;
+
+    if (const auto t = m_nucleo->listarTurnos(); t.ok) {
+        for (const TurnoDTO& turno : t.valor)
+            m_turnosNombres << turno.nombre;
+    }
 
     const auto r = m_nucleo->listarCursos();
     if (!r.ok)
@@ -468,9 +492,17 @@ void ScheduleGenerationWidget::poblarCursos()
         itemNombre->setFlags(itemNombre->flags() & ~Qt::ItemIsEditable);
         m_tablaCursos->setItem(fila, 0, itemNombre);
 
-        auto* itemTurno = new QTableWidgetItem(curso.turno);
-        itemTurno->setFlags(itemTurno->flags() & ~Qt::ItemIsEditable);
-        m_tablaCursos->setItem(fila, 1, itemTurno);
+        // Turno: los cursos del centro se siembran sin turno; el solver exige que
+        // cada curso declare uno (V7), así que se elige aquí (lo aporta el preset).
+        auto* comboTurno = new QComboBox(m_tablaCursos);
+        comboTurno->addItem(QStringLiteral("— Sin turno —"));
+        comboTurno->addItems(m_turnosNombres);
+        if (!curso.turno.isEmpty()) {
+            const int idx = comboTurno->findText(curso.turno);
+            if (idx >= 0)
+                comboTurno->setCurrentIndex(idx);
+        }
+        m_tablaCursos->setCellWidget(fila, 1, comboTurno);
 
         m_tablaCursos->setCellWidget(fila, 2, crearCombo(m_tablaCursos, m_planesCodigos));
 
@@ -549,6 +581,9 @@ GeneracionSolver::OpcionesUI ScheduleGenerationWidget::leerOpciones() const
 
     for (int fila = 0; fila < m_cursosNombres.size(); ++fila) {
         GeneracionSolver::ParametrosCurso pc;
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaCursos->cellWidget(fila, 1)))
+            if (combo->currentIndex() > 0)
+                pc.turno = combo->currentText().trimmed();
         if (auto* combo = qobject_cast<QComboBox*>(m_tablaCursos->cellWidget(fila, 2)))
             pc.plan = combo->currentText().trimmed();
         if (auto* spin = qobject_cast<QSpinBox*>(m_tablaCursos->cellWidget(fila, 3)))
@@ -600,6 +635,10 @@ void ScheduleGenerationWidget::aplicarOpciones(const GeneracionSolver::OpcionesU
     for (int fila = 0; fila < m_cursosNombres.size(); ++fila) {
         const GeneracionSolver::ParametrosCurso pc =
             opciones.cursos.value(m_cursosNombres[fila]);
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaCursos->cellWidget(fila, 1))) {
+            const int idx = combo->findText(pc.turno);
+            combo->setCurrentIndex(idx < 0 ? 0 : idx);
+        }
         if (auto* combo = qobject_cast<QComboBox*>(m_tablaCursos->cellWidget(fila, 2))) {
             const int idx = combo->findText(pc.plan);
             combo->setCurrentIndex(idx < 0 ? 0 : idx);
@@ -660,6 +699,10 @@ bool ScheduleGenerationWidget::validarConfiguracion(const GeneracionSolver::Opci
     }
 
     for (auto it = opciones.cursos.constBegin(); it != opciones.cursos.constEnd(); ++it) {
+        if (it.value().turno.isEmpty()) {
+            error = QStringLiteral("El curso «%1» no tiene un turno asignado.").arg(it.key());
+            return false;
+        }
         if (it.value().plan.isEmpty()) {
             error = QStringLiteral("El curso «%1» no tiene un plan de estudio asignado.")
                         .arg(it.key());
@@ -800,6 +843,7 @@ void ScheduleGenerationWidget::onCargarPreset()
     for (const CursoSolverConfig& curso : config.cursos) {
         GeneracionSolver::ParametrosCurso pc;
         pc.plan = curso.plan;
+        pc.turno = curso.turno;
         pc.numEstudiantes = curso.num_estudiantes;
         opciones.cursos.insert(nombreCurso(curso.anio, curso.seccion), pc);
     }

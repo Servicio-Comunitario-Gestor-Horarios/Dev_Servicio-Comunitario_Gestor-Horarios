@@ -531,14 +531,17 @@ eso la composición vive en el frontend, en `src/frontend/src/services/` (se com
 `GESTOR_TIENE_BACKEND`, es decir, cuando el target `backend` existe):
 
 - **`generacion_tipos.hpp`** — tipos puros compartidos (`OpcionesUI` con franja, dimensiones,
-  planificación, penalizaciones y parámetros por curso/docente; `ContextoHorario` con los nombres
-  índice→texto de la última entrada).
+  planificación, penalizaciones y parámetros por curso/docente —`ParametrosCurso` lleva `plan`,
+  `turno` y `num_estudiantes`, y `ParametrosDocente` horas, turno, plan, años y suplencias—;
+  `ContextoHorario` con los nombres índice→texto de la última entrada).
 - **`entrada_solver_builder.{hpp,cpp}`** — `GeneracionSolver::`:
   - `construirEntrada(nucleo, opciones)` → `Composicion{entrada, contexto, avisos}`. Reutiliza
-    `construirJsonEntrada` (backend) y **después inyecta por curso** el `plan`, el
-    `num_estudiantes` y las `materias` (derivadas del plan y el año del curso vía
-    `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. `avisos` recoge los
-    datos incompletos (curso sin plan, plan sin materias, lecturas fallidas).
+    `construirJsonEntrada` (backend) y **después inyecta por curso** el `plan`, el `turno` y el
+    `num_estudiantes` (las `materias` se derivan del plan embebido y el año del curso vía
+    `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. El `turno` del
+    preset tiene prioridad sobre el de la base (que suele venir vacío en los datos sembrados); el
+    `aula` la toma el constructor desde la base. `avisos` recoge los datos incompletos (curso sin
+    plan, plan sin materias, lecturas fallidas).
   - `horasSugeridasPorDocente(nucleo, cursos)` → precarga válida de horas por docente.
   - `aFormatoVisualizacion(horario, contexto)` → JSON con `teachers`/`years` (más un bloque `_meta`
     informativo) que entienden la sección de visualización y sus diálogos. Traduce los índices del
@@ -550,11 +553,18 @@ eso la composición vive en el frontend, en `src/frontend/src/services/` (se com
 **Vista `ScheduleGenerationWidget`** (`src/frontend/src/views/schedule_generation_widget.{hpp,cpp}`)
 es la vista «Generación de horario» (índice 4 del `MainWindow`). Con `GESTOR_TIENE_BACKEND` muestra:
 parámetros generales (franja, dimensiones, planificación, penalizaciones, aulas fijas), la tabla de
-**cursos** (plan + nº de estudiantes), la tabla de **docentes** (horas requeridas/en aula, turno,
-plan y materias suplentes) y botones de **preset** (`CargadorConfiguracionSolver`; el preset es la
-propia entrada de 13 secciones). Al pulsar «Generar horarios»: valida, compone la entrada, la envía
-con `ServicioGeneracion` y, si `presentable`, guarda el JSON en la carpeta de horarios y emite
-`horarioGenerado(datosVisualizacion, rutaArchivo)`. Sin backend muestra un aviso informativo.
+**cursos** (turno + plan + nº de estudiantes), la tabla de **docentes** (horas requeridas/en aula,
+turno, plan, años y materias suplentes) y botones de **preset** (`CargadorConfiguracionSolver`; el
+preset es la propia entrada de 13 secciones). Al pulsar «Generar horarios»: valida, compone la
+entrada, la envía con `ServicioGeneracion` y, si `presentable`, guarda el JSON en la carpeta de
+horarios y emite `horarioGenerado(datosVisualizacion, rutaArchivo)`. Sin backend muestra un aviso
+informativo.
+
+Al cargar la base por primera vez, la vista **deriva de los turnos** el nº de slots por día (suma de
+los slots de todos los turnos) y la **duración del bloque** (franja del turno menos recesos, sobre
+sus slots; 40 min en los datos de prueba del centro); ambos quedan editables. La columna **Turno** de
+cada curso es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún
+sin asignar (los del centro se siembran sin turno; el solver exige uno, V7).
 
 **Cableado (`MainWindow`):** el `InternalClient` se guarda como miembro y se inyecta en las vistas;
 en `setNucleoDatos` se lo reenvía a la vista de generación con el `NucleoDatos*`. Al recibir
@@ -565,6 +575,13 @@ obtiene de `ScheduleVisualizationWidget::schedulesDirectory()`.
 El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_conversion`
 (`test/frontend/test_conversion_entrada.cpp`, target añadido en `test/CMakeLists.txt` cuando existen
 `frontend` y `backend`).
+
+La integración completa (sembrar una base de prueba, componer la entrada desde el frontend con un
+reparto plan/turno por curso, validarla y **resolverla** con el motor) está cubierta por
+`test_generacion_seed` (`test/frontend/test_generacion_seed.cpp`), añadido cuando existen `frontend`,
+`backend_solver` y `seed`. Requiere ejecutarse con la configuración que enlaza OR-Tools
+(`Release`/Docker); en `Debug` sobre Windows el motor no arranca (CRT de depuración contra las DLL
+Release de OR-Tools).
 
 
 ---

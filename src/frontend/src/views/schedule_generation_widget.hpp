@@ -6,8 +6,8 @@
  *        generación y persistencia del resultado (RF-1).
  *
  * Presenta todos los parámetros que el motor necesita —franja horaria,
- * dimensiones, plan y nº de estudiantes por curso, y horas/turno/plan/años y
- * materias suplentes por docente— más la opción global de aulas fijas. Las
+ * dimensiones, plan/turno/nº de estudiantes por curso, y horas/turno/plan/años
+ * y materias suplentes por docente— más la opción global de aulas fijas. Las
  * materias y sus horas por curso se derivan del plan de estudio elegido; los
  * slots de cada turno ya vienen definidos por los turnos de la base, así que no
  * se configuran aquí. Al generar, compone la entrada del solver, la envía por
@@ -114,6 +114,7 @@ private:
 
     // ── Datos auxiliares (por fila) ───────────────────────────────────────
     QStringList m_planesCodigos;
+    QStringList m_turnosNombres;
     QStringList m_cursosNombres;
     QStringList m_docentesNombres;
     bool m_defaultsApplied = false; ///< Los valores por defecto se derivan una vez.

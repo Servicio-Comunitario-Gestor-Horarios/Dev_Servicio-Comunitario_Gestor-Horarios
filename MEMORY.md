@@ -146,3 +146,32 @@
 
 - 008: **T1–T9 completas** ✅ (APROBADO por el reviewer; 57 materias, 4 planes, 13 cursos sin turno, 16 aulas, 4 variantes de docentes; suite 46/46).
 - 005: **T11 completa** ✅ (hora académica = bloque; `bloques`/`bloquesAula` identidad; T10 sigue abierta).
+
+- **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
+  probó el flujo completo de la vista «Generación de horario» con la base sembrada
+  (`datos-prueba/centro-31059-holgada.db`, variante `holgada`), copiada sobre la base de la app
+  (`%APPDATA%/LiceoRobertSerra/GestorHorarios/gestor_horarios.db`) con respaldo previo
+  (`gestor_horarios.db.respaldo-antes-seed-*`). Cambios:
+  - **Turno por curso en el preset.** `ParametrosCurso` gana `turno`; la columna **Turno** de la tabla
+    de cursos pasa de texto de la base (siempre vacío en los datos sembrados) a un **desplegable** con
+    los turnos de la base + «Sin turno»; `construirEntrada` lo inyecta en el preset y
+    `ConstructorEntradaSolver` **prefiere el `turno` del preset** y cae al de la base si viene vacío
+    (la 005 I1 sigue valiendo cuando el preset no lo declara). `validarConfiguracion` exige turno.
+  - **Duración del bloque y slots derivados.** Al cargar la base por primera vez, la vista deriva de
+    los turnos el nº de slots/día (suma de slots) y `duracion_minutos` (franja menos recesos sobre
+    sus slots; 40 min en el conjunto). Antes solo derivaba los slots y fijaba 45 min.
+  - **Fix de mapeo de disponibilidad (`ConstructorEntradaSolver::slotsDeFranja`).** Antes exigía que
+    la franja del docente estuviese **contenida** en un turno, así que la disponibilidad por defecto
+    del seed (07:00–18:00, que abarca ambos turnos) se mapeaba a **cero** slots y **V13** rechazaba
+    (materia sin candidato). Ahora se emite cada bloque (anclado en el `inicio` del turno, pasos de
+    `duracion_minutos`) que cae **íntegramente** dentro de la franja, acumulando por turno — la misma
+    semántica que la cobertura del seed («la franja contiene un bloque completo»). `test_constructor_entrada`
+    sigue en verde.
+  - **Verificación de integración** `test_generacion_seed` (`test/frontend/`, con `frontend` +
+    `backend_solver` + `seed`): siembra una base temporal, compone la entrada con el reparto
+    plan/turno de la guía y **resuelve**; **Release en host: horario en ~1,5 s**. En **Debug sobre
+    Windows** el motor no arranca (CRT de depuración contra DLL Release de OR-Tools → `0xc0000374`),
+    igual que `test_solver_horarios`; el preset `full` es para Docker. Para generar en host hay que
+    **compilar en Release** (`build-rel`) y poner
+    `C:/ortools-v9.15-vs2022/or-tools_x64_VisualStudio2022_cpp_v9.15.6755/bin` en `PATH` (el proceso
+    `--backend` hereda el `PATH` del frontend).

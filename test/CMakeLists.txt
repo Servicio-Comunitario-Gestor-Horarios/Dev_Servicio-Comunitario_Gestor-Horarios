@@ -123,4 +123,12 @@ if(TARGET frontend AND TARGET backend)
 	add_qtest(test_frontend_conversion frontend/test_conversion_entrada.cpp frontend)
 	target_include_directories(test_frontend_conversion PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
+
+	# Integración: composición de la entrada + solver con los datos sembrados.
+	if(TARGET backend_solver AND TARGET seed)
+		add_qtest(test_generacion_seed frontend/test_generacion_seed.cpp
+						frontend backend_solver seed Qt6::Sql)
+		target_include_directories(test_generacion_seed PRIVATE
+						${CMAKE_SOURCE_DIR}/src/frontend/src)
+	endif()
 endif()
