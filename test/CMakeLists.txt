@@ -130,6 +130,15 @@ if(TARGET frontend AND TARGET backend)
 	target_include_directories(test_cuadricula_horario PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
 
+	# Selectores de la vista de generación (años como desplegable múltiple y
+	# materias suplentes en rejilla) y los ajustes visuales de sus tablas.
+	if(TARGET seed)
+		add_qtest(test_selector_generacion frontend/test_selector_generacion.cpp
+						frontend seed Qt6::Sql Qt6::Widgets)
+		target_include_directories(test_selector_generacion PRIVATE
+						${CMAKE_SOURCE_DIR}/src/frontend/src)
+	endif()
+
 	# Integración: composición de la entrada + solver con los datos sembrados.
 	if(TARGET backend_solver AND TARGET seed)
 		add_qtest(test_generacion_seed frontend/test_generacion_seed.cpp
