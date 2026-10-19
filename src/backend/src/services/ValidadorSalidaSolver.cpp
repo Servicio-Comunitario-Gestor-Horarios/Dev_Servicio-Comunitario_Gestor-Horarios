@@ -173,6 +173,82 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
         }
     }
 
+    // ── S3: análisis de agrupación de bloques ──
+    // Para cada (curso, materia, día, segmento), detectar los grupos contiguos
+    // y calcular su penalización (RF-2).
+    {
+        QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
+        for (const TurnoConfig& t : config.turnos.turnos)
+            segmentosPorTurno[t.nombre] = segmentosTurno(t, config.recesos);
+
+        for (auto itCurso = horario.horarios.constBegin();
+             itCurso != horario.horarios.constEnd(); ++itCurso)
+        {
+            const QString& nombreCurso = itCurso.key();
+            const CursoOutput& curso = itCurso.value();
+            const int idxCurso = indiceCurso(config, nombreCurso);
+            if (idxCurso < 0) continue;
+
+            const CursoSolverConfig& cursoCfg = config.cursos[idxCurso];
+            const QVector<QVector<int>>& segs = segmentosPorTurno.value(cursoCfg.turno);
+            if (segs.isEmpty()) continue;
+
+            for (const DiaOutput& dia : curso.dias)
+            {
+                // Horas del día por materia (suma sobre todos los segmentos).
+                QMap<int, int> horasDia;
+                for (const AsignacionOutput& asig : dia.asignaciones)
+                    horasDia[asig.materia] += 1;
+
+                for (int seg = 0; seg < segs.size(); ++seg)
+                {
+                    const QVector<int>& franjas = segs[seg];
+
+                    for (auto itM = horasDia.constBegin(); itM != horasDia.constEnd(); ++itM)
+                    {
+                        const int materia = itM.key();
+                        int runLen = 0;
+                        int runInicio = -1;
+
+                        auto cerrarGrupo = [&]() {
+                            if (runLen <= 0) return;
+                            GrupoAgrupacion g;
+                            g.curso = nombreCurso;
+                            g.materia = materia;
+                            g.dia = dia.dia;
+                            g.segmento = seg;
+                            g.inicio = runInicio;
+                            g.tamano = runLen;
+                            g.penalizacion = calcularPenalizacionGrupo(runLen, horasDia.value(materia));
+                            analisis.grupos.append(g);
+                            analisis.penalizacionAgrupacion += g.penalizacion;
+                            runLen = 0;
+                            runInicio = -1;
+                        };
+
+                        for (int f : franjas)
+                        {
+                            bool tiene = false;
+                            for (const AsignacionOutput& asig : dia.asignaciones)
+                                if (asig.materia == materia && asig.slot == f) { tiene = true; break; }
+
+                            if (tiene)
+                            {
+                                if (runLen == 0) runInicio = f;
+                                ++runLen;
+                            }
+                            else
+                            {
+                                cerrarGrupo();
+                            }
+                        }
+                        cerrarGrupo();
+                    }
+                }
+            }
+        }
+    }
+
     // P2: ningún profesor excede sus horas requeridas.
     for (auto it = horasPorProfesor.constBegin(); it != horasPorProfesor.constEnd(); ++it)
     {

@@ -90,3 +90,66 @@ bool docenteCandidatoElegible(const SolverConfig& config, const CursoSolverConfi
         if (!slotsDisponibles(config, curso, prof, d).isEmpty()) return true;
     return false;
 }
+
+QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<RecesoConfig>& recesos)
+{
+    // 1. Obtener recesos de este turno
+    QVector<RecesoConfig> recesosTurno;
+    for (const RecesoConfig& r : recesos)
+        if (r.turno == turno.nombre)
+            recesosTurno.append(r);
+
+    // 2. Ordenar recesos por despues_de_slot
+    std::sort(recesosTurno.begin(), recesosTurno.end(),
+              [](const RecesoConfig& a, const RecesoConfig& b) {
+                  return a.despues_de_slot < b.despues_de_slot;
+              });
+
+    // 3. Cortar slots por recesos
+    // `despues_de_slot` es 1-based y RELATIVO al turno: 2 significa "tras la
+    // segunda franja del turno". Se convierte a índice 0-based relativo.
+    if (turno.slot.isEmpty()) {
+        return {};
+    }
+
+    QVector<QVector<int>> segmentos;
+    int inicioRel = 0;  // índice relativo dentro de turno.slot
+    for (const RecesoConfig& r : recesosTurno) {
+        int corteRel = r.despues_de_slot - 1;   // 1-based → 0-based
+        if (corteRel >= 0 && corteRel < turno.slot.size() && inicioRel <= corteRel) {
+            QVector<int> seg;
+            for (int i = inicioRel; i <= corteRel; ++i)
+                seg.append(turno.slot[i]);
+            if (!seg.isEmpty()) segmentos.append(seg);
+            inicioRel = corteRel + 1;
+        }
+    }
+    // Último segmento
+    if (inicioRel < turno.slot.size()) {
+        QVector<int> seg;
+        for (int i = inicioRel; i < turno.slot.size(); ++i)
+            seg.append(turno.slot[i]);
+        if (!seg.isEmpty()) segmentos.append(seg);
+    }
+    // Si no hay recesos, devolver todos los slots
+    if (segmentos.isEmpty() && !turno.slot.isEmpty()) {
+        segmentos.append(turno.slot);
+    }
+    return segmentos;
+}
+
+bool esInicioSegmento(int slot, const QVector<QVector<int>>& segmentos)
+{
+    for (const QVector<int>& seg : segmentos)
+        if (!seg.isEmpty() && seg.first() == slot)
+            return true;
+    return false;
+}
+
+int calcularPenalizacionGrupo(int tamano, int horasDia)
+{
+    if (tamano <= 0) return 0;
+    if (tamano == 1) return (horasDia == 1) ? 0 : 1;  // D-4
+    if (tamano == 2 || tamano == 3) return 0;
+    return tamano - 3;  // ≥ 4
+}

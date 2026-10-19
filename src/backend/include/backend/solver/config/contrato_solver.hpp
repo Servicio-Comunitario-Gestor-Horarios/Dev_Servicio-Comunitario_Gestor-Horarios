@@ -1,22 +1,24 @@
 #pragma once
 
 /**
-* @file contrato_solver.hpp
-* @brief Funciones puras y constantes del contrato del solver
-*
-* Puras y deterministas: sin E/S, sin reloj y sin OR-Tools
-*/
+ * @file contrato_solver.hpp
+ * @brief Funciones puras y constantes del contrato del solver
+ *
+ * Puras y deterministas: sin E/S, sin reloj y sin OR-Tools
+ */
 
 #include <QString>
 #include <QVector>
 
 #include "backend/solver/config/solver_config.hpp"
+#include "qcontainerfwd.h"
 
 // Constantes del motor
 namespace ContratoSolver {
     constexpr int PESO_HORAS = 1000;
     constexpr int COSTE_SUPLENTE = 100;
     constexpr int COSTE_MAX_SUPLENTE = 100;
+    constexpr int PESO_AGRUPACION = 10;
 }
 
 int bloques(int horas, int duracion_minutos);
@@ -42,3 +44,18 @@ QVector<int> slotsDisponibles(const SolverConfig& config, const CursoSolverConfi
 /// horas: la capacidad es preferencia del objetivo, no una compuerta de elegibilidad.
 bool docenteCandidatoElegible(const SolverConfig& config, const CursoSolverConfig& curso,
                               const ProfesorSolverConfig& prof, int materiaIDx);
+
+/// Devuelve los segmentos contiguos de un turno, cortados por los recesos.
+/// Cada segmento es un vector de slots consecutivos.
+QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<RecesoConfig>& recesos);
+
+/// true si `slot` es la primera franja de su segmento (incluye primera del turno
+/// y la inmediatamente posterior al receso).
+bool esInicioSegmento(int slot, const QVector<QVector<int>>& segmentos);
+
+/// Penalización según RF-2:
+///   tamaño 1 → 1 si horasDia > 1, 0 si horasDia == 1 (D-4)
+///   tamaño 2 o 3 → 0
+///   tamaño ≥ 4 → tamaño − 3
+///   tamaño ≤ 0 → 0
+int calcularPenalizacionGrupo(int tamano, int horasDia);

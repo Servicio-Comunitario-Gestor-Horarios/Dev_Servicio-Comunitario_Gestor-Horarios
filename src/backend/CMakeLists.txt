@@ -88,6 +88,7 @@ target_sources(backend_solver PRIVATE
 				src/solver/restricciones/restricciones_turnos.cpp
 				src/solver/restricciones/restricciones_aulas.cpp
 				src/solver/restricciones/restricciones_profesores.cpp
+				src/solver/restricciones/restricciones_agrupacion.cpp
 )
 
 target_include_directories(backend_solver PUBLIC

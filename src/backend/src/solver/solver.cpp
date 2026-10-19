@@ -4,6 +4,7 @@
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
+#include "backend/solver/restricciones/restricciones_agrupacion.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/cp_model.h"
@@ -11,6 +12,7 @@
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/model.h"
 #include "qvariant.h"
+#include <cstdio>
 #include <QElapsedTimer>
 #include <QMap>
 #include <QSet>
@@ -167,7 +169,7 @@ QString causaConflictoDeAsignacion(const SolverConfig& config) {
     return {};
 }
 
-/// Primera categoría aplicable, en el orden de «Causa de un resultado no factible» (RF-6).
+/// Primera categoría aplicable, en el orden de la definición «Causa de un resultado no factible» (RF-6).
 QString primeraCausaNoFactible(const SolverConfig& config) {
     QString causa = causaEntradaInvalida(config);
     if (!causa.isEmpty()) return causa;
@@ -195,13 +197,13 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     agregarRestricciones(config);
 
     // Objetivo
-
     construirObjetivo(config);
 
     // Resolver CP-SAT (parametros deterministas: RNF-1)
     SatParameters params;
     params.set_num_search_workers(1);
     params.set_random_seed(0);
+    params.set_max_deterministic_time(2.0);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
@@ -210,11 +212,11 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     // Verificar status
     if (response.status() == CpSolverStatus::OPTIMAL ||
         response.status() == CpSolverStatus::FEASIBLE) {
-            resultado.exito = true;
-            resultado.resultado = extraerSolucion(response, config);
-        } else {
-            resultado.errores = analizarFallo(response, config);
-        }
+        resultado.exito = true;
+        resultado.resultado = extraerSolucion(response, config);
+    } else {
+        resultado.errores = analizarFallo(response, config);
+    }
     
     resultado.tiempo_ms = timer.elapsed();
     return resultado;
@@ -240,6 +242,15 @@ void Solver::construirObjetivo(const SolverConfig& config) {
         }
     }
 
+    // S3: penalización por fragmentación (agrupación de bloques) - RF-2
+    // Penalización = PESO_AGRUPACION · Σ (isolated + longGroup)
+    //   isolated  → grupo de 1          (1 unidad)
+    //   longGroup → 4.ª franja o más    (1 unidad por franja extra)
+    //   grupos de 2–3 → 0
+    // Esto equivale a f(len): 1 → 1, 2–3 → 0, ≥4 → len − 3.
+    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
+        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
+
     model.Minimize(objetivo);
 }
 
@@ -247,6 +258,7 @@ void Solver::agregarRestricciones(const SolverConfig& config) {
     agregarRestriccionesTurnos(model, config, vars);
     agregarRestriccionesAulas(model, config, vars);
     agregarRestriccionProfesores(model, config, vars);
+    agregarRestriccionesAgrupacion(model, config, vars);
 }
 
 HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const SolverConfig& config) {
