@@ -4,8 +4,8 @@
 
 ## Fase actual
 
-- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor). Suite **47/47** en verde.
-- **Fecha:** 2026-10-17
+- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor) y **controles de la vista de generación** (años y materias suplentes sin texto libre, filas de 40 px y popups con el color del tema). Suite **48/48** en verde.
+- **Fecha:** 2026-10-18
 - **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
 - **Specs en curso:** `specs/005-nucleo-solver` (implementada; T10 abierta por pendientes) y `specs/008-datos-de-prueba` (implementada; APROBADA por el reviewer)
 - **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo), los menores de la 008 y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
@@ -197,6 +197,31 @@
     visualización conserva las 520 clases, incluidas las de la tarde). **Suite 47/47 en verde.**
     Verificado con un barrido de los 86 destinos posibles sobre un horario de prueba (0 clases perdidas
     o duplicadas) y a ojo con capturas de las ventanas.
+
+- **Vista de generación: tablas, popups y elección de años/suplentes (2026-10-18, 3.ª vuelta).** El
+  dueño reportó tres defectos en «Generar horarios»; los tres son de presentación y se corrigen sin
+  tocar el contrato del solver:
+  - **Controles de celda descentrados.** Con la fila por defecto (30 px) el control de celda (32 px:
+    `min-height:24` + relleno + borde) más el relleno de `QTableWidget::item` (4 px) desbordaba la fila
+    hacia abajo: cada desplegable se veía como un rectángulo desfasado del centro. Ahora
+    `setDefaultSectionSize(40)` (constante `kAltoFilaControl`) en las dos tablas deja 4 px por arriba y
+    por abajo y el control queda centrado.
+  - **Popups de los desplegables en negro.** El popup es una ventana aparte y heredaba una paleta sin
+    brush de fondo (el `background` del QSS no fija `QPalette::Base` del árbol): los ítems los pintaba
+    el delegado **en negro**. `aplicarEstilo()` fija ahora explícitamente la paleta de la vista del
+    popup (`Base`/`Window` = superficie del tema, `Text`/`WindowText`/`ButtonText` = texto,
+    `Highlight` = acento, `HighlightedText` = blanco) y se vuelve a llamar al final de
+    `recargarDesdeNucleo()`, porque los combos de las celdas se crean al poblar.
+  - **Sin texto libre para «años» ni «materias suplentes».** Widgets nuevos en
+    `src/frontend/src/widgets/`: `ComboMultiple` (desplegable con casillas que **no cierra** el popup al
+    marcar; resume la selección y admite datos por ítem) para los años, y
+    `BotonMateriasSuplentes` + `SelectorMateriasDialog` (botón de celda que abre una rejilla de materias
+    marcables, con contador y `Limpiar`/`Cancelar`/`Aceptar`) para las suplentes. Los dos respetan los
+    tokens de `ScheduleTheme`, así que se ven bien en claro y en oscuro.
+  - Pruebas: `test_selector_generacion` (`test/frontend/`) cubre el resumen y el marcado/desmarcado sin
+    cerrar el popup, el botón y el diálogo de suplentes, la altura de fila y —por aserción sobre
+    `view()->palette()`— que **todos** los popups llevan el color del tema en claro y en oscuro.
+    **Suite 48/48 en verde.** Verificado además con capturas (tablas y diálogo, claro y oscuro).
 
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
   probó el flujo completo de la vista «Generación de horario» con la base sembrada

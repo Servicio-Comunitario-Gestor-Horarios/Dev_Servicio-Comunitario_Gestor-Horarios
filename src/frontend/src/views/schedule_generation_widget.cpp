@@ -5,6 +5,7 @@
 
 #if defined(GESTOR_TIENE_BACKEND)
 
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateTime>
@@ -17,6 +18,7 @@
 #include <QHeaderView>
 #include <QJsonDocument>
 #include <QLineEdit>
+#include <QPalette>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
@@ -40,8 +42,17 @@
 #include "dialogs/schedule_theme.hpp"
 #include "services/entrada_solver_builder.hpp"
 #include "services/puerto_solver_ipc.hpp"
+#include "widgets/combo_multiple.hpp"
+#include "widgets/selector_materias.hpp"
+
+#include <algorithm>
 
 namespace {
+
+/// Alto de fila de las tablas: los controles de celda piden 32 px y el estilo
+/// de ítem añade 4 px arriba y abajo; con las 30 px por defecto el control se
+/// desbordaba por abajo y quedaba descentrado. Con 40 queda centrado.
+constexpr int kAltoFilaControl = 40;
 
 /// Crea una tarjeta con título y devuelve el layout vertical de su contenido.
 QFrame* crearTarjeta(const QString& titulo, QVBoxLayout*& contenido, QWidget* padre)
@@ -135,6 +146,7 @@ void ScheduleGenerationWidget::actualizarTema(bool /*modoOscuro*/)
 void ScheduleGenerationWidget::recargarDesdeNucleo()
 {
     poblarPlanes();
+    poblarCatalogos();
     poblarCursos();
     poblarDocentes();
 
@@ -168,6 +180,10 @@ void ScheduleGenerationWidget::recargarDesdeNucleo()
         }
         m_defaultsApplied = true;
     }
+
+    // Los combos se crean al poblar: reaplicar el estilo deja sus popups con la
+    // paleta del tema (si no, la del árbol deja los ítems sin fondo y en negro).
+    aplicarEstilo();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -254,6 +270,7 @@ void ScheduleGenerationWidget::construirUi()
             tarjeta));
 
         m_tablaCursos = new QTableWidget(tarjeta);
+        m_tablaCursos->setObjectName(QStringLiteral("genTablaCursos"));
         m_tablaCursos->setColumnCount(4);
         m_tablaCursos->setHorizontalHeaderLabels(
             {QStringLiteral("Curso"), QStringLiteral("Turno"),
@@ -266,6 +283,7 @@ void ScheduleGenerationWidget::construirUi()
         m_tablaCursos->setSelectionMode(QAbstractItemView::NoSelection);
         m_tablaCursos->setEditTriggers(QAbstractItemView::NoEditTriggers);
         m_tablaCursos->setMinimumHeight(180);
+        m_tablaCursos->verticalHeader()->setDefaultSectionSize(kAltoFilaControl);
         contenido->addWidget(m_tablaCursos);
 
         auto* botones = new QHBoxLayout();
@@ -286,10 +304,11 @@ void ScheduleGenerationWidget::construirUi()
 
         contenido->addWidget(crearAyuda(
             QStringLiteral("Ajusta las horas semanales y, si quieres, el turno/plan/años "
-                           "preferidos y materias suplentes (separadas por «;»)."),
+                           "preferidos y las materias suplentes (elígelas en la rejilla)."),
             tarjeta));
 
         m_tablaDocentes = new QTableWidget(tarjeta);
+        m_tablaDocentes->setObjectName(QStringLiteral("genTablaDocentes"));
         m_tablaDocentes->setColumnCount(8);
         m_tablaDocentes->setHorizontalHeaderLabels(
             {QStringLiteral("Docente"), QStringLiteral("Horas requeridas"),
@@ -298,11 +317,19 @@ void ScheduleGenerationWidget::construirUi()
              QStringLiteral("Materias asignadas"), QStringLiteral("Materias suplentes")});
         m_tablaDocentes->verticalHeader()->setVisible(false);
         m_tablaDocentes->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+        m_tablaDocentes->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+        m_tablaDocentes->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+        m_tablaDocentes->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+        m_tablaDocentes->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
         m_tablaDocentes->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Stretch);
         m_tablaDocentes->horizontalHeader()->setSectionResizeMode(7, QHeaderView::Stretch);
         m_tablaDocentes->setSelectionMode(QAbstractItemView::NoSelection);
         m_tablaDocentes->setEditTriggers(QAbstractItemView::NoEditTriggers);
         m_tablaDocentes->setMinimumHeight(200);
+        m_tablaDocentes->verticalHeader()->setDefaultSectionSize(kAltoFilaControl);
+        // La columna de años es interactiva: su desplegable no declara el ancho
+        // del resumen que dibuja, así que se fija un ancho legible.
+        m_tablaDocentes->setColumnWidth(5, 140);
         contenido->addWidget(m_tablaDocentes);
 
         auto* botones = new QHBoxLayout();
@@ -445,6 +472,26 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
         qss += QStringLiteral("QLabel#genEstado { color: %1; font-size: 12px; }").arg(p.textMuted);
 
     setStyleSheet(qss);
+
+    // El popup de un QComboBox es una ventana aparte: hereda la paleta del árbol
+    // y, dentro de estas tarjetas, queda sin fondo (QBrush nulo), de modo que el
+    // delegado pinta los ítems en negro. Se fija aquí la paleta del tema para
+    // que la lista se vea clara en modo claro y oscura en modo oscuro.
+    const QColor fondo(p.surface), texto(p.text), resalte(p.accent);
+    for (QComboBox* combo : findChildren<QComboBox*>()) {
+        QAbstractItemView* vista = combo->view();
+        if (!vista)
+            continue;
+        QPalette paleta = vista->palette();
+        paleta.setColor(QPalette::Base, fondo);
+        paleta.setColor(QPalette::Window, fondo);
+        paleta.setColor(QPalette::Text, texto);
+        paleta.setColor(QPalette::WindowText, texto);
+        paleta.setColor(QPalette::ButtonText, texto);
+        paleta.setColor(QPalette::Highlight, resalte);
+        paleta.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#FFFFFF")));
+        vista->setPalette(paleta);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -459,6 +506,26 @@ void ScheduleGenerationWidget::poblarPlanes()
     if (const auto r = m_nucleo->listarPlanes(); r.ok) {
         for (const PlanDTO& plan : r.valor)
             m_planesCodigos << plan.codigo;
+    }
+}
+
+void ScheduleGenerationWidget::poblarCatalogos()
+{
+    m_aniosDisponibles.clear();
+    m_materiasDisponibles.clear();
+    if (!m_nucleo)
+        return;
+
+    if (const auto cursos = m_nucleo->listarCursos(); cursos.ok) {
+        for (const CursoDTO& curso : cursos.valor)
+            if (!m_aniosDisponibles.contains(curso.anio))
+                m_aniosDisponibles.append(curso.anio);
+        std::sort(m_aniosDisponibles.begin(), m_aniosDisponibles.end());
+    }
+
+    if (const auto materias = m_nucleo->listarMaterias(); materias.ok) {
+        for (const MateriaDTO& materia : materias.valor)
+            m_materiasDisponibles << materia.nombre;
     }
 }
 
@@ -530,6 +597,14 @@ void ScheduleGenerationWidget::poblarDocentes()
             turnos << turno.nombre;
     }
 
+    // Opciones del desplegable de años (el dato guardado es el número de año).
+    QStringList textosAnios;
+    QVariantList datosAnios;
+    for (int anio : m_aniosDisponibles) {
+        textosAnios << QString::number(anio);
+        datosAnios << anio;
+    }
+
     const QVector<ProfesorDTO>& docentes = r.valor;
     m_tablaDocentes->setRowCount(docentes.size());
     for (int fila = 0; fila < docentes.size(); ++fila) {
@@ -547,9 +622,10 @@ void ScheduleGenerationWidget::poblarDocentes()
         m_tablaDocentes->setCellWidget(fila, 3, crearCombo(m_tablaDocentes, turnos));
         m_tablaDocentes->setCellWidget(fila, 4, crearCombo(m_tablaDocentes, m_planesCodigos));
 
-        auto* editAnios = new QLineEdit(m_tablaDocentes);
-        editAnios->setPlaceholderText(QStringLiteral("Todos (p. ej. 1; 2)"));
-        m_tablaDocentes->setCellWidget(fila, 5, editAnios);
+        auto* comboAnios = new ComboMultiple(m_tablaDocentes);
+        comboAnios->setTextoVacio(QStringLiteral("Todos"));
+        comboAnios->agregarOpciones(textosAnios, datosAnios);
+        m_tablaDocentes->setCellWidget(fila, 5, comboAnios);
 
         QString materias;
         for (const MateriaAsignadaDTO& materia : docente.materias) {
@@ -561,9 +637,9 @@ void ScheduleGenerationWidget::poblarDocentes()
         itemMaterias->setFlags(itemMaterias->flags() & ~Qt::ItemIsEditable);
         m_tablaDocentes->setItem(fila, 6, itemMaterias);
 
-        auto* editSuplentes = new QLineEdit(m_tablaDocentes);
-        editSuplentes->setPlaceholderText(QStringLiteral("Opcional, separadas por «;»"));
-        m_tablaDocentes->setCellWidget(fila, 7, editSuplentes);
+        auto* botonSuplentes = new BotonMateriasSuplentes(m_tablaDocentes);
+        botonSuplentes->setDisponibles(m_materiasDisponibles);
+        m_tablaDocentes->setCellWidget(fila, 7, botonSuplentes);
     }
 }
 
@@ -601,23 +677,16 @@ GeneracionSolver::OpcionesUI ScheduleGenerationWidget::leerOpciones() const
             pd.turno = combo->currentText().trimmed();
         if (auto* combo = qobject_cast<QComboBox*>(m_tablaDocentes->cellWidget(fila, 4)))
             pd.plan = combo->currentText().trimmed();
-        if (auto* edit = qobject_cast<QLineEdit*>(m_tablaDocentes->cellWidget(fila, 5))) {
-            const QStringList partes = edit->text().split(QLatin1Char(';'), Qt::SkipEmptyParts);
-            for (const QString& parte : partes) {
-                bool ok = false;
-                const int anio = parte.trimmed().toInt(&ok);
-                if (ok && !pd.anios.contains(anio))
+        if (auto* combo = qobject_cast<ComboMultiple*>(m_tablaDocentes->cellWidget(fila, 5))) {
+            for (const QVariant& dato : combo->datosSeleccionados()) {
+                const int anio = dato.toInt();
+                if (anio > 0 && !pd.anios.contains(anio))
                     pd.anios.append(anio);
             }
         }
-        if (auto* edit = qobject_cast<QLineEdit*>(m_tablaDocentes->cellWidget(fila, 7))) {
-            const QStringList partes = edit->text().split(QLatin1Char(';'), Qt::SkipEmptyParts);
-            for (const QString& parte : partes) {
-                const QString limpio = parte.trimmed();
-                if (!limpio.isEmpty())
-                    pd.materiasSuplentes << limpio;
-            }
-        }
+        if (auto* boton =
+                qobject_cast<BotonMateriasSuplentes*>(m_tablaDocentes->cellWidget(fila, 7)))
+            pd.materiasSuplentes = boton->seleccion();
         opciones.docentes.insert(m_docentesNombres[fila], pd);
     }
 
@@ -662,14 +731,15 @@ void ScheduleGenerationWidget::aplicarOpciones(const GeneracionSolver::OpcionesU
             const int idx = combo->findText(pd.plan);
             if (idx >= 0) combo->setCurrentIndex(idx);
         }
-        if (auto* edit = qobject_cast<QLineEdit*>(m_tablaDocentes->cellWidget(fila, 5))) {
-            QStringList anios;
+        if (auto* combo = qobject_cast<ComboMultiple*>(m_tablaDocentes->cellWidget(fila, 5))) {
+            QVariantList anios;
             for (int anio : pd.anios)
-                anios << QString::number(anio);
-            edit->setText(anios.join(QStringLiteral("; ")));
+                anios << anio;
+            combo->setSeleccionDatos(anios);
         }
-        if (auto* edit = qobject_cast<QLineEdit*>(m_tablaDocentes->cellWidget(fila, 7)))
-            edit->setText(pd.materiasSuplentes.join(QStringLiteral("; ")));
+        if (auto* boton =
+                qobject_cast<BotonMateriasSuplentes*>(m_tablaDocentes->cellWidget(fila, 7)))
+            boton->setSeleccion(pd.materiasSuplentes);
     }
 }
 
