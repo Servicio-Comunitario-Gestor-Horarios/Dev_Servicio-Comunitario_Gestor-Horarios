@@ -2,6 +2,12 @@
 
 Estado: aprobada (2026-10-23)
 
+> **Decisión del usuario (2026-10-23): la clave normalizada se almacena.** El catálogo de tipos de
+> aula guarda la **clave normalizada** (recorte de espacios extremos + plegado de mayúsculas/minúsculas
+> en Unicode con `toCaseFolded()`), **calculada por el servicio**, y el **índice único va sobre esa
+> clave**. Motivo: `lower()`/`trim()` de SQLite solo son ASCII y no frenan «Física»/«FÍSICA» en
+> escrituras directas. Corrige la definición de «clave de tipo» y RF-5; la spec sigue **aprobada**.
+
 > **Alcance y reparto con la spec 010.** Esta spec cubre la **persistencia, los servicios, la huella de
 > datos, el esquema y su versión, los datos de prueba y la documentación de la API** del cambio. La
 > parte del **solver** —contrato 2.0, regla de tipo de aula, validaciones nuevas, supersesión de la
@@ -140,8 +146,9 @@ datos de prueba por los reales.
 - **Tipo de aula:** categoría de espacio del centro («Aula de estudio», «Laboratorio», «Taller»,
   «Cancha»…), identificada por su nombre y mantenida en un **catálogo**.
 - **Clave de tipo:** forma normalizada del nombre de un tipo (sin espacios extremos y sin distinguir
-  mayúsculas) que se usa para la **unicidad** y para comparar tipos. No se almacena como dato
-  independiente: el nombre se conserva tal como lo escribió el usuario.
+  mayúsculas en Unicode) que se usa para la **unicidad** y para comparar tipos. **El catálogo guarda
+  la clave normalizada, calculada por el servicio**, y el **índice único va sobre ella**; el nombre
+  visible se conserva tal como lo escribió el usuario.
 - **Catálogo de tipos de aula:** conjunto de tipos disponibles. Es **administrable** (crear, listar,
   renombrar, eliminar) y **no** puede quedar vacío mientras existan aulas o materias.
 - **Tipo de un aula:** **exactamente uno**, obligatorio. No hay aulas sin tipo.
@@ -239,7 +246,9 @@ datos de prueba por los reales.
   único según su clave de tipo** (sin distinguir mayúsculas ni espacios extremos); si no se cumple,
   rechazará la operación indicando el valor.
 - **EL SISTEMA garantizará la unicidad normalizada en el almacenamiento**, no solo en la aplicación:
-  ninguna escritura puede dejar dos tipos con la misma clave de tipo.
+  guardará la **clave normalizada calculada por el servicio** (recorte + `toCaseFolded()`) y mantendrá
+  un **índice único sobre esa clave**; ninguna escritura puede dejar dos tipos con la misma clave,
+  incluidas las que solo cambian mayúsculas en Unicode (p. ej. «Física»/«FÍSICA»).
 - **CUANDO se renombre un tipo cambiando solo mayúsculas o espacios extremos, EL SISTEMA lo tratará
   como el mismo tipo:** lo acepta y actualiza el nombre visible, sin considerarlo duplicado.
 - **EL SISTEMA permitirá crear, listar, renombrar y eliminar tipos de aula.**

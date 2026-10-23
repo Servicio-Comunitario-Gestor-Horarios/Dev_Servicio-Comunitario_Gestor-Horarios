@@ -1,12 +1,13 @@
 # Estado 009
 
-Fase: plan
-Aprobaciones: spec 2026-10-23
-Base: 5d6b1da77c9da645441a0bebb38e37753f0f7198 (HEAD). **Condición:** el cambio de esquema está **sin commitear** en el árbol; el diff no forma parte de la base y la validación futura no debe imputarlo a la implementación. La base efectiva será el commit que incluya el esquema inicial.
+Fase: implementacion
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-23
+Base: 059168f (commit `feat(bd): catálogo de tipos de aula y eventos del turno en el esquema`). HEAD actual: 98566a8; `plan.md`, `tasks.md` y este `estado.md` están **sin commitear**.
 Dudas abiertas: ninguna
-Siguiente paso: el planner escribirá `plan.md` y `tasks.md` de la 009 cuando el usuario confirme la base de commit.
+Siguiente paso: implementar **T1** (build sin frontend) en una sola tarea y una sola pasada. Tras cada tarea, el coordinator ejecuta la verificación del plan y `git diff --stat`; no se commitea sin permiso del usuario.
 Veredicto: pendiente
 QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
+QA del plan: CAMBIOS NECESARIOS corregidos y `plan.md`/`tasks.md` aprobados por el usuario el 2026-10-23.
 
 ## Decisiones cerradas (2026-10-23)
 
@@ -30,6 +31,11 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 
 ## Decisiones de modelado del re-QA (2026-10-23)
 
+- **Clave normalizada almacenada (decisión del usuario, 2026-10-23).** El catálogo de tipos de aula
+  **guarda la clave normalizada** (recorte de espacios extremos + `toCaseFolded()` Unicode, calculada
+  por el servicio) y el **índice único va sobre esa clave**. Corrige la definición de «clave de tipo» y
+  RF-5 de la spec, que sigue **aprobada**. Motivo: `lower()`/`trim()` de SQLite solo pliegan ASCII y no
+  frenan «Física»/«FÍSICA» en escrituras directas.
 - **N1 — Regla medible del seed.** Cada materia sembrada recibe el tipo especializado de su área
   (ciencias experimentales → laboratorio; informática/taller → taller; Educación Física → cancha) **si
   el conjunto tiene al menos un aula de ese tipo**; en caso contrario, el tipo genérico. Así se cumple
@@ -57,8 +63,9 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
   eventos antes que turnos; aulas y materias antes que el catálogo de tipos.
 - **N18 — Catálogo vacío en criterios.** El criterio del catálogo cubre que el catálogo vacío impide
   crear aulas y materias.
-- **N19 — Base.** Anotada la condición del esquema WIP sin commitear (ver cabecera); la validación no
-  debe imputar ese diff a la implementación.
+- **N19 — Base.** Fijada en **`059168f`**, el commit que ya incluye el esquema de `TiposAula` y
+  `Eventos`; el árbol tiene HEAD `98566a8` y `plan.md`/`tasks.md` aún sin commitear. No hay diff de
+  esquema sin commitear que imputar a la implementación.
 
 ## Supersesión
 
@@ -69,8 +76,13 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 
 ## Notas
 
-- **El esquema WIP tendrá que ajustarse.** El registro de eventos actual no admite varios por franja
-  ni un orden: hará falta identidad propia y orden único por turno y posición. El ajuste es del plan.
+- **Cierre del plan (2026-10-23).** `plan.md` y `tasks.md` aprobados por el usuario el 2026-10-23 y
+  **sin commitear** a fecha de hoy (junto con este `estado.md`). La implementación empieza el
+  **2026-10-24**. Riesgos declarados al usuario: **T6 y T8 en el límite de 30 min** y **el frontend no
+  compila** hasta que su equipo migre.
+- **El esquema del commit Base ya tiene `TiposAula` y `Eventos`**, pero no la identidad/orden del
+  evento, la clave normalizada/índice único de tipos ni la marca de versión; la 009 los añade. El
+  ajuste es del plan (T2).
 - **Sin migración.** Una base con el esquema anterior se rechaza al abrir; no se convierten recesos en
   eventos ni se suponen tipos. El usuario crea una base nueva con respaldo (specs 001 y 004).
 - **La constitución no se toca aquí.** Su enmienda es requisito y tarea de la 010.
@@ -79,6 +91,5 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 
 ## Tamaño previsto
 
-Doce RF agrupables en **≤10 tareas**: eventos (identidad, orden y coherencia temporal), actualización
-de turnos, catálogo, tipos de aula y materia, servicios/consola/huella, esquema y versión, seed,
-documentación de la API y puente de la entrada.
+Doce RF en **diez tareas** (T1 10-15 min; T2-T8 25-30 min; T9 25 min; T10 25 min), con build sin
+frontend y compatibilidad transitoria de eventos hasta el cierre.
