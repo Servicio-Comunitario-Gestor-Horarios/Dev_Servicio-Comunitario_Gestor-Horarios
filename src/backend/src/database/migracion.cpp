@@ -23,6 +23,16 @@ namespace
     {
         QSqlQuery query(db);
 
+        // ── TiposAula (catálogo de tipos de aula) ──
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS TiposAula ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "nombre TEXT NOT NULL UNIQUE CHECK(length(trim(nombre)) > 0),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
         // ── Aulas ──
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Aulas ("
@@ -31,6 +41,7 @@ namespace
             "capacidad INTEGER NOT NULL CHECK(capacidad > 0),"
             "edificio TEXT,"
             "piso TEXT,"
+            "id_tipo_aula INTEGER NOT NULL REFERENCES TiposAula(id),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
@@ -54,6 +65,7 @@ namespace
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "nombre TEXT NOT NULL,"
             "requisitos TEXT,"
+            "id_tipo_aula INTEGER NOT NULL REFERENCES TiposAula(id),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
@@ -117,9 +129,10 @@ namespace
             ")"
         )) return false;
 
-        // ── Recesos (un receso pertenece a un turno) ──
+        // ── Eventos (recesos, actos cívicos y sucesos del turno) ──
         if (!ejecutar(query,
-            "CREATE TABLE IF NOT EXISTS Recesos ("
+            "CREATE TABLE IF NOT EXISTS Eventos ("
+            "nombre TEXT NOT NULL,"
             "turno TEXT NOT NULL REFERENCES Turnos(nombre),"
             "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 0),"
             "duracion INTEGER NOT NULL CHECK(duracion > 0),"
