@@ -346,3 +346,133 @@ sqlite3 … "SELECT … quote(inicio), quote(fin) FROM Eventos"
 - **No se añadieron** `eventosFueraDeRango` ni `actualizarTurno(..., bool)`: son de T4.
   `NucleoDatos`, `cascada`, la huella, el puente del constructor, el seed y el frontend
   no se tocaron.
+
+## T4 - Coherencia temporal, ventanas y reducción de franjas (2026-10-24)
+
+RF-3, RF-4, RNF-1. Base: `08067ce` (T1-T3 commiteadas).
+
+### Cambios
+
+- `src/backend/include/backend/services/calculo_eventos.hpp` y
+  `src/backend/src/services/calculo_eventos.cpp` (nuevos): funciones puras
+  `duracionFranjaEstimada`, `ventanaDePosicion`, `eventoDentroDeVentana`,
+  `haySolapeCronologico`, `ordenSiguiente` y `eventosFueraDeRango`.
+  - `duracionFranjaEstimada` = `(minutos de ventana − Σ duraciones) / numSlots`, con guarda:
+    `numSlots <= 0`, ventana no positiva o reparto entero `< 1` → `0` (nunca divide por cero).
+  - `ventanaDePosicion(k)` = `inicio + k × franja + Σ duraciones de posiciones < k` hasta
+    `inicio + Σ duraciones de la posición`; la última posición (k = `numSlots`) termina en
+    `turno.fin` (N5: «la última hasta el fin del turno», incluido el resto entero del reparto).
+  - `haySolapeCronologico` ordena por `(posición, orden, id)` y compara con el **fin máximo**
+    acumulado (no solo con el evento anterior: A 08:00–10:00, B 09:00–09:10, C 09:20–09:30
+    es solape y una comparación por pares contiguos no lo vería).
+  - `ordenSiguiente` sustituye al ayudante privado `ordenSiguienteEn` del `.cpp` (T3).
+- `src/backend/src/services/ServicioTurnosRecesos.cpp`:
+  - `validarCoherenciaTemporal(turnoConCandidato, candidato)`: par de horas completo o ausente,
+    `fin > inicio`, `fin − inicio == duracion`, encaje en la rejilla
+    (`duracionFranjaEstimada > 0`), intervalo contenido en la ventana de su posición y ausencia
+    de solapes/cronología invertida. Se aplica en el alta y en la edición (la edición valida el
+    turno con el candidato sustituyendo al evento por su id).
+  - `actualizarTurno(..., bool eliminarEventosFueraDeRango = false)` (firma del plan): si se
+    reducen franjas y hay afectados, sin confirmación devuelve el error con `#id`, nombre y
+    posición; con confirmación los borra. Cambiar la ventana que deja fuera un evento con horas
+    se rechaza con el evento, su intervalo y la ventana nueva. El borrado y el `UPDATE` van en
+    una sola transacción (rollback ante cualquier fallo).
+  - `eventosFueraDeRango(turno, numSlots)` como método (la función pura homónima se invoca con
+    `::` para evitar que el método se oculte a sí mismo).
+- `src/backend/CMakeLists.txt`: `calculo_eventos.cpp` en la librería `backend`.
+- `test/CMakeLists.txt`: `add_qtest(test_calculo_eventos ... backend)`.
+- `test/backend/test_calculo_eventos.cpp` (nuevo, 26 casos) y
+  `test/backend/test_servicio_turnos_eventos.cpp` (+15 casos de coherencia y turnos).
+
+### Rojo inicial
+
+```bash
+cmake --build build-backend --parallel     # EXIT != 0
+# test_calculo_eventos.cpp:7:10: fatal error: backend/services/calculo_eventos.hpp: No existe…
+# test_servicio_turnos_eventos.cpp:454/460/464: ‘ServicioTurnosRecesos’ has no member
+#   named ‘eventosFueraDeRango’
+# test_servicio_turnos_eventos.cpp:492: no matching function for call to
+#   ‘ServicioTurnosRecesos::actualizarTurno(const char[8], QTime, QTime, int, bool)’
+```
+
+Un primer verde parcial dejó 2 rojos de test, ya corregidos: el caso
+`eventoDentroDeVentana_dentro_verdadero` usaba horas de la rejilla con dos eventos (franja 55)
+cuando el turno de la prueba tenía uno (franja 58), y el caso de reducción sin confirmar pedía
+«Receso» con `numSlots = 3` cuando ese evento (posición 2) deja de estar afectado.
+
+### Verde final
+
+```bash
+cmake --build --preset backend --parallel      # EXIT=0
+ctest --test-dir build-backend --output-on-failure \
+    -R 'test_calculo_eventos|test_servicio_turnos_eventos'
+# 100% tests passed out of 2
+#  test_servicio_turnos_eventos ... Passed (38 casos + init/cleanup)
+#  test_calculo_eventos .......... Passed (26 casos + init/cleanup)
+```
+
+Casos nuevos: guarda de `numSlots` 0/negativo, ventana invertida y reparto no positivo;
+reparto `(ventana − Σ)/franjas` y ventana de cada posición (incluida la última con resto);
+contención antes/dentro/después y evento sin horas; solape en la misma posición, entre
+posiciones invertidas, contiguo sin solape, entrada desordenada y solape con el primero a
+través de un tercero; `ordenSiguiente` y `eventosFueraDeRango` puros. En el servicio: par
+incompleto, `fin <= inicio`, diferencia distinta de la duración, fuera de ventana, solape en
+la misma posición, cronología invertida respecto a la posición, eventos que no caben en el
+turno, solape en la edición, listado de afectados con y sin confirmación, borrado confirmado,
+ventana nueva que deja fuera un evento y ventana sin reparto para los eventos.
+
+### Compatibilidad (no empeora respecto a la base)
+
+```bash
+ctest --test-dir build-backend         # 37/48 (77 %); los MISMOS 11 binarios rojos de T3
+```
+
+`test_constructor_entrada` sigue verde; `test_backend_cascada` sigue en 6/12 y
+`test_gestor_pendientes` en 11/2 por las razones conocidas (cascada de turno con la tabla
+retirada `Recesos` y `NOT NULL id_tipo_aula`, T5/T6). `test_seed_aplicacion` sigue rojo por
+`contarFilasDeDominio` consultando la tabla retirada `Recesos` (T8), no por T4.
+
+Comprobación manual (consola, base nueva v3):
+
+```bash
+… --cmd 'turnos crear "Mañana" 07:00 12:30 8'
+… --cmd 'turnos evento-agregar "Mañana" "Receso" 2 10 08:20 08:30'   # ok (ventana 08:20–08:30)
+… --cmd 'turnos evento-agregar "Mañana" "Mal" 2 10 08:20 08:35'
+# error: La duración del evento «Mal» (10 min) no coincide con la diferencia entre sus horas (15 min).
+… --cmd 'turnos actualizar "Mañana" 07:00 12:30 2'
+# error: El turno «Mañana» quedaría con 2 franjas y tiene 1 evento después de esa posición:
+#        #2 «Acto» (pos. 3). Confirma la eliminación para continuar.
+… --cmd 'turnos listar'   # sigue con slots=8 y eventos=2: sin confirmación no se toca nada
+```
+
+### Hallazgos / desviaciones
+
+- **Conflicto con una fixture de `test_nucleo_datos` (T6).**
+  `test_nucleo_datos.cpp:253` crea un turno 13:00–18:00 de 5 franjas y un receso de 15 min a las
+  15:00–15:15. Con la fórmula aprobada (N5) la franja es `(300 − 15) / 5 = 57` y la ventana de
+  la posición 2 es **14:54–15:09**, así que ese intervalo no cabe (y el
+  `actualizarTurno(14:00, 19:00, 6)` posterior, franja 47, dejaría la ventana en 15:34–15:49 y
+  también se rechazaría). El caso pasa de verde a rojo **dentro de un binario ya rojo**
+  (`test_backend_nucleo_datos`: 7/6 → 6/7); el conjunto de tests rojos no cambia. **No se
+  relajó la regla**: los datos sembrados sí encajan (Mañana 07:00–12:30, franja 40, posición 2 =
+  08:20–08:30 exacta; Tarde 12:40–18:10, franja 40, posición 2 = 14:00–14:10 exacta), lo que
+  confirma la fórmula; la fixture es la que quedó con la rejilla antigua de 60 min. T6 debe
+  ajustar las horas de ese caso al convertirlo a `eventos` (o mover el evento a su ventana).
+- **Solape entre posiciones.** Con la contención en ventanas disjuntas no es posible un cruce
+  entre posiciones: un evento que empieza antes que el de una posición anterior queda fuera de
+  su propia ventana y se rechaza ahí. `haySolapeCronologico` cubre el caso (probado con eventos
+  fuera de ventana) y el mensaje del servicio nombra el solape cuando el fallo es de la misma
+  posición. En el servicio, la cronología invertida se manifiesta como error de «ventana».
+- **Guarda extra en `actualizarTurno`.** Además de la contención de los eventos con horas
+  (§4.3), se rechaza la ventana nueva si `duracionFranjaEstimada` queda en 0, porque un turno
+  cuya ventana es menor que la suma de los eventos deja la rejilla sin franja aunque los
+  eventos no tengan horas. Es la misma regla de encaje de §4.2 aplicada al turno; no cambia
+  firmas ni alcance.
+- La última posición de la ventana llega a `turno.fin` (N5) y absorbe el resto entero del
+  reparto (`(ventana − Σ) % numSlots`), de modo que el fin del turno nunca queda fuera de la
+  rejilla. La semántica de las demás posiciones no cambia.
+- `NucleoDatos` sigue delegando con 4 argumentos (el `bool` tiene valor por defecto): la
+  fachada y la cascada son de T6. Consola, seed, huella, puente y frontend sin tocar. El
+  ejemplo manual de T3 `evento-actualizar … 08:20 08:35` ya no es válido (con 15 min la franja
+  baja a 39 y la ventana de la posición 2 pasa a 08:18–08:33); es consecuencia de la fórmula,
+  no un cambio de T4.

@@ -45,6 +45,7 @@ target_sources(backend PRIVATE
 				# Services - Nucleo de datos (Cursos, Turnos/Recesos y fachada)
 				src/services/ServicioCursos.cpp
 				src/services/ServicioTurnosRecesos.cpp
+				src/services/calculo_eventos.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
 				src/services/cascada.cpp

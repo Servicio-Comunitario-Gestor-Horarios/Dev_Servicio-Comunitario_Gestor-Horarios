@@ -309,6 +309,247 @@ private slots:
         QCOMPARE(q.value(0).toInt(), 0);
     }
 
+    // ─── Coherencia temporal del evento (RF-3) ─────────────────────────────
+    //
+    // Turno de partida «Mañana»: 07:00–12:00, 5 franjas (300 min). Con un
+    // evento de 10 min la franja estimada es 58 min y la ventana de la
+    // posición 1 (tras la primera franja) es 07:58–08:08.
+
+    void agregarEvento_parDeHorasIncompleto_rechazado()
+    {
+        auto soloInicio = m_servicio->agregarEvento("Mañana", "Receso", 2, 10,
+                                                    QTime(8, 30), QTime());
+        QVERIFY(!soloInicio.ok);
+        QVERIFY(soloInicio.mensajeError.contains("juntas"));
+
+        auto soloFin = m_servicio->agregarEvento("Mañana", "Receso", 2, 10,
+                                                 QTime(), QTime(8, 40));
+        QVERIFY(!soloFin.ok);
+        QVERIFY(soloFin.mensajeError.contains("juntas"));
+
+        QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
+    }
+
+    void agregarEvento_finNoPosteriorAlInicio_rechazado()
+    {
+        auto iguales = m_servicio->agregarEvento("Mañana", "Receso", 2, 10,
+                                                 QTime(9, 0), QTime(9, 0));
+        QVERIFY(!iguales.ok);
+        QVERIFY(iguales.mensajeError.contains("posterior"));
+
+        auto invertidas = m_servicio->agregarEvento("Mañana", "Receso", 2, 10,
+                                                    QTime(9, 10), QTime(9, 0));
+        QVERIFY(!invertidas.ok);
+        QVERIFY(invertidas.mensajeError.contains("posterior"));
+
+        QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
+    }
+
+    void agregarEvento_duracionNoCoincideConLasHoras_rechazada()
+    {
+        auto r = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                           QTime(7, 58), QTime(8, 13));
+
+        QVERIFY(!r.ok);
+        QVERIFY(r.mensajeError.contains("no coincide"));
+        QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
+    }
+
+    void agregarEvento_enLaVentanaDeSuPosicion_aceptado()
+    {
+        auto r = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                           QTime(7, 58), QTime(8, 8));
+
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.inicio, QTime(7, 58));
+        QCOMPARE(r.valor.fin, QTime(8, 8));
+    }
+
+    void agregarEvento_fueraDeLaVentanaDeSuPosicion_rechazado()
+    {
+        auto antes = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                               QTime(7, 50), QTime(8, 0));
+        QVERIFY(!antes.ok);
+        QVERIFY(antes.mensajeError.contains("ventana"));
+
+        auto despues = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                                 QTime(8, 8), QTime(8, 18));
+        QVERIFY(!despues.ok);
+        QVERIFY(despues.mensajeError.contains("ventana"));
+
+        QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
+    }
+
+    void agregarEvento_solapeEnLaMismaPosicion_rechazado()
+    {
+        // Con dos eventos de 10 min la franja baja a 56 y la ventana de la
+        // posición 1 pasa a 07:56–08:16: el segundo cabe pero pisa al primero.
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                          QTime(7, 58), QTime(8, 8)).ok);
+
+        auto solapado = m_servicio->agregarEvento("Mañana", "Aviso", 1, 10,
+                                                  QTime(8, 6), QTime(8, 16));
+
+        QVERIFY(!solapado.ok);
+        QVERIFY(solapado.mensajeError.contains("solapan"));
+        QCOMPARE(m_servicio->obtenerTurno("Mañana").valor.eventos.size(), 1);
+    }
+
+    void agregarEvento_cronologiaInvertidaRespectoALaPosicion_rechazada()
+    {
+        // Un evento que empieza antes que el de una posición anterior queda
+        // fuera de su propia ventana: las ventanas son disjuntas y ordenadas.
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Primero", 2, 10,
+                                          QTime(8, 56), QTime(9, 6)).ok);
+
+        auto invertido = m_servicio->agregarEvento("Mañana", "Segundo", 3, 10,
+                                                   QTime(8, 0), QTime(8, 10));
+
+        QVERIFY(!invertido.ok);
+        QVERIFY(invertido.mensajeError.contains("ventana"));
+        QCOMPARE(m_servicio->obtenerTurno("Mañana").valor.eventos.size(), 1);
+    }
+
+    void agregarEvento_eventosNoCabenEnElTurno_rechazado()
+    {
+        auto ocupaTodo = m_servicio->agregarEvento("Mañana", "Acto", 1, 300);
+        QVERIFY(!ocupaTodo.ok);
+        QVERIFY(ocupaTodo.mensajeError.contains("caben"));
+
+        auto dejaSinReparto = m_servicio->agregarEvento("Mañana", "Acto", 1, 299);
+        QVERIFY(!dejaSinReparto.ok);
+        QVERIFY(dejaSinReparto.mensajeError.contains("caben"));
+
+        QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
+    }
+
+    void actualizarEvento_solapeConOtroEvento_rechazado()
+    {
+        auto receso = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                                QTime(7, 58), QTime(8, 8));
+        auto aviso = m_servicio->agregarEvento("Mañana", "Aviso", 2, 10);
+        QVERIFY(receso.ok);
+        QVERIFY(aviso.ok);
+
+        // El aviso se mueve a la posición 1 con horas que pisan el receso.
+        auto r = m_servicio->actualizarEvento(aviso.valor.id, "Aviso", 1, 10,
+                                              QTime(8, 6), QTime(8, 16), 2);
+
+        QVERIFY(!r.ok);
+        QVERIFY(r.mensajeError.contains("solapan"));
+
+        auto turno = m_servicio->obtenerTurno("Mañana").valor;
+        QCOMPARE(turno.eventos.size(), 2);
+        QCOMPARE(turno.eventos[1].despuesDeSlot, 2);
+        QVERIFY(!turno.eventos[1].inicio.isValid());
+    }
+
+    // ─── Reducción de franjas y ventana del turno (RF-4) ───────────────────
+
+    void eventosFueraDeRango_listaAfectados()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Acto cívico", 4, 10).ok);
+
+        auto afectados = m_servicio->eventosFueraDeRango("Mañana", 3);
+        QVERIFY(afectados.ok);
+        QCOMPARE(afectados.valor.size(), 1);
+        QCOMPARE(afectados.valor.first().nombre, QStringLiteral("Acto cívico"));
+        QCOMPARE(afectados.valor.first().despuesDeSlot, 4);
+
+        auto ninguno = m_servicio->eventosFueraDeRango("Mañana", 5);
+        QVERIFY(ninguno.ok);
+        QVERIFY(ninguno.valor.isEmpty());
+
+        auto inexistente = m_servicio->eventosFueraDeRango("Nocturno", 3);
+        QVERIFY(!inexistente.ok);
+        QVERIFY(inexistente.mensajeError.contains("No se encontró"));
+    }
+
+    void actualizarTurno_reducirSinConfirmar_rechazaYListaAfectados()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Acto cívico", 4, 10).ok);
+
+        auto r = m_servicio->actualizarTurno("Mañana", QTime(7, 0), QTime(12, 0), 1);
+
+        QVERIFY(!r.ok);
+        QVERIFY(r.mensajeError.contains("Mañana"));
+        QVERIFY(r.mensajeError.contains("Receso"));
+        QVERIFY(r.mensajeError.contains("Acto cívico"));
+
+        // Sin confirmación no se toca nada.
+        auto turno = m_servicio->obtenerTurno("Mañana").valor;
+        QCOMPARE(turno.numSlots, 5);
+        QCOMPARE(turno.eventos.size(), 2);
+    }
+
+    void actualizarTurno_reducirConConfirmacion_borraAfectados()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Acto cívico", 4, 10).ok);
+
+        auto r = m_servicio->actualizarTurno("Mañana", QTime(7, 0), QTime(12, 0), 3,
+                                             true);
+
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.numSlots, 3);
+        QCOMPARE(r.valor.eventos.size(), 1);
+        QCOMPARE(r.valor.eventos.first().nombre, QStringLiteral("Receso"));
+
+        QSqlQuery q(m_dbManager->database());
+        q.prepare("SELECT COUNT(*) FROM Eventos WHERE turno = 'Mañana'");
+        QVERIFY(q.exec());
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 1);
+    }
+
+    void actualizarTurno_ventanaQueDejaFueraUnEvento_rechazada()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
+                                          QTime(7, 58), QTime(8, 8)).ok);
+
+        // Con la campana 08:00–12:00 la ventana de la posición 1 pasa a
+        // 08:46–08:56: el receso de 07:58–08:08 ya no cabe.
+        auto r = m_servicio->actualizarTurno("Mañana", QTime(8, 0), QTime(12, 0), 5);
+
+        QVERIFY(!r.ok);
+        QVERIFY(r.mensajeError.contains("Receso"));
+
+        auto turno = m_servicio->obtenerTurno("Mañana").valor;
+        QCOMPARE(turno.inicio, QTime(7, 0));
+        QCOMPARE(turno.eventos.size(), 1);
+        QCOMPARE(turno.eventos.first().inicio, QTime(7, 58));
+    }
+
+    void actualizarTurno_ventanaSinRepartoParaLosEventos_rechazada()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Aviso", 4, 10).ok);
+
+        // 20 min de ventana para 20 min de eventos: no queda franja.
+        auto r = m_servicio->actualizarTurno("Mañana", QTime(7, 0), QTime(7, 20), 5);
+
+        QVERIFY(!r.ok);
+        QVERIFY(r.mensajeError.contains("caben"));
+
+        auto turno = m_servicio->obtenerTurno("Mañana").valor;
+        QCOMPARE(turno.fin, QTime(12, 0));
+        QCOMPARE(turno.eventos.size(), 2);
+    }
+
+    void actualizarTurno_sinAfectados_conservaEventos()
+    {
+        QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
+
+        auto r = m_servicio->actualizarTurno("Mañana", QTime(7, 0), QTime(13, 0), 6);
+
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.numSlots, 6);
+        QCOMPARE(r.valor.fin, QTime(13, 0));
+        QCOMPARE(r.valor.eventos.size(), 1);
+    }
+
     // ─── Compatibilidad transitoria: recesos derivados de eventos ───────────
 
     void compatibilidad_agregarReceso_creaEventoDerivado()

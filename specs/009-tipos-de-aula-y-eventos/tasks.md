@@ -9,7 +9,7 @@
 - [x] **T3. Modelo y servicio de eventos, con compatibilidad.** RF-1, RF-2, RF-8
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_servicio_turnos_eventos'` está verde; se añaden `EventoDTO`/`TurnoDTO.eventos` y el CRUD sobre `Eventos`; `RecesoDTO`/`recesos` y `agregarReceso`/`eliminarReceso` siguen compilando como capa derivada; dos eventos en la misma posición se guardan con orden 1 y 2; la lista sale por posición/orden/id; el borrado no renumera; la identidad permite editar/eliminar; la posición 0 se rechaza; la edición no cambia el turno; la consola añade `evento-*` y conserva la lectura de recesos.
 
-- [ ] **T4. Coherencia temporal, ventanas y reducción de franjas.** RF-3, RF-4
+- [x] **T4. Coherencia temporal, ventanas y reducción de franjas.** RF-3, RF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_calculo_eventos|test_servicio_turnos_eventos'` está verde; se rechazan el par incompleto, la diferencia distinta de la duración, el intervalo fuera de la ventana de posición, los solapes dentro/entre posiciones y la cronología invertida; `duracionFranjaEstimada` con `numSlots <= 0` no divide por cero; reducir franjas sin confirmar lista los afectados y con confirmación los borra; cambiar la ventana que deja fuera un evento se rechaza.
 
 - [ ] **T5. Catálogo, tipos en aulas/materias y huella.** RF-5, RF-6, RF-7, RF-8

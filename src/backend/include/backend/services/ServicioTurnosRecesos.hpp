@@ -75,8 +75,12 @@ public:
 
     Resultado<QVector<TurnoDTO>> listarTurnos() const;
 
+    /// Actualiza el turno. Si se reducen las franjas y hay eventos que quedarían
+    /// fuera de rango, sin `eliminarEventosFueraDeRango` se devuelve el error con
+    /// la lista de afectados; con `true` se borran en la misma transacción (RF-4).
     Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio,
-                                        const QTime& fin, int numSlots);
+                                        const QTime& fin, int numSlots,
+                                        bool eliminarEventosFueraDeRango = false);
 
     bool eliminarTurno(const QString& nombre);
 
@@ -98,6 +102,11 @@ public:
     /// Borrado por identidad; no renumera los eventos restantes.
     bool eliminarEvento(int id);
 
+    /// Eventos que quedarían después de la franja `numSlots` (RF-4), para que la
+    /// interfaz o la consola pidan confirmación antes de reducir las franjas.
+    Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno,
+                                                      int numSlots) const;
+
     // ─── Recesos (compatibilidad transitoria; se retiran en T9) ────────────
 
     /// Alta de un evento llamado «Receso»; devuelve su vista como receso.
@@ -117,6 +126,12 @@ private:
     /// Valida nombre, posición, duración y orden de un evento del turno `dto`.
     bool validarEvento(const TurnoDTO& dto, const QString& nombre, int despuesDeSlot,
                        int duracion, int orden, bool ordenObligatorio, QString& error) const;
+
+    /// Valida el par de horas, la diferencia con la duración, el encaje en la
+    /// rejilla, la ventana de su posición y los solapes. `turno` debe incluir el
+    /// candidato en `turno.eventos`.
+    bool validarCoherenciaTemporal(const TurnoDTO& turno, const EventoDTO& candidato,
+                                   QString& error) const;
 
     /// Carga `dto.eventos` (ordenados por posición, orden e id) y deriva `recesos`.
     bool cargarEventos(TurnoDTO& dto) const;

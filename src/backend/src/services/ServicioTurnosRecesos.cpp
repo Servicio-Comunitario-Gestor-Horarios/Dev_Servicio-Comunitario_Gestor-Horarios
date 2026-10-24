@@ -3,24 +3,23 @@
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QStringList>
 #include <QVariant>
+
+#include "backend/services/calculo_eventos.hpp"
 
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
 
 namespace
 {
-    /// Orden que corresponde al siguiente evento de `posicion`: máximo + 1, o 1.
-    ///
-    /// Temporal en T3; la spec lo mueve a `calculo_eventos` en T4.
-    int ordenSiguienteEn(const QVector<EventoDTO>& eventos, int posicion)
+    QString formatearHora(const QTime& hora)
     {
-        int maximo = 0;
-        for (const EventoDTO& evento : eventos)
-        {
-            if (evento.despuesDeSlot == posicion && evento.orden > maximo)
-                maximo = evento.orden;
-        }
-        return maximo + 1;
+        return hora.isValid() ? hora.toString(FORMATO_HORA) : QStringLiteral("—");
+    }
+
+    QString formatearIntervalo(const QTime& inicio, const QTime& fin)
+    {
+        return QStringLiteral("%1–%2").arg(formatearHora(inicio), formatearHora(fin));
     }
 
     /// Vista de receso de un evento (compatibilidad transitoria del contrato 1.0).
@@ -84,6 +83,66 @@ bool ServicioTurnosRecesos::validarEvento(const TurnoDTO& dto, const QString& no
 
     if (orden < 0 || (ordenObligatorio && orden < 1)) {
         error = "El orden del evento debe ser mayor o igual que uno.";
+        return false;
+    }
+
+    return true;
+}
+
+bool ServicioTurnosRecesos::validarCoherenciaTemporal(const TurnoDTO& turno,
+                                                      const EventoDTO& candidato,
+                                                      QString& error) const {
+    const bool hayHoras = candidato.inicio.isValid() || candidato.fin.isValid();
+    if (candidato.inicio.isValid() != candidato.fin.isValid()) {
+        error = "Las horas del evento deben indicarse juntas (inicio y fin) o ninguna.";
+        return false;
+    }
+
+    if (hayHoras) {
+        if (candidato.fin <= candidato.inicio) {
+            error = QStringLiteral("La hora de fin del evento (%1) debe ser posterior a la de"
+                                   " inicio (%2).")
+                        .arg(formatearHora(candidato.fin), formatearHora(candidato.inicio));
+            return false;
+        }
+
+        const int minutosEntreHoras = candidato.inicio.secsTo(candidato.fin) / 60;
+        if (minutosEntreHoras != candidato.duracion) {
+            error = QStringLiteral("La duración del evento «%1» (%2 min) no coincide con la"
+                                   " diferencia entre sus horas (%3 min).")
+                        .arg(candidato.nombre)
+                        .arg(candidato.duracion)
+                        .arg(minutosEntreHoras);
+            return false;
+        }
+    }
+
+    // El reparto de la rejilla debe quedar en positivo: si los eventos ocupan
+    // toda la ventana o no dejan un minuto por franja, no encajan (RF-3, RF-4).
+    if (duracionFranjaEstimada(turno) <= 0) {
+        error = QStringLiteral("Los eventos del turno «%1» no caben en su ventana de %2 a %3.")
+                    .arg(turno.nombre,
+                         formatearHora(turno.inicio),
+                         formatearHora(turno.fin));
+        return false;
+    }
+
+    if (hayHoras && !eventoDentroDeVentana(candidato, turno, candidato.despuesDeSlot)) {
+        const QPair<QTime, QTime> ventana =
+            ventanaDePosicion(turno, candidato.despuesDeSlot);
+        error = QStringLiteral("El intervalo %1 del evento «%2» no cabe en la ventana de la"
+                               " posición %3 (%4).")
+                    .arg(formatearIntervalo(candidato.inicio, candidato.fin),
+                         candidato.nombre,
+                         QString::number(candidato.despuesDeSlot),
+                         formatearIntervalo(ventana.first, ventana.second));
+        return false;
+    }
+
+    if (haySolapeCronologico(turno.eventos)) {
+        error = QStringLiteral("Los eventos del turno «%1» se solapan o van en orden"
+                               " cronológico invertido: revisa las horas de «%2».")
+                    .arg(turno.nombre, candidato.nombre);
         return false;
     }
 
@@ -218,10 +277,101 @@ Resultado<QVector<TurnoDTO>> ServicioTurnosRecesos::listarTurnos() const {
 
 Resultado<TurnoDTO> ServicioTurnosRecesos::actualizarTurno(const QString& nombre,
                                                            const QTime& inicio,
-                                                      const QTime& fin, int numSlots) {
+                                                           const QTime& fin, int numSlots,
+                                                           bool eliminarEventosFueraDeRango) {
     QString error;
     if (!validarTurno(nombre, inicio, fin, numSlots, error)) {
         return Resultado<TurnoDTO>::error(error);
+    }
+
+    auto existente = obtenerTurno(nombre.trimmed());
+    if (!existente.ok) {
+        return Resultado<TurnoDTO>::error(existente.mensajeError, existente.codigoError);
+    }
+    const TurnoDTO& anterior = existente.valor;
+
+    // Eventos que la reducción de franjas dejaría fuera de rango.
+    QVector<EventoDTO> afectados;
+    if (numSlots < anterior.numSlots) {
+        afectados = ::eventosFueraDeRango(anterior, numSlots);
+        if (!afectados.isEmpty() && !eliminarEventosFueraDeRango) {
+            QStringList lista;
+            for (const EventoDTO& evento : afectados) {
+                lista << QStringLiteral("#%1 «%2» (pos. %3)")
+                             .arg(evento.id)
+                             .arg(evento.nombre)
+                             .arg(evento.despuesDeSlot);
+            }
+            return Resultado<TurnoDTO>::error(
+                QStringLiteral("El turno «%1» quedaría con %2 franjas y tiene %3 evento%4"
+                               " después de esa posición: %5. Confirma la eliminación para"
+                               " continuar.")
+                    .arg(anterior.nombre)
+                    .arg(numSlots)
+                    .arg(afectados.size())
+                    .arg(afectados.size() == 1 ? QString() : QStringLiteral("s"))
+                    .arg(lista.join(QStringLiteral(", "))));
+        }
+    }
+
+    // Estado del turno con la ventana nueva y sin los eventos eliminados.
+    TurnoDTO nuevo = anterior;
+    nuevo.inicio   = inicio;
+    nuevo.fin      = fin;
+    nuevo.numSlots = numSlots;
+    nuevo.eventos.clear();
+    for (const EventoDTO& evento : anterior.eventos) {
+        if (evento.despuesDeSlot <= numSlots)
+            nuevo.eventos.append(evento);
+    }
+
+    if (!nuevo.eventos.isEmpty() && duracionFranjaEstimada(nuevo) <= 0) {
+        return Resultado<TurnoDTO>::error(
+            QStringLiteral("Los eventos del turno «%1» no caben en la nueva ventana de %2 a"
+                           " %3 con %4 franjas.")
+                .arg(nuevo.nombre,
+                     formatearHora(inicio),
+                     formatearHora(fin),
+                     QString::number(numSlots)));
+    }
+
+    // La ventana nueva no puede dejar fuera el intervalo de un evento (RF-4).
+    for (const EventoDTO& evento : nuevo.eventos) {
+        if (!evento.inicio.isValid() || !evento.fin.isValid())
+            continue;
+
+        if (eventoDentroDeVentana(evento, nuevo, evento.despuesDeSlot))
+            continue;
+
+        const QPair<QTime, QTime> ventana =
+            ventanaDePosicion(nuevo, evento.despuesDeSlot);
+        return Resultado<TurnoDTO>::error(
+            QStringLiteral("Cambiar la ventana del turno «%1» dejaría fuera el evento «%2»"
+                           " (#%3, pos. %4): su intervalo %5 no cabe en la ventana %6.")
+                .arg(nuevo.nombre,
+                     evento.nombre,
+                     QString::number(evento.id),
+                     QString::number(evento.despuesDeSlot),
+                     formatearIntervalo(evento.inicio, evento.fin),
+                     formatearIntervalo(ventana.first, ventana.second)));
+    }
+
+    if (!m_db.transaction()) {
+        qCritical() << "No se pudo iniciar la transacción para actualizar el turno.";
+        return Resultado<TurnoDTO>::error("Error al actualizar el turno en la base de datos.");
+    }
+
+    // Borrado de los afectados y actualización del turno: una sola transacción.
+    for (const EventoDTO& evento : afectados) {
+        QSqlQuery borrar(m_db);
+        borrar.prepare("DELETE FROM Eventos WHERE id = :id");
+        borrar.bindValue(":id", evento.id);
+        if (!borrar.exec()) {
+            qCritical() << "Error al eliminar los eventos fuera de rango:"
+                        << borrar.lastError().text();
+            m_db.rollback();
+            return Resultado<TurnoDTO>::error("Error al actualizar el turno en la base de datos.");
+        }
     }
 
     QSqlQuery query(m_db);
@@ -236,19 +386,21 @@ Resultado<TurnoDTO> ServicioTurnosRecesos::actualizarTurno(const QString& nombre
     query.bindValue(":inicio", inicio.toString(FORMATO_HORA));
     query.bindValue(":fin", fin.toString(FORMATO_HORA));
     query.bindValue(":slots", numSlots);
-    query.bindValue(":nombre", nombre.trimmed());
+    query.bindValue(":nombre", anterior.nombre);
 
-    if (!query.exec()) {
+    if (!query.exec() || query.numRowsAffected() == 0) {
         qCritical() << "Error al actualizar turno:" << query.lastError().text();
-        return Resultado<TurnoDTO>::error(
-            "Error al actualizar el turno en la base de datos.");
+        m_db.rollback();
+        return Resultado<TurnoDTO>::error("Error al actualizar el turno en la base de datos.");
     }
 
-    if (query.numRowsAffected() == 0) {
-        return Resultado<TurnoDTO>::error("No se encontró un turno con ese nombre.", -3);
+    if (!m_db.commit()) {
+        qCritical() << "Error al confirmar la actualización del turno.";
+        m_db.rollback();
+        return Resultado<TurnoDTO>::error("Error al actualizar el turno en la base de datos.");
     }
 
-    return obtenerTurno(nombre.trimmed());
+    return obtenerTurno(anterior.nombre);
 }
 
 bool ServicioTurnosRecesos::eliminarTurno(const QString& nombre) {
@@ -318,13 +470,8 @@ Resultado<EventoDTO> ServicioTurnosRecesos::agregarEvento(const QString& turno,
         return Resultado<EventoDTO>::error(error);
     }
 
-    // El esquema exige el par de horas completo; la coherencia temporal es de T4.
-    if (inicio.isValid() != fin.isValid()) {
-        return Resultado<EventoDTO>::error(
-            "Las horas del evento deben indicarse juntas (inicio y fin) o ninguna.");
-    }
-
-    const int ordenFinal = (orden == 0) ? ordenSiguienteEn(dto.eventos, despuesDeSlot)
+    // El orden es el máximo de la posición + 1 cuando no se indica.
+    const int ordenFinal = (orden == 0) ? ordenSiguiente(dto.eventos, despuesDeSlot)
                                         : orden;
     for (const EventoDTO& existente : dto.eventos) {
         if (existente.despuesDeSlot == despuesDeSlot && existente.orden == ordenFinal) {
@@ -335,6 +482,21 @@ Resultado<EventoDTO> ServicioTurnosRecesos::agregarEvento(const QString& turno,
                     .arg(dto.nombre)
                     .arg(ordenFinal));
         }
+    }
+
+    EventoDTO candidato;
+    candidato.nombre        = nombre.trimmed();
+    candidato.despuesDeSlot = despuesDeSlot;
+    candidato.orden         = ordenFinal;
+    candidato.duracion      = duracion;
+    candidato.inicio        = inicio;
+    candidato.fin           = fin;
+
+    // Se valida el turno con el candidato dentro: ventana, rejilla y solapes.
+    TurnoDTO conCandidato = dto;
+    conCandidato.eventos.append(candidato);
+    if (!validarCoherenciaTemporal(conCandidato, candidato, error)) {
+        return Resultado<EventoDTO>::error(error);
     }
 
     QSqlQuery query(m_db);
@@ -426,6 +588,27 @@ Resultado<EventoDTO> ServicioTurnosRecesos::actualizarEvento(int id, const QStri
         }
     }
 
+    EventoDTO candidato;
+    candidato.id            = id;
+    candidato.nombre        = nombre.trimmed();
+    candidato.despuesDeSlot = despuesDeSlot;
+    candidato.orden         = orden;
+    candidato.duracion      = duracion;
+    candidato.inicio        = inicio;
+    candidato.fin           = fin;
+
+    // El turno con el candidato sustituyendo al evento editado.
+    TurnoDTO conCandidato = dto;
+    conCandidato.eventos.clear();
+    for (const EventoDTO& existente : dto.eventos) {
+        if (existente.id != id)
+            conCandidato.eventos.append(existente);
+    }
+    conCandidato.eventos.append(candidato);
+    if (!validarCoherenciaTemporal(conCandidato, candidato, error)) {
+        return Resultado<EventoDTO>::error(error);
+    }
+
     QSqlQuery query(m_db);
     query.prepare(
         "UPDATE Eventos SET "
@@ -477,6 +660,18 @@ bool ServicioTurnosRecesos::eliminarEvento(int id) {
     }
 
     return query.numRowsAffected() > 0;
+}
+
+Resultado<QVector<EventoDTO>> ServicioTurnosRecesos::eventosFueraDeRango(
+    const QString& turno, int numSlots) const {
+    auto turnoExistente = obtenerTurno(turno.trimmed());
+    if (!turnoExistente.ok) {
+        return Resultado<QVector<EventoDTO>>::error(turnoExistente.mensajeError,
+                                                    turnoExistente.codigoError);
+    }
+
+    return Resultado<QVector<EventoDTO>>::exito(
+        ::eventosFueraDeRango(turnoExistente.valor, numSlots));
 }
 
 // ─── Recesos (compatibilidad transitoria; se retiran en T9) ────────────────

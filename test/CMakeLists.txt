@@ -74,6 +74,9 @@ if(TARGET backend)
 	# Eventos del turno (los antiguos recesos): CRUD por identidad y derivación.
 	add_qtest(test_servicio_turnos_eventos backend/test_servicio_turnos_eventos.cpp backend Qt6::Sql)
 
+	# Funciones puras de eventos: ventana de posición, reparto y solapes.
+	add_qtest(test_calculo_eventos backend/test_calculo_eventos.cpp backend)
+
 	add_qtest(test_servicio_aula backend/test_servicio_aula.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_materias backend/test_servicio_materias.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_planes_estudio backend/test_servicio_planes_estudio.cpp backend Qt6::Sql)
