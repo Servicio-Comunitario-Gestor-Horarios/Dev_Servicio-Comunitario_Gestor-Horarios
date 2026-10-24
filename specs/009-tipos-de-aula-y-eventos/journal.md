@@ -476,3 +476,141 @@ Comprobación manual (consola, base nueva v3):
   ejemplo manual de T3 `evento-actualizar … 08:20 08:35` ya no es válido (con 15 min la franja
   baja a 39 y la ventana de la posición 2 pasa a 08:18–08:33); es consecuencia de la fórmula,
   no un cambio de T4.
+
+## T5 - Catálogo, tipos en aulas/materias y huella (2026-10-24)
+
+RF-5, RF-6, RF-7, RF-8 (parte de huella). Base: `693fa18` (T1-T4 commiteadas).
+
+### Cambios
+
+- `src/backend/include/backend/services/ServicioTiposAula.hpp` y
+  `src/backend/src/services/ServicioTiposAula.cpp` (nuevos):
+  - `TipoAulaDTO { id, nombre }` y `ServicioTiposAula::claveTipo(nombre)` =
+    `trimmed().toCaseFolded()` (pública y pura: la usan los tests).
+  - `crearTipoAula` guarda `nombre` recortado y `clave` normalizada; rechaza nombre vacío y
+    duplica dos veces: comparación **en memoria** con `claveTipo` sobre todas las filas
+    (frena claves escritas sin normalizar) y el índice único de la tabla (`UNIQUE` → mismo
+    mensaje).
+  - `renombrarTipoAula` valida existencia, excluye la propia fila del chequeo de clave y
+    actualiza solo `TiposAula` (nombre + clave). Las aulas/materias lo ven por el `JOIN`: no
+    se reescribe ninguna fila dependiente.
+  - `eliminarTipoAula` devuelve `Resultado<bool>`: error con la lista de aulas y materias
+    dependientes («…está en uso por las aulas «A», «B» y las materias «C».»); nunca confirma.
+  - `namespace tipos_aula { catalogoVacio(db), existe(db, id) }`: consultas compartidas que
+    usan `ServicioAula`/`ServicioMaterias` para exigir un tipo existente.
+- `src/backend/include/backend/services/ServicioAula.hpp` / `src/.../ServicioAula.cpp`:
+  `AulaDTO.idTipoAula`/`tipoAula`; `crearAula`/`actualizarAula` con `int idTipoAula = -1`
+  **al final** (centinela transitorio, T9 retira el default); `validarTipoAula` rechaza
+  `-1` en ejecución (mensaje «No hay tipos de aula registrados…» si el catálogo está vacío,
+  «El aula debe tener un tipo de aula.» si hay catálogo) y los ids inexistentes; `SELECT` con
+  `LEFT JOIN TiposAula` en `obtenerAula`/`listarAulas`; el `INSERT`/`UPDATE` incluye
+  `id_tipo_aula`.
+- `src/backend/include/backend/services/ServicioMaterias.hpp` / `.../ServicioMaterias.cpp`:
+  mismo patrón para `MateriaDTO.idTipoAula`/`tipoAula`, `crearMateria(nombre, requisitos,
+  idTipoAula = -1)` y `actualizarMateria(id, nombre, requisitos, idTipoAula = -1)`, con
+  `LEFT JOIN` y validación del tipo.
+- `src/backend/src/services/ServicioGeneracion.cpp` (`huellaDatos`): la huella canónica pasa
+  a `A:<id>|<nombre>|<capacidad>|<idTipoAula>;`, `M:<id>|<nombre>|<idTipoAula>;` y
+  `e:<id>|<nombre>|<pos>|<orden>|<duracion>|<inicio>|<fin>;` por evento (horas ausentes como
+  cadena vacía). Se retira el bucle `r:` de recesos: esa vista deriva de los eventos, así que
+  no se perdía información y se evitaba contar dos veces.
+- `src/backend/CMakeLists.txt`: `ServicioTiposAula.cpp` en la librería `backend`.
+- `test/CMakeLists.txt`: `add_qtest(test_servicio_tipos_aula … backend Qt6::Sql)`.
+- `test/backend/test_servicio_tipos_aula.cpp` (nuevo, 28 casos; 30 totales con init/cleanup): clave de `claveTipo`
+  (recorte y plegado), clave guardada en la tabla («laboratorio», «física»), nombre visible
+  conservado, duplicados exacto/mayúsculas/acento/espacios y clave directa sin normalizar,
+  listado ordenado, obtención, renombrado (nombre, clave, solo mayúsculas, colisión con otro
+  tipo, propagación a aula y materia sin reescribir sus filas), borrado libre, en uso por aula,
+  por materia y por ambos, borrado tras retirar dependientes e ids inválidos.
+- `test/backend/test_servicio_aula.cpp` y `test_servicio_materias.cpp`: `setUp` crea un tipo
+  («Aula de estudio») y se pasa como **último** argumento en todas las llamadas. Casos nuevos:
+  crear sin tipo, tipo inexistente, catálogo vacío (base nueva), DTO expone `idTipoAula`/
+  `tipoAula` en alta/obtención/listado, actualizar sin tipo (rechazado sin conservar el
+  anterior) y actualizar cambiando de tipo.
+- `test/backend/test_servicio_profesor.cpp`, `test_servicio_carga_horaria.cpp`,
+  `test_composicion_plan.cpp`: crean el tipo en su `init` y lo pasan en cada `crearMateria`.
+  No cambia lo que prueban.
+- `test/backend/test_servicio_planes_estudio.cpp`: igual, y el `INSERT` directo
+  `INSERT INTO Materias (nombre) …` de `eliminarPlan_conMaterias_falla` incluye `id_tipo_aula`.
+- `test/backend/test_servicio_generacion.cpp`: `dominio()` fija `idTipoAula` en aula y materia;
+  casos nuevos `huellaDatos_cambiaConElTipoDeAula` (aula y materia) y
+  `huellaDatos_cambiaConLosEventos` (alta de evento y cambio de `orden`).
+
+### Rojo inicial
+
+Los tests usan la API que T5 debía crear; el rojo es de compilación:
+
+```bash
+cmake --build --preset backend --parallel     # EXIT != 0
+# 5 × backend/services/ServicioTiposAula.hpp: No existe el fichero o el directorio
+# 2 × ‘struct MateriaDTO’ has no member named ‘idTipoAula’
+# 2 × ‘struct AulaDTO’ has no member named ‘idTipoAula’
+```
+
+### Verde final
+
+```bash
+cmake --build --preset backend --parallel       # EXIT=0 (repetido: "ninja: no work to do.")
+ctest --test-dir build-backend --output-on-failure \
+    -R 'test_servicio_tipos_aula|test_servicio_aula|test_servicio_materias|test_servicio_generacion'
+# 100% tests passed out of 4
+#  test_servicio_generacion (25) ... Passed
+#  test_servicio_aula       (28) ... Passed
+#  test_servicio_materias   (29) ... Passed
+#  test_servicio_tipos_aula (30) ... Passed   (binario nuevo)
+```
+
+### Suite: antes y después
+
+| | Antes (base `693fa18`) | Después (T5) |
+|---|---|---|
+| binarios | 48 | 49 (nuevo `test_servicio_tipos_aula`) |
+| verdes | **37/48 (77 %)** | **44/49 (90 %)** |
+| rojos | **11** | **5** |
+
+Rojos que desaparecen: `test_servicio_aula`, `test_servicio_materias`,
+`test_servicio_planes_estudio`, `test_servicio_carga_horaria`, `test_composicion_plan` y
+`test_servicio_profesor` (los seis por `NOT NULL constraint failed: <tabla>.id_tipo_aula`).
+
+Rojos que quedan, todos dependientes de T6-T8 (mismos totales por binario que en `693fa18`):
+
+| binario | Totales | motivo |
+|---|---|---|
+| `test_backend_nucleo_datos` | 6/7 | `NucleoDatos` delega aún sin tipo (`-1` rechazado en ejecución), `Recesos` esperada y la fixture de 60 min de `:253` (T6) |
+| `test_backend_cascada` | 6/12 | `crearAula`/`crearMateria` por la fachada sin tipo y cascada de turno sobre `Recesos` (T6) |
+| `test_backend_gestor_pendientes` | 11/2 | idem fachada (T6) |
+| `test_datos_contexto_base_datos` | 8/3 | `nucleo().crearMateria` sin tipo (T6) |
+| `test_seed_aplicacion` | 5/9 | seed antiguo y `contarFilasDeDominio` sobre `Recesos` (T8) |
+
+`test_constructor_entrada`, `test_servicio_turnos_eventos`, `test_calculo_eventos` y
+`test_backend_version_esquema` siguen verdes.
+
+### Comprobaciones manuales (sqlite3)
+
+```bash
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/opencode/t5.db < /dev/null
+sqlite3 /tmp/opencode/t5.db "INSERT INTO TiposAula (nombre, clave) VALUES ('Física','física');"
+sqlite3 /tmp/opencode/t5.db "INSERT INTO TiposAula (nombre, clave) VALUES ('FÍSICA','física');"
+# Error in 2nd command line argument: UNIQUE constraint failed: TiposAula.clave (exit 1)
+# filas finales: 1|Física|física  (el índice sigue frenando la escritura directa)
+```
+
+### Hallazgos / desviaciones
+
+- **`test_servicio_planes_estudio` se toca aquí, no en T6.** El plan (§1.4/T6) asigna a T6 el
+  `INSERT` directo de materia de ese test, pero su único caso rojo era justo ese `NOT NULL`
+  y la verificación de T5 exige dejar solo rojos de T6-T8. Se crea el tipo en su `init` y se
+  usa su id en el `INSERT`; no cambia lo que el caso prueba (no borrar un plan con materias).
+- **`test_datos_contexto_base_datos` queda rojo a propósito.** Sus altas van por
+  `NucleoDatos`, cuya firma no recibe tipo hasta T6; hacerlo verde aquí obligaría a tocar la
+  fachada, fuera del alcance. Se une a T6 como preveía el plan.
+- **El centinela `-1` sigue vigente** en `ServicioAula`/`ServicioMaterias` (y por tanto
+  compilan consola, seed, `NucleoDatos` y frontend); en ejecución se rechaza con mensaje
+  propio. T9 retira los valores por defecto manteniendo el orden.
+- **El `JOIN` es `LEFT`** en aulas y materias: una fila huérfana (si se desactivan las claves
+  foráneas) se sigue listando con `idTipoAula = -1` y `tipoAula` vacío en vez de desaparecer.
+  Con las FK activas y `id_tipo_aula NOT NULL` no hay diferencia observable.
+- **`claveTipo` no se calcula en SQL** (T2 ya lo decidió): el servicio la guarda y compara en
+  memoria; el índice único de la tabla queda como red para escrituras directas.
+- La huella deja de recorrer `TurnoDTO.recesos`; al derivar de `t.eventos`, el contenido sigue
+  cubierto y se evita duplicarlo. Ningún hash almacenado dependía del formato anterior.

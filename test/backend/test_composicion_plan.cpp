@@ -7,6 +7,7 @@
 #include <backend/services/ServicioComposicionPlan.hpp>
 #include <backend/services/ServicioPlanesEstudio.hpp>
 #include <backend/services/ServicioMaterias.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
 #include <backend/services/ServicioCargaHoraria.hpp>
 
 class TestServicioComposicionPlan : public QObject {
@@ -30,9 +31,14 @@ private slots:
         // Crear datos de prueba completos
         m_servicioPlanes->crearPlan("PLAN-COMP", "Plan de Composición", "Plan para pruebas");
 
-        auto mat1 = m_servicioMaterias->crearMateria("Matemática", "Álgebra, Geometría");
-        auto mat2 = m_servicioMaterias->crearMateria("Física", "Matemática");
-        auto mat3 = m_servicioMaterias->crearMateria("Química", "Física");
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        m_idTipoAula = tipo.valor.id;
+
+        auto mat1 = m_servicioMaterias->crearMateria("Matemática", "Álgebra, Geometría", m_idTipoAula);
+        auto mat2 = m_servicioMaterias->crearMateria("Física", "Matemática", m_idTipoAula);
+        auto mat3 = m_servicioMaterias->crearMateria("Química", "Física", m_idTipoAula);
 
         m_mateId = mat1.valor.id;
         m_fisicaId = mat2.valor.id;
@@ -46,6 +52,7 @@ private slots:
     void cleanup() {
         m_servicioCarga.reset();
         m_servicioMaterias.reset();
+        m_tipos.reset();
         m_servicioPlanes.reset();
         m_servicioComposicion.reset();
         m_dbManager->close();
@@ -186,6 +193,8 @@ private:
     int m_mateId = -1;
     int m_fisicaId = -1;
     int m_quimicaId = -1;
+    std::unique_ptr<ServicioTiposAula> m_tipos;
+    int m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioComposicionPlan)

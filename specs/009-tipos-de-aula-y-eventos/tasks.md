@@ -12,7 +12,7 @@
 - [x] **T4. Coherencia temporal, ventanas y reducción de franjas.** RF-3, RF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_calculo_eventos|test_servicio_turnos_eventos'` está verde; se rechazan el par incompleto, la diferencia distinta de la duración, el intervalo fuera de la ventana de posición, los solapes dentro/entre posiciones y la cronología invertida; `duracionFranjaEstimada` con `numSlots <= 0` no divide por cero; reducir franjas sin confirmar lista los afectados y con confirmación los borra; cambiar la ventana que deja fuera un evento se rechaza.
 
-- [ ] **T5. Catálogo, tipos en aulas/materias y huella.** RF-5, RF-6, RF-7, RF-8
+- [x] **T5. Catálogo, tipos en aulas/materias y huella.** RF-5, RF-6, RF-7, RF-8
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_servicio_tipos_aula|test_servicio_aula|test_servicio_materias|test_servicio_generacion'` está verde; la clave normalizada se guarda y el índice único rechaza «Laboratorio»/«laboratorio» y «Física»/«FÍSICA»; el borrado en uso se rechaza con dependientes; el catálogo vacío impide crear aulas y materias (vía `ServicioAula`/`ServicioMaterias`); aula/materia sin tipo o actualizadas sin tipo se rechazan; el aula/materia expone `idTipoAula`/`tipoAula`; la huella cambia al cambiar un tipo o un evento; los tests de aula/materia crean un tipo en su `setUp` y lo pasan en el último argumento.
 
 - [ ] **T6. Fachada NucleoDatos, cascada, puente y consumidores.** RF-6, RF-7, RF-8, RF-12

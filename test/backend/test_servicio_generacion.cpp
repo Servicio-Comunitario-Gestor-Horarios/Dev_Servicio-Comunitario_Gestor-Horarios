@@ -9,6 +9,7 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
+#include <backend/services/ServicioTurnosRecesos.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 
 using Estado = ResultadoGeneracion::Estado;
@@ -46,9 +47,11 @@ private:
         DatosDominio d;
 
         MateriaDTO mat; mat.id = 1; mat.nombre = QStringLiteral("Matemática");
+        mat.idTipoAula = 1;
         d.materias = {mat};
 
         AulaDTO aula; aula.id = 10; aula.nombre = QStringLiteral("A1"); aula.capacidad = 30;
+        aula.idTipoAula = 1;
         d.aulas = {aula};
 
         TurnoDTO turno;
@@ -263,6 +266,44 @@ private slots:
         DatosDominio modificado = dominio();
         modificado.cursos[0].seccion = QStringLiteral("B");
         QVERIFY(huellaDatos(modificado) != h1);
+    }
+
+    void huellaDatos_cambiaConElTipoDeAula()
+    {
+        const QString h1 = huellaDatos(dominio());
+
+        DatosDominio otraAula = dominio();
+        otraAula.aulas[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraAula) != h1);
+
+        DatosDominio otraMateria = dominio();
+        otraMateria.materias[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraMateria) != h1);
+    }
+
+    void huellaDatos_cambiaConLosEventos()
+    {
+        EventoDTO evento;
+        evento.id = 3;
+        evento.nombre = QStringLiteral("Receso");
+        evento.despuesDeSlot = 2;
+        evento.orden = 1;
+        evento.duracion = 10;
+        evento.inicio = QTime(8, 20);
+        evento.fin = QTime(8, 30);
+
+        DatosDominio sinEventos = dominio();
+        const QString h1 = huellaDatos(sinEventos);
+
+        DatosDominio conEvento = dominio();
+        conEvento.turnos[0].eventos = {evento};
+        const QString h2 = huellaDatos(conEvento);
+        QVERIFY(h2 != h1);
+
+        // El orden persistente del evento también entra en la huella.
+        DatosDominio otroOrden = conEvento;
+        otroOrden.turnos[0].eventos[0].orden = 2;
+        QVERIFY(huellaDatos(otroOrden) != h2);
     }
 
     void estamparFechaGeneracion_usaElInstante()

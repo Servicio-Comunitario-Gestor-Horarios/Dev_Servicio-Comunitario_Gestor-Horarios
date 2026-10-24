@@ -8,6 +8,7 @@
 #include <backend/services/ServicioProfesor.hpp>
 
 #include <backend/services/ServicioMaterias.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
 
 class TestServicioProfesor : public QObject {
     Q_OBJECT
@@ -24,9 +25,15 @@ private slots:
 
         m_servicio.reset(new ServicioProfesor(m_dbManager->database()));
         m_servicioMaterias.reset(new ServicioMaterias(m_dbManager->database()));
+
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        m_idTipoAula = tipo.valor.id;
     }
 
     void cleanup() {
+        m_tipos.reset();
         m_servicioMaterias.reset();
         m_servicio.reset();
         m_dbManager->close();
@@ -260,7 +267,7 @@ private slots:
         QVERIFY(m_servicio->agregarDisponibilidad(
             "P-900", franja(1, 8, 0, 10, 0)).ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Materia Cascada");
+        auto materia = m_servicioMaterias->crearMateria("Materia Cascada", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-900", materia.valor.id));
 
@@ -413,7 +420,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-1700", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Álgebra");
+        auto materia = m_servicioMaterias->crearMateria("Álgebra", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-1700", materia.valor.id));
@@ -429,7 +436,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-1800", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Física");
+        auto materia = m_servicioMaterias->crearMateria("Física", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-1800", materia.valor.id));
@@ -441,7 +448,7 @@ private slots:
     }
 
     void asignarMateria_parametrosInvalidos_falla() {
-        auto materia = m_servicioMaterias->crearMateria("Química");
+        auto materia = m_servicioMaterias->crearMateria("Química", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(!m_servicio->asignarMateria("", materia.valor.id));
@@ -453,7 +460,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2000", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Cálculo");
+        auto materia = m_servicioMaterias->crearMateria("Cálculo", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateriaPorNombre("P-2000", "Cálculo"));
@@ -481,8 +488,8 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2200", "Dr. X", "x@uni.edu").ok);
 
-        auto m1 = m_servicioMaterias->crearMateria("Mat A");
-        auto m2 = m_servicioMaterias->crearMateria("Mat B");
+        auto m1 = m_servicioMaterias->crearMateria("Mat A", QString(), m_idTipoAula);
+        auto m2 = m_servicioMaterias->crearMateria("Mat B", QString(), m_idTipoAula);
         QVERIFY(m1.ok && m2.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-2200", m1.valor.id));
@@ -500,7 +507,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2300", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Sin Asignar");
+        auto materia = m_servicioMaterias->crearMateria("Sin Asignar", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(!m_servicio->quitarMateria("P-2300", materia.valor.id));
@@ -515,8 +522,8 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2400", "Dr. X", "x@uni.edu").ok);
 
-        auto m1 = m_servicioMaterias->crearMateria("A");
-        auto m2 = m_servicioMaterias->crearMateria("B");
+        auto m1 = m_servicioMaterias->crearMateria("A", QString(), m_idTipoAula);
+        auto m2 = m_servicioMaterias->crearMateria("B", QString(), m_idTipoAula);
         QVERIFY(m1.ok && m2.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-2400", m1.valor.id));
@@ -572,7 +579,7 @@ private slots:
         QVERIFY(m_servicio->agregarDisponibilidad(
             "P-2500", franja(1, 8, 0, 10, 0)).ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Mat");
+        auto materia = m_servicioMaterias->crearMateria("Mat", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-2500", materia.valor.id));
 
@@ -617,6 +624,8 @@ private:
     std::unique_ptr<DatabaseManager>     m_dbManager;
     std::unique_ptr<ServicioProfesor>    m_servicio;
     std::unique_ptr<ServicioMaterias>    m_servicioMaterias;
+    std::unique_ptr<ServicioTiposAula>   m_tipos;
+    int                                  m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioProfesor)

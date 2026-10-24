@@ -19,6 +19,8 @@ struct AulaDTO {
     int capacidad = 0;
     QString edificio;
     QString piso;
+    int idTipoAula = -1;   ///< Referencia al catálogo de tipos de aula
+    QString tipoAula;      ///< Nombre del tipo (solo lectura, viene del JOIN)
 
     /** @brief Convierte el DTO a un struct Aula del solver. */
     Aula toAula() const;
@@ -36,7 +38,8 @@ public:
     /** @brief Crea un nuevo aula en la base de datos. */
     Resultado<AulaDTO> crearAula(const QString& nombre, int capacidad,
                                  const QString& edificio = QString(),
-                                 const QString& piso = QString());
+                                 const QString& piso = QString(),
+                                 int idTipoAula = -1);
 
     /** @brief Obtiene un aula por su ID. */
     Resultado<AulaDTO> obtenerAula(int id) const;
@@ -47,7 +50,8 @@ public:
     /** @brief Actualiza los datos de un aula existente. */
     Resultado<AulaDTO> actualizarAula(int id, const QString& nombre, int capacidad,
                                       const QString& edificio = QString(),
-                                      const QString& piso = QString());
+                                      const QString& piso = QString(),
+                                      int idTipoAula = -1);
 
     /** @brief Elimina un aula por su ID. */
     bool eliminarAula(int id);
@@ -65,6 +69,9 @@ private:
 
     /** @brief Valida los datos de un aula. */
     bool validarAula(const QString& nombre, int capacidad, QString& error) const;
+
+    /** @brief Valida que el tipo de aula indicado exista en el catálogo. */
+    bool validarTipoAula(int idTipoAula, QString& error) const;
 
     /** @brief Mapea un QSqlRecord a AulaDTO. */
     AulaDTO mapearARecord(const QSqlRecord& record) const;

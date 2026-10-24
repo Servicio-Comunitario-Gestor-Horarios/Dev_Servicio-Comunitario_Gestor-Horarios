@@ -31,6 +31,7 @@ target_sources(backend PRIVATE
 
 				# Services - Issue #23 (Aulas)
 				src/services/ServicioAula.cpp
+				src/services/ServicioTiposAula.cpp
 
 				# Services - Issue #21 (Materias - usando tablas existentes)
 				src/services/ServicioMaterias.cpp

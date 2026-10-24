@@ -17,6 +17,8 @@ struct MateriaDTO {
     int id = -1;
     QString nombre;
     QString requisitos;  // Texto plano, separado por comas
+    int idTipoAula = -1; ///< Referencia al catálogo de tipos de aula
+    QString tipoAula;    ///< Nombre del tipo (solo lectura, viene del JOIN)
 
     /** @brief Convierte el DTO a un struct Materia del solver. */
     Materia toMateria(int horasSemanales = 0) const;
@@ -35,7 +37,8 @@ public:
     // ─── CRUD ─────────────────────────────────────────────────────────────
 
     /** @brief Crea una nueva materia. */
-    Resultado<MateriaDTO> crearMateria(const QString& nombre, const QString& requisitos = QString());
+    Resultado<MateriaDTO> crearMateria(const QString& nombre, const QString& requisitos = QString(),
+                                       int idTipoAula = -1);
 
     /** @brief Obtiene una materia por ID. */
     Resultado<MateriaDTO> obtenerMateria(int id) const;
@@ -44,7 +47,9 @@ public:
     Resultado<QVector<MateriaDTO>> listarMaterias() const;
 
     /** @brief Actualiza los datos de una materia. */
-    Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre, const QString& requisitos = QString());
+    Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre,
+                                            const QString& requisitos = QString(),
+                                            int idTipoAula = -1);
 
     /** @brief Elimina una materia por ID. */
     bool eliminarMateria(int id);
@@ -64,5 +69,9 @@ private:
     QSqlDatabase& m_db;
 
     bool validarMateria(const QString& nombre, QString& error) const;
+
+    /** @brief Valida que el tipo de aula indicado exista en el catálogo. */
+    bool validarTipoAula(int idTipoAula, QString& error) const;
+
     MateriaDTO mapearARecord(const QSqlRecord& record) const;
 };

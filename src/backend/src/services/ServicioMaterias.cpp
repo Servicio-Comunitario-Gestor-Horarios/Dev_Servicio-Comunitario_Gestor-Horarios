@@ -1,4 +1,5 @@
 #include "backend/services/ServicioMaterias.hpp"
+#include "backend/services/ServicioTiposAula.hpp"
 #include "backend/services/ordenacion.hpp"
 
 #include <QSqlQuery>
@@ -7,6 +8,12 @@
 #include <QDebug>
 
 #include <algorithm>
+
+/// Columnas de la materia con el nombre del tipo resuelto por JOIN.
+static const QString CONSULTA_MATERIA =
+    QStringLiteral("SELECT m.id AS id, m.nombre AS nombre, m.requisitos AS requisitos, "
+                   "m.id_tipo_aula AS id_tipo_aula, t.nombre AS tipo_aula "
+                   "FROM Materias m LEFT JOIN TiposAula t ON t.id = m.id_tipo_aula");
 
 // ─── MateriaDTO ────────────────────────────────────────────────────────────
 
@@ -47,19 +54,45 @@ bool ServicioMaterias::validarMateria(const QString& nombre, QString& error) con
     return true;
 }
 
+bool ServicioMaterias::validarTipoAula(int idTipoAula, QString& error) const {
+    if (idTipoAula <= 0) {
+        if (tipos_aula::catalogoVacio(m_db)) {
+            error = "No hay tipos de aula registrados. Cree un tipo de aula antes de crear materias.";
+            return false;
+        }
+        error = "La materia debe tener un tipo de aula.";
+        return false;
+    }
+
+    if (!tipos_aula::existe(m_db, idTipoAula)) {
+        error = "No existe el tipo de aula indicado.";
+        return false;
+    }
+
+    return true;
+}
+
 MateriaDTO ServicioMaterias::mapearARecord(const QSqlRecord& record) const {
     MateriaDTO dto;
     dto.id = record.value("id").toInt();
     dto.nombre = record.value("nombre").toString();
     dto.requisitos = record.value("requisitos").toString();
+    const QVariant tipo = record.value("id_tipo_aula");
+    dto.idTipoAula = tipo.isNull() ? -1 : tipo.toInt();
+    dto.tipoAula = record.value("tipo_aula").toString();
     return dto;
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
-Resultado<MateriaDTO> ServicioMaterias::crearMateria(const QString& nombre, const QString& requisitos) {
+Resultado<MateriaDTO> ServicioMaterias::crearMateria(const QString& nombre, const QString& requisitos,
+                                                     int idTipoAula) {
     QString error;
     if (!validarMateria(nombre, error)) {
+        return Resultado<MateriaDTO>::error(error);
+    }
+
+    if (!validarTipoAula(idTipoAula, error)) {
         return Resultado<MateriaDTO>::error(error);
     }
 
@@ -73,11 +106,12 @@ Resultado<MateriaDTO> ServicioMaterias::crearMateria(const QString& nombre, cons
 
     QSqlQuery query(m_db);
     query.prepare(
-        "INSERT INTO Materias (nombre, requisitos) "
-        "VALUES (:nombre, :requisitos)"
+        "INSERT INTO Materias (nombre, requisitos, id_tipo_aula) "
+        "VALUES (:nombre, :requisitos, :id_tipo_aula)"
     );
     query.bindValue(":nombre", nombre.trimmed());
     query.bindValue(":requisitos", requisitos.trimmed());
+    query.bindValue(":id_tipo_aula", idTipoAula);
 
     if (!query.exec()) {
         if (query.lastError().text().contains("UNIQUE")) {
@@ -97,7 +131,7 @@ Resultado<MateriaDTO> ServicioMaterias::obtenerMateria(int id) const {
     }
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, requisitos FROM Materias WHERE id = :id");
+    query.prepare(CONSULTA_MATERIA + QStringLiteral(" WHERE m.id = :id"));
     query.bindValue(":id", id);
 
     if (!query.exec()) {
@@ -116,7 +150,7 @@ Resultado<QVector<MateriaDTO>> ServicioMaterias::listarMaterias() const {
     QVector<MateriaDTO> resultados;
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, requisitos FROM Materias ORDER BY nombre");
+    query.prepare(CONSULTA_MATERIA + QStringLiteral(" ORDER BY m.nombre"));
 
     if (!query.exec()) {
         qCritical() << "Error al listar materias:" << query.lastError().text();
@@ -137,9 +171,15 @@ Resultado<QVector<MateriaDTO>> ServicioMaterias::listarMaterias() const {
     return Resultado<QVector<MateriaDTO>>::exito(resultados);
 }
 
-Resultado<MateriaDTO> ServicioMaterias::actualizarMateria(int id, const QString& nombre, const QString& requisitos) {
+Resultado<MateriaDTO> ServicioMaterias::actualizarMateria(int id, const QString& nombre,
+                                                         const QString& requisitos,
+                                                         int idTipoAula) {
     QString error;
     if (!validarMateria(nombre, error)) {
+        return Resultado<MateriaDTO>::error(error);
+    }
+
+    if (!validarTipoAula(idTipoAula, error)) {
         return Resultado<MateriaDTO>::error(error);
     }
 
@@ -148,11 +188,13 @@ Resultado<MateriaDTO> ServicioMaterias::actualizarMateria(int id, const QString&
         "UPDATE Materias SET "
         "nombre = :nombre, "
         "requisitos = :requisitos, "
+        "id_tipo_aula = :id_tipo_aula, "
         "fecha_modificacion = CURRENT_TIMESTAMP "
         "WHERE id = :id"
     );
     query.bindValue(":nombre", nombre.trimmed());
     query.bindValue(":requisitos", requisitos.trimmed());
+    query.bindValue(":id_tipo_aula", idTipoAula);
     query.bindValue(":id", id);
 
     if (!query.exec()) {
