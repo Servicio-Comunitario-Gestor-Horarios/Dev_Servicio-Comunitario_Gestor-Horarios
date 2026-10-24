@@ -6,7 +6,7 @@
 - [x] **T2. Esquema v3: identidad/orden de eventos, clave normalizada almacenada, catálogo esperado y huella.** RF-2, RF-5, RF-6, RF-7, RF-9
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_backend_version_esquema|test_backend_apertura_base_datos|test_esquema_cursos'` está verde; `VERSION_ESQUEMA_ACTUAL` es 3; `Eventos` tiene `id`/`orden` con único por turno y posición; `TiposAula` guarda `clave` y el índice único sobre ella rechaza «Laboratorio»/«laboratorio» y «Física»/«FÍSICA»; la huella de la versión 3 está registrada; una base v2 falla al abrir.
 
-- [ ] **T3. Modelo y servicio de eventos, con compatibilidad.** RF-1, RF-2, RF-8
+- [x] **T3. Modelo y servicio de eventos, con compatibilidad.** RF-1, RF-2, RF-8
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_servicio_turnos_eventos'` está verde; se añaden `EventoDTO`/`TurnoDTO.eventos` y el CRUD sobre `Eventos`; `RecesoDTO`/`recesos` y `agregarReceso`/`eliminarReceso` siguen compilando como capa derivada; dos eventos en la misma posición se guardan con orden 1 y 2; la lista sale por posición/orden/id; el borrado no renumera; la identidad permite editar/eliminar; la posición 0 se rechaza; la edición no cambia el turno; la consola añade `evento-*` y conserva la lectura de recesos.
 
 - [ ] **T4. Coherencia temporal, ventanas y reducción de franjas.** RF-3, RF-4

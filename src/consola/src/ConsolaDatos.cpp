@@ -1,6 +1,7 @@
 #include "consola/ConsolaDatos.hpp"
 
 #include "backend/services/NucleoDatos.hpp"
+#include "backend/services/ServicioTurnosRecesos.hpp"
 #include "datos/ContextoBaseDatos.hpp"
 
 #include <QTextStream>
@@ -449,11 +450,24 @@ void ConsolaDatos::cmdCursos(const Args& args)
     imprimir(QStringLiteral("acción desconocida: %1").arg(accion));
 }
 
-// ─── Turnos y recesos ──────────────────────────────────────────────────────
+// ─── Turnos y eventos ──────────────────────────────────────────────────────
+
+namespace
+{
+    /// Horas del evento en formato «HH:mm-HH:mm», o «-» si no las tiene.
+    QString horasEvento(const EventoDTO& evento)
+    {
+        if (!evento.inicio.isValid() || !evento.fin.isValid())
+            return QStringLiteral("-");
+        return QStringLiteral("%1-%2")
+            .arg(evento.inicio.toString(QStringLiteral("HH:mm")),
+                 evento.fin.toString(QStringLiteral("HH:mm")));
+    }
+} // namespace
 
 void ConsolaDatos::cmdTurnos(const Args& args)
 {
-    if (args.size() < 2) { imprimir(QStringLiteral("Uso: turnos listar|crear|actualizar|eliminar|receso-agregar|receso-eliminar ...")); return; }
+    if (args.size() < 2) { imprimir(QStringLiteral("Uso: turnos listar|crear|actualizar|eliminar|eventos|evento-agregar|evento-actualizar|evento-eliminar|receso-agregar|receso-eliminar ...")); return; }
     const QString accion = args[1].toLower();
 
     if (accion == QStringLiteral("listar"))
@@ -462,10 +476,10 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("turnos: %1").arg(r.valor.size()));
         for (const TurnoDTO& t : r.valor)
-            imprimir(QStringLiteral("  %1 | %2-%3 | slots=%4 | recesos=%5")
+            imprimir(QStringLiteral("  %1 | %2-%3 | slots=%4 | eventos=%5 | recesos=%6")
                          .arg(t.nombre, t.inicio.toString(QStringLiteral("HH:mm")),
                               t.fin.toString(QStringLiteral("HH:mm")))
-                         .arg(t.numSlots).arg(t.recesos.size()));
+                         .arg(t.numSlots).arg(t.eventos.size()).arg(t.recesos.size()));
         return;
     }
     if (accion == QStringLiteral("crear") || accion == QStringLiteral("actualizar"))
@@ -508,6 +522,68 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         if (!okSlot) { imprimir(QStringLiteral("error: parámetro inválido")); return; }
         imprimir(textoBool(nucleo().eliminarReceso(args[2], despuesDeSlot),
                            QStringLiteral("receso del turno «%1» eliminado").arg(args[2])));
+        return;
+    }
+    // Eventos del turno: identidad propia y orden dentro de la posición. Hasta T6
+    // el CRUD no está en la fachada, así que la consola usa el servicio de turnos.
+    ServicioTurnosRecesos servicio(m_contexto.conexion());
+    if (accion == QStringLiteral("eventos"))
+    {
+        if (args.size() < 3) { imprimir(QStringLiteral("Uso: turnos eventos \"<turno>\"")); return; }
+        const auto r = servicio.obtenerTurno(args[2]);
+        if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
+        imprimir(QStringLiteral("eventos de «%1»: %2").arg(args[2]).arg(r.valor.eventos.size()));
+        for (const EventoDTO& e : r.valor.eventos)
+            imprimir(QStringLiteral("  #%1 | pos=%2 | orden=%3 | %4 min | %5 | %6")
+                         .arg(e.id).arg(e.despuesDeSlot).arg(e.orden).arg(e.duracion)
+                         .arg(horasEvento(e), e.nombre));
+        return;
+    }
+    if (accion == QStringLiteral("evento-agregar"))
+    {
+        if (args.size() < 6) { imprimir(QStringLiteral("Uso: turnos evento-agregar \"<turno>\" \"<nombre>\" <despuesDeSlot> <duracion> [inicio HH:mm] [fin HH:mm] [orden]")); return; }
+        bool okSlot = false, okDur = false;
+        const int despuesDeSlot = args[4].toInt(&okSlot);
+        const int duracion = args[5].toInt(&okDur);
+        if (!okSlot || !okDur) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
+        QTime inicio, fin;
+        int orden = 0;
+        if (args.size() > 6) inicio = QTime::fromString(args[6], QStringLiteral("HH:mm"));
+        if (args.size() > 7) fin = QTime::fromString(args[7], QStringLiteral("HH:mm"));
+        if (args.size() > 8) {
+            bool okOrden = false; orden = args[8].toInt(&okOrden);
+            if (!okOrden) { imprimir(QStringLiteral("error: orden inválido")); return; }
+        }
+        imprimir(resultadoATexto(servicio.agregarEvento(args[2], args[3], despuesDeSlot,
+                                                        duracion, inicio, fin, orden),
+                                 QStringLiteral("evento «%1» agregado al turno «%2»")
+                                     .arg(args[3], args[2])));
+        return;
+    }
+    if (accion == QStringLiteral("evento-actualizar"))
+    {
+        if (args.size() < 7) { imprimir(QStringLiteral("Uso: turnos evento-actualizar <id> \"<nombre>\" <despuesDeSlot> <duracion> <orden> [inicio HH:mm] [fin HH:mm]")); return; }
+        bool okId = false, okSlot = false, okDur = false, okOrden = false;
+        const int id = args[2].toInt(&okId);
+        const int despuesDeSlot = args[4].toInt(&okSlot);
+        const int duracion = args[5].toInt(&okDur);
+        const int orden = args[6].toInt(&okOrden);
+        if (!okId || !okSlot || !okDur || !okOrden) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
+        QTime inicio, fin;
+        if (args.size() > 7) inicio = QTime::fromString(args[7], QStringLiteral("HH:mm"));
+        if (args.size() > 8) fin = QTime::fromString(args[8], QStringLiteral("HH:mm"));
+        imprimir(resultadoATexto(servicio.actualizarEvento(id, args[3], despuesDeSlot,
+                                                           duracion, inicio, fin, orden),
+                                 QStringLiteral("evento %1 actualizado").arg(id)));
+        return;
+    }
+    if (accion == QStringLiteral("evento-eliminar"))
+    {
+        if (args.size() < 3) { imprimir(QStringLiteral("Uso: turnos evento-eliminar <id>")); return; }
+        bool okId = false; const int id = args[2].toInt(&okId);
+        if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
+        imprimir(textoBool(servicio.eliminarEvento(id),
+                           QStringLiteral("evento %1 eliminado").arg(id)));
         return;
     }
     imprimir(QStringLiteral("acción desconocida: %1").arg(accion));

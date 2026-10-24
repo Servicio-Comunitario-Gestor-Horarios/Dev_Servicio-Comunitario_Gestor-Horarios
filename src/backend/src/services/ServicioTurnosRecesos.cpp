@@ -3,8 +3,37 @@
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QVariant>
 
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
+
+namespace
+{
+    /// Orden que corresponde al siguiente evento de `posicion`: máximo + 1, o 1.
+    ///
+    /// Temporal en T3; la spec lo mueve a `calculo_eventos` en T4.
+    int ordenSiguienteEn(const QVector<EventoDTO>& eventos, int posicion)
+    {
+        int maximo = 0;
+        for (const EventoDTO& evento : eventos)
+        {
+            if (evento.despuesDeSlot == posicion && evento.orden > maximo)
+                maximo = evento.orden;
+        }
+        return maximo + 1;
+    }
+
+    /// Vista de receso de un evento (compatibilidad transitoria del contrato 1.0).
+    RecesoDTO recesoDeEvento(const EventoDTO& evento)
+    {
+        RecesoDTO receso;
+        receso.despuesDeSlot = evento.despuesDeSlot;
+        receso.duracion      = evento.duracion;
+        receso.inicio        = evento.inicio;
+        receso.fin           = evento.fin;
+        return receso;
+    }
+} // namespace
 
 ServicioTurnosRecesos::ServicioTurnosRecesos(QSqlDatabase& db) : m_db(db) {}
 
@@ -34,6 +63,33 @@ bool ServicioTurnosRecesos::validarTurno(const QString& nombre, const QTime& ini
     return true;
 }
 
+bool ServicioTurnosRecesos::validarEvento(const TurnoDTO& dto, const QString& nombre,
+                                          int despuesDeSlot, int duracion, int orden,
+                                          bool ordenObligatorio, QString& error) const {
+    if (nombre.trimmed().isEmpty()) {
+        error = "El nombre del evento no puede estar vacío.";
+        return false;
+    }
+
+    if (despuesDeSlot < 1 || despuesDeSlot > dto.numSlots) {
+        error = QStringLiteral("La posición del evento debe estar entre 1 y %1.")
+                    .arg(dto.numSlots);
+        return false;
+    }
+
+    if (duracion <= 0) {
+        error = "La duración del evento debe ser mayor que cero.";
+        return false;
+    }
+
+    if (orden < 0 || (ordenObligatorio && orden < 1)) {
+        error = "El orden del evento debe ser mayor o igual que uno.";
+        return false;
+    }
+
+    return true;
+}
+
 TurnoDTO ServicioTurnosRecesos::mapearARecord(const QSqlRecord& record) const {
     TurnoDTO dto;
     dto.nombre = record.value("nombre").toString();
@@ -43,29 +99,39 @@ TurnoDTO ServicioTurnosRecesos::mapearARecord(const QSqlRecord& record) const {
     return dto;
 }
 
-bool ServicioTurnosRecesos::cargarRecesos(TurnoDTO& dto) const {
+bool ServicioTurnosRecesos::cargarEventos(TurnoDTO& dto) const {
+    dto.eventos.clear();
+    dto.recesos.clear();
+
     QSqlQuery q(m_db);
     q.prepare(
-        "SELECT despues_de_slot, duracion, inicio, fin "
-        "FROM Recesos "
+        "SELECT id, nombre, despues_de_slot, orden, duracion, inicio, fin "
+        "FROM Eventos "
         "WHERE turno = :turno "
-        "ORDER BY despues_de_slot"
+        "ORDER BY despues_de_slot, orden, id"
     );
     q.bindValue(":turno", dto.nombre);
 
     if (!q.exec()) {
-        qCritical() << "Error al cargar recesos:" << q.lastError().text();
+        qCritical() << "Error al cargar eventos:" << q.lastError().text();
         return false;
     }
 
     while (q.next()) {
-        RecesoDTO r;
-        r.despuesDeSlot = q.value("despues_de_slot").toInt();
-        r.duracion = q.value("duracion").toInt();
-        r.inicio = QTime::fromString(q.value("inicio").toString(), FORMATO_HORA);
-        r.fin = QTime::fromString(q.value("fin").toString(), FORMATO_HORA);
-        dto.recesos.append(r);
+        EventoDTO e;
+        e.id            = q.value("id").toInt();
+        e.nombre        = q.value("nombre").toString();
+        e.despuesDeSlot = q.value("despues_de_slot").toInt();
+        e.orden         = q.value("orden").toInt();
+        e.duracion      = q.value("duracion").toInt();
+        e.inicio        = QTime::fromString(q.value("inicio").toString(), FORMATO_HORA);
+        e.fin           = QTime::fromString(q.value("fin").toString(), FORMATO_HORA);
+        dto.eventos.append(e);
     }
+
+    // Compatibilidad transitoria: la sección de recesos se deriva de los eventos.
+    for (const EventoDTO& evento : dto.eventos)
+        dto.recesos.append(recesoDeEvento(evento));
 
     return true;
 }
@@ -121,8 +187,8 @@ Resultado<TurnoDTO> ServicioTurnosRecesos::obtenerTurno(const QString& nombre) c
     }
 
     TurnoDTO dto = mapearARecord(query.record());
-    if (!cargarRecesos(dto)) {
-        return Resultado<TurnoDTO>::error("Error al cargar los recesos del turno.");
+    if (!cargarEventos(dto)) {
+        return Resultado<TurnoDTO>::error("Error al cargar los eventos del turno.");
     }
 
     return Resultado<TurnoDTO>::exito(dto);
@@ -143,7 +209,7 @@ Resultado<QVector<TurnoDTO>> ServicioTurnosRecesos::listarTurnos() const {
 
     while (query.next()) {
         TurnoDTO dto = mapearARecord(query.record());
-        cargarRecesos(dto);
+        cargarEventos(dto);
         resultados.append(dto);
     }
 
@@ -194,14 +260,14 @@ bool ServicioTurnosRecesos::eliminarTurno(const QString& nombre) {
         return false;
     }
 
-    // Los recesos no tienen ON DELETE CASCADE: se borran primero.
-    QSqlQuery borrarRecesos(m_db);
-    borrarRecesos.prepare("DELETE FROM Recesos WHERE turno = :turno");
-    borrarRecesos.bindValue(":turno", nombreLimpio);
+    // Los eventos referencian el turno sin ON DELETE CASCADE: se borran primero.
+    QSqlQuery borrarEventos(m_db);
+    borrarEventos.prepare("DELETE FROM Eventos WHERE turno = :turno");
+    borrarEventos.bindValue(":turno", nombreLimpio);
 
-    if (!borrarRecesos.exec()) {
-        qCritical() << "Error al eliminar recesos del turno:"
-                    << borrarRecesos.lastError().text();
+    if (!borrarEventos.exec()) {
+        qCritical() << "Error al eliminar los eventos del turno:"
+                    << borrarEventos.lastError().text();
         m_db.rollback();
         return false;
     }
@@ -226,68 +292,222 @@ bool ServicioTurnosRecesos::eliminarTurno(const QString& nombre) {
     return true;
 }
 
-// ─── Recesos ───────────────────────────────────────────────────────────────
+// ─── Eventos ───────────────────────────────────────────────────────────────
+
+Resultado<EventoDTO> ServicioTurnosRecesos::agregarEvento(const QString& turno,
+                                                          const QString& nombre,
+                                                          int despuesDeSlot,
+                                                          int duracion,
+                                                          const QTime& inicio,
+                                                          const QTime& fin,
+                                                          int orden) {
+    if (turno.trimmed().isEmpty()) {
+        return Resultado<EventoDTO>::error("Nombre de turno inválido.");
+    }
+
+    // Valida que el turno exista y trae sus eventos (misma conexión).
+    auto turnoExistente = obtenerTurno(turno.trimmed());
+    if (!turnoExistente.ok) {
+        return Resultado<EventoDTO>::error(turnoExistente.mensajeError,
+                                           turnoExistente.codigoError);
+    }
+    const TurnoDTO& dto = turnoExistente.valor;
+
+    QString error;
+    if (!validarEvento(dto, nombre, despuesDeSlot, duracion, orden, false, error)) {
+        return Resultado<EventoDTO>::error(error);
+    }
+
+    // El esquema exige el par de horas completo; la coherencia temporal es de T4.
+    if (inicio.isValid() != fin.isValid()) {
+        return Resultado<EventoDTO>::error(
+            "Las horas del evento deben indicarse juntas (inicio y fin) o ninguna.");
+    }
+
+    const int ordenFinal = (orden == 0) ? ordenSiguienteEn(dto.eventos, despuesDeSlot)
+                                        : orden;
+    for (const EventoDTO& existente : dto.eventos) {
+        if (existente.despuesDeSlot == despuesDeSlot && existente.orden == ordenFinal) {
+            return Resultado<EventoDTO>::error(
+                QStringLiteral("Ya existe un evento en la posición %1 del turno «%2» con"
+                               " orden %3.")
+                    .arg(despuesDeSlot)
+                    .arg(dto.nombre)
+                    .arg(ordenFinal));
+        }
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(
+        "INSERT INTO Eventos "
+        "(nombre, turno, despues_de_slot, orden, duracion, inicio, fin) "
+        "VALUES (:nombre, :turno, :despues_de_slot, :orden, :duracion, :inicio, :fin)"
+    );
+    query.bindValue(":nombre", nombre.trimmed());
+    query.bindValue(":turno", dto.nombre);
+    query.bindValue(":despues_de_slot", despuesDeSlot);
+    query.bindValue(":orden", ordenFinal);
+    query.bindValue(":duracion", duracion);
+    query.bindValue(":inicio", inicio.isValid() ? QVariant(inicio.toString(FORMATO_HORA))
+                                                : QVariant());
+    query.bindValue(":fin", fin.isValid() ? QVariant(fin.toString(FORMATO_HORA))
+                                          : QVariant());
+
+    if (!query.exec()) {
+        qCritical() << "Error al agregar evento:" << query.lastError().text();
+        return Resultado<EventoDTO>::error("Error al guardar el evento.");
+    }
+
+    EventoDTO creado;
+    creado.id            = query.lastInsertId().toInt();
+    creado.nombre        = nombre.trimmed();
+    creado.despuesDeSlot = despuesDeSlot;
+    creado.orden         = ordenFinal;
+    creado.duracion      = duracion;
+    creado.inicio        = inicio;
+    creado.fin           = fin;
+    return Resultado<EventoDTO>::exito(creado);
+}
+
+Resultado<EventoDTO> ServicioTurnosRecesos::actualizarEvento(int id, const QString& nombre,
+                                                             int despuesDeSlot,
+                                                             int duracion,
+                                                             const QTime& inicio,
+                                                             const QTime& fin, int orden) {
+    if (id <= 0) {
+        return Resultado<EventoDTO>::error("Identificador de evento inválido.");
+    }
+
+    // El turno del evento es inmutable: se lee para validarlo, no se acepta otro.
+    QString turnoActual;
+    {
+        QSqlQuery query(m_db);
+        query.prepare("SELECT turno FROM Eventos WHERE id = :id");
+        query.bindValue(":id", id);
+
+        if (!query.exec()) {
+            qCritical() << "Error al obtener el evento:" << query.lastError().text();
+            return Resultado<EventoDTO>::error("Error al consultar la base de datos.");
+        }
+        if (!query.next()) {
+            return Resultado<EventoDTO>::error(
+                "No se encontró un evento con ese identificador.", -4);
+        }
+        turnoActual = query.value("turno").toString();
+    }
+
+    auto turnoExistente = obtenerTurno(turnoActual);
+    if (!turnoExistente.ok) {
+        return Resultado<EventoDTO>::error(turnoExistente.mensajeError,
+                                           turnoExistente.codigoError);
+    }
+    const TurnoDTO& dto = turnoExistente.valor;
+
+    QString error;
+    if (!validarEvento(dto, nombre, despuesDeSlot, duracion, orden, true, error)) {
+        return Resultado<EventoDTO>::error(error);
+    }
+
+    // El esquema exige el par de horas completo; la coherencia temporal es de T4.
+    if (inicio.isValid() != fin.isValid()) {
+        return Resultado<EventoDTO>::error(
+            "Las horas del evento deben indicarse juntas (inicio y fin) o ninguna.");
+    }
+
+    for (const EventoDTO& existente : dto.eventos) {
+        if (existente.id != id && existente.despuesDeSlot == despuesDeSlot
+            && existente.orden == orden) {
+            return Resultado<EventoDTO>::error(
+                QStringLiteral("Ya existe un evento en la posición %1 del turno «%2» con"
+                               " orden %3.")
+                    .arg(despuesDeSlot)
+                    .arg(dto.nombre)
+                    .arg(orden));
+        }
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(
+        "UPDATE Eventos SET "
+        "nombre = :nombre, "
+        "despues_de_slot = :despues_de_slot, "
+        "orden = :orden, "
+        "duracion = :duracion, "
+        "inicio = :inicio, "
+        "fin = :fin, "
+        "fecha_modificacion = CURRENT_TIMESTAMP "
+        "WHERE id = :id"
+    );
+    query.bindValue(":nombre", nombre.trimmed());
+    query.bindValue(":despues_de_slot", despuesDeSlot);
+    query.bindValue(":orden", orden);
+    query.bindValue(":duracion", duracion);
+    query.bindValue(":inicio", inicio.isValid() ? QVariant(inicio.toString(FORMATO_HORA))
+                                                : QVariant());
+    query.bindValue(":fin", fin.isValid() ? QVariant(fin.toString(FORMATO_HORA))
+                                          : QVariant());
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qCritical() << "Error al actualizar evento:" << query.lastError().text();
+        return Resultado<EventoDTO>::error("Error al actualizar el evento.");
+    }
+
+    EventoDTO actualizado;
+    actualizado.id            = id;
+    actualizado.nombre        = nombre.trimmed();
+    actualizado.despuesDeSlot = despuesDeSlot;
+    actualizado.orden         = orden;
+    actualizado.duracion      = duracion;
+    actualizado.inicio        = inicio;
+    actualizado.fin           = fin;
+    return Resultado<EventoDTO>::exito(actualizado);
+}
+
+bool ServicioTurnosRecesos::eliminarEvento(int id) {
+    if (id <= 0) return false;
+
+    QSqlQuery query(m_db);
+    query.prepare("DELETE FROM Eventos WHERE id = :id");
+    query.bindValue(":id", id);
+
+    if (!query.exec()) {
+        qCritical() << "Error al eliminar evento:" << query.lastError().text();
+        return false;
+    }
+
+    return query.numRowsAffected() > 0;
+}
+
+// ─── Recesos (compatibilidad transitoria; se retiran en T9) ────────────────
 
 Resultado<RecesoDTO> ServicioTurnosRecesos::agregarReceso(const QString& turno,
                                                           int despuesDeSlot,
                                                           int duracion,
                                                           const QTime& inicio,
                                                           const QTime& fin) {
-    if (turno.trimmed().isEmpty()) {
-        return Resultado<RecesoDTO>::error("Nombre de turno inválido.");
+    auto evento = agregarEvento(turno, QStringLiteral("Receso"), despuesDeSlot, duracion,
+                                inicio, fin);
+    if (!evento.ok) {
+        return Resultado<RecesoDTO>::error(evento.mensajeError, evento.codigoError);
     }
 
-    if (despuesDeSlot < 0) {
-        return Resultado<RecesoDTO>::error("El slot del receso no puede ser negativo.");
-    }
-
-    if (duracion <= 0) {
-        return Resultado<RecesoDTO>::error("La duración del receso debe ser mayor que cero.");
-    }
-
-    // Verificar que el turno exista antes de insertar (mejor mensaje que FK).
-    auto turnoExistente = obtenerTurno(turno.trimmed());
-    if (!turnoExistente.ok) {
-        return Resultado<RecesoDTO>::error(turnoExistente.mensajeError,
-                                           turnoExistente.codigoError);
-    }
-
-    QSqlQuery query(m_db);
-    query.prepare(
-        "INSERT OR REPLACE INTO Recesos "
-        "(turno, despues_de_slot, duracion, inicio, fin) "
-        "VALUES (:turno, :despues_de_slot, :duracion, :inicio, :fin)"
-    );
-    query.bindValue(":turno", turno.trimmed());
-    query.bindValue(":despues_de_slot", despuesDeSlot);
-    query.bindValue(":duracion", duracion);
-    query.bindValue(":inicio", inicio.isValid() ? inicio.toString(FORMATO_HORA) : QString());
-    query.bindValue(":fin", fin.isValid() ? fin.toString(FORMATO_HORA) : QString());
-
-    if (!query.exec()) {
-        qCritical() << "Error al agregar receso:" << query.lastError().text();
-        return Resultado<RecesoDTO>::error("Error al guardar el receso.");
-    }
-
-    RecesoDTO dto;
-    dto.despuesDeSlot = despuesDeSlot;
-    dto.duracion = duracion;
-    dto.inicio = inicio;
-    dto.fin = fin;
-    return Resultado<RecesoDTO>::exito(dto);
+    return Resultado<RecesoDTO>::exito(recesoDeEvento(evento.valor));
 }
 
 bool ServicioTurnosRecesos::eliminarReceso(const QString& turno, int despuesDeSlot) {
-    if (turno.trimmed().isEmpty() || despuesDeSlot < 0) return false;
+    const QString nombreLimpio = turno.trimmed();
+    if (nombreLimpio.isEmpty() || despuesDeSlot < 1) return false;
 
     QSqlQuery query(m_db);
-    query.prepare("DELETE FROM Recesos "
+    query.prepare("DELETE FROM Eventos "
                   "WHERE turno = :turno AND despues_de_slot = :slot");
-    query.bindValue(":turno", turno.trimmed());
+    query.bindValue(":turno", nombreLimpio);
     query.bindValue(":slot", despuesDeSlot);
 
     if (!query.exec()) {
-        qCritical() << "Error al eliminar receso:" << query.lastError().text();
+        qCritical() << "Error al eliminar el receso (eventos de la posición):"
+                    << query.lastError().text();
         return false;
     }
 
