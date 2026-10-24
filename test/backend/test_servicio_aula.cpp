@@ -56,6 +56,7 @@ private slots:
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("sin tipo"));
         QVERIFY(m_servicio->listarAulas().valor.isEmpty());
     }
 
@@ -64,6 +65,7 @@ private slots:
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("No existe el tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("9999"));
         QVERIFY(m_servicio->listarAulas().valor.isEmpty());
     }
 
@@ -118,6 +120,7 @@ private slots:
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("al menos"));
+        QVERIFY(resultado.mensajeError.contains("se recibió 0"));
     }
 
     void crearAula_capacidadExcesiva_falla() {
@@ -125,6 +128,7 @@ private slots:
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("no puede exceder"));
+        QVERIFY(resultado.mensajeError.contains("se recibió 600"));
     }
 
     void crearAula_nombreDuplicado_falla() {
@@ -196,6 +200,7 @@ private slots:
 
         QVERIFY(!actualizada.ok);
         QVERIFY(actualizada.mensajeError.contains("tipo de aula"));
+        QVERIFY(actualizada.mensajeError.contains("sin tipo"));
 
         // No se conserva el tipo anterior de forma implícita: el aula sigue igual.
         auto sinCambios = m_servicio->obtenerAula(creada.valor.id);

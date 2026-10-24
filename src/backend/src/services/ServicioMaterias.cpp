@@ -60,12 +60,12 @@ bool ServicioMaterias::validarTipoAula(int idTipoAula, QString& error) const {
             error = "No hay tipos de aula registrados. Cree un tipo de aula antes de crear materias.";
             return false;
         }
-        error = "La materia debe tener un tipo de aula.";
+        error = "La materia debe tener un tipo de aula (se recibió: sin tipo).";
         return false;
     }
 
     if (!tipos_aula::existe(m_db, idTipoAula)) {
-        error = "No existe el tipo de aula indicado.";
+        error = QStringLiteral("No existe el tipo de aula indicado (id %1).").arg(idTipoAula);
         return false;
     }
 

@@ -60,18 +60,21 @@ bool ServicioTurnosEventos::validarEvento(const TurnoDTO& dto, const QString& no
     }
 
     if (despuesDeSlot < 1 || despuesDeSlot > dto.numSlots) {
-        error = QStringLiteral("La posición del evento debe estar entre 1 y %1.")
-                    .arg(dto.numSlots);
+        error = QStringLiteral("La posición del evento debe estar entre 1 y %1; se recibió %2.")
+                    .arg(dto.numSlots)
+                    .arg(despuesDeSlot);
         return false;
     }
 
     if (duracion <= 0) {
-        error = "La duración del evento debe ser mayor que cero.";
+        error = QStringLiteral("La duración del evento debe ser mayor que cero; se recibió %1 min.")
+                    .arg(duracion);
         return false;
     }
 
     if (orden < 0 || (ordenObligatorio && orden < 1)) {
-        error = "El orden del evento debe ser mayor o igual que uno.";
+        error = QStringLiteral("El orden del evento debe ser mayor o igual que uno; se recibió %1.")
+                    .arg(orden);
         return false;
     }
 

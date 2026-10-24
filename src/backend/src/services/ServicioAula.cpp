@@ -41,12 +41,16 @@ bool ServicioAula::validarAula(const QString& nombre, int capacidad, QString& er
     }
 
     if (capacidad < CAPACIDAD_MINIMA) {
-        error = QString("La capacidad debe ser al menos %1.").arg(CAPACIDAD_MINIMA);
+        error = QStringLiteral("La capacidad debe ser al menos %1; se recibió %2.")
+                    .arg(CAPACIDAD_MINIMA)
+                    .arg(capacidad);
         return false;
     }
 
     if (capacidad > CAPACIDAD_MAXIMA) {
-        error = QString("La capacidad no puede exceder %1.").arg(CAPACIDAD_MAXIMA);
+        error = QStringLiteral("La capacidad no puede exceder %1; se recibió %2.")
+                    .arg(CAPACIDAD_MAXIMA)
+                    .arg(capacidad);
         return false;
     }
 
@@ -59,12 +63,12 @@ bool ServicioAula::validarTipoAula(int idTipoAula, QString& error) const {
             error = "No hay tipos de aula registrados. Cree un tipo de aula antes de crear aulas.";
             return false;
         }
-        error = "El aula debe tener un tipo de aula.";
+        error = "El aula debe tener un tipo de aula (se recibió: sin tipo).";
         return false;
     }
 
     if (!tipos_aula::existe(m_db, idTipoAula)) {
-        error = "No existe el tipo de aula indicado.";
+        error = QStringLiteral("No existe el tipo de aula indicado (id %1).").arg(idTipoAula);
         return false;
     }
 

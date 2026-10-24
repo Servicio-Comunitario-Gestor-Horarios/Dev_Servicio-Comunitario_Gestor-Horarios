@@ -1342,3 +1342,112 @@ código.
   nombre del evento sembrado o del ejemplo; no queda ninguna entidad, DTO ni comando.
 - **Frontend**: no se tocó. `test_frontend_conversion` y `test_generacion_seed` no se configuran con
   `BUILD_FRONTEND=OFF`; la deuda quedó documentada en §5 de `docs/interfaz-frontend.md`.
+
+## Corrección de validación (2026-10-24)
+
+Base `221e563`, árbol limpio, 49/49 en verde. Alcance: mensajes de rechazo con el valor recibido
+(hallazgo 1) y la guía `docs/guias/datos-prueba-frontend.md` (hallazgo 2). Sin tocar frontend,
+specs, `plan.md` ni `estado.md`; sin commit.
+
+### Tests primero (rojo)
+
+Se añadieron aserciones del **valor** recibido en los mensajes de rechazo. Rojo con 3 binarios y
+13 aserciones en fallo:
+
+```
+$ cmake --build --preset backend --parallel   # ok
+$ ctest --preset backend
+94% tests passed, 3 tests failed out of 49
+ 26 - test_servicio_turnos_eventos (Failed)
+ 28 - test_servicio_aula (Failed)
+ 29 - test_servicio_materias (Failed)
+
+FAIL!  : TestServicioTurnosEventos::agregarEvento_posicionCero_rechazada() 'r.mensajeError.contains("1 y 5")' returned FALSE.
+FAIL!  : TestServicioTurnosEventos::agregarEvento_posicionFueraDeRango_rechazada() 'r.mensajeError.contains("1 y 5")' returned FALSE.
+FAIL!  : TestServicioTurnosEventos::agregarEvento_duracionCero_rechazada() 'r.mensajeError.contains("se recibió 0 min")' returned FALSE.
+FAIL!  : TestServicioTurnosEventos::actualizarEvento_posicionCero_rechazada() 'r.mensajeError.contains("se recibió 0")' returned FALSE.
+FAIL!  : TestServicioTurnosEventos::actualizarEvento_ordenCero_rechazado() 'r.mensajeError.contains("se recibió 0")' returned FALSE.
+FAIL!  : TestServicioAula::crearAula_sinTipo_falla() 'resultado.mensajeError.contains("sin tipo")' returned FALSE.
+FAIL!  : TestServicioAula::crearAula_tipoInexistente_falla() 'resultado.mensajeError.contains("9999")' returned FALSE.
+FAIL!  : TestServicioAula::crearAula_capacidadCero_falla() 'resultado.mensajeError.contains("se recibió 0")' returned FALSE.
+FAIL!  : TestServicioAula::crearAula_capacidadExcesiva_falla() 'resultado.mensajeError.contains("se recibió 600")' returned FALSE.
+FAIL!  : TestServicioAula::actualizarAula_sinTipo_falla() 'actualizada.mensajeError.contains("sin tipo")' returned FALSE.
+FAIL!  : TestServicioMaterias::crearMateria_sinTipo_falla() 'resultado.mensajeError.contains("sin tipo")' returned FALSE.
+FAIL!  : TestServicioMaterias::crearMateria_tipoInexistente_falla() 'resultado.mensajeError.contains("9999")' returned FALSE.
+FAIL!  : TestServicioMaterias::actualizarMateria_sinTipo_falla() 'actualizada.mensajeError.contains("sin tipo")' returned FALSE.
+```
+
+Nota: las aserciones de «orden repetido» (`agregarEvento_ordenExplicitoRepetido_rechazado`,
+`actualizarEvento_ordenDuplicadoEnLaPosicion_rechazado`) ya pasaban en rojo porque ese mensaje ya
+incluía el orden; se endurecieron a `contains("orden 1")`, no a la palabra suelta.
+
+### Mensajes nuevos (salida real de los tests)
+
+Se instrumentaron temporalmente los tests con `qInfo` para capturar el texto exacto y se
+restauraron después:
+
+```
+QINFO  : TestServicioTurnosEventos::agregarEvento_posicionCero_rechazada() MSG posicion 0: La posición del evento debe estar entre 1 y 5; se recibió 0.
+QINFO  : TestServicioTurnosEventos::agregarEvento_duracionCero_rechazada() MSG duracion 0: La duración del evento debe ser mayor que cero; se recibió 0 min.
+QINFO  : TestServicioTurnosEventos::agregarEvento_ordenExplicitoRepetido_rechazado() MSG orden repetido: Ya existe un evento en la posición 2 del turno «Mañana» con orden 1.
+QINFO  : TestServicioTurnosEventos::actualizarEvento_ordenCero_rechazado() MSG orden 0: El orden del evento debe ser mayor o igual que uno; se recibió 0.
+QINFO  : TestServicioAula::crearAula_sinTipo_falla() MSG aula sin tipo: El aula debe tener un tipo de aula (se recibió: sin tipo).
+QINFO  : TestServicioAula::crearAula_tipoInexistente_falla() MSG tipo inexistente: No existe el tipo de aula indicado (id 9999).
+QINFO  : TestServicioAula::crearAula_capacidadCero_falla() MSG capacidad 0: La capacidad debe ser al menos 1; se recibió 0.
+```
+
+En materias, el texto es el análogo con «La materia debe tener…» y el mismo «(id 9999)».
+
+### Verde
+
+```
+$ cmake --build --preset backend --parallel
+[53/53] Linking CXX executable test/test_ipc_aislamiento_bd
+$ ctest --preset backend
+100% tests passed out of 49
+```
+
+### Guía `docs/guias/datos-prueba-frontend.md`
+
+- Tabla §2: fila «Recesos | 2» sustituida por «Eventos | 2» (evento «Receso») y fila nueva
+  «Tipos de aula | 3» (`Aula de estudio` · `Laboratorio` · `Taller`).
+- Nota al inicio de §2: la base ya trae eventos y tipos de aula, pero el frontend **no ha migrado**
+  (`docs/interfaz-frontend.md` §5): los recuentos describen la base, no las firmas que compila hoy.
+- Resto de menciones de receso reescritas al **evento «Receso»** (rejilla, checklist) y recuento del
+  checklist «2 turnos/2 eventos, 3 tipos de aula».
+
+```
+$ grep -in "receso" docs/guias/datos-prueba-frontend.md
+57:| Eventos | 2 | evento «Receso» de 10 min tras la 2.ª franja: 08:20–08:30 (Mañana) y 14:00–14:10 (Tarde) |
+70:avanzan en pasos de 40 min; **el evento «Receso» no desplaza bloques**. La rejilla termina en **12:20**
+72:evento «Receso» (desfase de 10 min asumido y documentado en la spec 008).
+201:      del turno) y recordar que el **evento «Receso» no desplaza los bloques**.
+```
+
+Todas son el nombre del evento sembrado, no una entidad ni un comando.
+
+### Diff
+
+```
+ docs/guias/datos-prueba-frontend.md                | 24 ++++++++++++++--------
+ src/backend/src/services/ServicioAula.cpp          | 12 +++++++----
+ src/backend/src/services/ServicioMaterias.cpp      |  4 ++--
+ src/backend/src/services/ServicioTurnosEventos.cpp | 11 ++++++----
+ test/backend/test_servicio_aula.cpp                |  5 +++++
+ test/backend/test_servicio_materias.cpp            |  3 +++
+ test/backend/test_servicio_turnos_eventos.cpp      | 11 +++++++++--
+ 7 files changed, 50 insertions(+), 20 deletions(-)
+```
+
+Sin cambios en `src/frontend`, `specs/009-*/tasks.md`, `plan.md` ni `estado.md`.
+
+### Hallazgos
+
+- **Rango del mensaje de posición:** el turno de prueba tiene **5** franjas (no 8), así que la
+  aserción correcta es «1 y 5»; la primera tentativa «1 y 8» se corrigió en el test, no en el
+  mensaje.
+- **Capacidad máxima incluida:** el mismo bloque de `validarAula` valida el mínimo y el máximo; se
+  añadió el valor recibido a ambos mensajes y se actualizó su test (`se recibió 600`).
+- **«Orden» con dos orígenes:** `validarEvento` valida el rango del orden (0/negativo) y el alta
+  valida el duplicado en la misma posición; ambos mensajes identifican ahora el valor (rango
+  recibido / «orden 1»).

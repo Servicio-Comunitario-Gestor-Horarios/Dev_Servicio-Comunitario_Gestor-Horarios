@@ -64,6 +64,8 @@ private slots:
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("posición"));
+        QVERIFY(r.mensajeError.contains("1 y 5"));
+        QVERIFY(r.mensajeError.contains("se recibió 0"));
         QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
     }
 
@@ -73,6 +75,8 @@ private slots:
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("posición"));
+        QVERIFY(r.mensajeError.contains("1 y 5"));
+        QVERIFY(r.mensajeError.contains("se recibió 6"));
         QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
     }
 
@@ -82,6 +86,7 @@ private slots:
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("duración"));
+        QVERIFY(r.mensajeError.contains("se recibió 0 min"));
     }
 
     // ─── Orden dentro de la posición (RF-2) ─────────────────────────────────
@@ -112,7 +117,7 @@ private slots:
         auto duplicado = m_servicio->agregarEvento("Mañana", "Aviso", 2, 10, QTime(), QTime(), 1);
 
         QVERIFY(!duplicado.ok);
-        QVERIFY(duplicado.mensajeError.contains("orden"));
+        QVERIFY(duplicado.mensajeError.contains("orden 1"));
         QCOMPARE(m_servicio->obtenerTurno("Mañana").valor.eventos.size(), 1);
     }
 
@@ -227,6 +232,7 @@ private slots:
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("posición"));
+        QVERIFY(r.mensajeError.contains("se recibió 0"));
         QCOMPARE(m_servicio->obtenerTurno("Mañana").valor.eventos[0].despuesDeSlot, 2);
     }
 
@@ -240,6 +246,7 @@ private slots:
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("orden"));
+        QVERIFY(r.mensajeError.contains("se recibió 0"));
     }
 
     void actualizarEvento_ordenDuplicadoEnLaPosicion_rechazado()
@@ -253,7 +260,7 @@ private slots:
             segundo.valor.id, "R2", 2, 10, QTime(), QTime(), 1);
 
         QVERIFY(!r.ok);
-        QVERIFY(r.mensajeError.contains("orden"));
+        QVERIFY(r.mensajeError.contains("orden 1"));
         QCOMPARE(m_servicio->obtenerTurno("Mañana").valor.eventos[1].orden, 2);
     }
 
