@@ -21,7 +21,7 @@
 - [x] **T7. Seed: perfil con tipos y eventos, con compatibilidad.** RF-10
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_seed_perfil$'` está verde; hay 3 tipos, cada aula tiene tipo, las 57 materias tienen tipo resuelto (las «Aplicada» por prefijo/área), cada turno tiene un evento `Receso` en la posición 2 con orden 1; los campos `receso*` y `Recuentos.recesos` siguen existiendo como compatibilidad para que `sembrador.cpp` compile; la validación rechaza un evento fuera de ventana o un tipo sin aula.
 
-- [ ] **T8. Seed: aplicación, retirada de la compatibilidad y recuentos.** RF-1, RF-8, RF-10
+- [x] **T8. Seed: aplicación, retirada de la compatibilidad y recuentos.** RF-1, RF-8, RF-10
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'` está verde; se insertan tipos, aulas/materias con tipo y eventos; `docentes.cpp` pasa a `r.eventos`/`r.tiposAula` y se retiran `Recuentos.recesos` y los campos `receso*`; `resultado.recuentos.eventos == 2` y `tiposAula == 3`; la base sembrada tiene 2 filas en `Eventos` y 3 en `TiposAula`; aulas y materias tienen `id_tipo_aula`; el reemplazo vacía en el orden `Eventos, Disponibilidad_Profesor, Profesor_Materia, Cursos, PlanEstudio_Materia, PlanEstudio, Materias, Turnos, Aulas, TiposAula, Profesores` (Eventos antes que Turnos; Cursos antes que Turnos y Aulas; Aulas/Materias antes que TiposAula); la conmutación de docentes no toca tipos ni eventos.
 
 - [ ] **T9. Cierre: retirar compatibilidad y defaults, renombrar el servicio.** RF-6, RF-7, RF-8, RF-12

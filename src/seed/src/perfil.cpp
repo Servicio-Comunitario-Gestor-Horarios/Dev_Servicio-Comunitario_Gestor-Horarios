@@ -282,8 +282,7 @@ const Perfil& perfilPorDefecto() {
         // Turnos (008-T3, RF-4, plan §4.1; 009-T7, RF-10): mañana y tarde, 8 franjas de 40 min
         // y un evento «Receso» de 10 min tras la franja 2 (08:20–08:30 / 14:00–14:10). El `fin`
         // es la campana (incluye el receso): la rejilla aritmética termina en 12:20/18:00 y el
-        // desfase de 10 min se asume (spec 008). Los campos `receso*` son el espejo de
-        // compatibilidad del evento y se retiran en T8.
+        // desfase de 10 min se asume (spec 008). El evento es la única fuente del receso.
         {
             TurnoDef manana;
             manana.nombre = QStringLiteral("Mañana");
@@ -291,9 +290,6 @@ const Perfil& perfilPorDefecto() {
             manana.fin = QTime(12, 30);
             manana.numSlots = 8;
             manana.eventos.append(eventoReceso(QTime(8, 20), QTime(8, 30)));
-            manana.recesoDespuesDeSlot = manana.eventos.first().despuesDeSlot;
-            manana.recesoInicio = manana.eventos.first().inicio;
-            manana.recesoFin = manana.eventos.first().fin;
             p.turnos.append(manana);
 
             TurnoDef tarde;
@@ -302,9 +298,6 @@ const Perfil& perfilPorDefecto() {
             tarde.fin = QTime(18, 10);
             tarde.numSlots = 8;
             tarde.eventos.append(eventoReceso(QTime(14, 0), QTime(14, 10)));
-            tarde.recesoDespuesDeSlot = tarde.eventos.first().despuesDeSlot;
-            tarde.recesoInicio = tarde.eventos.first().inicio;
-            tarde.recesoFin = tarde.eventos.first().fin;
             p.turnos.append(tarde);
         }
 
@@ -442,16 +435,15 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
         return false;
     };
 
-    // 0. Turnos (RF-4): exactamente 2 (mañana y tarde), 8 franjas, receso de 10 min tras la
-    //    franja 2 con las horas de §4.1.
+    // 0. Turnos (RF-4): exactamente 2 (mañana y tarde), 8 franjas y ventana de campana de §4.1.
+    //    El contenido y la coherencia de los eventos se valida en 0bis.
     {
         const struct {
             const char* nombre;
             int hIni, mIni, hFin, mFin;
-            int hRecesoIni, mRecesoIni, hRecesoFin, mRecesoFin;
         } kTurnos[] = {
-            {"Mañana", 7, 0, 12, 30, 8, 20, 8, 30},
-            {"Tarde", 12, 40, 18, 10, 14, 0, 14, 10},
+            {"Mañana", 7, 0, 12, 30},
+            {"Tarde", 12, 40, 18, 10},
         };
         if (perfil.turnos.size() != 2) {
             return falla(QStringLiteral("El perfil debe tener 2 turnos (tiene %1).")
@@ -475,18 +467,6 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
                                  .arg(turno.nombre)
                                  .arg(turno.inicio.toString(QStringLiteral("HH:mm")))
                                  .arg(turno.fin.toString(QStringLiteral("HH:mm"))));
-            }
-            if (turno.recesoDespuesDeSlot != 2) {
-                return falla(QStringLiteral("El receso del turno «%1» no cae tras la franja 2 (%2).")
-                                 .arg(turno.nombre)
-                                 .arg(turno.recesoDespuesDeSlot));
-            }
-            if (turno.recesoInicio != QTime(kTurnos[i].hRecesoIni, kTurnos[i].mRecesoIni) ||
-                turno.recesoFin != QTime(kTurnos[i].hRecesoFin, kTurnos[i].mRecesoFin)) {
-                return falla(QStringLiteral("El receso del turno «%1» no es %2–%3.")
-                                 .arg(turno.nombre)
-                                 .arg(turno.recesoInicio.toString(QStringLiteral("HH:mm")))
-                                 .arg(turno.recesoFin.toString(QStringLiteral("HH:mm"))));
             }
         }
     }
@@ -930,8 +910,8 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
     }
 
     // 6. Recuentos esperados (plan §5.6, RF-1/RF-2): 57 materias, 4 planes y 210
-    //    plan-materias. Los 2 turnos/2 recesos, 16 aulas y 13 cursos ya se comprueban
-    //    arriba; aquí se cierra el conteo del catálogo y de los enlaces plan-materia.
+    //    plan-materias. Los 2 turnos con su evento, 3 tipos, 16 aulas y 13 cursos ya se
+    //    comprueban arriba; aquí se cierra el conteo del catálogo y de los enlaces plan-materia.
     {
         if (perfil.materias.size() != 57) {
             return falla(

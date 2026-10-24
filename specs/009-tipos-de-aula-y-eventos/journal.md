@@ -880,3 +880,177 @@ Igual que al cerrar T6 (48/49; `test_seed_aplicacion` 5/9). Ningún otro binario
   `recuentosCoinciden` no los compara, así que `test_seed_aplicacion` no cambia de estado.
 - No se tocaron `sembrador.cpp`, `docentes.cpp`, servicios, consola ni la retirada de la
   compatibilidad (T8/T9). Sin cambios en `estado.md`, `spec.md`, `plan.md` ni `AGENTS.md`.
+
+## T8 - Seed: aplicación, retirada de la compatibilidad y recuentos (2026-10-24)
+
+RF-1 (eventos sembrados), RF-8 y RF-10. Base: `f438079`.
+
+### Cambios
+
+- `src/seed/src/sembrador.cpp`:
+  - `kTablasDominio` pasa de 10 a 11 tablas: entra `TiposAula`, entra `Eventos` y sale
+    `Recesos` (ya no existe en el esquema v3). Sin esto la detección de base no vacía fallaba
+    con «No se pudo comprobar si la base ya tiene datos».
+  - `leerRecuentos`/`recuentosCoinciden`: cuentan y comparan `eventos` y `tiposAula`; fuera
+    `recesos`.
+  - `resumenTexto`: la línea informa `Eventos` en lugar de `Recesos` y añade `Tipos de aula`.
+  - Inserción en orden de dependencia: primero el catálogo con `NucleoDatos::crearTipoAula`
+    (mapa nombre → id), después cada turno con `crearTurno` **y sus eventos** con
+    `agregarEvento` (nombre, posición, duración, horas y orden explícito), después las aulas
+    con `crearAula(..., idTipoAula)` y por último las materias con
+    `crearMateria(nombre, "", idTipoAula)` resolviendo el tipo con
+    `tipoFinalDeMateria(nombre, tiposDeAulas)`.
+  - Vaciado/reemplazo en el orden FK-seguro de plan §4.5: `Eventos`,
+    `Disponibilidad_Profesor`, `Profesor_Materia`, `Cursos`, `PlanEstudio_Materia`,
+    `PlanEstudio`, `Materias`, `Turnos`, `Aulas`, `TiposAula`, `Profesores`.
+- `src/seed/src/docentes.cpp`: `recuentosEsperados` calcula `r.eventos` sumando los eventos de
+  los turnos y `r.tiposAula` desde `perfil.tiposAula`; ya no rellena `r.recesos`.
+- `src/seed/include/seed/perfil.hpp`: se retiran `Recuentos.recesos` y los campos
+  `TurnoDef::recesoDespuesDeSlot/recesoInicio/recesoFin`. `src/seed/src/perfil.cpp`: fuera las
+  asignaciones del espejo y el bloque de validación que solo miraba esos campos (la validación
+  de eventos de §0bis ya cubre posición, ventana, par de horas y solapes).
+- `src/seed/include/seed/docentes.hpp`: comentario de `recuentosEsperados` (2 eventos, 3 tipos).
+- `test/backend/test_seed_aplicacion.cpp`: recuentos `eventos == 2`/`tiposAula == 3`; 2 filas
+  en `Eventos` (turno, nombre «Receso», posición 2, orden 1, 10 min, 08:20–08:30 / 14:00–14:10);
+  3 filas en `TiposAula` y todas las aulas y materias con `id_tipo_aula` que resuelve a un tipo
+  del catálogo; comparación de determinismo con `TiposAula`/`Eventos` y el nombre del tipo
+  (no el id) en aulas/materias; `--solo-docentes` incluye tipos y eventos entre lo intacto;
+  rollback con las 11 tablas; **caso nuevo** `reemplazoTotalConCursosAsignados`.
+- `test/backend/test_seed_perfil.cpp`: ajustes por la retirada de los campos (sin cambiar lo
+  que se prueba): fuera las aserciones del espejo `receso*`, `eventosDeTurnosConCompatibilidad`
+  → `eventosDeTurnos`, `recuentosNuevosYCompatibilidad` → `recuentosNuevos` (comprueba además
+  `recuentosEsperados`), y el subcaso «receso fuera de la franja 2» pasa a «evento movido a la
+  franja 1» con las horas de la franja 2, que la validación rechaza por ventana.
+
+### Rojo (tests primero)
+
+```bash
+cmake --build --preset backend --parallel            # EXIT=0 (los tests compilan)
+ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'
+# 0% tests passed, 1 tests failed out of 1
+# Totals: 5 passed, 10 failed
+#   creaBaseNuevaYPuebla / baseConDatosFallaSinEscribir / determinismo /
+#   reemplazoTotalConRespaldo / reemplazoTotalConCursosAsignados /
+#   reemplazoTotalSinConfirmacion / soloDocentesConservaElResto /
+#   atomicidadAnteFalloEnReemplazo / tiempoDeAplicacion
+#   -> «No se pudo comprobar si la base ya tiene datos.» (kTablasDominio con «Recesos»)
+#   rollbackAnteFalloTrasDocentes -> Estado 7 (FalloApertura) en vez de FalloEscritura
+```
+
+### Verde
+
+```bash
+cmake --build --preset backend --parallel             # EXIT=0
+ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'
+# 1/1 Test #45: test_seed_aplicacion ... Passed    0.41 sec
+# 100% tests passed out of 1
+
+ctest --test-dir build-backend --output-on-failure -R '^test_seed_perfil$'   # ajustado en T8
+# 1/1 Test #44: test_seed_perfil ... Passed
+```
+
+### Comprobación manual sobre una base sembrada nueva
+
+```bash
+rm -f /tmp/009-t8-nueva.db
+./build-backend/src/seed/gestor-horarios-seed --db /tmp/009-t8-nueva.db
+# Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
+# Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65
+# Disponibilidades: 325   Tipos de aula: 3
+# ok
+
+sqlite3 /tmp/009-t8-nueva.db "SELECT COUNT(*) FROM Eventos; SELECT COUNT(*) FROM TiposAula;"
+# 2
+# 3
+sqlite3 /tmp/009-t8-nueva.db "SELECT turno,nombre,despues_de_slot,orden,duracion,inicio,fin FROM Eventos"
+# Mañana|Receso|2|1|10|08:20|08:30
+# Tarde|Receso|2|1|10|14:00|14:10
+sqlite3 /tmp/009-t8-nueva.db "SELECT COUNT(*) FROM Aulas WHERE id_tipo_aula IS NULL;
+                              SELECT COUNT(*) FROM Materias WHERE id_tipo_aula IS NULL;"
+# 0
+# 0
+sqlite3 /tmp/009-t8-nueva.db "SELECT t.nombre, COUNT(a.id) FROM TiposAula t
+                              LEFT JOIN Aulas a ON a.id_tipo_aula=t.id GROUP BY t.id"
+# Aula de estudio|14
+# Laboratorio|1
+# Taller|1
+sqlite3 /tmp/009-t8-nueva.db "SELECT t.nombre, COUNT(m.id) FROM TiposAula t
+                              LEFT JOIN Materias m ON m.id_tipo_aula=t.id GROUP BY t.id"
+# Aula de estudio|42
+# Laboratorio|15
+# Taller|0
+```
+
+Reemplazo total **con cursos ya asignados** (el caso que rompía el orden antiguo por FK):
+
+```bash
+sqlite3 /tmp/009-t8-nueva.db \
+  "UPDATE Cursos SET turno='Mañana', aula=(SELECT MIN(id) FROM Aulas)"
+# 13 cursos con turno y aula
+
+./build-backend/src/seed/gestor-horarios-seed --db /tmp/009-t8-nueva.db --reemplazar --si
+# Cursos: 13 (sin turno) ... Tipos de aula: 3
+# Respaldo: /tmp/009-t8-nueva.db.respaldo-20261024-190939
+# ok
+
+sqlite3 /tmp/009-t8-nueva.db "SELECT COUNT(*) FROM Eventos; SELECT COUNT(*) FROM TiposAula;
+  SELECT COUNT(*), SUM(turno IS NULL) FROM Cursos;
+  SELECT COUNT(*), SUM(id_tipo_aula IS NOT NULL) FROM Aulas;
+  SELECT COUNT(*), SUM(id_tipo_aula IS NOT NULL) FROM Materias;"
+# Eventos|2
+# TiposAula|3
+# Cursos|13|13          (todos vuelven a quedar sin turno)
+# Aulas|16|16
+# Materias|57|57
+```
+
+No hizo falta reordenar nada a ciegas: con el orden de §4.5 ninguna FK rechazó el borrado (y
+con el orden anterior, `UPDATE Cursos SET turno/aula` + `--reemplazar` habría fallado en
+`DELETE FROM Turnos`/`Aulas`; queda cubierto por `reemplazoTotalConCursosAsignados`).
+
+### Suite completa
+
+```bash
+ctest --test-dir build-backend
+# 100% tests passed, 0 tests failed out of 49
+```
+
+49/49 en verde (incluye `test_seed_perfil` y `test_seed_aplicacion` ya con la compatibilidad
+retirada). `test_seed_perfil` era de T7 y solo se ajustó a los campos retirados.
+
+`git diff --stat`:
+
+```
+ src/seed/include/seed/docentes.hpp    |   3 +-
+ src/seed/include/seed/perfil.hpp      |   4 -
+ src/seed/src/docentes.cpp             |   6 +-
+ src/seed/src/perfil.cpp               |  34 ++------
+ src/seed/src/sembrador.cpp            |  77 +++++++++++++-----
+ test/backend/test_seed_aplicacion.cpp | 148 +++++++++++++++++++++++++++-------
+ test/backend/test_seed_perfil.cpp     |  39 ++++-----
+ 7 files changed, 205 insertions(+), 106 deletions(-)
+```
+
+Sin cambios en servicios de backend, consola, docs, `estado.md`, `spec.md`, `plan.md` ni
+`AGENTS.md`; tampoco en el renombrado de T9.
+
+### Hallazgos / desviaciones
+
+- **`validarPerfil` pierde el bloque 0 de receso.** Ese bloque solo leía los campos `receso*`
+  retirados; la validación de eventos (0bis) ya rechaza posición fuera de rango, ventana y
+  horas incoherentes, y el caso del test se reescribió con el evento real. El perfil sigue
+  fijando el «Receso» en la posición 2 por contenido (tests de perfil y de aplicación).
+- **`resumenTexto` cambia de texto** («Eventos» y «Tipos de aula»): lo exige la retirada de
+  `Recuentos.recesos`. La guía `docs/guias/datos-prueba.md` aún muestra «Recesos: 2»; es de
+  T10.
+- **Test nuevo `reemplazoTotalConCursosAsignados`**: la verificación 3 del encargo era manual;
+  además de hacerla a mano se deja automatizada porque el fallo por FK es silencioso en
+  producción (solo se ve al reemplazar con cursos asignados).
+- **El sembrador usa la fachada** (`crearTipoAula`, `agregarEvento`, `crearAula(...,
+  idTipoAula)`, `crearMateria(..., idTipoAula)`) en vez de SQL directo: son altas sin
+  transacción propia y validan el tipo; las cargas de plan y los docentes siguen por SQL
+  directo (transacción externa, plan §6.4).
+- **Orden de inserción**: tipos → turnos con eventos → aulas → materias. El plan exige el
+  catálogo antes que aulas y materias; los turnos pueden ir antes o después de los tipos.
+- `TiposAula`/`Eventos` entran en `kTablasDominio`, así que `--solo-docentes` conserva ambos
+  (verificado en `soloDocentesConservaElResto`).

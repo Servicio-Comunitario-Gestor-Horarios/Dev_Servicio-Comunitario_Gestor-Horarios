@@ -165,7 +165,11 @@ QVector<DocenteDef> docentesDeVariante(const Perfil& perfil, VarianteDocentes va
 Recuentos recuentosEsperados(const Perfil& perfil, VarianteDocentes variante) {
     Recuentos r;
     r.turnos       = perfil.turnos.size();
-    r.recesos      = perfil.turnos.size();  // un receso por turno (RF-4).
+    r.eventos      = 0;
+    for (const TurnoDef& turno : perfil.turnos) {
+        r.eventos += turno.eventos.size();  // un evento «Receso» por turno (RF-10).
+    }
+    r.tiposAula    = perfil.tiposAula.size();
     r.aulas        = perfil.aulas.size();
     r.materias     = perfil.materias.size();
     r.planes       = perfil.planes.size();

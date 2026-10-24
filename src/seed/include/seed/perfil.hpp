@@ -52,9 +52,6 @@ struct TurnoDef {
     QTime inicio;
     QTime fin;
     int numSlots;              ///< franjas del turno (8); «slots» es keyword de Qt
-    int recesoDespuesDeSlot;   ///< compatibilidad: espejo del evento «Receso» (se retira en T8)
-    QTime recesoInicio;
-    QTime recesoFin;
     QVector<EventoDef> eventos; ///< eventos del turno, en el orden en que se declaran
 };
 
@@ -81,7 +78,6 @@ struct Recuentos {
     int turnos = 0;            ///< filas de Turnos (2)
     int eventos = 0;           ///< filas de Eventos (2)
     int tiposAula = 0;         ///< filas de TiposAula (3)
-    int recesos = 0;           ///< compatibilidad: filas de Recesos (2); se retira en T8
     int aulas = 0;             ///< filas de Aulas (16)
     int materias = 0;          ///< filas de Materias (57)
     int planes = 0;            ///< filas de PlanEstudio (4)

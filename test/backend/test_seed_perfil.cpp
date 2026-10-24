@@ -148,7 +148,8 @@ private slots:
     {
         const Perfil& perfil = perfilPorDefecto();
 
-        // ── Turnos (RF-4): 2, mañana y tarde, 8 franjas y receso de 10 min tras la franja 2.
+        // ── Turnos (RF-4): 2, mañana y tarde y 8 franjas (el evento «Receso» se comprueba
+        //    en `eventosDeTurnos`).
         QCOMPARE(perfil.turnos.size(), 2);
         const TurnoDef& manana = perfil.turnos[0];
         const TurnoDef& tarde = perfil.turnos[1];
@@ -157,17 +158,11 @@ private slots:
         QCOMPARE(manana.inicio, QTime(7, 0));
         QCOMPARE(manana.fin, QTime(12, 30));
         QCOMPARE(manana.numSlots, 8);
-        QCOMPARE(manana.recesoDespuesDeSlot, 2);
-        QCOMPARE(manana.recesoInicio, QTime(8, 20));
-        QCOMPARE(manana.recesoFin, QTime(8, 30));
 
         QCOMPARE(tarde.nombre, QString("Tarde"));
         QCOMPARE(tarde.inicio, QTime(12, 40));
         QCOMPARE(tarde.fin, QTime(18, 10));
         QCOMPARE(tarde.numSlots, 8);
-        QCOMPARE(tarde.recesoDespuesDeSlot, 2);
-        QCOMPARE(tarde.recesoInicio, QTime(14, 0));
-        QCOMPARE(tarde.recesoFin, QTime(14, 10));
 
         // ── Aulas (RF-5): 16, nombre único, con laboratorio o taller.
         QCOMPARE(perfil.aulas.size(), 16);
@@ -344,13 +339,14 @@ private slots:
         }
     }
 
-    void eventosDeTurnosConCompatibilidad()
+    void eventosDeTurnos()
     {
         const Perfil& perfil = perfilPorDefecto();
         QCOMPARE(perfil.turnos.size(), 2);
         QCOMPARE(eventosDe(perfil), 2);
 
-        // Un evento «Receso» por turno: posición 2, orden 1, 10 min y su horario.
+        // Un evento «Receso» por turno: posición 2, orden 1, 10 min y su horario. El evento
+        // es la única representación del receso (sin campos de compatibilidad).
         for (const TurnoDef& turno : perfil.turnos) {
             QCOMPARE(turno.eventos.size(), 1);
             const EventoDef& evento = turno.eventos[0];
@@ -358,11 +354,6 @@ private slots:
             QCOMPARE(evento.despuesDeSlot, 2);
             QCOMPARE(evento.orden, 1);
             QCOMPARE(evento.duracion, 10);
-
-            // Compatibilidad (se retira en T8): los campos receso* siguen y coinciden.
-            QCOMPARE(turno.recesoDespuesDeSlot, evento.despuesDeSlot);
-            QCOMPARE(turno.recesoInicio, evento.inicio);
-            QCOMPARE(turno.recesoFin, evento.fin);
         }
 
         QCOMPARE(perfil.turnos[0].eventos[0].inicio, QTime(8, 20));
@@ -371,21 +362,23 @@ private slots:
         QCOMPARE(perfil.turnos[1].eventos[0].fin, QTime(14, 10));
     }
 
-    void recuentosNuevosYCompatibilidad()
+    void recuentosNuevos()
     {
         const Perfil& perfil = perfilPorDefecto();
 
-        // Recuentos nuevos (T7) junto al de recesos, que aún se conserva (se retira en T8).
+        // Recuentos de eventos y tipos (T8): lo que debe informar la siembra es 2 eventos y
+        // 3 tipos, nunca un recuento de recesos sumado aparte.
         Recuentos recuentos;
         QCOMPARE(recuentos.eventos, 0);
         QCOMPARE(recuentos.tiposAula, 0);
-        QCOMPARE(recuentos.recesos, 0);
 
-        // Lo que debe informar la siembra: 2 eventos, 3 tipos y los recesos de compatibilidad
-        // derivados de los eventos (2), nunca sumados aparte.
         QCOMPARE(eventosDe(perfil), 2);
         QCOMPARE(perfil.tiposAula.size(), 3);
         QCOMPARE(perfil.turnos.size(), 2);
+
+        const Recuentos esperados = seed::recuentosEsperados(perfil, VarianteDocentes::Holgada);
+        QCOMPARE(esperados.eventos, 2);
+        QCOMPARE(esperados.tiposAula, 3);
     }
 
     void validarPerfilRechazaTurnosAulasYCursos()
@@ -396,13 +389,15 @@ private slots:
         QCOMPARE(base.aulas.size(), 16);
         QCOMPARE(base.cursos.size(), 13);
 
-        // Un turno con el receso fuera de la franja 2.
+        // Un evento fuera de la ventana de su posición (se mueve a la franja 1 con las horas
+        // de la franja 2, que ya no le corresponden).
         {
             Perfil perfil = perfilPorDefecto();
-            perfil.turnos[0].recesoDespuesDeSlot = 1;
+            perfil.turnos[0].eventos[0].despuesDeSlot = 1;
             QString error;
             QVERIFY(!validarPerfil(perfil, &error));
-            QVERIFY2(error.contains(QStringLiteral("franja 2")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("Receso")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("ventana")), qPrintable(error));
         }
 
         // Un aula duplicada.

@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QHash>
+#include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
 
@@ -29,10 +30,11 @@ bool varianteValida(VarianteDocentes variante) {
     return false;
 }
 
-/// Las 10 tablas de dominio del esquema (RF-10, detección de datos).
+/// Las 11 tablas de dominio del esquema v3 (RF-10, detección de datos). `TiposAula` y
+/// `Eventos` son datos de dominio desde la spec 009; `Recesos` ya no existe.
 const char* const kTablasDominio[] = {
-    "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
-    "Turnos", "Recesos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+    "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
+    "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
 };
 
 /// Número de filas de una tabla; -1 si la consulta falla.
@@ -61,7 +63,8 @@ int contarFilasDeDominio(QSqlDatabase& db) {
 Recuentos leerRecuentos(QSqlDatabase& db) {
     Recuentos r;
     r.turnos           = contarFilas(db, QStringLiteral("Turnos"));
-    r.recesos          = contarFilas(db, QStringLiteral("Recesos"));
+    r.eventos          = contarFilas(db, QStringLiteral("Eventos"));
+    r.tiposAula        = contarFilas(db, QStringLiteral("TiposAula"));
     r.aulas            = contarFilas(db, QStringLiteral("Aulas"));
     r.materias         = contarFilas(db, QStringLiteral("Materias"));
     r.planes           = contarFilas(db, QStringLiteral("PlanEstudio"));
@@ -75,9 +78,10 @@ Recuentos leerRecuentos(QSqlDatabase& db) {
 
 /// ¿Los recuentos leídos coinciden con los esperados para la variante? (RF-12).
 bool recuentosCoinciden(const Recuentos& actuales, const Recuentos& esperados) {
-    return actuales.turnos == esperados.turnos && actuales.recesos == esperados.recesos &&
-           actuales.aulas == esperados.aulas && actuales.materias == esperados.materias &&
-           actuales.planes == esperados.planes && actuales.planMaterias == esperados.planMaterias &&
+    return actuales.turnos == esperados.turnos && actuales.eventos == esperados.eventos &&
+           actuales.tiposAula == esperados.tiposAula && actuales.aulas == esperados.aulas &&
+           actuales.materias == esperados.materias && actuales.planes == esperados.planes &&
+           actuales.planMaterias == esperados.planMaterias &&
            actuales.cursos == esperados.cursos && actuales.docentes == esperados.docentes &&
            actuales.asignaciones == esperados.asignaciones &&
            actuales.disponibilidades == esperados.disponibilidades;
@@ -114,20 +118,22 @@ QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recu
 
     // Recuentos por entidad, leídos de la base tras el commit (RF-12): el informe verifica
     // lo escrito, no lo declarado en el perfil.
-    lineas << QStringLiteral("Turnos: %1   Recesos: %2   Aulas: %3   Materias: %4   "
+    lineas << QStringLiteral("Turnos: %1   Eventos: %2   Aulas: %3   Materias: %4   "
                              "Planes: %5   Materias de plan: %6")
                   .arg(r.turnos)
-                  .arg(r.recesos)
+                  .arg(r.eventos)
                   .arg(r.aulas)
                   .arg(r.materias)
                   .arg(r.planes)
                   .arg(r.planMaterias);
     lineas << QStringLiteral("Cursos: %1 (sin turno)   Docentes: %2   "
-                             "Materias asignadas: %3   Disponibilidades: %4")
+                             "Materias asignadas: %3   Disponibilidades: %4   "
+                             "Tipos de aula: %5")
                   .arg(r.cursos)
                   .arg(r.docentes)
                   .arg(r.asignaciones)
-                  .arg(r.disponibilidades);
+                  .arg(r.disponibilidades)
+                  .arg(r.tiposAula);
 
     // Materias por año de cada plan (RF-12): se calcula del perfil (validado) y contrasta con
     // lo declarado en la spec (GEN 9/9/10/11/12; derivados 9/9/10/12/13).
@@ -375,9 +381,13 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
     } else {
         // ── Alta completa (base nueva o reemplazo total) ──────────────────────────────
         if (opciones.reemplazarTodo) {
+            // Orden FK-seguro (plan §4.5): Eventos antes que Turnos; Cursos antes que Turnos
+            // y Aulas; PlanEstudio_Materia/Profesor_Materia/Disponibilidad_Profesor antes de
+            // sus padres; Aulas y Materias antes que TiposAula; Profesores al final.
             for (const char* tabla :
-                 {"Disponibilidad_Profesor", "Profesor_Materia", "Cursos", "PlanEstudio_Materia",
-                  "PlanEstudio", "Materias", "Recesos", "Turnos", "Aulas", "Profesores"}) {
+                 {"Eventos", "Disponibilidad_Profesor", "Profesor_Materia", "Cursos",
+                  "PlanEstudio_Materia", "PlanEstudio", "Materias", "Turnos", "Aulas",
+                  "TiposAula", "Profesores"}) {
                 if (!borrarTabla(QString::fromLatin1(tabla))) {
                     return abortar(QStringLiteral(
                         "No se pudieron borrar los datos previos para el reemplazo total."));
@@ -385,33 +395,56 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
             }
         }
 
-        // Turnos + recesos (RF-4): 2 turnos y su receso de 10 min tras la franja 2.
+        // Tipos de aula (RF-5/RF-10): el catálogo va antes que las aulas y las materias,
+        // que lo referencian. Se guarda nombre → id para resolver el tipo de cada fila.
+        QHash<QString, int> idTipoAula;
+        for (const QString& tipo : perfil.tiposAula) {
+            const auto creado = nucleo.crearTipoAula(tipo);
+            if (!creado.ok) {
+                return abortar(creado.mensajeError);
+            }
+            idTipoAula.insert(tipo, creado.valor.id);
+        }
+
+        // Turnos y sus eventos (RF-1/RF-4): 2 turnos, cada uno con su evento «Receso» de
+        // 10 min tras la franja 2. El evento es la única fuente del receso (sin compatibilidad).
         for (const TurnoDef& turno : perfil.turnos) {
             const auto creado =
                 nucleo.crearTurno(turno.nombre, turno.inicio, turno.fin, turno.numSlots);
             if (!creado.ok) {
                 return abortar(creado.mensajeError);
             }
-            const auto receso = nucleo.agregarReceso(turno.nombre, turno.recesoDespuesDeSlot, 10,
-                                                     turno.recesoInicio, turno.recesoFin);
-            if (!receso.ok) {
-                return abortar(receso.mensajeError);
+            for (const EventoDef& evento : turno.eventos) {
+                const auto agregado = nucleo.agregarEvento(
+                    turno.nombre, evento.nombre, evento.despuesDeSlot, evento.duracion,
+                    evento.inicio, evento.fin, evento.orden);
+                if (!agregado.ok) {
+                    return abortar(agregado.mensajeError);
+                }
             }
         }
 
-        // Aulas (RF-5), guardando nombre → id para asignar el aula de cada curso.
+        // Aulas (RF-5), con su tipo y guardando nombre → id para asignar el aula de cada curso.
         QHash<QString, int> idAula;
         for (const AulaDef& aula : perfil.aulas) {
-            const auto creada = nucleo.crearAula(aula.nombre, aula.capacidad, aula.edificio, aula.piso);
+            const auto creada = nucleo.crearAula(aula.nombre, aula.capacidad, aula.edificio,
+                                                 aula.piso, idTipoAula.value(aula.tipo, -1));
             if (!creada.ok) {
                 return abortar(creada.mensajeError);
             }
             idAula.insert(aula.nombre, creada.valor.id);
         }
 
-        // Materias (RF-1), guardando nombre → id para enlazar cargas y docentes.
+        // Materias (RF-1/RF-7), con el tipo que pide su área (N1: si el conjunto no tiene
+        // aula de ese tipo, genérico). Se guarda nombre → id para enlazar cargas y docentes.
+        QSet<QString> tiposDeAulas;
+        for (const AulaDef& aula : perfil.aulas) {
+            tiposDeAulas.insert(aula.tipo);
+        }
         for (const MateriaAnio& materia : perfil.materias) {
-            const auto creada = nucleo.crearMateria(materia.nombre);
+            const QString tipo = tipoFinalDeMateria(materia.nombre, tiposDeAulas);
+            const auto creada =
+                nucleo.crearMateria(materia.nombre, QString(), idTipoAula.value(tipo, -1));
             if (!creada.ok) {
                 return abortar(creada.mensajeError);
             }

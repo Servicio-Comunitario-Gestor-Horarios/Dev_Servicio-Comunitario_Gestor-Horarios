@@ -43,7 +43,8 @@ struct DocenteDef {
 /// para calcular el tope de los titulares de la variante de suplentes.
 QVector<DocenteDef> docentesDeVariante(const Perfil& perfil, VarianteDocentes variante);
 
-/// Recuentos esperados del conjunto aplicado (RF-12): 2 turnos, 2 recesos, 16 aulas, 57
+/// Recuentos esperados del conjunto aplicado (RF-12): 2 turnos, 2 eventos, 3 tipos de aula,
+/// 16 aulas, 57
 /// materias, 4 planes, 210 materias de plan, 13 cursos y, según la variante, docentes,
 /// materias asignadas y disponibilidades. Determinista y pura: se usa para contrastar lo
 /// escrito en la base (RF-12) sin recalcular a mano los recuentos de profesorado.
