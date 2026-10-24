@@ -18,7 +18,7 @@
 - [x] **T6. Fachada NucleoDatos, cascada, puente y consumidores.** RF-6, RF-7, RF-8, RF-12
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_backend_nucleo_datos|test_backend_cascada|test_gestor_pendientes|test_servicio_profesor|test_composicion_plan|test_servicio_carga_horaria|test_servicio_planes_estudio|test_datos_contexto_base_datos|test_constructor_entrada'` está verde; la cascada de turno lista y borra eventos; los consumidores de backend/consola y tests pasan el tipo y usan `eventos`; el `INSERT` directo de materia de `test_servicio_planes_estudio` incluye `id_tipo_aula`; el puente `eventos → recesos` emite una entrada por evento; la consola de aulas/materias y de `tipos` usa el tipo; la compatibilidad del DTO sigue presente.
 
-- [ ] **T7. Seed: perfil con tipos y eventos, con compatibilidad.** RF-10
+- [x] **T7. Seed: perfil con tipos y eventos, con compatibilidad.** RF-10
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_seed_perfil$'` está verde; hay 3 tipos, cada aula tiene tipo, las 57 materias tienen tipo resuelto (las «Aplicada» por prefijo/área), cada turno tiene un evento `Receso` en la posición 2 con orden 1; los campos `receso*` y `Recuentos.recesos` siguen existiendo como compatibilidad para que `sembrador.cpp` compile; la validación rechaza un evento fuera de ventana o un tipo sin aula.
 
 - [ ] **T8. Seed: aplicación, retirada de la compatibilidad y recuentos.** RF-1, RF-8, RF-10

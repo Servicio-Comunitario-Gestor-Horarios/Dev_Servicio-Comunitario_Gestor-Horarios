@@ -2,6 +2,8 @@
 
 #include <QSet>
 
+#include "backend/services/calculo_eventos.hpp"
+
 namespace seed {
 
 int bloques(int horas) {
@@ -35,6 +37,36 @@ int seccionesDeAnio(int anio) {
 }
 
 namespace {
+
+/// Tipos de aula del conjunto (RF-5, RF-10): el genérico y los dos especializados que usan
+/// las aulas. «Cancha» no entra en el catálogo: el conjunto no tiene ninguna.
+const char* const kTipoGenerico = "Aula de estudio";
+const char* const kTipoLaboratorio = "Laboratorio";
+const char* const kTipoTaller = "Taller";
+
+/// Regla de tipo de materia por área/prefijo (RF-10, N1), no por nombre exacto: así
+/// «Física Aplicada», «Química Aplicada» y «Ciencias de la Tierra Aplicadas» caen en
+/// laboratorio. La fila de informática/taller es inocua: el perfil no tiene esas materias.
+struct ReglaTipoMateria {
+    const char* prefijo;
+    const char* tipo;
+};
+
+const ReglaTipoMateria kReglasTipoMateria[] = {
+    {"Ciencias Naturales", kTipoLaboratorio},
+    {"Ciencias de la Tierra", kTipoLaboratorio},
+    {"Física", kTipoLaboratorio},
+    {"Química", kTipoLaboratorio},
+    {"Biología", kTipoLaboratorio},
+    {"Informática", kTipoTaller},
+    {"Taller", kTipoTaller},
+    {"Educación Física", "Cancha"},
+};
+
+/// Evento «Receso» sembrado (RF-10): posición 2, orden 1, 10 min y su horario.
+EventoDef eventoReceso(const QTime& inicio, const QTime& fin) {
+    return EventoDef{QStringLiteral("Receso"), 2, 1, 10, inicio, fin};
+}
 
 /// Un área de formación del 31059 con sus horas académicas semanales por año
 /// (índice 0 = 1.º, … 4 = 5.º; -1 = no se cursa en ese año).
@@ -174,6 +206,12 @@ const Perfil& perfilPorDefecto() {
     static const Perfil perfil = [] {
         Perfil p;
 
+        // Catálogo de tipos de aula (009-T7, RF-5/RF-10): 3, en el orden en que las aulas los
+        // usan. El sembrador los inserta antes que las aulas y las materias (T8).
+        p.tiposAula = {QString::fromUtf8(kTipoGenerico),
+                       QString::fromUtf8(kTipoLaboratorio),
+                       QString::fromUtf8(kTipoTaller)};
+
         PlanDef general;
         general.codigo = QStringLiteral("GEN");
         general.nombre = QStringLiteral("General");
@@ -241,18 +279,21 @@ const Perfil& perfilPorDefecto() {
             p.planes.append(plan);
         }
 
-        // Turnos (008-T3, RF-4, plan §4.1): mañana y tarde, 8 franjas de 40 min y receso de
-        // 10 min tras la franja 2. El `fin` es la campana (incluye el receso): la rejilla
-        // aritmética termina en 12:20/18:00 y el desfase de 10 min se asume (spec 008).
+        // Turnos (008-T3, RF-4, plan §4.1; 009-T7, RF-10): mañana y tarde, 8 franjas de 40 min
+        // y un evento «Receso» de 10 min tras la franja 2 (08:20–08:30 / 14:00–14:10). El `fin`
+        // es la campana (incluye el receso): la rejilla aritmética termina en 12:20/18:00 y el
+        // desfase de 10 min se asume (spec 008). Los campos `receso*` son el espejo de
+        // compatibilidad del evento y se retiran en T8.
         {
             TurnoDef manana;
             manana.nombre = QStringLiteral("Mañana");
             manana.inicio = QTime(7, 0);
             manana.fin = QTime(12, 30);
             manana.numSlots = 8;
-            manana.recesoDespuesDeSlot = 2;
-            manana.recesoInicio = QTime(8, 20);
-            manana.recesoFin = QTime(8, 30);
+            manana.eventos.append(eventoReceso(QTime(8, 20), QTime(8, 30)));
+            manana.recesoDespuesDeSlot = manana.eventos.first().despuesDeSlot;
+            manana.recesoInicio = manana.eventos.first().inicio;
+            manana.recesoFin = manana.eventos.first().fin;
             p.turnos.append(manana);
 
             TurnoDef tarde;
@@ -260,42 +301,46 @@ const Perfil& perfilPorDefecto() {
             tarde.inicio = QTime(12, 40);
             tarde.fin = QTime(18, 10);
             tarde.numSlots = 8;
-            tarde.recesoDespuesDeSlot = 2;
-            tarde.recesoInicio = QTime(14, 0);
-            tarde.recesoFin = QTime(14, 10);
+            tarde.eventos.append(eventoReceso(QTime(14, 0), QTime(14, 10)));
+            tarde.recesoDespuesDeSlot = tarde.eventos.first().despuesDeSlot;
+            tarde.recesoInicio = tarde.eventos.first().inicio;
+            tarde.recesoFin = tarde.eventos.first().fin;
             p.turnos.append(tarde);
         }
 
-        // Aulas (008-T3, RF-5, plan §4.3): 16, nombre único, con variedad de capacidad,
-        // edificio y piso; Aula 14 es de reserva y hay un laboratorio y un taller.
+        // Aulas (008-T3, RF-5, plan §4.3; 009-T7, RF-10): 16, nombre único, con variedad de
+        // capacidad, edificio y piso; Aula 14 es de reserva y hay un laboratorio y un taller,
+        // cada uno con su tipo; las demás son «Aula de estudio».
         {
             const struct {
                 const char* nombre;
                 int capacidad;
                 const char* edificio;
                 const char* piso;
+                const char* tipo;
             } kAulas[] = {
-                {"Aula 01", 40, "A", "Planta baja"},
-                {"Aula 02", 40, "A", "Planta baja"},
-                {"Aula 03", 38, "A", "Planta baja"},
-                {"Aula 04", 38, "A", "Piso 1"},
-                {"Aula 05", 36, "A", "Piso 1"},
-                {"Aula 06", 36, "A", "Piso 1"},
-                {"Aula 07", 34, "B", "Planta baja"},
-                {"Aula 08", 34, "B", "Planta baja"},
-                {"Aula 09", 36, "B", "Piso 1"},
-                {"Aula 10", 38, "B", "Piso 1"},
-                {"Aula 11", 40, "B", "Piso 1"},
-                {"Aula 12", 40, "B", "Piso 1"},
-                {"Aula 13", 34, "A", "Piso 1"},
-                {"Aula 14", 32, "B", "Planta baja"},            // reserva
-                {"Laboratorio de Ciencias", 36, "C", "Planta baja"},
-                {"Taller de Informática", 30, "C", "Piso 1"},
+                {"Aula 01", 40, "A", "Planta baja", kTipoGenerico},
+                {"Aula 02", 40, "A", "Planta baja", kTipoGenerico},
+                {"Aula 03", 38, "A", "Planta baja", kTipoGenerico},
+                {"Aula 04", 38, "A", "Piso 1", kTipoGenerico},
+                {"Aula 05", 36, "A", "Piso 1", kTipoGenerico},
+                {"Aula 06", 36, "A", "Piso 1", kTipoGenerico},
+                {"Aula 07", 34, "B", "Planta baja", kTipoGenerico},
+                {"Aula 08", 34, "B", "Planta baja", kTipoGenerico},
+                {"Aula 09", 36, "B", "Piso 1", kTipoGenerico},
+                {"Aula 10", 38, "B", "Piso 1", kTipoGenerico},
+                {"Aula 11", 40, "B", "Piso 1", kTipoGenerico},
+                {"Aula 12", 40, "B", "Piso 1", kTipoGenerico},
+                {"Aula 13", 34, "A", "Piso 1", kTipoGenerico},
+                {"Aula 14", 32, "B", "Planta baja", kTipoGenerico},            // reserva
+                {"Laboratorio de Ciencias", 36, "C", "Planta baja", kTipoLaboratorio},
+                {"Taller de Informática", 30, "C", "Piso 1", kTipoTaller},
             };
             for (const auto& a : kAulas) {
                 p.aulas.append(AulaDef{QString::fromUtf8(a.nombre), a.capacidad,
                                        QString::fromUtf8(a.edificio),
-                                       QString::fromUtf8(a.piso)});
+                                       QString::fromUtf8(a.piso),
+                                       QString::fromUtf8(a.tipo)});
             }
         }
 
@@ -326,6 +371,22 @@ const Perfil& perfilPorDefecto() {
 
 bool esMateriaNueva(const QString& nombre) {
     return materiaNueva(nombre) != nullptr;
+}
+
+QString tipoEspecializadoDeMateria(const QString& nombre) {
+    for (const ReglaTipoMateria& regla : kReglasTipoMateria) {
+        const QString prefijo = QString::fromUtf8(regla.prefijo) + QLatin1Char(' ');
+        if (nombre.startsWith(prefijo)) {
+            return QString::fromUtf8(regla.tipo);
+        }
+    }
+    return QString::fromUtf8(kTipoGenerico);
+}
+
+QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas) {
+    const QString especializado = tipoEspecializadoDeMateria(nombre);
+    return tiposDeAulas.contains(especializado) ? especializado
+                                                : QString::fromUtf8(kTipoGenerico);
 }
 
 int horasMaximas(const Perfil& perfil, const QString& materia) {
@@ -430,6 +491,103 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
         }
     }
 
+    // 0bis. Eventos de los turnos (009-T7, RF-1, RF-3, RF-10): nombre, posición, orden único
+    //    por posición, duración y, si declaran horario, par completo, diferencia coherente y
+    //    contención en la ventana de su posición. La ventana y el par se comprueban con las
+    //    funciones puras del servicio (`calculo_eventos`), para que el perfil y la base no
+    //    diverjan.
+    for (const TurnoDef& turno : perfil.turnos) {
+        TurnoDTO turnoDto;
+        turnoDto.nombre = turno.nombre;
+        turnoDto.inicio = turno.inicio;
+        turnoDto.fin = turno.fin;
+        turnoDto.numSlots = turno.numSlots;
+        for (const EventoDef& evento : turno.eventos) {
+            EventoDTO dto;
+            dto.nombre = evento.nombre;
+            dto.despuesDeSlot = evento.despuesDeSlot;
+            dto.orden = evento.orden;
+            dto.duracion = evento.duracion;
+            dto.inicio = evento.inicio;
+            dto.fin = evento.fin;
+            turnoDto.eventos.append(dto);
+        }
+
+        QSet<QString> ordenesOcupados;
+        for (int i = 0; i < turno.eventos.size(); ++i) {
+            const EventoDef& evento = turno.eventos[i];
+            if (evento.nombre.trimmed().isEmpty()) {
+                return falla(QStringLiteral("El turno «%1» tiene un evento sin nombre.")
+                                 .arg(turno.nombre));
+            }
+            if (evento.despuesDeSlot < 1 || evento.despuesDeSlot > turno.numSlots) {
+                return falla(QStringLiteral("El evento «%1» del turno «%2» tiene la posición %3 "
+                                            "fuera de 1..%4.")
+                                 .arg(evento.nombre, turno.nombre)
+                                 .arg(evento.despuesDeSlot)
+                                 .arg(turno.numSlots));
+            }
+            if (evento.duracion <= 0) {
+                return falla(QStringLiteral("El evento «%1» del turno «%2» tiene una duración no "
+                                            "positiva (%3 min).")
+                                 .arg(evento.nombre, turno.nombre)
+                                 .arg(evento.duracion));
+            }
+            if (evento.orden < 1) {
+                return falla(QStringLiteral("El evento «%1» del turno «%2» tiene un orden inválido (%3).")
+                                 .arg(evento.nombre, turno.nombre)
+                                 .arg(evento.orden));
+            }
+            const QString clave =
+                QStringLiteral("%1#%2").arg(evento.despuesDeSlot).arg(evento.orden);
+            if (ordenesOcupados.contains(clave)) {
+                return falla(QStringLiteral("El turno «%1» repite el orden %2 en la posición %3.")
+                                 .arg(turno.nombre)
+                                 .arg(evento.orden)
+                                 .arg(evento.despuesDeSlot));
+            }
+            ordenesOcupados.insert(clave);
+
+            const bool tieneInicio = evento.inicio.isValid();
+            const bool tieneFin = evento.fin.isValid();
+            if (tieneInicio != tieneFin) {
+                return falla(QStringLiteral("El evento «%1» del turno «%2» declara solo una de "
+                                            "sus horas.")
+                                 .arg(evento.nombre, turno.nombre));
+            }
+            if (!tieneInicio) {
+                continue;   // sin horario no hay ventana que comprobar
+            }
+            if (evento.fin <= evento.inicio) {
+                return falla(QStringLiteral("El evento «%1» del turno «%2» termina antes de "
+                                            "empezar (%3–%4).")
+                                 .arg(evento.nombre, turno.nombre)
+                                 .arg(evento.inicio.toString(QStringLiteral("HH:mm")))
+                                 .arg(evento.fin.toString(QStringLiteral("HH:mm"))));
+            }
+            if (evento.inicio.secsTo(evento.fin) != evento.duracion * 60) {
+                return falla(QStringLiteral("La duración del evento «%1» (%2 min) del turno «%3» "
+                                            "no coincide con la diferencia entre sus horas (%4 min).")
+                                 .arg(evento.nombre)
+                                 .arg(evento.duracion)
+                                 .arg(turno.nombre)
+                                 .arg(evento.inicio.secsTo(evento.fin) / 60));
+            }
+            if (!eventoDentroDeVentana(turnoDto.eventos[i], turnoDto, evento.despuesDeSlot)) {
+                const QPair<QTime, QTime> ventana =
+                    ventanaDePosicion(turnoDto, evento.despuesDeSlot);
+                return falla(QStringLiteral("El evento «%1» del turno «%2» (%3–%4) queda fuera de "
+                                            "la ventana de la posición %5 (%6–%7).")
+                                 .arg(evento.nombre, turno.nombre)
+                                 .arg(evento.inicio.toString(QStringLiteral("HH:mm")))
+                                 .arg(evento.fin.toString(QStringLiteral("HH:mm")))
+                                 .arg(evento.despuesDeSlot)
+                                 .arg(ventana.first.toString(QStringLiteral("HH:mm")))
+                                 .arg(ventana.second.toString(QStringLiteral("HH:mm"))));
+            }
+        }
+    }
+
     // Aulas (RF-5): exactamente 16, con nombre único.
     {
         QSet<QString> nombres;
@@ -445,6 +603,47 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
         if (perfil.aulas.size() != 16) {
             return falla(QStringLiteral("El perfil debe tener 16 aulas (tiene %1).")
                              .arg(perfil.aulas.size()));
+        }
+    }
+
+    // 0ter. Tipos de aula (009-T7, RF-5, RF-6, RF-10): catálogo no vacío y sin duplicados, cada
+    //    aula con un tipo del catálogo y cada materia con un tipo requerido que tenga al menos
+    //    un aula sembrada (N1). Así no se siembra una materia imposible de ubicar.
+    {
+        if (perfil.tiposAula.isEmpty()) {
+            return falla(QStringLiteral("El perfil no declara tipos de aula."));
+        }
+        QSet<QString> catalogo;
+        for (const QString& tipo : perfil.tiposAula) {
+            const QString nombre = tipo.trimmed();
+            if (nombre.isEmpty()) {
+                return falla(
+                    QStringLiteral("El catálogo de tipos de aula contiene un tipo sin nombre."));
+            }
+            if (catalogo.contains(nombre)) {
+                return falla(QStringLiteral("El tipo de aula «%1» está duplicado en el catálogo.")
+                                 .arg(nombre));
+            }
+            catalogo.insert(nombre);
+        }
+
+        QSet<QString> tiposDeAulas;
+        for (const AulaDef& aula : perfil.aulas) {
+            if (!catalogo.contains(aula.tipo)) {
+                return falla(QStringLiteral("El aula «%1» tiene el tipo «%2», que no está en el "
+                                            "catálogo.")
+                                 .arg(aula.nombre, aula.tipo));
+            }
+            tiposDeAulas.insert(aula.tipo);
+        }
+
+        for (const MateriaAnio& materia : perfil.materias) {
+            const QString tipo = tipoFinalDeMateria(materia.nombre, tiposDeAulas);
+            if (!tiposDeAulas.contains(tipo)) {
+                return falla(QStringLiteral("La materia «%1» requiere el tipo de aula «%2», del "
+                                            "que no hay ninguna aula sembrada.")
+                                 .arg(materia.nombre, tipo));
+            }
         }
     }
 

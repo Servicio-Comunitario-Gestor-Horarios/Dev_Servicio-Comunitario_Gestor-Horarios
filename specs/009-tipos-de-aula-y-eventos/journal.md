@@ -763,3 +763,120 @@ $C … 'tipos eliminar 1'                   # error: en uso por el aula «Aula 1
   `false` y muestra el error con los afectados. La confirmación explícita de RF-4 ya está probada en
   el servicio (`test_servicio_turnos_eventos`) y su comando `--si` no forma parte de T6.
 - El frontend sigue sin compilar (fuera de la entrega); esta verificación es la del preset `backend`.
+
+## T7 - Seed: perfil con tipos y eventos, con compatibilidad (2026-10-24)
+
+RF-10 (RNF-3). Base: `e79d227` (T1-T6 commiteadas).
+
+### Cambios
+
+- `src/seed/include/seed/perfil.hpp`:
+  - `EventoDef { nombre, despuesDeSlot, orden, duracion, inicio, fin }` (inicio/fin inválidas =
+    evento sin horario) y `TurnoDef.eventos` (`QVector<EventoDef>`); se **conservan** los campos
+    `receso*` como espejo de compatibilidad (se retiran en T8).
+  - `AulaDef.tipo` (tipo del catálogo), `Perfil.tiposAula` (catálogo de 3, ver desviación 1) y
+    `Recuentos.eventos`/`Recuentos.tiposAula`, junto al `Recuentos.recesos` de compatibilidad.
+  - Funciones puras `tipoEspecializadoDeMateria` y `tipoFinalDeMateria(nombre, tiposDeAulas)`
+    (plan §3): regla por **prefijo/área**, no por nombre exacto, con caída al genérico si el
+    conjunto no tiene aula de ese tipo (N1).
+- `src/seed/src/perfil.cpp`:
+  - `perfilPorDefecto`: catálogo `{"Aula de estudio", "Laboratorio", "Taller"}`; las 14 aulas
+    genéricas al genérico, «Laboratorio de Ciencias» a `Laboratorio` y «Taller de Informática» a
+    `Taller`; un evento `Receso` por turno (posición 2, orden 1, 10 min, 08:20–08:30 /
+    14:00–14:10) del que se derivan los campos `receso*` (un solo origen, sin divergencia).
+  - `tipoEspecializadoDeMateria`: `Ciencias Naturales`, `Ciencias de la Tierra`, `Física`,
+    `Química`, `Biología` → `Laboratorio`; `Informática`/`Taller` → `Taller`; `Educación Física`
+    → `Cancha`; resto → `Aula de estudio`. El casado es `prefijo + " "`, así «Física Aplicada»,
+    «Química Aplicada» y «Ciencias de la Tierra Aplicadas» caen en laboratorio.
+  - `tipoFinalDeMateria`: especializado si hay aula de ese tipo; si no, genérico.
+  - `validarPerfil`: bloque **0bis** de eventos (nombre, posición 1..`numSlots`, duración > 0,
+    orden >= 1 único por posición y, si declaran horario, par completo, `fin > inicio`,
+    `fin − inicio == duracion` y contención en la ventana de la posición) reutilizando
+    `calculo_eventos` (`eventoDentroDeVentana`/`ventanaDePosicion`) con un `TurnoDTO`/`EventoDTO`
+    adaptado; bloque **0ter** de tipos (catálogo no vacío y sin duplicados, tipo de cada aula en
+    el catálogo y tipo requerido de cada materia con al menos un aula sembrada).
+  - `sembrador.cpp` y `docentes.cpp` **sin tocar** (T8): `Recuentos.recesos`, `receso*` y la
+    inserción antigua siguen compilando; `recuentosCoinciden` no compara aún los campos nuevos.
+- `test/backend/test_seed_perfil.cpp` (+8 casos, 269 líneas): `tiposDeAulaDelPerfil`,
+  `tipoEspecializadoDeMateriaPorArea`, `tipoFinalDeMateriaCaeAGenericoSinAula`,
+  `cadaMateriaSembradaTieneTipoConAula` (57 materias: 15 laboratorio / 42 genérico / 0 otros),
+  `eventosDeTurnosConCompatibilidad`, `recuentosNuevosYCompatibilidad`,
+  `validarPerfilRechazaEventosIncoherentes` y `validarPerfilRechazaTipoRequeridoSinAula`.
+
+### Rojo inicial
+
+Los tests usan la API que T7 debía crear, así que el rojo es de compilación:
+
+```bash
+cmake --build --preset backend --parallel --target test_seed_perfil
+# EXIT != 0; 46 líneas "error:":
+#   9 × ‘const struct seed::AulaDef’ has no member named ‘tipo’
+#   7 × ‘tipoEspecializadoDeMateria’ was not declared in this scope
+#   7 × ‘const struct seed::Perfil’ has no member named ‘tiposAula’
+#   6 × ‘const struct seed::TurnoDef’ has no member named ‘eventos’ (+5 del no-const)
+#   5 × ‘tipoFinalDeMateria’ no se declaró en este ámbito
+#   1 × ‘struct seed::Recuentos’ has no member named ‘eventos’ / ‘tiposAula’
+#   1 × ‘EventoDef’ no se declaró en este ámbito
+```
+
+### Verde final
+
+```bash
+cmake --build --preset backend --parallel      # EXIT=0, 0 "error:"
+ctest --test-dir build-backend --output-on-failure -R '^test_seed_perfil$'
+# 1/1 Test #44: test_seed_perfil ... Passed
+# 100% tests passed out of 1
+./build-backend/test/test_seed_perfil           # Totals: 35 passed, 0 failed
+```
+
+Casos nuevos en verde (uno por requisito de T7):
+
+| comprobación | caso |
+|---|---|
+| 3 tipos y toda aula con tipo del catálogo (14 genéricas + laboratorio + taller) | `tiposDeAulaDelPerfil` |
+| regla por área/prefijo, incluidas las «Aplicada», informática/taller y EF | `tipoEspecializadoDeMateriaPorArea` |
+| caída al genérico sin aula del tipo (cancha, laboratorio) | `tipoFinalDeMateriaCaeAGenericoSinAula` |
+| 57 materias con tipo no vacío (15 laboratorio / 42 genérico) y tipo requerido con aula | `cadaMateriaSembradaTieneTipoConAula` |
+| `Receso` por turno en posición 2, orden 1, 10 min, horario y espejo `receso*` | `eventosDeTurnosConCompatibilidad` |
+| 2 eventos, 3 tipos, 2 recesos de compatibilidad; campos nuevos en `Recuentos` | `recuentosNuevosYCompatibilidad` |
+| rechazo de evento fuera de ventana, duración incoherente, posición fuera de rango y orden repetido | `validarPerfilRechazaEventosIncoherentes` |
+| rechazo de tipo de aula fuera del catálogo y de tipo requerido sin aula | `validarPerfilRechazaTipoRequeridoSinAula` |
+
+Ventanas que confirman la fórmula de T4: Mañana franja `(330 − 10)/8 = 40` → posición 2 =
+08:20–08:30 (evento exacto); Tarde ídem → 14:00–14:10.
+
+### Suite: antes y después
+
+```bash
+ctest --test-dir build-backend --output-on-failure
+# 98% tests passed, 1 tests failed out of 49
+#   45 - test_seed_aplicacion (Failed)  -> Totals: 5 passed, 9 failed
+#        «No se pudo comprobar si la base ya tiene datos.» (contarFilasDeDominio sobre Recesos)
+#        y seed antiguo sin tipos/eventos: el rojo previsto para T8.
+```
+
+Igual que al cerrar T6 (48/49; `test_seed_aplicacion` 5/9). Ningún otro binario cambia.
+
+`git diff --stat`: solo `src/seed/include/seed/perfil.hpp` (+34/−3),
+`src/seed/src/perfil.cpp` (+255/−20) y `test/backend/test_seed_perfil.cpp` (+269).
+
+### Hallazgos / desviaciones
+
+- **`Perfil.tiposAula` no figuraba en §1.5.** El plan lo pide en §4.5 (`tipos = {...}`) y T8
+  necesita insertar el catálogo antes que aulas y materias; se guarda como `QStringList` de 3 en
+  `perfilPorDefecto`. `AulaDef.tipo` y `Recuentos.*` sí estaban en §1.5. `MateriaAnio` **no**
+  gana campo de tipo: §4.5 resuelve el tipo con `tipoFinalDeMateria` en el momento de sembrar.
+- **La ventana del evento se valida con `calculo_eventos`**, no con una copia local de la fórmula:
+  `seed` enlaza `datos → backend` y `perfil.cpp` construye un `TurnoDTO`/`EventoDTO` efímero. Así
+  la validación del perfil y la del servicio no pueden divergir. `validarPerfil` sigue siendo
+  pura (sin E/S).
+- **Los campos `receso*` se derivan del evento** en `perfilPorDefecto` para que no haya dos
+  fuentes: la validación antigua de receso sigue tal cual y la nueva de eventos es independiente.
+  No se comprueba su igualdad (T8 los retira); los tests del perfil sí verifican el espejo.
+- **El rechazo «tipo requerido sin aula»** solo es alcanzable cuando falta el aula del tipo
+  **genérico** (si falta una especializada, N1 cae al genérico). Se prueba poniendo las 16 aulas
+  como `Laboratorio`: Castellano 1.º requiere «Aula de estudio» y no hay ninguna.
+- **`recuentosEsperados` (docentes.cpp) no rellena `eventos`/`tiposAula`**: es de T8, y
+  `recuentosCoinciden` no los compara, así que `test_seed_aplicacion` no cambia de estado.
+- No se tocaron `sembrador.cpp`, `docentes.cpp`, servicios, consola ni la retirada de la
+  compatibilidad (T8/T9). Sin cambios en `estado.md`, `spec.md`, `plan.md` ni `AGENTS.md`.

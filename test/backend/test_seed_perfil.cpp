@@ -51,6 +51,26 @@ int disponibilidadesDe(const QVector<DocenteDef>& docentes)
     return n;
 }
 
+/// Conjunto de tipos de aula que usan las aulas del perfil (RF-10).
+QSet<QString> tiposDeAulasDe(const Perfil& perfil)
+{
+    QSet<QString> tipos;
+    for (const AulaDef& aula : perfil.aulas) {
+        tipos.insert(aula.tipo);
+    }
+    return tipos;
+}
+
+/// Σ eventos de todos los turnos del perfil (RF-10).
+int eventosDe(const Perfil& perfil)
+{
+    int n = 0;
+    for (const TurnoDef& turno : perfil.turnos) {
+        n += turno.eventos.size();
+    }
+    return n;
+}
+
 } // namespace
 
 class TestSeedPerfil : public QObject {
@@ -191,6 +211,183 @@ private slots:
         QCOMPARE(aulasUsadas.size(), 13);
     }
 
+    // ── 009-T7: tipos de aula, tipos de materia y eventos (RF-10) ─────────────
+
+    void tiposDeAulaDelPerfil()
+    {
+        const Perfil& perfil = perfilPorDefecto();
+
+        // 3 tipos: el genérico y los dos especializados que usan las aulas.
+        QCOMPARE(perfil.tiposAula.size(), 3);
+        QCOMPARE(perfil.tiposAula.at(0), QStringLiteral("Aula de estudio"));
+        QCOMPARE(perfil.tiposAula.at(1), QStringLiteral("Laboratorio"));
+        QCOMPARE(perfil.tiposAula.at(2), QStringLiteral("Taller"));
+
+        // Toda aula declara un tipo del catálogo; las genéricas son «Aula de estudio».
+        int genericas = 0;
+        for (const AulaDef& aula : perfil.aulas) {
+            QVERIFY2(!aula.tipo.isEmpty(), qPrintable(aula.nombre));
+            QVERIFY2(perfil.tiposAula.contains(aula.tipo), qPrintable(aula.nombre));
+            if (aula.tipo == QStringLiteral("Aula de estudio")) {
+                ++genericas;
+            }
+        }
+        QCOMPARE(genericas, 14);
+        QCOMPARE(perfil.aulas[0].tipo, QStringLiteral("Aula de estudio"));    // Aula 01
+        QCOMPARE(perfil.aulas[13].tipo, QStringLiteral("Aula de estudio"));   // Aula 14 (reserva)
+        QCOMPARE(perfil.aulas[14].tipo, QStringLiteral("Laboratorio"));       // Laboratorio de Ciencias
+        QCOMPARE(perfil.aulas[15].tipo, QStringLiteral("Taller"));            // Taller de Informática
+
+        // Todo tipo del catálogo lo usa al menos un aula («los que usan las aulas»).
+        QCOMPARE(tiposDeAulasDe(perfil).size(), 3);
+        for (const QString& tipo : perfil.tiposAula) {
+            QVERIFY2(tiposDeAulasDe(perfil).contains(tipo), qPrintable(tipo));
+        }
+    }
+
+    void tipoEspecializadoDeMateriaPorArea()
+    {
+        // Ciencias experimentales (incluidas las «Aplicada»): por prefijo/área, no por
+        // nombre exacto.
+        const QString laboratorio[] = {
+            QStringLiteral("Física 3º"),
+            QStringLiteral("Física Aplicada"),
+            QStringLiteral("Química 3º"),
+            QStringLiteral("Química Aplicada"),
+            QStringLiteral("Biología 3º"),
+            QStringLiteral("Ciencias Naturales 1º"),
+            QStringLiteral("Ciencias de la Tierra 5º"),
+            QStringLiteral("Ciencias de la Tierra Aplicadas"),
+        };
+        for (const QString& nombre : laboratorio) {
+            QCOMPARE(tipoEspecializadoDeMateria(nombre), QStringLiteral("Laboratorio"));
+        }
+
+        // Informática o taller: la fila existe aunque el perfil no tenga materias de esas áreas.
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Informática 1º")),
+                 QStringLiteral("Taller"));
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Taller de Robótica")),
+                 QStringLiteral("Taller"));
+
+        // Educación Física pide cancha; el resto, el tipo genérico.
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Educación Física 1º")),
+                 QStringLiteral("Cancha"));
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Castellano 1º")),
+                 QStringLiteral("Aula de estudio"));
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Matemática Aplicada")),
+                 QStringLiteral("Aula de estudio"));
+        QCOMPARE(tipoEspecializadoDeMateria(QStringLiteral("Geografía Económica")),
+                 QStringLiteral("Aula de estudio"));
+    }
+
+    void tipoFinalDeMateriaCaeAGenericoSinAula()
+    {
+        const Perfil& perfil = perfilPorDefecto();
+        const QSet<QString> tipos = tiposDeAulasDe(perfil);
+
+        // Con las aulas sembradas hay laboratorio, pero no cancha (N1).
+        QCOMPARE(tipoFinalDeMateria(QStringLiteral("Física 3º"), tipos),
+                 QStringLiteral("Laboratorio"));
+        QCOMPARE(tipoFinalDeMateria(QStringLiteral("Educación Física 1º"), tipos),
+                 QStringLiteral("Aula de estudio"));
+
+        // Si el conjunto tuviera una cancha, Educación Física la usaría.
+        QSet<QString> conCancha = tipos;
+        conCancha.insert(QStringLiteral("Cancha"));
+        QCOMPARE(tipoFinalDeMateria(QStringLiteral("Educación Física 1º"), conCancha),
+                 QStringLiteral("Cancha"));
+
+        // Sin aula de laboratorio, las ciencias experimentales caen al genérico.
+        QSet<QString> sinLaboratorio = tipos;
+        sinLaboratorio.remove(QStringLiteral("Laboratorio"));
+        QCOMPARE(tipoFinalDeMateria(QStringLiteral("Física 3º"), sinLaboratorio),
+                 QStringLiteral("Aula de estudio"));
+    }
+
+    void cadaMateriaSembradaTieneTipoConAula()
+    {
+        const Perfil& perfil = perfilPorDefecto();
+        const QSet<QString> tipos = tiposDeAulasDe(perfil);
+
+        int generico = 0;
+        int laboratorio = 0;
+        int otros = 0;
+        QSet<QString> requeridos;
+        for (const MateriaAnio& materia : perfil.materias) {
+            const QString tipo = tipoFinalDeMateria(materia.nombre, tipos);
+            QVERIFY2(!tipo.isEmpty(), qPrintable(materia.nombre));
+            QVERIFY2(tipos.contains(tipo),
+                     qPrintable(materia.nombre + QStringLiteral(" -> ") + tipo));
+            requeridos.insert(tipo);
+            if (tipo == QStringLiteral("Aula de estudio")) {
+                ++generico;
+            } else if (tipo == QStringLiteral("Laboratorio")) {
+                ++laboratorio;
+            } else {
+                ++otros;
+            }
+        }
+        QCOMPARE(perfil.materias.size(), 57);
+        QCOMPARE(laboratorio, 15);   // Física, Química, Biología, C. Naturales y C. de la Tierra
+        QCOMPARE(generico, 42);      // Educación Física incluida: no hay cancha en el conjunto
+        QCOMPARE(otros, 0);
+
+        // «Todo tipo requerido tiene al menos un aula sembrada de ese tipo» (RF-10).
+        QCOMPARE(requeridos.size(), 2);
+        for (const QString& tipo : requeridos) {
+            QVERIFY2(tipos.contains(tipo), qPrintable(tipo));
+            bool hayAula = false;
+            for (const AulaDef& aula : perfil.aulas) {
+                hayAula = hayAula || aula.tipo == tipo;
+            }
+            QVERIFY2(hayAula, qPrintable(tipo));
+        }
+    }
+
+    void eventosDeTurnosConCompatibilidad()
+    {
+        const Perfil& perfil = perfilPorDefecto();
+        QCOMPARE(perfil.turnos.size(), 2);
+        QCOMPARE(eventosDe(perfil), 2);
+
+        // Un evento «Receso» por turno: posición 2, orden 1, 10 min y su horario.
+        for (const TurnoDef& turno : perfil.turnos) {
+            QCOMPARE(turno.eventos.size(), 1);
+            const EventoDef& evento = turno.eventos[0];
+            QCOMPARE(evento.nombre, QStringLiteral("Receso"));
+            QCOMPARE(evento.despuesDeSlot, 2);
+            QCOMPARE(evento.orden, 1);
+            QCOMPARE(evento.duracion, 10);
+
+            // Compatibilidad (se retira en T8): los campos receso* siguen y coinciden.
+            QCOMPARE(turno.recesoDespuesDeSlot, evento.despuesDeSlot);
+            QCOMPARE(turno.recesoInicio, evento.inicio);
+            QCOMPARE(turno.recesoFin, evento.fin);
+        }
+
+        QCOMPARE(perfil.turnos[0].eventos[0].inicio, QTime(8, 20));
+        QCOMPARE(perfil.turnos[0].eventos[0].fin, QTime(8, 30));
+        QCOMPARE(perfil.turnos[1].eventos[0].inicio, QTime(14, 0));
+        QCOMPARE(perfil.turnos[1].eventos[0].fin, QTime(14, 10));
+    }
+
+    void recuentosNuevosYCompatibilidad()
+    {
+        const Perfil& perfil = perfilPorDefecto();
+
+        // Recuentos nuevos (T7) junto al de recesos, que aún se conserva (se retira en T8).
+        Recuentos recuentos;
+        QCOMPARE(recuentos.eventos, 0);
+        QCOMPARE(recuentos.tiposAula, 0);
+        QCOMPARE(recuentos.recesos, 0);
+
+        // Lo que debe informar la siembra: 2 eventos, 3 tipos y los recesos de compatibilidad
+        // derivados de los eventos (2), nunca sumados aparte.
+        QCOMPARE(eventosDe(perfil), 2);
+        QCOMPARE(perfil.tiposAula.size(), 3);
+        QCOMPARE(perfil.turnos.size(), 2);
+    }
+
     void validarPerfilRechazaTurnosAulasYCursos()
     {
         const Perfil& base = perfilPorDefecto();
@@ -234,6 +431,78 @@ private slots:
             QString error;
             QVERIFY(!validarPerfil(perfil, &error));
             QVERIFY2(error.contains(QStringLiteral("año+sección")), qPrintable(error));
+        }
+    }
+
+    void validarPerfilRechazaEventosIncoherentes()
+    {
+        // Guarda de la fase roja: el perfil ya trae un evento por turno.
+        QCOMPARE(eventosDe(perfilPorDefecto()), 2);
+
+        // Un evento fuera de la ventana de su posición (se corre 5 min).
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.turnos[0].eventos[0].inicio = QTime(8, 25);
+            perfil.turnos[0].eventos[0].fin = QTime(8, 35);
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("Receso")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("ventana")), qPrintable(error));
+        }
+
+        // Duración que no coincide con la diferencia entre las horas.
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.turnos[0].eventos[0].duracion = 15;
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("duración")), qPrintable(error));
+        }
+
+        // Posición fuera del rango del turno.
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.turnos[0].eventos[0].despuesDeSlot = 9;
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("posición")), qPrintable(error));
+        }
+
+        // Dos eventos con el mismo orden en la misma posición.
+        {
+            Perfil perfil = perfilPorDefecto();
+            EventoDef copia = perfil.turnos[0].eventos[0];
+            copia.nombre = QStringLiteral("Acto cívico");
+            copia.inicio = QTime();
+            copia.fin = QTime();
+            perfil.turnos[0].eventos.append(copia);
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("orden")), qPrintable(error));
+        }
+    }
+
+    void validarPerfilRechazaTipoRequeridoSinAula()
+    {
+        // Un aula con un tipo que no está en el catálogo.
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.aulas[0].tipo = QStringLiteral("Cancha");
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("Cancha")), qPrintable(error));
+        }
+
+        // Ninguna aula de tipo genérico: Castellano 1.º lo requiere y no hay dónde ubicarla.
+        {
+            Perfil perfil = perfilPorDefecto();
+            for (AulaDef& aula : perfil.aulas) {
+                aula.tipo = QStringLiteral("Laboratorio");
+            }
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("Aula de estudio")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("ninguna aula")), qPrintable(error));
         }
     }
 
