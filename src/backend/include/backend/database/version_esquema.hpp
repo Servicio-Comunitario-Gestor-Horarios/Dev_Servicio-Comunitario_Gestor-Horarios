@@ -11,7 +11,11 @@
 namespace VersionEsquema
 {
     /// Versión de esquema que espera esta compilación de la aplicación (marca única).
-    constexpr int VERSION_ESQUEMA_ACTUAL = 2;
+    ///
+    /// v3: catálogo de tipos de aula con clave normalizada, referencia de tipo
+    /// obligatoria en aulas y materias, y eventos del turno con identidad y orden
+    /// (se retira el registro de recesos).
+    constexpr int VERSION_ESQUEMA_ACTUAL = 3;
 
     /// Resultado de decidir qué hacer al abrir una base de datos.
     enum class EstadoApertura
@@ -36,7 +40,8 @@ namespace VersionEsquema
     bool crearEsquema(QSqlDatabase& db);
 
     /// Comprueba que la base tenga el catálogo del esquema único (tablas y columnas
-    /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia`).
+    /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia` o el
+    /// registro de recesos `Recesos`, sustituido por `Eventos`).
     /// Si se pasa `motivo`, recibe una explicación legible de lo que no cuadra
     /// (vacía si el catálogo corresponde al esquema esperado).
     bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr);

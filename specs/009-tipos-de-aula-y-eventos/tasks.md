@@ -3,7 +3,7 @@
 - [x] **T1. Build sin frontend (`BUILD_FRONTEND=OFF` + preset `backend`).** RNF-6
     - Hecho cuando: `cmake --preset backend -Dortools_DIR="$HOME/.local/ortools/lib/cmake/ortools"`, `cmake --build --preset backend --parallel` (exit 0) y `ctest --test-dir build-backend -N` funcionan; el listado incluye `test_backend_version_esquema`, `test_backend_nucleo_datos`, `test_seed_aplicacion` y `test_instancia_unica`, y no incluye `test_frontend_conversion` ni `test_generacion_seed`.
 
-- [ ] **T2. Esquema v3: identidad/orden de eventos, clave normalizada almacenada, catálogo esperado y huella.** RF-2, RF-5, RF-6, RF-7, RF-9
+- [x] **T2. Esquema v3: identidad/orden de eventos, clave normalizada almacenada, catálogo esperado y huella.** RF-2, RF-5, RF-6, RF-7, RF-9
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_backend_version_esquema|test_backend_apertura_base_datos|test_esquema_cursos'` está verde; `VERSION_ESQUEMA_ACTUAL` es 3; `Eventos` tiene `id`/`orden` con único por turno y posición; `TiposAula` guarda `clave` y el índice único sobre ella rechaza «Laboratorio»/«laboratorio» y «Física»/«FÍSICA»; la huella de la versión 3 está registrada; una base v2 falla al abrir.
 
 - [ ] **T3. Modelo y servicio de eventos, con compatibilidad.** RF-1, RF-2, RF-8

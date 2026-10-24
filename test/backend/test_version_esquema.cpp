@@ -21,6 +21,21 @@ bool tablaExiste(QSqlDatabase& db, const QString& tabla)
     return query.exec() && query.next();
 }
 
+bool columnaExiste(QSqlDatabase& db, const QString& tabla, const QString& columna)
+{
+    QSqlQuery query(db);
+    // `PRAGMA table_info` no admite parámetros enlazados; el nombre de tabla es
+    // una constante del test.
+    if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(tabla)))
+        return false;
+
+    while (query.next())
+        if (query.value(1).toString().compare(columna, Qt::CaseInsensitive) == 0)
+            return true;
+
+    return false;
+}
+
 /// Huella SHA-256 del catálogo real de la base: tablas y su DDL tal y como los
 /// registró SQLite, en orden estable y con el espacio normalizado. Cualquier
 /// cambio de esquema (tabla, columna, restricción) cambia la huella.
@@ -70,33 +85,99 @@ private:
         QSqlDatabase::removeDatabase(m_nombreConexion);
     }
 
+    /// Inserta un tipo de aula escribiendo la clave directamente en la tabla,
+    /// como haría una escritura ajena al servicio: el índice único debe frenarla.
+    bool insertarTipo(QSqlDatabase& db, const QString& nombre, const QString& clave)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO TiposAula (nombre, clave) "
+                                     "VALUES (:nombre, :clave)"));
+        query.bindValue(QStringLiteral(":nombre"), nombre);
+        query.bindValue(QStringLiteral(":clave"), clave);
+        return query.exec();
+    }
+
+    /// Inserta un turno mínimo para poder colgar eventos de él.
+    bool insertarTurno(QSqlDatabase& db, const QString& nombre)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO Turnos (nombre, inicio, fin, slots) "
+                                     "VALUES (:nombre, '07:00', '12:00', 8)"));
+        query.bindValue(QStringLiteral(":nombre"), nombre);
+        return query.exec();
+    }
+
+    bool insertarEvento(QSqlDatabase& db, const QString& nombre, const QString& turno,
+                        int posicion, int orden, int duracion)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO Eventos "
+                                     "(nombre, turno, despues_de_slot, orden, duracion) "
+                                     "VALUES (:nombre, :turno, :posicion, :orden, :duracion)"));
+        query.bindValue(QStringLiteral(":nombre"), nombre);
+        query.bindValue(QStringLiteral(":turno"), turno);
+        query.bindValue(QStringLiteral(":posicion"), posicion);
+        query.bindValue(QStringLiteral(":orden"), orden);
+        query.bindValue(QStringLiteral(":duracion"), duracion);
+        return query.exec();
+    }
+
+    bool insertarEventoConHoras(QSqlDatabase& db, const QString& turno, int posicion, int orden,
+                                const QVariant& inicio, const QVariant& fin)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO Eventos "
+                                     "(nombre, turno, despues_de_slot, orden, duracion, inicio, fin) "
+                                     "VALUES ('Evento', :turno, :posicion, :orden, 10, :inicio, :fin)"));
+        query.bindValue(QStringLiteral(":turno"), turno);
+        query.bindValue(QStringLiteral(":posicion"), posicion);
+        query.bindValue(QStringLiteral(":orden"), orden);
+        query.bindValue(QStringLiteral(":inicio"), inicio);
+        query.bindValue(QStringLiteral(":fin"), fin);
+        return query.exec();
+    }
+
 private slots:
+
+    void versionActual_esTres()
+    {
+        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 3);
+    }
 
     // ─── decidirApertura ────────────────────────────────────────────────────
 
     void decidirApertura_inexistente_debeCrear()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(false, 0, 2), EstadoApertura::Crear);
+        QCOMPARE(VersionEsquema::decidirApertura(false, 0, VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+                 EstadoApertura::Crear);
     }
 
     void decidirApertura_versionIgual_debeAbrir()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 2, 2), EstadoApertura::Abrir);
+        QCOMPARE(VersionEsquema::decidirApertura(true, VersionEsquema::VERSION_ESQUEMA_ACTUAL,
+                                                 VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+                 EstadoApertura::Abrir);
     }
 
     void decidirApertura_versionAusente_debeFallarEsquema()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 0, 2), EstadoApertura::FalloEsquema);
+        QCOMPARE(VersionEsquema::decidirApertura(true, 0, VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+                 EstadoApertura::FalloEsquema);
     }
 
     void decidirApertura_versionAnterior_debeFallarEsquema()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 1, 2), EstadoApertura::FalloEsquema);
+        // Una base v2 (la anterior a los eventos con identidad y al catálogo) no se migra.
+        QCOMPARE(VersionEsquema::decidirApertura(true, 2, VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+                 EstadoApertura::FalloEsquema);
     }
 
     void decidirApertura_versionPosterior_debeFallarEsquema()
     {
-        QCOMPARE(VersionEsquema::decidirApertura(true, 3, 2), EstadoApertura::FalloEsquema);
+        QCOMPARE(VersionEsquema::decidirApertura(true,
+                                                 VersionEsquema::VERSION_ESQUEMA_ACTUAL + 1,
+                                                 VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+                 EstadoApertura::FalloEsquema);
     }
 
     // ─── crearEsquema ───────────────────────────────────────────────────────
@@ -112,7 +193,10 @@ private slots:
         QVERIFY(tablaExiste(db, QStringLiteral("Aulas")));
         QVERIFY(tablaExiste(db, QStringLiteral("Profesores")));
         QVERIFY(tablaExiste(db, QStringLiteral("Cursos")));
+        QVERIFY(tablaExiste(db, QStringLiteral("TiposAula")));
+        QVERIFY(tablaExiste(db, QStringLiteral("Eventos")));
         QVERIFY(!tablaExiste(db, QStringLiteral("Curso_Materia")));
+        QVERIFY(!tablaExiste(db, QStringLiteral("Recesos")));
 
         // Idempotente: repetir no falla ni cambia la versión.
         QVERIFY(VersionEsquema::crearEsquema(db));
@@ -163,6 +247,177 @@ private slots:
         cerrarBase(db);
     }
 
+    void crearEsquema_columnasDeTiposEventosAulasYMaterias()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // TiposAula: nombre visible y clave normalizada almacenada.
+        QVERIFY(columnaExiste(db, QStringLiteral("TiposAula"), QStringLiteral("id")));
+        QVERIFY(columnaExiste(db, QStringLiteral("TiposAula"), QStringLiteral("nombre")));
+        QVERIFY(columnaExiste(db, QStringLiteral("TiposAula"), QStringLiteral("clave")));
+
+        // Eventos: identidad propia y orden persistente dentro de la posición.
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("id")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("nombre")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("turno")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("despues_de_slot")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("orden")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("duracion")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("inicio")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Eventos"), QStringLiteral("fin")));
+
+        // La referencia de tipo es obligatoria en aulas y materias.
+        QVERIFY(columnaExiste(db, QStringLiteral("Aulas"), QStringLiteral("id_tipo_aula")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Materias"), QStringLiteral("id_tipo_aula")));
+
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_rechazaRegistroDeRecesos()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE Recesos ("
+                                      "turno TEXT, despues_de_slot INTEGER, duracion INTEGER)")));
+
+        QString motivo;
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("Recesos"), Qt::CaseInsensitive));
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_rechazaEventosSinOrden()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE Eventos")));
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE Eventos ("
+                                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                      "nombre TEXT NOT NULL,"
+                                      "turno TEXT NOT NULL,"
+                                      "despues_de_slot INTEGER NOT NULL,"
+                                      "duracion INTEGER NOT NULL)")));
+
+        QString motivo;
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("Eventos")));
+        QVERIFY(motivo.contains(QStringLiteral("orden"))); // columna que falta
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_rechazaTiposAulaSinClave()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE TiposAula")));
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE TiposAula ("
+                                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                      "nombre TEXT NOT NULL)")));
+
+        QString motivo;
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("TiposAula")));
+        QVERIFY(motivo.contains(QStringLiteral("clave"))); // columna que falta
+        cerrarBase(db);
+    }
+
+    // ─── unicidad normalizada del catálogo de tipos ─────────────────────────
+
+    void tipoAula_claveUnica_rechazaDuplicadoAscii()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QVERIFY(insertarTipo(db, QStringLiteral("Laboratorio"), QStringLiteral("laboratorio")));
+        // Misma clave, distinta capitalización: la escritura directa se rechaza.
+        QVERIFY(!insertarTipo(db, QStringLiteral("laboratorio"), QStringLiteral("laboratorio")));
+        cerrarBase(db);
+    }
+
+    void tipoAula_claveUnica_rechazaDuplicadoAcentuado()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // «Física».toCaseFolded() == «física» == «FÍSICA».toCaseFolded().
+        QVERIFY(insertarTipo(db, QStringLiteral("Física"), QStringLiteral("física")));
+        QVERIFY(!insertarTipo(db, QStringLiteral("FÍSICA"), QStringLiteral("física")));
+        cerrarBase(db);
+    }
+
+    void tipoAula_check_rechazaNombreConEspaciosYClaveVacia()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QVERIFY(!insertarTipo(db, QStringLiteral(" Laboratorio"), QStringLiteral(" laboratorio")));
+        QVERIFY(!insertarTipo(db, QStringLiteral("Laboratorio"), QString()));
+        cerrarBase(db);
+    }
+
+    // ─── eventos: unicidad y restricciones básicas ──────────────────────────
+
+    void eventos_unicoTurnoPosicionOrden_rechazaDuplicado()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarTurno(db, QStringLiteral("Mañana")));
+
+        QVERIFY(insertarEvento(db, QStringLiteral("Receso"), QStringLiteral("Mañana"), 2, 1, 10));
+        // Mismo turno, posición y orden: rechazado por UNIQUE.
+        QVERIFY(!insertarEvento(db, QStringLiteral("Acto"), QStringLiteral("Mañana"), 2, 1, 10));
+        // Misma posición con el orden siguiente: admitido.
+        QVERIFY(insertarEvento(db, QStringLiteral("Acto"), QStringLiteral("Mañana"), 2, 2, 10));
+
+        // Cada evento conserva su identidad propia.
+        QSqlQuery ids(db);
+        QVERIFY(ids.exec(QStringLiteral("SELECT id FROM Eventos ORDER BY orden")));
+        QVERIFY(ids.next());
+        const int primero = ids.value(0).toInt();
+        QVERIFY(ids.next());
+        QVERIFY(ids.value(0).toInt() != primero);
+
+        cerrarBase(db);
+    }
+
+    void eventos_check_rechazaPosicionCeroOrdenCeroYDuracionCero()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarTurno(db, QStringLiteral("Mañana")));
+
+        QVERIFY(!insertarEvento(db, QStringLiteral("Receso"), QStringLiteral("Mañana"), 0, 1, 10));
+        QVERIFY(!insertarEvento(db, QStringLiteral("Receso"), QStringLiteral("Mañana"), 1, 0, 10));
+        QVERIFY(!insertarEvento(db, QStringLiteral("Receso"), QStringLiteral("Mañana"), 1, 1, 0));
+        cerrarBase(db);
+    }
+
+    void eventos_check_exigeElParDeHoras()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarTurno(db, QStringLiteral("Mañana")));
+
+        // Par incompleto: rechazado por CHECK((inicio IS NULL) = (fin IS NULL)).
+        QVERIFY(!insertarEventoConHoras(db, QStringLiteral("Mañana"), 1, 1,
+                                        QStringLiteral("08:00"), QVariant()));
+        QVERIFY(!insertarEventoConHoras(db, QStringLiteral("Mañana"), 1, 2,
+                                        QVariant(), QStringLiteral("08:10")));
+        // Ambos declarados y ninguno declarado: admitidos.
+        QVERIFY(insertarEventoConHoras(db, QStringLiteral("Mañana"), 1, 3,
+                                       QStringLiteral("08:00"), QStringLiteral("08:10")));
+        QVERIFY(insertarEventoConHoras(db, QStringLiteral("Mañana"), 2, 1,
+                                       QVariant(), QVariant()));
+        cerrarBase(db);
+    }
+
     void esquemaEsperado_explicaElMotivo()
     {
         QSqlDatabase db = abrirBaseEnMemoria();
@@ -202,12 +457,15 @@ private slots:
         //
         // SI ESTE TEST FALLA AL CAMBIAR EL ESQUEMA, ACTÚA ASÍ:
         //   1. Sube VERSION_ESQUEMA_ACTUAL en `backend/database/version_esquema.hpp`.
-        //   2. Registra la huella nueva en HUELLAS_CONOCIDAS más abajo.
-        //   3. Actualiza TABLAS_ESPERADAS/COLUMNAS_CURSOS de `version_esquema.cpp`.
+        //   2. Actualiza TABLAS_ESPERADAS/TABLAS_RETIRADAS y las listas COLUMNAS_* de
+        //      `version_esquema.cpp`.
+        //   3. Ejecuta el test: falla mostrando la huella real del esquema recién
+        //      creado; cópiala a HUELLAS_CONOCIDAS más abajo y repite.
         // Cambiar el DDL sin subir la versión vuelve a romper las bases de los
         // usuarios: la marca ya no las distingue y solo el catálogo las rechaza.
         static const struct { int version; const char* huella; } HUELLAS_CONOCIDAS[] = {
             { 2, "b7684333c36458b0529308f9130e2a3b105c4cd4086b5f0e470a26ca917eb882" },
+            { 3, "ba386397216ac9fb8d427ab4603c09ce3d8342cc5605dda16eecc78a02f1701b" },
         };
 
         QSqlDatabase db = abrirBaseEnMemoria();

@@ -16,16 +16,59 @@ namespace
         QStringLiteral("Materias"),     QStringLiteral("Profesor_Materia"),
         QStringLiteral("Disponibilidad_Profesor"), QStringLiteral("PlanEstudio"),
         QStringLiteral("PlanEstudio_Materia"),     QStringLiteral("Turnos"),
-        QStringLiteral("Recesos"),      QStringLiteral("Cursos")
+        QStringLiteral("TiposAula"),    QStringLiteral("Eventos"),
+        QStringLiteral("Cursos")
     };
 
     /// Tablas que NO deben existir (retiradas en el modelo nuevo).
-    const QStringList TABLAS_RETIRADAS = { QStringLiteral("Curso_Materia") };
+    const QStringList TABLAS_RETIRADAS = {
+        QStringLiteral("Curso_Materia"), QStringLiteral("Recesos")
+    };
 
     /// Columnas que debe tener la tabla `Cursos`.
     const QStringList COLUMNAS_CURSOS = {
         QStringLiteral("anio"), QStringLiteral("seccion"),
         QStringLiteral("turno"), QStringLiteral("aula")
+    };
+
+    /// Columnas que debe tener la tabla `Aulas` (el tipo es obligatorio).
+    const QStringList COLUMNAS_AULAS = {
+        QStringLiteral("nombre"), QStringLiteral("capacidad"),
+        QStringLiteral("edificio"), QStringLiteral("piso"),
+        QStringLiteral("id_tipo_aula")
+    };
+
+    /// Columnas que debe tener la tabla `Materias` (el tipo es obligatorio).
+    const QStringList COLUMNAS_MATERIAS = {
+        QStringLiteral("nombre"), QStringLiteral("requisitos"),
+        QStringLiteral("id_tipo_aula")
+    };
+
+    /// Columnas que debe tener la tabla `Eventos` (identidad y orden propios).
+    const QStringList COLUMNAS_EVENTOS = {
+        QStringLiteral("id"), QStringLiteral("nombre"), QStringLiteral("turno"),
+        QStringLiteral("despues_de_slot"), QStringLiteral("orden"),
+        QStringLiteral("duracion"), QStringLiteral("inicio"), QStringLiteral("fin")
+    };
+
+    /// Columnas que debe tener la tabla `TiposAula` (clave normalizada almacenada).
+    const QStringList COLUMNAS_TIPOS = {
+        QStringLiteral("id"), QStringLiteral("nombre"), QStringLiteral("clave")
+    };
+
+    /// Tablas del catálogo con sus columnas obligatorias.
+    struct TablaConColumnas
+    {
+        const char* tabla;
+        const QStringList* columnas;
+    };
+
+    const TablaConColumnas TABLAS_CON_COLUMNAS[] = {
+        { "Cursos", &COLUMNAS_CURSOS },
+        { "Aulas", &COLUMNAS_AULAS },
+        { "Materias", &COLUMNAS_MATERIAS },
+        { "Eventos", &COLUMNAS_EVENTOS },
+        { "TiposAula", &COLUMNAS_TIPOS },
     };
 
     bool tablaExiste(QSqlDatabase& db, const QString& tabla)
@@ -141,12 +184,22 @@ bool VersionEsquema::esquemaEsperado(QSqlDatabase& db, QString* motivo)
         if (!tablaExiste(db, tabla))
             faltantes << tabla;
 
-    QStringList columnasFaltantes;
-    if (tablaExiste(db, QStringLiteral("Cursos")))
+    // Columnas que faltan, agrupadas por tabla (el motivo nombra tabla y columna).
+    QStringList piezasColumnas;
+    for (const TablaConColumnas& entrada : TABLAS_CON_COLUMNAS)
     {
-        for (const QString& columna : COLUMNAS_CURSOS)
-            if (!columnaExiste(db, QStringLiteral("Cursos"), columna))
+        const QString tabla = QString::fromLatin1(entrada.tabla);
+        if (!tablaExiste(db, tabla))
+            continue; // ya figura como tabla faltante
+
+        QStringList columnasFaltantes;
+        for (const QString& columna : *entrada.columnas)
+            if (!columnaExiste(db, tabla, columna))
                 columnasFaltantes << columna;
+
+        if (!columnasFaltantes.isEmpty())
+            piezasColumnas << QStringLiteral("faltan las columnas «%1» de la tabla «%2»")
+                                  .arg(columnasFaltantes.join(QStringLiteral("», «")), tabla);
     }
 
     QStringList retiradasPresentes;
@@ -154,7 +207,7 @@ bool VersionEsquema::esquemaEsperado(QSqlDatabase& db, QString* motivo)
         if (tablaExiste(db, retirada))
             retiradasPresentes << retirada;
 
-    if (faltantes.isEmpty() && columnasFaltantes.isEmpty() && retiradasPresentes.isEmpty())
+    if (faltantes.isEmpty() && piezasColumnas.isEmpty() && retiradasPresentes.isEmpty())
     {
         if (motivo)
             motivo->clear();
@@ -169,9 +222,7 @@ bool VersionEsquema::esquemaEsperado(QSqlDatabase& db, QString* motivo)
             piezas << QStringLiteral("faltan las tablas «%1»")
                           .arg(faltantes.join(QStringLiteral("», «")));
 
-        if (!columnasFaltantes.isEmpty())
-            piezas << QStringLiteral("faltan las columnas «%1» de la tabla «Cursos»")
-                          .arg(columnasFaltantes.join(QStringLiteral("», «")));
+        piezas << piezasColumnas;
 
         if (!retiradasPresentes.isEmpty())
             piezas << QStringLiteral("existe la tabla retirada «%1»")

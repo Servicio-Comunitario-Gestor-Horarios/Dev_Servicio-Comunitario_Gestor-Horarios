@@ -24,13 +24,21 @@ namespace
         QSqlQuery query(db);
 
         // ── TiposAula (catálogo de tipos de aula) ──
+        // `clave` es la forma normalizada del nombre (recorte + plegado Unicode),
+        // calculada por el servicio; el índice único va sobre ella para frenar
+        // duplicados incluso en escrituras directas («Física»/«FÍSICA»).
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS TiposAula ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "nombre TEXT NOT NULL UNIQUE CHECK(length(trim(nombre)) > 0),"
+            "nombre TEXT NOT NULL CHECK(trim(nombre) = nombre AND length(nombre) > 0),"
+            "clave TEXT NOT NULL CHECK(length(clave) > 0),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
+        )) return false;
+
+        if (!ejecutar(query,
+            "CREATE UNIQUE INDEX IF NOT EXISTS TiposAula_clave ON TiposAula(clave)"
         )) return false;
 
         // ── Aulas ──
@@ -130,15 +138,23 @@ namespace
         )) return false;
 
         // ── Eventos (recesos, actos cívicos y sucesos del turno) ──
+        // Identidad propia (`id`) y orden persistente dentro de la posición; varios
+        // eventos caben tras la misma franja. Las horas son un par opcional: o
+        // ambas o ninguna (NULL), nunca cadena vacía.
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Eventos ("
-            "nombre TEXT NOT NULL,"
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "nombre TEXT NOT NULL CHECK(length(trim(nombre)) > 0),"
             "turno TEXT NOT NULL REFERENCES Turnos(nombre),"
-            "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 0),"
+            "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 1),"
+            "orden INTEGER NOT NULL CHECK(orden >= 1),"
             "duracion INTEGER NOT NULL CHECK(duracion > 0),"
             "inicio TEXT,"
             "fin TEXT,"
-            "PRIMARY KEY (turno, despues_de_slot)"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "CHECK((inicio IS NULL) = (fin IS NULL)),"
+            "UNIQUE(turno, despues_de_slot, orden)"
             ")"
         )) return false;
 
