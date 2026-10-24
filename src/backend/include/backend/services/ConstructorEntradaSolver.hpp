@@ -23,7 +23,7 @@
 #include "backend/services/ServicioPlanesEstudio.hpp"
 #include "backend/data/plan_estudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
 /// Instantánea de los dominios del cliente que forman la entrada del solver.

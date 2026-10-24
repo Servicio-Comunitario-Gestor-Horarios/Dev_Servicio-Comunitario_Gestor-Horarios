@@ -52,7 +52,7 @@ private slots:
     }
 
     void crearAula_sinTipo_falla() {
-        auto resultado = m_servicio->crearAula("Aula 101", 30);
+        auto resultado = m_servicio->crearAula("Aula 101", 30, "", "", -1);
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("tipo de aula"));
@@ -76,7 +76,7 @@ private slots:
 
         ServicioAula servicio(db.database());
 
-        auto sinTipo = servicio.crearAula("Aula 101", 30);
+        auto sinTipo = servicio.crearAula("Aula 101", 30, "", "", -1);
         QVERIFY(!sinTipo.ok);
         QVERIFY(sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
 
@@ -191,7 +191,8 @@ private slots:
         auto creada = m_servicio->crearAula("Aula Original", 20, "", "", m_idTipoAula);
         QVERIFY(creada.ok);
 
-        auto actualizada = m_servicio->actualizarAula(creada.valor.id, "Aula Renovada", 45);
+        auto actualizada = m_servicio->actualizarAula(creada.valor.id, "Aula Renovada", 45,
+                                                      "", "", -1);
 
         QVERIFY(!actualizada.ok);
         QVERIFY(actualizada.mensajeError.contains("tipo de aula"));

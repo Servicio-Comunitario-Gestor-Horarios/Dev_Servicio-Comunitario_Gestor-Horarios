@@ -3,7 +3,7 @@
 #include <QTime>
 #include <QVector>
 
-#include <backend/services/ServicioTurnosRecesos.hpp>
+#include <backend/services/ServicioTurnosEventos.hpp>
 #include <backend/services/calculo_eventos.hpp>
 
 namespace

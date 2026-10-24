@@ -19,7 +19,7 @@
 #include <QTime>
 #include <QVector>
 
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
 
 /// Minutos de franja que quedan al restar los eventos y repartir entre las franjas.
 ///

@@ -57,7 +57,7 @@ private slots:
     }
 
     void crearMateria_sinTipo_falla() {
-        auto resultado = m_servicio->crearMateria("Matemática");
+        auto resultado = m_servicio->crearMateria("Matemática", QString(), -1);
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("tipo de aula"));
@@ -81,7 +81,7 @@ private slots:
 
         ServicioMaterias servicio(db.database());
 
-        auto sinTipo = servicio.crearMateria("Matemática");
+        auto sinTipo = servicio.crearMateria("Matemática", QString(), -1);
         QVERIFY(!sinTipo.ok);
         QVERIFY(sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
 
@@ -174,7 +174,7 @@ private slots:
         QVERIFY(creada.ok);
 
         auto actualizada = m_servicio->actualizarMateria(creada.valor.id,
-                                                        "Matemática Moderna");
+                                                        "Matemática Moderna", QString(), -1);
 
         QVERIFY(!actualizada.ok);
         QVERIFY(actualizada.mensajeError.contains("tipo de aula"));

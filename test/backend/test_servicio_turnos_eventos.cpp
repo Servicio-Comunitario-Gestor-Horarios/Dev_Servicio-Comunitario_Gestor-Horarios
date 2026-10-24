@@ -8,11 +8,10 @@
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
-#include <backend/services/ServicioTurnosRecesos.hpp>
+#include <backend/services/ServicioTurnosEventos.hpp>
 
-/// Tests del servicio de turnos y eventos (RF-1, RF-2) con la compatibilidad
-/// transitoria de recesos: `RecesoDTO`/`TurnoDTO.recesos` y
-/// `agregarReceso`/`eliminarReceso` se derivan de los eventos.
+/// Tests del servicio de turnos y eventos (RF-1, RF-2): los eventos son la
+/// única representación del turno (sin capa de compatibilidad de recesos).
 class TestServicioTurnosEventos : public QObject
 {
     Q_OBJECT
@@ -27,7 +26,7 @@ private slots:
         QVERIFY(m_dbManager->initialize(m_dir->filePath("eventos.db")));
         QVERIFY(m_dbManager->isInitialized());
 
-        m_servicio.reset(new ServicioTurnosRecesos(m_dbManager->database()));
+        m_servicio.reset(new ServicioTurnosEventos(m_dbManager->database()));
 
         QVERIFY(m_servicio->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
         QVERIFY(m_servicio->crearTurno("Tarde", QTime(13, 0), QTime(18, 0), 5).ok);
@@ -550,64 +549,16 @@ private slots:
         QCOMPARE(r.valor.eventos.size(), 1);
     }
 
-    // ─── Compatibilidad transitoria: recesos derivados de eventos ───────────
-
-    void compatibilidad_agregarReceso_creaEventoDerivado()
-    {
-        auto receso = m_servicio->agregarReceso("Mañana", 2, 10);
-
-        QVERIFY(receso.ok);
-        QCOMPARE(receso.valor.despuesDeSlot, 2);
-        QCOMPARE(receso.valor.duracion, 10);
-
-        auto turno = m_servicio->obtenerTurno("Mañana").valor;
-        QCOMPARE(turno.eventos.size(), 1);
-        QCOMPARE(turno.eventos[0].nombre, QStringLiteral("Receso"));
-        QCOMPARE(turno.eventos[0].despuesDeSlot, 2);
-        QCOMPARE(turno.eventos[0].duracion, 10);
-        QCOMPARE(turno.eventos[0].orden, 1);
-
-        // La sección derivada de recesos refleja el evento.
-        QCOMPARE(turno.recesos.size(), 1);
-        QCOMPARE(turno.recesos[0].despuesDeSlot, 2);
-        QCOMPARE(turno.recesos[0].duracion, 10);
-    }
-
-    void compatibilidad_eliminarReceso_borraElEvento()
-    {
-        QVERIFY(m_servicio->agregarReceso("Mañana", 2, 10).ok);
-        QVERIFY(m_servicio->agregarEvento("Mañana", "Acto", 4, 20).ok);
-
-        QVERIFY(m_servicio->eliminarReceso("Mañana", 2));
-
-        auto turno = m_servicio->obtenerTurno("Mañana").valor;
-        QCOMPARE(turno.eventos.size(), 1);
-        QCOMPARE(turno.eventos[0].nombre, QStringLiteral("Acto"));
-        // La vista derivada es una entrada por evento: ya no queda la del receso.
-        QCOMPARE(turno.recesos.size(), 1);
-        QCOMPARE(turno.recesos[0].duracion, 20);
-    }
-
-    void compatibilidad_eliminarReceso_inexistente_falso()
-    {
-        QVERIFY(!m_servicio->eliminarReceso("Mañana", 2));
-    }
-
-    void compatibilidad_agregarReceso_validaIgualQueElEvento()
-    {
-        auto posicionCero = m_servicio->agregarReceso("Mañana", 0, 10);
-        QVERIFY(!posicionCero.ok);
-        QVERIFY(posicionCero.mensajeError.contains("posición"));
-
-        auto duracionCero = m_servicio->agregarReceso("Mañana", 2, 0);
-        QVERIFY(!duracionCero.ok);
-        QVERIFY(duracionCero.mensajeError.contains("duración"));
-    }
+    // ─── Compatibilidad retirada (T9) ─────────────────────────────────────
+    //
+    // La vista de recesos y los métodos antiguos ya no existen: los eventos son
+    // la única representación. Su cobertura vive en los tests de eventos
+    // (`agregarEvento_*`, `actualizarEvento_*`, `eliminarEvento_*`).
 
 private:
     std::unique_ptr<QTemporaryDir> m_dir;
     std::unique_ptr<DatabaseManager> m_dbManager;
-    std::unique_ptr<ServicioTurnosRecesos> m_servicio;
+    std::unique_ptr<ServicioTurnosEventos> m_servicio;
 };
 
 QTEST_MAIN(TestServicioTurnosEventos)

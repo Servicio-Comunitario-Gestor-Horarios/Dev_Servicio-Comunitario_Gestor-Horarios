@@ -165,8 +165,10 @@ void ConsolaDatos::imprimirAyuda()
   turnos    crear    "<nombre>" <inicio HH:mm> <fin HH:mm> <numSlots>
   turnos    actualizar "<nombre>" <inicio HH:mm> <fin HH:mm> <numSlots>
   turnos    eliminar "<nombre>"
-  turnos    receso-agregar  "<turno>" <despuesDeSlot> <duracion>
-  turnos    receso-eliminar "<turno>" <despuesDeSlot>
+  turnos    eventos  "<turno>"
+  turnos    evento-agregar    "<turno>" "<nombre>" <despuesDeSlot> <duracion> [inicio HH:mm] [fin HH:mm] [orden]
+  turnos    evento-actualizar <id> "<nombre>" <despuesDeSlot> <duracion> <orden> [inicio HH:mm] [fin HH:mm]
+  turnos    evento-eliminar   <id>
 
   dependientes <dominio> <id>    Lista los registros que se eliminarían en cascada.
   cascada      <dominio> <id> [--si]
@@ -527,7 +529,7 @@ namespace
 
 void ConsolaDatos::cmdTurnos(const Args& args)
 {
-    if (args.size() < 2) { imprimir(QStringLiteral("Uso: turnos listar|crear|actualizar|eliminar|eventos|evento-agregar|evento-actualizar|evento-eliminar|receso-agregar|receso-eliminar ...")); return; }
+    if (args.size() < 2) { imprimir(QStringLiteral("Uso: turnos listar|crear|actualizar|eliminar|eventos|evento-agregar|evento-actualizar|evento-eliminar ...")); return; }
     const QString accion = args[1].toLower();
 
     if (accion == QStringLiteral("listar"))
@@ -536,10 +538,10 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("turnos: %1").arg(r.valor.size()));
         for (const TurnoDTO& t : r.valor)
-            imprimir(QStringLiteral("  %1 | %2-%3 | slots=%4 | eventos=%5 | recesos=%6")
+            imprimir(QStringLiteral("  %1 | %2-%3 | slots=%4 | eventos=%5")
                          .arg(t.nombre, t.inicio.toString(QStringLiteral("HH:mm")),
                               t.fin.toString(QStringLiteral("HH:mm")))
-                         .arg(t.numSlots).arg(t.eventos.size()).arg(t.recesos.size()));
+                         .arg(t.numSlots).arg(t.eventos.size()));
         return;
     }
     if (accion == QStringLiteral("crear") || accion == QStringLiteral("actualizar"))
@@ -562,26 +564,6 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         if (args.size() < 3) { imprimir(QStringLiteral("Uso: turnos eliminar \"<nombre>\"")); return; }
         imprimir(textoBool(nucleo().eliminarTurno(args[2]),
                            QStringLiteral("turno «%1» eliminado").arg(args[2])));
-        return;
-    }
-    if (accion == QStringLiteral("receso-agregar"))
-    {
-        if (args.size() < 5) { imprimir(QStringLiteral("Uso: turnos receso-agregar \"<turno>\" <despuesDeSlot> <duracion>")); return; }
-        bool okSlot = false, okDur = false;
-        const int despuesDeSlot = args[3].toInt(&okSlot);
-        const int duracion = args[4].toInt(&okDur);
-        if (!okSlot || !okDur) { imprimir(QStringLiteral("error: parámetros inválidos")); return; }
-        imprimir(resultadoATexto(nucleo().agregarReceso(args[2], despuesDeSlot, duracion),
-                                 QStringLiteral("receso agregado al turno «%1»").arg(args[2])));
-        return;
-    }
-    if (accion == QStringLiteral("receso-eliminar"))
-    {
-        if (args.size() < 4) { imprimir(QStringLiteral("Uso: turnos receso-eliminar \"<turno>\" <despuesDeSlot>")); return; }
-        bool okSlot = false; const int despuesDeSlot = args[3].toInt(&okSlot);
-        if (!okSlot) { imprimir(QStringLiteral("error: parámetro inválido")); return; }
-        imprimir(textoBool(nucleo().eliminarReceso(args[2], despuesDeSlot),
-                           QStringLiteral("receso del turno «%1» eliminado").arg(args[2])));
         return;
     }
     // Eventos del turno: identidad propia y orden dentro de la posición.

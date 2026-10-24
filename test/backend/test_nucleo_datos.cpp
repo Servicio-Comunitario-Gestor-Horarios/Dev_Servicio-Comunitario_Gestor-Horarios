@@ -144,14 +144,15 @@ private slots:
     void aulas_sinTipo_seRechazan()
     {
         // La fachada no rellena el tipo de forma implícita: sin tipo no se crea.
-        const auto sinTipo = m_nucleo->crearAula("Aula sin tipo", 30);
+        const auto sinTipo = m_nucleo->crearAula("Aula sin tipo", 30, QString(), QString(), -1);
         QVERIFY(!sinTipo.ok);
         QVERIFY(!sinTipo.mensajeError.isEmpty());
 
         const auto creada = m_nucleo->crearAula("Aula 102", 30, QString(), QString(),
                                                 m_idTipoAula);
         QVERIFY(creada.ok);
-        QVERIFY(!m_nucleo->actualizarAula(creada.valor.id, "Aula 102", 40).ok);
+        QVERIFY(!m_nucleo->actualizarAula(creada.valor.id, "Aula 102", 40, QString(),
+                                          QString(), -1).ok);
         QCOMPARE(m_nucleo->listarAulas().valor.first().idTipoAula, m_idTipoAula);
     }
 
@@ -176,11 +177,11 @@ private slots:
 
     void materias_sinTipo_seRechazan()
     {
-        QVERIFY(!m_nucleo->crearMateria("Materia sin tipo").ok);
+        QVERIFY(!m_nucleo->crearMateria("Materia sin tipo", QString(), -1).ok);
 
         const auto creada = m_nucleo->crearMateria("Física", QString(), m_idTipoAula);
         QVERIFY(creada.ok);
-        QVERIFY(!m_nucleo->actualizarMateria(creada.valor.id, "Física").ok);
+        QVERIFY(!m_nucleo->actualizarMateria(creada.valor.id, "Física", QString(), -1).ok);
         QCOMPARE(m_nucleo->listarMaterias().valor.first().idTipoAula, m_idTipoAula);
     }
 
@@ -307,9 +308,6 @@ private slots:
         QCOMPARE(lista.size(), 1);
         QCOMPARE(lista.first().eventos.size(), 1);
         QCOMPARE(lista.first().eventos.first().nombre, QStringLiteral("Receso"));
-        // La vista de compatibilidad deriva de los eventos.
-        QCOMPARE(lista.first().recesos.size(), 1);
-        QCOMPARE(lista.first().recesos.first().duracion, 15);
 
         QVERIFY(m_nucleo->eliminarEvento(evento.valor.id));
         QCOMPARE(m_nucleo->listarTurnos().valor.first().eventos.size(), 0);
@@ -377,7 +375,7 @@ private slots:
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería de Sistemas").ok);
         QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
-        QVERIFY(m_nucleo->agregarReceso("Mañana", 2, 10).ok);
+        QVERIFY(m_nucleo->agregarEvento("Mañana", "Receso", 2, 10).ok);
         QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
         QVERIFY(m_nucleo->crearAula("Aula 1", 30, "Edificio A", QString(),
                                     m_idTipoAula).ok);

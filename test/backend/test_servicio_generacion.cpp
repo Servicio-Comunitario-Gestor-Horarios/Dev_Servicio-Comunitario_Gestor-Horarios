@@ -9,7 +9,7 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
-#include <backend/services/ServicioTurnosRecesos.hpp>
+#include <backend/services/ServicioTurnosEventos.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 
 using Estado = ResultadoGeneracion::Estado;

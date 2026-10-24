@@ -1,6 +1,6 @@
 #include "backend/services/ServicioGeneracion.hpp"
 
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/services/ValidadorEntradaSolver.hpp"
 
 #include <QCryptographicHash>

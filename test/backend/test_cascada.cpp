@@ -237,7 +237,7 @@ private slots:
         const auto dependencias =
             m_nucleo->dependientesDe(QStringLiteral("turno"), QStringLiteral("Mañana"));
 
-        QCOMPARE(contarDominio(dependencias, QStringLiteral("receso")), 1);
+        QCOMPARE(contarDominio(dependencias, QStringLiteral("evento")), 1);
         // La dependencia lleva la etiqueta del evento (su nombre).
         QVERIFY(dependencias.first().descripcion.contains(QStringLiteral("Receso")));
     }

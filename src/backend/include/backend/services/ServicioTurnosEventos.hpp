@@ -1,15 +1,12 @@
 #pragma once
 
 /**
- * @file ServicioTurnosRecesos.hpp
+ * @file ServicioTurnosEventos.hpp
  * @brief Servicio para gestión de turnos y de sus eventos (tablas Turnos y Eventos).
  *
- * Nombre temporal: la spec 009 introduce los **eventos** de turno (con identidad
- * y orden propios) y la tarea T9 renombra este servicio a `ServicioTurnosEventos`.
- * Mientras dure la transición se conservan `RecesoDTO`, `TurnoDTO::recesos` y
- * `agregarReceso`/`eliminarReceso` como **capa derivada de los eventos**, para que
- * el constructor de entrada, la huella, el seed, la consola y los tests sigan
- * compilando sin un big-bang.
+ * Los **eventos** son la única representación de lo que ocurre dentro de un
+ * turno: tienen identidad estable, nombre, posición, orden y duración (RF-1,
+ * RF-2). No existen recesos como concepto propio ni una tabla `Recesos`.
  */
 
 #include <QSqlDatabase>
@@ -36,18 +33,7 @@ struct EventoDTO {
     QTime fin;                 ///< Hora de fin (inválida = ausente)
 };
 
-/// Receso dentro de un turno: ocurre después de un slot y dura un tiempo.
-///
-/// **Compatibilidad transitoria (se retira en T9):** se deriva de los eventos
-/// del turno; no existe una tabla `Recesos`.
-struct RecesoDTO {
-    int despuesDeSlot = 0;
-    int duracion = 0;       ///< Duración en minutos
-    QTime inicio;           ///< Hora de inicio (puede ser inválida)
-    QTime fin;              ///< Hora de fin (puede ser inválida)
-};
-
-/// Representación persistente de un turno, sus eventos y los recesos derivados.
+/// Representación persistente de un turno y de sus eventos.
 struct TurnoDTO {
     QString nombre;
     QTime inicio;
@@ -56,15 +42,12 @@ struct TurnoDTO {
 
     /// Eventos del turno, ordenados por (posición, orden, id).
     QVector<EventoDTO> eventos;
-
-    /// Vista derivada de `eventos`, una entrada por evento (compatibilidad 1.0).
-    QVector<RecesoDTO> recesos;
 };
 
 /// Servicio CRUD sobre las tablas Turnos y Eventos (RF-1, RF-2).
-class ServicioTurnosRecesos {
+class ServicioTurnosEventos {
 public:
-    explicit ServicioTurnosRecesos(QSqlDatabase& db);
+    explicit ServicioTurnosEventos(QSqlDatabase& db);
 
     // ─── Turnos ───────────────────────────────────────────────────────────
 
@@ -107,16 +90,6 @@ public:
     Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno,
                                                       int numSlots) const;
 
-    // ─── Recesos (compatibilidad transitoria; se retiran en T9) ────────────
-
-    /// Alta de un evento llamado «Receso»; devuelve su vista como receso.
-    Resultado<RecesoDTO> agregarReceso(const QString& turno, int despuesDeSlot,
-                                       int duracion, const QTime& inicio = QTime(),
-                                       const QTime& fin = QTime());
-
-    /// Borra los eventos de la posición indicada (antiguo receso único).
-    bool eliminarReceso(const QString& turno, int despuesDeSlot);
-
 private:
     QSqlDatabase& m_db;
 
@@ -133,7 +106,7 @@ private:
     bool validarCoherenciaTemporal(const TurnoDTO& turno, const EventoDTO& candidato,
                                    QString& error) const;
 
-    /// Carga `dto.eventos` (ordenados por posición, orden e id) y deriva `recesos`.
+    /// Carga `dto.eventos` ordenados por posición, orden e id.
     bool cargarEventos(TurnoDTO& dto) const;
 
     TurnoDTO mapearARecord(const QSqlRecord& record) const;

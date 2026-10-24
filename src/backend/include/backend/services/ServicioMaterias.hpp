@@ -37,8 +37,8 @@ public:
     // ─── CRUD ─────────────────────────────────────────────────────────────
 
     /** @brief Crea una nueva materia. */
-    Resultado<MateriaDTO> crearMateria(const QString& nombre, const QString& requisitos = QString(),
-                                       int idTipoAula = -1);
+    Resultado<MateriaDTO> crearMateria(const QString& nombre, const QString& requisitos,
+                                       int idTipoAula);
 
     /** @brief Obtiene una materia por ID. */
     Resultado<MateriaDTO> obtenerMateria(int id) const;
@@ -48,8 +48,8 @@ public:
 
     /** @brief Actualiza los datos de una materia. */
     Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre,
-                                            const QString& requisitos = QString(),
-                                            int idTipoAula = -1);
+                                            const QString& requisitos,
+                                            int idTipoAula);
 
     /** @brief Elimina una materia por ID. */
     bool eliminarMateria(int id);

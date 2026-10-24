@@ -387,28 +387,6 @@ Resultado<QVector<EventoDTO>> NucleoDatos::eventosFueraDeRango(const QString& tu
     return m_turnos.eventosFueraDeRango(turno, numSlots);
 }
 
-// ─── Recesos (compatibilidad transitoria; se retiran en T9) ────────────────
-
-Resultado<RecesoDTO> NucleoDatos::agregarReceso(const QString& turno, int despuesDeSlot,
-                                                int duracion, const QTime& inicio,
-                                                const QTime& fin) {
-    const QString clave = QStringLiteral("%1-%2").arg(turno).arg(despuesDeSlot);
-    return conPendiente(
-        m_pendientes, QStringLiteral("receso"), clave, TipoOperacion::Alta,
-        QStringLiteral("Pendiente de guardar: receso del turno %1").arg(turno),
-        [this, turno, despuesDeSlot, duracion, inicio, fin]() {
-            return m_turnos.agregarReceso(turno, despuesDeSlot, duracion, inicio, fin);
-        });
-}
-
-bool NucleoDatos::eliminarReceso(const QString& turno, int despuesDeSlot) {
-    const QString clave = QStringLiteral("%1-%2").arg(turno).arg(despuesDeSlot);
-    return conPendienteBool(
-        m_pendientes, QStringLiteral("receso"), clave, TipoOperacion::Baja,
-        QStringLiteral("Pendiente de eliminar: receso del turno %1").arg(turno),
-        [this, turno, despuesDeSlot]() { return m_turnos.eliminarReceso(turno, despuesDeSlot); });
-}
-
 // ─── Cambios pendientes y reintento (RF-3) ────────────────────────────────
 
 GestorPendientes& NucleoDatos::gestorPendientes() {

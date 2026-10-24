@@ -1054,3 +1054,151 @@ Sin cambios en servicios de backend, consola, docs, `estado.md`, `spec.md`, `pla
   catálogo antes que aulas y materias; los turnos pueden ir antes o después de los tipos.
 - `TiposAula`/`Eventos` entran en `kTablasDominio`, así que `--solo-docentes` conserva ambos
   (verificado en `soloDocentesConservaElResto`).
+
+## T9 - Cierre: retirar compatibilidad y defaults, renombrar el servicio (2026-10-24)
+
+RF-6, RF-7, RF-8 y RF-12. Base: `af1ac8a` (T1-T8 commiteadas; suite 49/49 en verde).
+
+### Cambios
+
+- **Renombrado del servicio.** `git mv` de `src/backend/include/backend/services/
+  ServicioTurnosRecesos.hpp` → `ServicioTurnosEventos.hpp` y de `src/backend/src/services/
+  ServicioTurnosRecesos.cpp` → `ServicioTurnosEventos.cpp`; clase, constructor y definiciones
+  renombradas. Includes actualizados en `NucleoDatos.hpp`, `ConstructorEntradaSolver.hpp`,
+  `calculo_eventos.hpp`, `ServicioGeneracion.cpp` y `src/backend/CMakeLists.txt` (fuente y
+  comentario «Turnos/Eventos»).
+- **Compatibilidad retirada.** Fuera `RecesoDTO`, `TurnoDTO::recesos`,
+  `ServicioTurnosEventos::agregarReceso/eliminarReceso`, el helper `recesoDeEvento` y el bucle
+  que derivaba `recesos` en `cargarEventos`; fuera `NucleoDatos::agregarReceso/eliminarReceso`
+  (y sus claves de pendiente `"receso"`, que ya no existen). La cabecera documenta que los
+  eventos son la única representación y que no hay tabla `Recesos`.
+- **Cascada.** `dependenciasDe("turno")` emite el dominio lógico `evento` (tabla `Eventos`)
+  en lugar de `receso`; el comentario deja de hablar de nombre transitorio.
+- **Firmas finales sin defaults.** `ServicioAula::crearAula/actualizarAula`,
+  `ServicioMaterias::crearMateria/actualizarMateria` y sus réplicas en `NucleoDatos` pierden
+  todos los valores por defecto (`edificio`, `piso`, `requisitos`, `idTipoAula`) y **mantienen
+  el orden con `idTipoAula` al final**: no se reordena ningún call site. Nota: C++ no admite
+  un parámetro con default delante de uno sin default, así que retirar solo el `-1` de
+  `idTipoAula` obliga a retirar también los defaults anteriores; el servicio sigue rechazando
+  `-1` en ejecución.
+- **Consola.** Fuera los comandos `receso-agregar`/`receso-eliminar`; la ayuda ofrece
+  `turnos eventos`, `evento-agregar`, `evento-actualizar` y `evento-eliminar`; `turnos listar`
+  deja de imprimir la columna `recesos`; la línea de uso de `turnos` ya no los menciona.
+- **Tests (actualizados sin cambiar lo que prueban).** `test_servicio_turnos_eventos`: incluye
+  la cabecera nueva, instancia `ServicioTurnosEventos` y se retiran los 4 tests de la capa de
+  compatibilidad (su comportamiento ya está cubierto por los tests de eventos).
+  `test_nucleo_datos`: fuera las dos aserciones de la vista derivada; el alta de persistencia
+  usa `agregarEvento("Mañana", "Receso", 2, 10)`; los casos «sin tipo» pasan `-1` explícito.
+  `test_cascada`: la dependencia se cuenta con el dominio `evento`. `test_servicio_aula` y
+  `test_servicio_materias`: los casos «sin tipo» pasan `-1` explícito.
+  `test_calculo_eventos` y `test_servicio_generacion`: solo el include.
+
+### Rojo (tests primero)
+
+1) Tests actualizados a la API final (cabecera renombrada) con el servicio aún sin renombrar:
+
+```bash
+cmake --build --preset backend --parallel       # EXIT!=0
+# FAILED: test_calculo_eventos.cpp / test_servicio_generacion.cpp /
+#         test_servicio_turnos_eventos.cpp
+# fatal error: backend/services/ServicioTurnosEventos.hpp: No existe el fichero o el directorio
+```
+
+2) Cascada: con el renombrado hecho y `dependenciasDe("turno")` todavía con la clave `receso`,
+el test que cambia de expectativa falla (comprobación de que la aserción no es vacía):
+
+```bash
+cmake --build --preset backend --parallel --target test_backend_cascada   # EXIT=0
+ctest --test-dir build-backend --output-on-failure -R '^test_backend_cascada$'
+# FAIL!  : TestCascada::dependientesDe_turno_listaEventos() Compared values are not the same
+#   Loc: [.../test/backend/test_cascada.cpp(240)]
+# Totals: 18 passed, 1 failed ... 0% tests passed, 1 tests failed out of 1
+# (después se restaura la clave `evento` antes de la verificación final)
+```
+
+### Verde
+
+```bash
+cmake --build --preset backend --parallel                          # EXIT=0
+ctest --test-dir build-backend --output-on-failure \
+  -R 'test_servicio_turnos_eventos|test_backend_nucleo_datos|test_backend_cascada|test_constructor_entrada|test_seed_aplicacion|test_servicio_aula|test_servicio_materias'
+# 1/7 .. 7/7 Passed: nucleo_datos, cascada, constructor_entrada, servicio_turnos_eventos,
+# servicio_aula, servicio_materias, seed_aplicacion
+# 100% tests passed out of 7
+
+ctest --test-dir build-backend
+# 49/49 Test ... Passed -- 100% tests passed out of 49 (9.25 s)
+```
+
+### Greps obligatorios (sin coincidencias)
+
+```bash
+grep -rn "RecesoDTO\|agregarReceso\|eliminarReceso\|TurnoDTO.*recesos" \
+     src/backend src/seed src/consola test/backend
+# (sin salida; exit 1)
+
+grep -rn "receso-" src/consola
+# (sin salida; exit 1)
+```
+
+Comprobación real de la ayuda (extra, no exigida por el plan):
+
+```bash
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t9-ayuda.db --ayuda
+#   turnos    eventos  "<turno>"
+#   turnos    evento-agregar    "<turno>" "<nombre>" <despuesDeSlot> <duracion> [inicio HH:mm] [fin HH:mm] [orden]
+#   turnos    evento-actualizar <id> "<nombre>" <despuesDeSlot> <duracion> <orden> [inicio HH:mm] [fin HH:mm]
+#   turnos    evento-eliminar   <id>
+# grep -c "receso-" -> 0
+```
+
+### `git diff --stat`
+
+```
+ src/backend/CMakeLists.txt                         |  4 +-
+ .../backend/services/ConstructorEntradaSolver.hpp  |  2 +-
+ .../include/backend/services/NucleoDatos.hpp       | 29 +++-----
+ .../include/backend/services/ServicioAula.hpp      | 12 ++--
+ .../include/backend/services/ServicioMaterias.hpp  |  8 +--
+ ...TurnosRecesos.hpp => ServicioTurnosEventos.hpp} | 43 +++--------
+ .../include/backend/services/calculo_eventos.hpp   |  2 +-
+ src/backend/src/services/NucleoDatos.cpp           | 22 ------
+ src/backend/src/services/ServicioGeneracion.cpp    |  2 +-
+ ...TurnosRecesos.cpp => ServicioTurnosEventos.cpp} | 83 +++++-----------------
+ src/backend/src/services/cascada.cpp               |  5 +-
+ src/consola/src/ConsolaDatos.cpp                   | 32 ++-------
+ test/backend/test_calculo_eventos.cpp              |  2 +-
+ test/backend/test_cascada.cpp                      |  2 +-
+ test/backend/test_nucleo_datos.cpp                 | 14 ++--
+ test/backend/test_servicio_aula.cpp                |  7 +-
+ test/backend/test_servicio_generacion.cpp          |  2 +-
+ test/backend/test_servicio_materias.cpp            |  6 +-
+ test/backend/test_servicio_turnos_eventos.cpp      | 69 +++---------------
+ 19 files changed, 84 insertions(+), 262 deletions(-)
+```
+
+Sin cambios en `docs/`, `src/seed`, `estado.md`, `spec.md`, `plan.md` ni `AGENTS.md`.
+
+### Hallazgos / desviaciones
+
+- **C++ obliga a retirar todos los defaults de esas firmas.** El plan (§2, decisión 14) pide
+  quitar solo el `-1` de `idTipoAula` manteniendo el orden. Como `idTipoAula` va al final
+  detrás de `edificio`/`piso`/`requisitos` con default, dejarlos con default sería ilegal
+  (`-Werror` de lenguaje). Se retiran los defaults de toda la firma, con el orden intacto y sin
+  tocar el orden de argumentos de ningún call site; la firma final coincide literalmente con la
+  del plan (`crearAula(nombre, capacidad, edificio, piso, idTipoAula)`, etc.).
+- **Consumidor del renombrado fuera de alcance (frontend).** `src/frontend/src/views/
+  schedule_generation_widget.cpp:37` incluye `backend/services/ServicioTurnosRecesos.hpp`
+  (que ya no existe) y `test/frontend/test_generacion_seed.cpp:74` usa `RecesoDTO` y
+  `t.recesos`. No los he tocado: la spec 009 y la decisión N3 dejan la interfaz y sus tests
+  fuera de alcance y ya declaran que no compilan hasta que su equipo los migre. Quedan como
+  deuda explícita del frontend (y `docs/interfaz-frontend.md` de T10); si el coordinator
+  prefiere adecuar el include del widget, es una línea y no toca lógica.
+- **Se conserva `RecesoConfig` y la sección `recesos` del contrato 1.0** en
+  `ConstructorEntradaSolver`/`solver_config`/`contrato_solver`: es el puente que la 009
+  mantiene (N2) y que retira la 010; no es la capa de compatibilidad del DTO.
+- **Se conserva `Recesos` en `TABLAS_RETIRADAS`** (`version_esquema.cpp`) y los tests que
+  rechazan esa tabla o la buscan: son la guardia del esquema v3, no la entidad.
+- **Quedan menciones de «receso» solo como nombre del evento sembrado** (`«Receso»`) y en
+  comentarios del contrato 1.0; no hay ninguna referencia a la tabla como entidad en
+  backend/seed/consola.

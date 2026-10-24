@@ -77,10 +77,9 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
     }
     else if (dominio == QStringLiteral("turno"))
     {
-        // Los eventos del turno se borran antes que el turno (RF-1). El nombre
-        // lógico `receso` se conserva hasta T9; la tabla vigente es `Eventos`.
+        // Los eventos del turno se borran antes que el turno (RF-1).
         relaciones.append(relacion(
-            QStringLiteral("receso"), QStringLiteral("Eventos"),
+            QStringLiteral("evento"), QStringLiteral("Eventos"),
             QStringLiteral("turno"), QStringLiteral("id"),
             QStringLiteral("nombre"), QStringLiteral("Evento del turno"), false));
 

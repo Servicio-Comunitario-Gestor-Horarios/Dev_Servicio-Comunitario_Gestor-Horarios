@@ -37,9 +37,9 @@ public:
 
     /** @brief Crea un nuevo aula en la base de datos. */
     Resultado<AulaDTO> crearAula(const QString& nombre, int capacidad,
-                                 const QString& edificio = QString(),
-                                 const QString& piso = QString(),
-                                 int idTipoAula = -1);
+                                 const QString& edificio,
+                                 const QString& piso,
+                                 int idTipoAula);
 
     /** @brief Obtiene un aula por su ID. */
     Resultado<AulaDTO> obtenerAula(int id) const;
@@ -49,9 +49,9 @@ public:
 
     /** @brief Actualiza los datos de un aula existente. */
     Resultado<AulaDTO> actualizarAula(int id, const QString& nombre, int capacidad,
-                                      const QString& edificio = QString(),
-                                      const QString& piso = QString(),
-                                      int idTipoAula = -1);
+                                      const QString& edificio,
+                                      const QString& piso,
+                                      int idTipoAula);
 
     /** @brief Elimina un aula por su ID. */
     bool eliminarAula(int id);

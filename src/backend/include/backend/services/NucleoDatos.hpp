@@ -25,7 +25,7 @@
 #include "backend/services/ServicioPlanesEstudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
 #include "backend/services/ServicioTiposAula.hpp"
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/services/cascada.hpp"
 
 class NucleoDatos {
@@ -51,24 +51,22 @@ public:
 
     Resultado<QVector<AulaDTO>> listarAulas() const;
     Resultado<AulaDTO> crearAula(const QString& nombre, int capacidad,
-                                 const QString& edificio = QString(),
-                                 const QString& piso = QString(),
-                                 int idTipoAula = -1);
+                                 const QString& edificio, const QString& piso,
+                                 int idTipoAula);
     Resultado<AulaDTO> actualizarAula(int id, const QString& nombre, int capacidad,
-                                      const QString& edificio = QString(),
-                                      const QString& piso = QString(),
-                                      int idTipoAula = -1);
+                                      const QString& edificio, const QString& piso,
+                                      int idTipoAula);
     bool eliminarAula(int id);
 
     // ─── Materias ─────────────────────────────────────────────────────────
 
     Resultado<QVector<MateriaDTO>> listarMaterias() const;
     Resultado<MateriaDTO> crearMateria(const QString& nombre,
-                                       const QString& requisitos = QString(),
-                                       int idTipoAula = -1);
+                                       const QString& requisitos,
+                                       int idTipoAula);
     Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre,
-                                            const QString& requisitos = QString(),
-                                            int idTipoAula = -1);
+                                            const QString& requisitos,
+                                            int idTipoAula);
     bool eliminarMateria(int id);
 
     // ─── Tipos de aula ────────────────────────────────────────────────────
@@ -138,13 +136,6 @@ public:
     Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno,
                                                       int numSlots) const;
 
-    // ─── Recesos (compatibilidad transitoria; se retiran en T9) ───────────
-
-    Resultado<RecesoDTO> agregarReceso(const QString& turno, int despuesDeSlot,
-                                       int duracion, const QTime& inicio = QTime(),
-                                       const QTime& fin = QTime());
-    bool eliminarReceso(const QString& turno, int despuesDeSlot);
-
     // ─── Eliminación en cascada (RF-2) ────────────────────────────────────
 
     /**
@@ -197,7 +188,7 @@ private:
     ServicioCargaHoraria m_carga;
     ServicioComposicionPlan m_composicion;
     ServicioCursos m_cursos;
-    ServicioTurnosRecesos m_turnos;
+    ServicioTurnosEventos m_turnos;
 
     /// Estado en memoria de las escrituras fallidas pendientes de reintento.
     GestorPendientes m_pendientes;
