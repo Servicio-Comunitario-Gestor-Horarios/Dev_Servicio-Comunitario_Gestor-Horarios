@@ -138,6 +138,27 @@ namespace
     }
 } // namespace
 
+QVector<RecesoConfig> recesosDesdeEventos(const TurnoDTO& turno)
+{
+    QVector<RecesoConfig> recesos;
+    recesos.reserve(turno.eventos.size());
+    for (const EventoDTO& evento : turno.eventos)
+    {
+        RecesoConfig receso;
+        receso.turno           = turno.nombre;
+        receso.despues_de_slot = evento.despuesDeSlot;
+        receso.duracion        = evento.duracion;
+        receso.inicio          = evento.inicio.isValid()
+                                     ? evento.inicio.toString(QStringLiteral("HH:mm"))
+                                     : QString();
+        receso.fin             = evento.fin.isValid()
+                                     ? evento.fin.toString(QStringLiteral("HH:mm"))
+                                     : QString();
+        recesos.append(receso);
+    }
+    return recesos;
+}
+
 QJsonObject construirJsonEntrada(const DatosDominio& datos,
                                  const SolverConfig& parametros,
                                  const QDateTime& ahora)
@@ -175,19 +196,12 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         salida.turnos.turnos.append(turno);
     }
 
-    // Recesos: se aplanan desde los turnos del dominio.
+    // Recesos (puente 1.0): una entrada por evento del turno.
     for (const TurnoDTO& t : datos.turnos)
     {
-        for (const RecesoDTO& r : t.recesos)
-        {
-            RecesoConfig receso;
-            receso.turno           = t.nombre;
-            receso.despues_de_slot = r.despuesDeSlot;
-            receso.duracion        = r.duracion;
-            receso.inicio          = r.inicio.isValid() ? r.inicio.toString(QStringLiteral("HH:mm")) : QString();
-            receso.fin             = r.fin.isValid() ? r.fin.toString(QStringLiteral("HH:mm")) : QString();
+        const QVector<RecesoConfig> recesosDelTurno = recesosDesdeEventos(t);
+        for (const RecesoConfig& receso : recesosDelTurno)
             salida.recesos.append(receso);
-        }
     }
 
     // Cursos: de la BD (anio/seccion/turno/aula); del preset (plan/num_estudiantes).

@@ -34,8 +34,16 @@ struct DatosDominio
     QVector<MateriaDTO>  materias;
     QVector<PlanEstudio> planes;   ///< planes compuestos (materias + horas)
     QVector<CursoDTO>    cursos;
-    QVector<TurnoDTO>    turnos;   ///< incluye sus recesos
+    QVector<TurnoDTO>    turnos;   ///< incluye sus eventos
 };
+
+/**
+ * @brief Puente temporal (hasta la spec 010): una entrada por evento del turno.
+ *
+ * El contrato 1.0 no transporta el nombre ni el orden del evento; el constructor
+ * solo necesita turno, posición, duración y horario (RF-12).
+ */
+QVector<RecesoConfig> recesosDesdeEventos(const TurnoDTO& turno);
 
 /// Construye el JSON de entrada (13 secciones) de forma pura.
 ///

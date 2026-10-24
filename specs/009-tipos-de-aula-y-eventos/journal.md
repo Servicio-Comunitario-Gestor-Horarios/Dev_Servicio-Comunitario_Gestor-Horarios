@@ -614,3 +614,152 @@ sqlite3 /tmp/opencode/t5.db "INSERT INTO TiposAula (nombre, clave) VALUES ('FÍS
   memoria; el índice único de la tabla queda como red para escrituras directas.
 - La huella deja de recorrer `TurnoDTO.recesos`; al derivar de `t.eventos`, el contenido sigue
   cubierto y se evita duplicarlo. Ningún hash almacenado dependía del formato anterior.
+
+## T6 - Fachada, cascada, puente y consumidores (2026-10-24)
+
+RF-6, RF-7, RF-8, RF-12. Base: `83d7e7f` (T1-T5 commiteadas).
+
+### Cambios
+
+- `src/backend/include/backend/services/NucleoDatos.hpp` / `src/.../NucleoDatos.cpp`:
+  - Aulas y materias reciben `int idTipoAula = -1` **al final** (centinela transitorio; T9 quita el
+    defecto) y lo delegan al servicio, que lo exige en ejecución.
+  - CRUD del catálogo: `listarTiposAula`, `obtenerTipoAula`, `crearTipoAula`, `renombrarTipoAula`,
+    `eliminarTipoAula`. El borrado en uso **no** se registra como pendiente de reintento: devuelve el
+    error con los dependientes (RF-5).
+  - Turnos: `obtenerTurno`, `actualizarTurno(..., bool eliminarEventosFueraDeRango = false)`,
+    `eventosFueraDeRango`, y el CRUD de eventos por identidad (`agregarEvento`, `actualizarEvento`,
+    `eliminarEvento`) con dominio de pendiente `evento`. `agregarReceso`/`eliminarReceso` siguen como
+    compatibilidad derivada hasta T9.
+  - La fachada no consulta la tabla retirada `Recesos`: todo va por `ServicioTurnosRecesos` sobre
+    `Eventos`.
+- `src/backend/src/services/cascada.cpp`: la relación del dominio `turno` apunta a `Eventos` con
+  `columnaId = id`, etiqueta `nombre` («Evento del turno: <nombre>») y descripción «Evento del turno».
+  El nombre lógico `receso` se conserva hasta T9.
+- `src/backend/include/backend/services/ConstructorEntradaSolver.hpp` /
+  `src/backend/src/services/ConstructorEntradaSolver.cpp`: función pura
+  `recesosDesdeEventos(const TurnoDTO&)` y el constructor la usa para emitir la sección `recesos`
+  del contrato 1.0: **una entrada por evento** (turno, posición, duración, inicio y fin), sin añadir
+  tipos ni eventos al contrato.
+- `src/consola/include/consola/ConsolaDatos.hpp` / `src/consola/src/ConsolaDatos.cpp`:
+  - Comando `tipos listar|crear|renombrar|eliminar`.
+  - `aulas crear "<nombre>" <capacidad> <idTipoAula> [edificio] [piso]` y su `actualizar`;
+    `materias crear "<nombre>" <idTipoAula> [requisitos]` y su `actualizar`. Los listados muestran
+    `tipo=...`.
+  - Los comandos `evento-*` y `turnos eventos` pasan por la fachada (`NucleoDatos`); se retira el uso
+    directo de `ServicioTurnosRecesos` y su include. La ayuda sigue ofreciendo `receso-*` (T9/T10) y
+    solo se amplía con `tipos` y el tipo de aulas/materias.
+- Tests (primero en rojo):
+  - `test/backend/test_constructor_entrada.cpp`: `dominioCompleto()` construye `turno.eventos` (no
+    `recesos`) y nuevo caso `dosEventosEnLaMismaPosicion_emitenDosRecesos` (2 entradas).
+  - `test/backend/test_cascada.cpp`: tipos en el `init`; altas por la fachada con tipo;
+    `dependientesDe_turno_listaEventos` comprueba etiqueta con el nombre; nuevo
+    `eliminarConCascada_turno_borraSusEventos` (2 eventos → 0).
+  - `test/backend/test_gestor_pendientes.cpp` y `test/datos/test_contexto_base_datos.cpp`: crean un
+    tipo y lo pasan en las altas por la fachada.
+  - `test/backend/test_nucleo_datos.cpp`: `esquemaActual_contieneTablasDeDominio` exige `Eventos` y
+    `TiposAula` y la ausencia de `Recesos`; casos nuevos de tipos por la fachada, tipo obligatorio en
+    aula/materia (`aulas_sinTipo_seRechazan`, `materias_sinTipo_seRechazan`) y
+    `eventos_altaEdicionBajaPorIdentidad` (dos en la misma posición, orden 1/2, sin renumerar).
+
+### Rojo inicial
+
+Punto de partida con la base `83d7e7f`:
+
+```bash
+ctest --test-dir build-backend --output-on-failure \
+    -R 'test_backend_nucleo_datos|test_backend_cascada|test_backend_gestor_pendientes|...'
+# 4 tests failed out of 9: nucleo_datos, cascada, gestor_pendientes, datos_contexto_base_datos
+#   nucleo_datos: «Recesos» esperada, fachada sin tipo (NOT NULL id_tipo_aula) y fixture 15:00–15:15
+#   cascada: crearMateria/crearAula por la fachada sin tipo y turno → tabla retirada «Recesos»
+#   gestor_pendientes: crearAula sin tipo
+#   datos_contexto_base_datos: crearMateria sin tipo
+```
+
+Con los tests nuevos, el rojo es de compilación porque usan la API que T6 debía crear:
+
+```bash
+cmake --build --preset backend --parallel     # EXIT != 0
+# ‘class NucleoDatos’ has no member named ‘listarTiposAula’ / ‘agregarEvento’ /
+#   ‘actualizarEvento’ / ‘eliminarEvento’
+# no matching function for call to ‘NucleoDatos::crearAula(..., int&)’
+# no matching function for call to ‘NucleoDatos::crearMateria(..., int&)’
+```
+
+### Verde final
+
+```bash
+cmake --build --preset backend --parallel      # EXIT=0, 65/65 targets, 0 "error:"
+ctest --test-dir build-backend --output-on-failure \
+    -R 'test_backend_nucleo_datos|test_backend_cascada|test_backend_gestor_pendientes|test_servicio_profesor|test_composicion_plan|test_servicio_carga_horaria|test_servicio_planes_estudio|test_datos_contexto_base_datos|test_servicio_generacion|test_constructor_entrada'
+# 100% tests passed out of 10
+#   test_backend_nucleo_datos (17 casos) · test_backend_cascada (14) · test_backend_gestor_pendientes (14)
+#   test_constructor_entrada (9) · test_datos_contexto_base_datos (12)
+#   test_servicio_generacion · test_servicio_planes_estudio · test_servicio_carga_horaria
+#   test_composicion_plan · test_servicio_profesor ... Passed
+```
+
+El puente queda probado con `dosEventosEnLaMismaPosicion_emitenDosRecesos`: dos eventos en la
+posición 1 producen **dos** entradas en `recesos` (duraciones 10 y 5), no una.
+
+### Fixture de `test_nucleo_datos` (regla de T4, sin excepciones)
+
+- Franja con 13:00–18:00 y 5 franjas y evento de 15 min: `(300 − 15) / 5 = 57`; la ventana de la
+  posición 2 es **14:54–15:09**, no 15:00–15:15.
+- Primer intento: evento 14:54–15:09 y actualización a 13:00–18:15/6. El servicio **rechazó** la
+  actualización («su intervalo 14:54–15:09 no cabe en la ventana 14:40–14:55»), lo que confirma que
+  la validación sigue activa y que la ventana termina en `inicio + Σ duraciones de la posición`.
+- Fixture final: el turno se actualiza **antes** de crear el evento (14:00–19:00, 6 franjas →
+  franja 47, ventana de la posición 2 = 15:34–15:49) y el evento se declara en 15:34–15:49. Pasa por
+  la regla nueva; no se relajó la validación ni se añadieron excepciones. El caso cubre el CRUD de
+  turnos/eventos por la fachada y la vista derivada `recesos`.
+
+### Suite completa
+
+```bash
+ctest --test-dir build-backend                  # 48/49 (98 %)
+# 45 - test_seed_aplicacion (Failed)  -> Totals: 5 passed, 9 failed
+#   «No se pudo comprobar si la base ya tiene datos.» (contarFilasDeDominio sobre Recesos) y
+#   seed antiguo sin tipos/eventos: es el rojo previsto para T7/T8.
+# test_seed_perfil sigue verde.
+```
+
+### Comprobaciones manuales (consola, base nueva v3)
+
+```bash
+C=./build-backend/src/consola/gestor-horarios-consola
+$C --db /tmp/opencode/t6-consola.db --cmd 'tipos crear "Aula de estudio"'          # ok
+$C … 'tipos crear "Laboratorio"'                                                    # ok
+$C … 'tipos listar'                       # 1 | Aula de estudio ; 2 | Laboratorio
+$C … 'aulas crear "Aula 101" 30 1 "Edificio A"'                                     # ok
+$C … 'aulas listar'                       # 1 | Aula 101 | capacidad=30 | tipo=Aula de estudio
+$C … 'materias crear "Física" 2 "Matemática"'                                       # ok
+$C … 'materias listar'                    # 1 | Física | tipo=Laboratorio | requisitos=Matemática
+$C … 'turnos crear "Mañana" 07:00 12:30 8'
+$C … 'turnos evento-agregar "Mañana" "Receso" 2 10 08:20 08:30'                     # ok
+$C … 'turnos evento-agregar "Mañana" "Acto cívico" 2 5'                             # ok (orden 2)
+$C … 'turnos listar'                      # slots=8 | eventos=2 | recesos=2
+$C … 'dependientes turno "Mañana"'
+#   - [receso] Evento del turno: Receso (id=1)
+#   - [receso] Evento del turno: Acto cívico (id=2)
+$C … 'cascada turno "Mañana" --si'        # borra los 2 eventos y el turno; 'turnos listar' -> 0
+$C … 'aulas crear "Aula sin tipo" 20'     # Uso: … <idTipoAula> … (el tipo no es opcional en consola)
+$C … 'tipos eliminar 1'                   # error: en uso por el aula «Aula 101»
+```
+
+### Hallazgos / desviaciones
+
+- **Sintaxis de la consola.** El tipo entra como argumento obligatorio **antes** de los opcionales
+  (`aulas crear … <idTipoAula> [edificio] [piso]`, `materias crear … <idTipoAula> [requisitos]`), para
+  que no haya que pasar cadenas vacías; la alternativa natural (tipo al final) obligaba a rellenar
+  `edificio`/`piso` con `""`. Los `evento-*` ya no usan el servicio directamente sino la fachada.
+- **`eliminarTipoAula` no pasa por `conPendienteBool`.** Un borrado en uso es un rechazo de negocio,
+  no una escritura fallida reintentable; registrarlo como pendiente haría que el reintento volviera a
+  fallar para siempre.
+- **Nombre lógico `receso` en la cascada.** Se mantiene hasta T9 (como fijó el plan para el dominio),
+  pero la tabla es `Eventos`: `dependientesDe("turno")` lista los eventos con su nombre y
+  `eliminarConCascada("turno")` los borra antes del turno.
+- La consola `turnos actualizar` no pide confirmación para reducir franjas: usa el valor por defecto
+  `false` y muestra el error con los afectados. La confirmación explícita de RF-4 ya está probada en
+  el servicio (`test_servicio_turnos_eventos`) y su comando `--si` no forma parte de T6.
+- El frontend sigue sin compilar (fuera de la entrega); esta verificación es la del preset `backend`.

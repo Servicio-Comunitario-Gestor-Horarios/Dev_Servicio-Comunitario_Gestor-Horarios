@@ -26,14 +26,15 @@ private:
         AulaDTO aula; aula.id = 10; aula.nombre = QStringLiteral("A1"); aula.capacidad = 30;
         d.aulas = {aula};
 
-        RecesoDTO receso;
-        receso.despuesDeSlot = 1; receso.duracion = 10;
-        receso.inicio = QTime(8, 20); receso.fin = QTime(8, 30);
+        EventoDTO evento;
+        evento.id = 1; evento.nombre = QStringLiteral("Receso");
+        evento.despuesDeSlot = 1; evento.orden = 1; evento.duracion = 10;
+        evento.inicio = QTime(8, 20); evento.fin = QTime(8, 30);
         TurnoDTO turno;
         turno.nombre = QStringLiteral("manana");
         turno.inicio = QTime(7, 0); turno.fin = QTime(12, 0);
         turno.numSlots = 6;
-        turno.recesos = {receso};
+        turno.eventos = {evento};
         d.turnos = {turno};
 
         CursoDTO curso;
@@ -140,6 +141,27 @@ private slots:
         QCOMPARE(recesos.size(), 1);
         QCOMPARE(recesos[0].toObject()["turno"].toString(), QStringLiteral("manana"));
         QCOMPARE(recesos[0].toObject()["despues_de_slot"].toInt(), 1);
+    }
+
+    /// RF-12: el puente emite una entrada por evento, aunque compartan posición.
+    void dosEventosEnLaMismaPosicion_emitenDosRecesos()
+    {
+        DatosDominio datos = dominioCompleto();
+        EventoDTO acto;
+        acto.id = 2; acto.nombre = QStringLiteral("Acto cívico");
+        acto.despuesDeSlot = 1; acto.orden = 2; acto.duracion = 5;
+        datos.turnos[0].eventos.append(acto);
+
+        const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 0, 0));
+        const QJsonObject json = construirJsonEntrada(datos, parametros(), ahora);
+
+        const QJsonArray recesos = json["recesos"].toArray();
+        QCOMPARE(recesos.size(), 2);
+        QCOMPARE(recesos[0].toObject()["turno"].toString(), QStringLiteral("manana"));
+        QCOMPARE(recesos[0].toObject()["despues_de_slot"].toInt(), 1);
+        QCOMPARE(recesos[0].toObject()["duracion"].toInt(), 10);
+        QCOMPARE(recesos[1].toObject()["despues_de_slot"].toInt(), 1);
+        QCOMPARE(recesos[1].toObject()["duracion"].toInt(), 5);
     }
 
     void cursosYprofesoresReferencianElPoolDeMaterias()

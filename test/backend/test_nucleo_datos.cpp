@@ -21,6 +21,7 @@ private:
     std::unique_ptr<DatabaseManager> m_dbManager;
     std::unique_ptr<NucleoDatos> m_nucleo;
     QString m_ruta;
+    int m_idTipoAula = -1;
 
     /// Abre una conexión a la base de prueba y construye el núcleo de datos.
     void abrirBase()
@@ -56,6 +57,10 @@ private slots:
         QVERIFY(m_dir->isValid());
         m_ruta = m_dir->filePath("nucleo.db");
         abrirBase();
+
+        const auto tipo = m_nucleo->crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY2(tipo.ok, qPrintable(tipo.mensajeError));
+        m_idTipoAula = tipo.valor.id;
     }
 
     void cleanup()
@@ -64,9 +69,9 @@ private slots:
         m_dir.reset();
     }
 
-    // ─── Esquema v2 ─────────────────────────────────────────────────────────
+    // ─── Esquema actual ─────────────────────────────────────────────────────
 
-    void esquemaV2_contieneTablasDeDominio()
+    void esquemaActual_contieneTablasDeDominio()
     {
         QCOMPARE(VersionEsquema::leerVersionEsquema(m_dbManager->database()),
                  VersionEsquema::VERSION_ESQUEMA_ACTUAL);
@@ -74,7 +79,9 @@ private slots:
         QVERIFY(tablaExiste(QStringLiteral("Cursos")));
         QVERIFY(!tablaExiste(QStringLiteral("Curso_Materia"))); // retirada (RF-5)
         QVERIFY(tablaExiste(QStringLiteral("Turnos")));
-        QVERIFY(tablaExiste(QStringLiteral("Recesos")));
+        QVERIFY(tablaExiste(QStringLiteral("Eventos")));
+        QVERIFY(tablaExiste(QStringLiteral("TiposAula")));
+        QVERIFY(!tablaExiste(QStringLiteral("Recesos")));       // retirada (RF-9)
     }
 
     // ─── Contrato de lectura: error vs vacío (RF-3) ─────────────────────────
@@ -118,12 +125,15 @@ private slots:
 
     void aulas_altaModificacionBaja()
     {
-        auto creado = m_nucleo->crearAula("Aula 101", 30, "Edificio A", "Piso 1");
+        auto creado = m_nucleo->crearAula("Aula 101", 30, "Edificio A", "Piso 1",
+                                          m_idTipoAula);
         QVERIFY(creado.ok);
+        QCOMPARE(creado.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(creado.valor.tipoAula, QStringLiteral("Aula de estudio"));
         QCOMPARE(m_nucleo->listarAulas().valor.size(), 1);
 
         auto actualizado = m_nucleo->actualizarAula(creado.valor.id, "Aula 101", 45,
-                                                    "Edificio B", "Piso 2");
+                                                    "Edificio B", "Piso 2", m_idTipoAula);
         QVERIFY(actualizado.ok);
         QCOMPARE(m_nucleo->listarAulas().valor.first().capacidad, 45);
 
@@ -131,20 +141,47 @@ private slots:
         QVERIFY(m_nucleo->listarAulas().valor.isEmpty());
     }
 
+    void aulas_sinTipo_seRechazan()
+    {
+        // La fachada no rellena el tipo de forma implícita: sin tipo no se crea.
+        const auto sinTipo = m_nucleo->crearAula("Aula sin tipo", 30);
+        QVERIFY(!sinTipo.ok);
+        QVERIFY(!sinTipo.mensajeError.isEmpty());
+
+        const auto creada = m_nucleo->crearAula("Aula 102", 30, QString(), QString(),
+                                                m_idTipoAula);
+        QVERIFY(creada.ok);
+        QVERIFY(!m_nucleo->actualizarAula(creada.valor.id, "Aula 102", 40).ok);
+        QCOMPARE(m_nucleo->listarAulas().valor.first().idTipoAula, m_idTipoAula);
+    }
+
     // ─── Materias ───────────────────────────────────────────────────────────
 
     void materias_altaModificacionBaja()
     {
-        auto creado = m_nucleo->crearMateria("Matemática");
+        auto creado = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(creado.ok);
+        QCOMPARE(creado.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(creado.valor.tipoAula, QStringLiteral("Aula de estudio"));
         QCOMPARE(m_nucleo->listarMaterias().valor.size(), 1);
 
-        auto actualizado = m_nucleo->actualizarMateria(creado.valor.id, "Matemática II");
+        auto actualizado = m_nucleo->actualizarMateria(creado.valor.id, "Matemática II",
+                                                       QString(), m_idTipoAula);
         QVERIFY(actualizado.ok);
         QCOMPARE(m_nucleo->listarMaterias().valor.first().nombre, QStringLiteral("Matemática II"));
 
         QVERIFY(m_nucleo->eliminarMateria(creado.valor.id));
         QVERIFY(m_nucleo->listarMaterias().valor.isEmpty());
+    }
+
+    void materias_sinTipo_seRechazan()
+    {
+        QVERIFY(!m_nucleo->crearMateria("Materia sin tipo").ok);
+
+        const auto creada = m_nucleo->crearMateria("Física", QString(), m_idTipoAula);
+        QVERIFY(creada.ok);
+        QVERIFY(!m_nucleo->actualizarMateria(creada.valor.id, "Física").ok);
+        QCOMPARE(m_nucleo->listarMaterias().valor.first().idTipoAula, m_idTipoAula);
     }
 
     // ─── Planes de estudio ──────────────────────────────────────────────────
@@ -170,7 +207,7 @@ private slots:
     void cursos_altaModificacionBaja()
     {
         QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
-        auto aula = m_nucleo->crearAula("Aula 1", 30);
+        auto aula = m_nucleo->crearAula("Aula 1", 30, QString(), QString(), m_idTipoAula);
         QVERIFY(aula.ok);
 
         auto creado = m_nucleo->crearCurso(1, "A", "Mañana", aula.valor.id);
@@ -196,7 +233,7 @@ private slots:
 
     void cursos_validacionIdentidadYAula()
     {
-        auto aula = m_nucleo->crearAula("Aula 1", 30);
+        auto aula = m_nucleo->crearAula("Aula 1", 30, QString(), QString(), m_idTipoAula);
         QVERIFY(aula.ok);
 
         // Alta valida.
@@ -241,34 +278,97 @@ private slots:
         QVERIFY(!m_nucleo->actualizarCurso(creado.valor.id, 4, "A", QString(), 99999).ok);
     }
 
-    // ─── Turnos y recesos ───────────────────────────────────────────────────
+    // ─── Turnos y eventos ───────────────────────────────────────────────────
 
-    void turnosRecesos_altaModificacionBaja()
+    /// Fixture corregida a la rejilla de T4: con 13:00–18:00 y 5 franjas, un
+    /// evento de 15 min deja franja = (300 − 15)/5 = 57, así que su ventana en
+    /// la posición 2 es 14:54–15:09 (no 15:00–15:15). El turno se actualiza
+    /// antes de crear el evento (14:00–19:00 con 6 franjas deja franja = 47 y
+    /// ventana 15:34–15:49) y el evento se declara dentro de su ventana real,
+    /// sin relajar la validación.
+    void turnosEventos_altaModificacionBaja()
     {
         auto turno = m_nucleo->crearTurno("Tarde", QTime(13, 0), QTime(18, 0), 5);
         QVERIFY(turno.ok);
         QCOMPARE(turno.valor.nombre, QStringLiteral("Tarde"));
         QCOMPARE(turno.valor.numSlots, 5);
 
-        auto receso = m_nucleo->agregarReceso("Tarde", 2, 15, QTime(15, 0), QTime(15, 15));
-        QVERIFY(receso.ok);
-        QCOMPARE(receso.valor.despuesDeSlot, 2);
-        QCOMPARE(receso.valor.duracion, 15);
+        auto actualizado = m_nucleo->actualizarTurno("Tarde", QTime(14, 0), QTime(19, 0), 6);
+        QVERIFY2(actualizado.ok, qPrintable(actualizado.mensajeError));
+        QCOMPARE(actualizado.valor.numSlots, 6);
+
+        auto evento = m_nucleo->agregarEvento("Tarde", "Receso", 2, 15,
+                                              QTime(15, 34), QTime(15, 49));
+        QVERIFY2(evento.ok, qPrintable(evento.mensajeError));
+        QCOMPARE(evento.valor.despuesDeSlot, 2);
+        QCOMPARE(evento.valor.duracion, 15);
 
         auto lista = m_nucleo->listarTurnos().valor;
         QCOMPARE(lista.size(), 1);
+        QCOMPARE(lista.first().eventos.size(), 1);
+        QCOMPARE(lista.first().eventos.first().nombre, QStringLiteral("Receso"));
+        // La vista de compatibilidad deriva de los eventos.
         QCOMPARE(lista.first().recesos.size(), 1);
         QCOMPARE(lista.first().recesos.first().duracion, 15);
 
-        auto actualizado = m_nucleo->actualizarTurno("Tarde", QTime(14, 0), QTime(19, 0), 6);
-        QVERIFY(actualizado.ok);
-        QCOMPARE(actualizado.valor.numSlots, 6);
-
-        QVERIFY(m_nucleo->eliminarReceso("Tarde", 2));
-        QCOMPARE(m_nucleo->listarTurnos().valor.first().recesos.size(), 0);
+        QVERIFY(m_nucleo->eliminarEvento(evento.valor.id));
+        QCOMPARE(m_nucleo->listarTurnos().valor.first().eventos.size(), 0);
 
         QVERIFY(m_nucleo->eliminarTurno("Tarde"));
         QVERIFY(m_nucleo->listarTurnos().valor.isEmpty());
+    }
+
+    // ─── Catálogo de tipos de aula ──────────────────────────────────────────
+
+    void tiposAula_altaListadoRenombradoBaja()
+    {
+        QCOMPARE(m_nucleo->listarTiposAula().valor.size(), 1);   // el del init
+
+        const auto creado = m_nucleo->crearTipoAula("Laboratorio");
+        QVERIFY(creado.ok);
+        QCOMPARE(m_nucleo->listarTiposAula().valor.size(), 2);
+
+        const auto obtenido = m_nucleo->obtenerTipoAula(creado.valor.id);
+        QVERIFY(obtenido.ok);
+        QCOMPARE(obtenido.valor.nombre, QStringLiteral("Laboratorio"));
+
+        const auto renombrado = m_nucleo->renombrarTipoAula(creado.valor.id, "Taller");
+        QVERIFY(renombrado.ok);
+        QCOMPARE(m_nucleo->obtenerTipoAula(creado.valor.id).valor.nombre,
+                 QStringLiteral("Taller"));
+
+        QVERIFY(m_nucleo->eliminarTipoAula(creado.valor.id).ok);
+        QCOMPARE(m_nucleo->listarTiposAula().valor.size(), 1);
+    }
+
+    // ─── Eventos por identidad ──────────────────────────────────────────────
+
+    void eventos_altaEdicionBajaPorIdentidad()
+    {
+        QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
+
+        const auto primero = m_nucleo->agregarEvento("Mañana", "Receso", 2, 10);
+        const auto segundo = m_nucleo->agregarEvento("Mañana", "Acto cívico", 2, 5);
+        QVERIFY(primero.ok);
+        QVERIFY(segundo.ok);
+        QCOMPARE(primero.valor.orden, 1);
+        QCOMPARE(segundo.valor.orden, 2);
+
+        auto eventos = m_nucleo->listarTurnos().valor.first().eventos;
+        QCOMPARE(eventos.size(), 2);
+        QCOMPARE(eventos[0].id, primero.valor.id);
+        QCOMPARE(eventos[1].id, segundo.valor.id);
+
+        const auto editado = m_nucleo->actualizarEvento(segundo.valor.id, "Izada",
+                                                        2, 5, QTime(), QTime(), 2);
+        QVERIFY(editado.ok);
+        QCOMPARE(m_nucleo->listarTurnos().valor.first().eventos[1].nombre,
+                 QStringLiteral("Izada"));
+
+        QVERIFY(m_nucleo->eliminarEvento(primero.valor.id));
+        eventos = m_nucleo->listarTurnos().valor.first().eventos;
+        QCOMPARE(eventos.size(), 1);
+        QCOMPARE(eventos.first().orden, 2);   // no se renumera
     }
 
     // ─── Persistencia tras reapertura ───────────────────────────────────────
@@ -279,8 +379,9 @@ private slots:
         QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
         QVERIFY(m_nucleo->agregarReceso("Mañana", 2, 10).ok);
         QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
-        QVERIFY(m_nucleo->crearAula("Aula 1", 30, "Edificio A").ok);
-        auto materia = m_nucleo->crearMateria("Matemática");
+        QVERIFY(m_nucleo->crearAula("Aula 1", 30, "Edificio A", QString(),
+                                    m_idTipoAula).ok);
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         auto curso = m_nucleo->crearCurso(1, "A", "Mañana", -1);
         QVERIFY(curso.ok);
@@ -295,7 +396,7 @@ private slots:
         QCOMPARE(m_nucleo->listarPlanes().valor.size(), 1);
         QCOMPARE(m_nucleo->listarCursos().valor.size(), 1);
         QCOMPARE(m_nucleo->listarTurnos().valor.size(), 1);
-        QCOMPARE(m_nucleo->listarTurnos().valor.first().recesos.size(), 1);
+        QCOMPARE(m_nucleo->listarTurnos().valor.first().eventos.size(), 1);
 
         auto cursos = m_nucleo->listarCursos().valor;
         QCOMPARE(cursos.first().anio, 1);

@@ -1,7 +1,6 @@
 #include "consola/ConsolaDatos.hpp"
 
 #include "backend/services/NucleoDatos.hpp"
-#include "backend/services/ServicioTurnosRecesos.hpp"
 #include "datos/ContextoBaseDatos.hpp"
 
 #include <QTextStream>
@@ -81,6 +80,7 @@ void ConsolaDatos::registrarComandos()
     m_comandos[QStringLiteral("docentes")]     = [this](const Args& a) { cmdDocentes(a); };
     m_comandos[QStringLiteral("aulas")]        = [this](const Args& a) { cmdAulas(a); };
     m_comandos[QStringLiteral("materias")]     = [this](const Args& a) { cmdMaterias(a); };
+    m_comandos[QStringLiteral("tipos")]        = [this](const Args& a) { cmdTipos(a); };
     m_comandos[QStringLiteral("planes")]       = [this](const Args& a) { cmdPlanes(a); };
     m_comandos[QStringLiteral("cursos")]       = [this](const Args& a) { cmdCursos(a); };
     m_comandos[QStringLiteral("turnos")]       = [this](const Args& a) { cmdTurnos(a); };
@@ -137,14 +137,19 @@ void ConsolaDatos::imprimirAyuda()
   docentes  eliminar <id>
 
   aulas     listar
-  aulas     crear    "<nombre>" <capacidad> [edificio] [piso]
-  aulas     actualizar <id> "<nombre>" <capacidad> [edificio] [piso]
+  aulas     crear    "<nombre>" <capacidad> <idTipoAula> ["<edificio>"] ["<piso>"]
+  aulas     actualizar <id> "<nombre>" <capacidad> <idTipoAula> ["<edificio>"] ["<piso>"]
   aulas     eliminar <id>
 
   materias  listar
-  materias  crear    "<nombre>" ["<requisitos>"]
-  materias  actualizar <id> "<nombre>" ["<requisitos>"]
+  materias  crear    "<nombre>" <idTipoAula> ["<requisitos>"]
+  materias  actualizar <id> "<nombre>" <idTipoAula> ["<requisitos>"]
   materias  eliminar <id>
+
+  tipos     listar
+  tipos     crear    "<nombre>"
+  tipos     renombrar <id> "<nombre>"
+  tipos     eliminar <id>
 
   planes    listar
   planes    crear    <codigo> "<nombre>" ["<descripcion>"]
@@ -258,33 +263,39 @@ void ConsolaDatos::cmdAulas(const Args& args)
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("aulas: %1").arg(r.valor.size()));
         for (const AulaDTO& a : r.valor)
-            imprimir(QStringLiteral("  %1 | %2 | capacidad=%3 | %4 %5")
+            imprimir(QStringLiteral("  %1 | %2 | capacidad=%3 | tipo=%4 | %5 %6")
                          .arg(a.id).arg(a.nombre).arg(a.capacidad)
-                         .arg(a.edificio.isEmpty() ? QStringLiteral("-") : a.edificio,
+                         .arg(a.tipoAula.isEmpty() ? QStringLiteral("-") : a.tipoAula,
+                              a.edificio.isEmpty() ? QStringLiteral("-") : a.edificio,
                               a.piso.isEmpty() ? QStringLiteral("") : a.piso));
         return;
     }
     if (accion == QStringLiteral("crear"))
     {
-        if (args.size() < 4) { imprimir(QStringLiteral("Uso: aulas crear \"<nombre>\" <capacidad> [edificio] [piso]")); return; }
-        bool okCap = false; const int capacidad = args[3].toInt(&okCap);
-        if (!okCap) { imprimir(QStringLiteral("error: capacidad inválida")); return; }
-        const QString edificio = args.size() > 4 ? args[4] : QString();
-        const QString piso = args.size() > 5 ? args[5] : QString();
-        imprimir(resultadoATexto(nucleo().crearAula(args[2], capacidad, edificio, piso),
+        if (args.size() < 5) { imprimir(QStringLiteral("Uso: aulas crear \"<nombre>\" <capacidad> <idTipoAula> [edificio] [piso]")); return; }
+        bool okCap = false, okTipo = false;
+        const int capacidad = args[3].toInt(&okCap);
+        const int idTipoAula = args[4].toInt(&okTipo);
+        if (!okCap || !okTipo) { imprimir(QStringLiteral("error: capacidad o tipo de aula inválidos")); return; }
+        const QString edificio = args.size() > 5 ? args[5] : QString();
+        const QString piso = args.size() > 6 ? args[6] : QString();
+        imprimir(resultadoATexto(nucleo().crearAula(args[2], capacidad, edificio, piso,
+                                                     idTipoAula),
                                  QStringLiteral("aula «%1» creada").arg(args[2])));
         return;
     }
     if (accion == QStringLiteral("actualizar"))
     {
-        if (args.size() < 5) { imprimir(QStringLiteral("Uso: aulas actualizar <id> \"<nombre>\" <capacidad> [edificio] [piso]")); return; }
-        bool okId = false, okCap = false;
+        if (args.size() < 6) { imprimir(QStringLiteral("Uso: aulas actualizar <id> \"<nombre>\" <capacidad> <idTipoAula> [edificio] [piso]")); return; }
+        bool okId = false, okCap = false, okTipo = false;
         const int id = args[2].toInt(&okId);
         const int capacidad = args[4].toInt(&okCap);
-        if (!okId || !okCap) { imprimir(QStringLiteral("error: id o capacidad inválidos")); return; }
-        const QString edificio = args.size() > 5 ? args[5] : QString();
-        const QString piso = args.size() > 6 ? args[6] : QString();
-        imprimir(resultadoATexto(nucleo().actualizarAula(id, args[3], capacidad, edificio, piso),
+        const int idTipoAula = args[5].toInt(&okTipo);
+        if (!okId || !okCap || !okTipo) { imprimir(QStringLiteral("error: id, capacidad o tipo de aula inválidos")); return; }
+        const QString edificio = args.size() > 6 ? args[6] : QString();
+        const QString piso = args.size() > 7 ? args[7] : QString();
+        imprimir(resultadoATexto(nucleo().actualizarAula(id, args[3], capacidad, edificio, piso,
+                                                          idTipoAula),
                                  QStringLiteral("aula %1 actualizada").arg(id)));
         return;
     }
@@ -312,26 +323,31 @@ void ConsolaDatos::cmdMaterias(const Args& args)
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("materias: %1").arg(r.valor.size()));
         for (const MateriaDTO& m : r.valor)
-            imprimir(QStringLiteral("  %1 | %2 | requisitos=%3")
+            imprimir(QStringLiteral("  %1 | %2 | tipo=%3 | requisitos=%4")
                          .arg(m.id).arg(m.nombre,
+                                        m.tipoAula.isEmpty() ? QStringLiteral("-") : m.tipoAula,
                                         m.requisitos.isEmpty() ? QStringLiteral("-") : m.requisitos));
         return;
     }
     if (accion == QStringLiteral("crear"))
     {
-        if (args.size() < 3) { imprimir(QStringLiteral("Uso: materias crear \"<nombre>\" [\"<requisitos>\"]")); return; }
-        const QString requisitos = args.size() > 3 ? args[3] : QString();
-        imprimir(resultadoATexto(nucleo().crearMateria(args[2], requisitos),
+        if (args.size() < 4) { imprimir(QStringLiteral("Uso: materias crear \"<nombre>\" <idTipoAula> [\"<requisitos>\"]")); return; }
+        bool okTipo = false; const int idTipoAula = args[3].toInt(&okTipo);
+        if (!okTipo) { imprimir(QStringLiteral("error: tipo de aula inválido")); return; }
+        const QString requisitos = args.size() > 4 ? args[4] : QString();
+        imprimir(resultadoATexto(nucleo().crearMateria(args[2], requisitos, idTipoAula),
                                  QStringLiteral("materia «%1» creada").arg(args[2])));
         return;
     }
     if (accion == QStringLiteral("actualizar"))
     {
-        if (args.size() < 4) { imprimir(QStringLiteral("Uso: materias actualizar <id> \"<nombre>\" [\"<requisitos>\"]")); return; }
-        bool okId = false; const int id = args[2].toInt(&okId);
-        if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
-        const QString requisitos = args.size() > 4 ? args[4] : QString();
-        imprimir(resultadoATexto(nucleo().actualizarMateria(id, args[3], requisitos),
+        if (args.size() < 5) { imprimir(QStringLiteral("Uso: materias actualizar <id> \"<nombre>\" <idTipoAula> [\"<requisitos>\"]")); return; }
+        bool okId = false, okTipo = false;
+        const int id = args[2].toInt(&okId);
+        const int idTipoAula = args[4].toInt(&okTipo);
+        if (!okId || !okTipo) { imprimir(QStringLiteral("error: id o tipo de aula inválidos")); return; }
+        const QString requisitos = args.size() > 5 ? args[5] : QString();
+        imprimir(resultadoATexto(nucleo().actualizarMateria(id, args[3], requisitos, idTipoAula),
                                  QStringLiteral("materia %1 actualizada").arg(id)));
         return;
     }
@@ -341,6 +357,50 @@ void ConsolaDatos::cmdMaterias(const Args& args)
         bool okId = false; const int id = args[2].toInt(&okId);
         if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
         imprimir(textoBool(nucleo().eliminarMateria(id), QStringLiteral("materia %1 eliminada").arg(id)));
+        return;
+    }
+    imprimir(QStringLiteral("acción desconocida: %1").arg(accion));
+}
+
+// ─── Tipos de aula ─────────────────────────────────────────────────────────
+
+void ConsolaDatos::cmdTipos(const Args& args)
+{
+    if (args.size() < 2) { imprimir(QStringLiteral("Uso: tipos listar|crear|renombrar|eliminar ...")); return; }
+    const QString accion = args[1].toLower();
+
+    if (accion == QStringLiteral("listar"))
+    {
+        const auto r = nucleo().listarTiposAula();
+        if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
+        imprimir(QStringLiteral("tipos de aula: %1").arg(r.valor.size()));
+        for (const TipoAulaDTO& t : r.valor)
+            imprimir(QStringLiteral("  %1 | %2").arg(t.id).arg(t.nombre));
+        return;
+    }
+    if (accion == QStringLiteral("crear"))
+    {
+        if (args.size() < 3) { imprimir(QStringLiteral("Uso: tipos crear \"<nombre>\"")); return; }
+        imprimir(resultadoATexto(nucleo().crearTipoAula(args[2]),
+                                 QStringLiteral("tipo de aula «%1» creado").arg(args[2])));
+        return;
+    }
+    if (accion == QStringLiteral("renombrar"))
+    {
+        if (args.size() < 4) { imprimir(QStringLiteral("Uso: tipos renombrar <id> \"<nombre>\"")); return; }
+        bool okId = false; const int id = args[2].toInt(&okId);
+        if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
+        imprimir(resultadoATexto(nucleo().renombrarTipoAula(id, args[3]),
+                                 QStringLiteral("tipo de aula %1 renombrado").arg(id)));
+        return;
+    }
+    if (accion == QStringLiteral("eliminar"))
+    {
+        if (args.size() < 3) { imprimir(QStringLiteral("Uso: tipos eliminar <id>")); return; }
+        bool okId = false; const int id = args[2].toInt(&okId);
+        if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
+        imprimir(resultadoATexto(nucleo().eliminarTipoAula(id),
+                                 QStringLiteral("tipo de aula %1 eliminado").arg(id)));
         return;
     }
     imprimir(QStringLiteral("acción desconocida: %1").arg(accion));
@@ -524,13 +584,11 @@ void ConsolaDatos::cmdTurnos(const Args& args)
                            QStringLiteral("receso del turno «%1» eliminado").arg(args[2])));
         return;
     }
-    // Eventos del turno: identidad propia y orden dentro de la posición. Hasta T6
-    // el CRUD no está en la fachada, así que la consola usa el servicio de turnos.
-    ServicioTurnosRecesos servicio(m_contexto.conexion());
+    // Eventos del turno: identidad propia y orden dentro de la posición.
     if (accion == QStringLiteral("eventos"))
     {
         if (args.size() < 3) { imprimir(QStringLiteral("Uso: turnos eventos \"<turno>\"")); return; }
-        const auto r = servicio.obtenerTurno(args[2]);
+        const auto r = nucleo().obtenerTurno(args[2]);
         if (!r.ok) { imprimir(QStringLiteral("error: %1").arg(r.mensajeError)); return; }
         imprimir(QStringLiteral("eventos de «%1»: %2").arg(args[2]).arg(r.valor.eventos.size()));
         for (const EventoDTO& e : r.valor.eventos)
@@ -554,7 +612,7 @@ void ConsolaDatos::cmdTurnos(const Args& args)
             bool okOrden = false; orden = args[8].toInt(&okOrden);
             if (!okOrden) { imprimir(QStringLiteral("error: orden inválido")); return; }
         }
-        imprimir(resultadoATexto(servicio.agregarEvento(args[2], args[3], despuesDeSlot,
+        imprimir(resultadoATexto(nucleo().agregarEvento(args[2], args[3], despuesDeSlot,
                                                         duracion, inicio, fin, orden),
                                  QStringLiteral("evento «%1» agregado al turno «%2»")
                                      .arg(args[3], args[2])));
@@ -572,7 +630,7 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         QTime inicio, fin;
         if (args.size() > 7) inicio = QTime::fromString(args[7], QStringLiteral("HH:mm"));
         if (args.size() > 8) fin = QTime::fromString(args[8], QStringLiteral("HH:mm"));
-        imprimir(resultadoATexto(servicio.actualizarEvento(id, args[3], despuesDeSlot,
+        imprimir(resultadoATexto(nucleo().actualizarEvento(id, args[3], despuesDeSlot,
                                                            duracion, inicio, fin, orden),
                                  QStringLiteral("evento %1 actualizado").arg(id)));
         return;
@@ -582,7 +640,7 @@ void ConsolaDatos::cmdTurnos(const Args& args)
         if (args.size() < 3) { imprimir(QStringLiteral("Uso: turnos evento-eliminar <id>")); return; }
         bool okId = false; const int id = args[2].toInt(&okId);
         if (!okId) { imprimir(QStringLiteral("error: id inválido")); return; }
-        imprimir(textoBool(servicio.eliminarEvento(id),
+        imprimir(textoBool(nucleo().eliminarEvento(id),
                            QStringLiteral("evento %1 eliminado").arg(id)));
         return;
     }
