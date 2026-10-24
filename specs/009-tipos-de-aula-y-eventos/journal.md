@@ -1347,7 +1347,7 @@ código.
 
 Base `221e563`, árbol limpio, 49/49 en verde. Alcance: mensajes de rechazo con el valor recibido
 (hallazgo 1) y la guía `docs/guias/datos-prueba-frontend.md` (hallazgo 2). Sin tocar frontend,
-specs, `plan.md` ni `estado.md`; sin commit.
+specs, `plan.md` ni `estado.md`; la corrección se commiteó en `1835399`.
 
 ### Tests primero (rojo)
 
@@ -1451,3 +1451,22 @@ Sin cambios en `src/frontend`, `specs/009-*/tasks.md`, `plan.md` ni `estado.md`.
 - **«Orden» con dos orígenes:** `validarEvento` valida el rango del orden (0/negativo) y el alta
   valida el duplicado en la misma posición; ambos mensajes identifican ahora el valor (rango
   recibido / «orden 1»).
+
+## Cierre (2026-10-24)
+
+- **Veredicto:** APROBADO (2026-10-24) tras la re-validación; los 12 RF y los RNF conformes. La
+  corrección final de validación es `1835399`.
+- **Commits de las tareas (`00aed20..HEAD`):**
+  - **T1:** `8cfa211` feat(build): preset backend sin interfaz para verificar backend, seed y consola
+  - **T2:** `357102d` feat(bd): esquema v3 con identidad y orden de eventos y clave de tipos
+  - **T3:** `08067ce` feat(servicios): eventos del turno con identidad y orden en el servicio
+  - **T4:** `693fa18` feat(servicios): coherencia temporal de eventos y ventanas por posición
+  - **T5:** `83d7e7f` feat(servicios): catálogo de tipos de aula, tipo en aulas y materias y huella
+  - **T6:** `e79d227` feat(servicios): fachada, cascada y puente de eventos en la entrada del solver
+  - **T7:** `f438079` feat(seed): tipos de aula y eventos en el perfil de datos de prueba
+  - **T8:** `af1ac8a` feat(seed): siembra de tipos y eventos con reemplazo seguro y recuentos
+  - **T9:** `c7a5ce1` refactor(servicios): ServicioTurnosEventos sin capa de compatibilidad de recesos
+  - **T10:** `221e563` docs: API de eventos y tipos de aula, guías y deuda del frontend
+- **Corrección de validación:** `1835399` fix(servicios): mensajes de rechazo con el valor recibido.
+- **Commit de cierre:** pendiente de anotar. Se completa con el sha del commit que incluya este
+  cierre (`spec.md`, `estado.md` y `journal.md`); tras commitear, `git log -1 --oneline`.

@@ -1,12 +1,13 @@
 # Spec 009 - Persistencia y servicios de tipos de aula y eventos
 
-Estado: aprobada (2026-10-23)
+Estado: implementada (2026-10-24)
 
 > **Decisión del usuario (2026-10-23): la clave normalizada se almacena.** El catálogo de tipos de
 > aula guarda la **clave normalizada** (recorte de espacios extremos + plegado de mayúsculas/minúsculas
 > en Unicode con `toCaseFolded()`), **calculada por el servicio**, y el **índice único va sobre esa
 > clave**. Motivo: `lower()`/`trim()` de SQLite solo son ASCII y no frenan «Física»/«FÍSICA» en
-> escrituras directas. Corrige la definición de «clave de tipo» y RF-5; la spec sigue **aprobada**.
+> escrituras directas. Corrige la definición de «clave de tipo» y RF-5; la spec quedó **aprobada**
+> con ese contenido.
 
 > **Alcance y reparto con la spec 010.** Esta spec cubre la **persistencia, los servicios, la huella de
 > datos, el esquema y su versión, los datos de prueba y la documentación de la API** del cambio. La

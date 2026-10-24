@@ -1,11 +1,11 @@
 # Estado 009
 
-Fase: implementacion
+Fase: cerrada
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-23
-Base: 471311c (commit docs(specs): plan y tareas de la 009 aprobados; contiene el esquema de 059168f). HEAD = 471311c.
+Base: 471311c (commit docs(specs): plan y tareas de la 009 aprobados; contiene el esquema de 059168f). HEAD = 1835399 (antes del commit de cierre).
 Dudas abiertas: ninguna
-Siguiente paso: implementar **T1** (build sin frontend) en una sola tarea y una sola pasada. Tras cada tarea, el coordinator ejecuta la verificación del plan y `git diff --stat`; no se commitea sin permiso del usuario.
-Veredicto: pendiente
+Siguiente paso: la **010 (solver)** es la siguiente; su `plan.md` está pendiente de escribir y de aprobación del usuario.
+Veredicto: APROBADO (2026-10-24)
 QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
 QA del plan: CAMBIOS NECESARIOS corregidos y `plan.md`/`tasks.md` aprobados por el usuario el 2026-10-23.
 
@@ -63,8 +63,8 @@ QA del plan: CAMBIOS NECESARIOS corregidos y `plan.md`/`tasks.md` aprobados por 
   eventos antes que turnos; aulas y materias antes que el catálogo de tipos.
 - **N18 — Catálogo vacío en criterios.** El criterio del catálogo cubre que el catálogo vacío impide
   crear aulas y materias.
-- **N19 — Base.** Fijada en **`471311c`**, que contiene el esquema de `059168f`; HEAD = `471311c`. No
-  hay diff de esquema sin commitear que imputar a la implementación.
+- **N19 — Base.** Fijada en **`471311c`**, que contiene el esquema de `059168f`; HEAD = `1835399`
+  (antes del commit de cierre). No hay diff de esquema sin commitear que imputar a la implementación.
 
 ## Supersesión
 
