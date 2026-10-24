@@ -1,19 +1,21 @@
 # Plan 009 - Persistencia y servicios de tipos de aula y eventos
 
-Base: 059168f
+Base: 471311c
 
-> **Alcance.** Este plan implementa la spec 009 (12 RF) sobre el commit `059168f`, que ya trae el
-> cambio de esquema WIP (catálogo de tipos, referencias de tipo y tabla de eventos renombrada) pero
-> **no** la identidad ni el orden del evento, la marca de versión, los servicios, el seed ni la
-> documentación. La 009 deja un **puente temporal** que sigue emitiendo la sección `recesos` del
-> contrato 1.0 derivada de los eventos; la 010 sustituye el contrato por el 2.0. El frontend queda
-> fuera y **no compila** hasta que su equipo migre; esta entrega se verifica **sin frontend**.
+> **Alcance.** Este plan implementa la spec 009 (12 RF) sobre la base `471311c` (que contiene el
+> esquema de `059168f`), que ya trae el cambio de esquema (catálogo de tipos, referencias de tipo y
+> tabla de eventos renombrada) pero **no** la identidad ni el orden del evento, la marca de versión,
+> los servicios, el seed ni la documentación. La 009 deja un **puente temporal** que sigue emitiendo
+> la sección `recesos` del contrato 1.0 derivada de los eventos; la 010 sustituye el contrato por el
+> 2.0. El frontend queda fuera y **no compila** hasta que su equipo migre; esta entrega se verifica
+> **sin frontend**.
 >
-> **Estado de partida conocido.** En `059168f` la suite está roja: el esquema tiene `TiposAula` y
-> `Eventos`, pero `version_esquema` sigue esperando `Recesos` y la versión 2, los servicios consultan
-> `Recesos` y los INSERT de aulas/materias no rellenan `id_tipo_aula` (`NOT NULL`). Las tareas están
-> ordenadas para recuperar el verde: T1 deja el build verificable, T2 el esquema/versión, T3/T4 los
-> eventos, T5/T6 los tipos, T7/T8 el seed y T9/T10 el puente y la documentación.
+> **Estado de partida conocido.** En la base `471311c` (esquema de `059168f`) la suite está roja: el
+> esquema tiene `TiposAula` y `Eventos`, pero `version_esquema` sigue esperando `Recesos` y la versión
+> 2, los servicios consultan `Recesos` y los INSERT de aulas/materias no rellenan `id_tipo_aula`
+> (`NOT NULL`). Las tareas están ordenadas para recuperar el verde: T1 deja el build verificable, T2 el
+> esquema/versión, T3/T4 los eventos, T5/T6 los tipos, T7/T8 el seed y T9/T10 el puente y la
+> documentación.
 
 ## 1. Archivos y responsabilidades
 

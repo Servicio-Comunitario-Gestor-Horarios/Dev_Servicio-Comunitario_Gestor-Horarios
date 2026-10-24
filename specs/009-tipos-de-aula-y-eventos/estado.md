@@ -2,7 +2,7 @@
 
 Fase: implementacion
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-23
-Base: 059168f (commit `feat(bd): catálogo de tipos de aula y eventos del turno en el esquema`). HEAD actual: 98566a8; `plan.md`, `tasks.md` y este `estado.md` están **sin commitear**.
+Base: 471311c (commit docs(specs): plan y tareas de la 009 aprobados; contiene el esquema de 059168f). HEAD = 471311c.
 Dudas abiertas: ninguna
 Siguiente paso: implementar **T1** (build sin frontend) en una sola tarea y una sola pasada. Tras cada tarea, el coordinator ejecuta la verificación del plan y `git diff --stat`; no se commitea sin permiso del usuario.
 Veredicto: pendiente
@@ -63,9 +63,8 @@ QA del plan: CAMBIOS NECESARIOS corregidos y `plan.md`/`tasks.md` aprobados por 
   eventos antes que turnos; aulas y materias antes que el catálogo de tipos.
 - **N18 — Catálogo vacío en criterios.** El criterio del catálogo cubre que el catálogo vacío impide
   crear aulas y materias.
-- **N19 — Base.** Fijada en **`059168f`**, el commit que ya incluye el esquema de `TiposAula` y
-  `Eventos`; el árbol tiene HEAD `98566a8` y `plan.md`/`tasks.md` aún sin commitear. No hay diff de
-  esquema sin commitear que imputar a la implementación.
+- **N19 — Base.** Fijada en **`471311c`**, que contiene el esquema de `059168f`; HEAD = `471311c`. No
+  hay diff de esquema sin commitear que imputar a la implementación.
 
 ## Supersesión
 
@@ -77,7 +76,7 @@ QA del plan: CAMBIOS NECESARIOS corregidos y `plan.md`/`tasks.md` aprobados por 
 ## Notas
 
 - **Cierre del plan (2026-10-23).** `plan.md` y `tasks.md` aprobados por el usuario el 2026-10-23 y
-  **sin commitear** a fecha de hoy (junto con este `estado.md`). La implementación empieza el
+  **commiteados en `471311c`** (junto con este `estado.md`). La implementación empieza el
   **2026-10-24**. Riesgos declarados al usuario: **T6 y T8 en el límite de 30 min** y **el frontend no
   compila** hasta que su equipo migre.
 - **El esquema del commit Base ya tiene `TiposAula` y `Eventos`**, pero no la identidad/orden del
