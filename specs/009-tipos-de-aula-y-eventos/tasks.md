@@ -1,6 +1,6 @@
 # Tareas 009 - Persistencia y servicios de tipos de aula y eventos
 
-- [ ] **T1. Build sin frontend (`BUILD_FRONTEND=OFF` + preset `backend`).** RNF-6
+- [x] **T1. Build sin frontend (`BUILD_FRONTEND=OFF` + preset `backend`).** RNF-6
     - Hecho cuando: `cmake --preset backend -Dortools_DIR="$HOME/.local/ortools/lib/cmake/ortools"`, `cmake --build --preset backend --parallel` (exit 0) y `ctest --test-dir build-backend -N` funcionan; el listado incluye `test_backend_version_esquema`, `test_backend_nucleo_datos`, `test_seed_aplicacion` y `test_instancia_unica`, y no incluye `test_frontend_conversion` ni `test_generacion_seed`.
 
 - [ ] **T2. Esquema v3: identidad/orden de eventos, clave normalizada almacenada, catálogo esperado y huella.** RF-2, RF-5, RF-6, RF-7, RF-9

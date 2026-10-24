@@ -22,15 +22,30 @@
       "inherits": "full",
       "binaryDir": "${sourceDir}/build-rel",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "backend",
+      "displayName": "Backend + tests (sin interfaz, con OR-Tools)",
+      "description": "Verificación de backend, seed y consola sin la interfaz Qt; apunta a la instalación local de OR-Tools",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-backend",
+      "cacheVariables": {
+        "BUILD_BACKEND": "ON",
+        "BUILD_TESTING": "ON",
+        "BUILD_FRONTEND": "OFF",
+        "CMAKE_PREFIX_PATH": "$env{HOME}/.local/ortools"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev-frontend", "configurePreset": "dev-frontend" },
     { "name": "full", "configurePreset": "full" },
-    { "name": "full-release", "configurePreset": "full-release" }
+    { "name": "full-release", "configurePreset": "full-release" },
+    { "name": "backend", "configurePreset": "backend" }
   ],
   "testPresets": [
     { "name": "full", "configurePreset": "full", "output": { "outputOnFailure": true } },
-    { "name": "full-release", "configurePreset": "full-release", "output": { "outputOnFailure": true } }
+    { "name": "full-release", "configurePreset": "full-release", "output": { "outputOnFailure": true } },
+    { "name": "backend", "configurePreset": "backend", "output": { "outputOnFailure": true } }
   ]
 }

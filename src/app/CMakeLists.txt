@@ -27,55 +27,61 @@ target_link_libraries(app_core PUBLIC
 set_project_warnings(app_core)
 
 # === Ejecutable `gestor-horarios` ===
+# Solo con BUILD_FRONTEND=ON: el main() y sus fuentes enlazan `frontend`, que no
+# se configura cuando la interfaz está fuera. `app_core` (arriba) se mantiene
+# siempre para que `test_instancia_unica` siga teniendo su target.
+if(BUILD_FRONTEND)
 
-add_executable(gestor-horarios)
+	add_executable(gestor-horarios)
 
-set_target_properties(gestor-horarios PROPERTIES AUTOMOC ON)
+	set_target_properties(gestor-horarios PROPERTIES AUTOMOC ON)
 
-target_sources(gestor-horarios PRIVATE
-				main.cpp
-				src/aplicacion_frontend.cpp
-				src/aplicacion_backend.cpp
-				src/gestor_proceso_backend.cpp
-				include/app/gestor_proceso_backend.hpp
-				include/app/aplicacion_frontend.hpp
-				include/app/aplicacion_backend.hpp
-)
+	target_sources(gestor-horarios PRIVATE
+					main.cpp
+					src/aplicacion_frontend.cpp
+					src/aplicacion_backend.cpp
+					src/gestor_proceso_backend.cpp
+					include/app/gestor_proceso_backend.hpp
+					include/app/aplicacion_frontend.hpp
+					include/app/aplicacion_backend.hpp
+	)
 
-target_include_directories(gestor-horarios PRIVATE
-				${CMAKE_CURRENT_SOURCE_DIR}/include
-				${CMAKE_SOURCE_DIR}/src/frontend/src
-)
+	target_include_directories(gestor-horarios PRIVATE
+					${CMAKE_CURRENT_SOURCE_DIR}/include
+					${CMAKE_SOURCE_DIR}/src/frontend/src
+	)
 
-target_link_libraries(gestor-horarios PRIVATE
-				common
-				app_core
-				frontend
-)
+	target_link_libraries(gestor-horarios PRIVATE
+					common
+					app_core
+					frontend
+	)
 
-# El solver es lo único que exige OR-Tools. `backend` (persistencia) llega
-# transitivamente vía `frontend` -> `backend`.
-if(TARGET backend_solver)
-	target_link_libraries(gestor-horarios PRIVATE backend_solver)
-	target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_SOLVER=1)
+	# El solver es lo único que exige OR-Tools. `backend` (persistencia) llega
+	# transitivamente vía `frontend` -> `backend`.
+	if(TARGET backend_solver)
+		target_link_libraries(gestor-horarios PRIVATE backend_solver)
+		target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_SOLVER=1)
+	endif()
+	if(TARGET middleware)
+		target_link_libraries(gestor-horarios PRIVATE middleware)
+	endif()
+
+	# El arranque del cliente usa el módulo `datos` para el ciclo de vida de la base
+	# (ContextoBaseDatos). Si existe, el backend de persistencia está disponible.
+	if(TARGET datos)
+		target_link_libraries(gestor-horarios PRIVATE datos)
+	endif()
+
+	# El arranque del cliente abre la base y construye el núcleo de datos solo si
+	# el backend (persistencia) está disponible en esta configuración.
+	if(TARGET datos)
+		target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_BACKEND=1)
+	endif()
+
+	# Forzar C++17 para evitar conflictos con OR-Tools que usa C++20
+	target_compile_features(gestor-horarios PRIVATE cxx_std_17)
+
+	set_project_warnings(gestor-horarios)
+
 endif()
-if(TARGET middleware)
-	target_link_libraries(gestor-horarios PRIVATE middleware)
-endif()
-
-# El arranque del cliente usa el módulo `datos` para el ciclo de vida de la base
-# (ContextoBaseDatos). Si existe, el backend de persistencia está disponible.
-if(TARGET datos)
-	target_link_libraries(gestor-horarios PRIVATE datos)
-endif()
-
-# El arranque del cliente abre la base y construye el núcleo de datos solo si
-# el backend (persistencia) está disponible en esta configuración.
-if(TARGET datos)
-	target_compile_definitions(gestor-horarios PRIVATE GESTOR_TIENE_BACKEND=1)
-endif()
-
-# Forzar C++17 para evitar conflictos con OR-Tools que usa C++20
-target_compile_features(gestor-horarios PRIVATE cxx_std_17)
-
-set_project_warnings(gestor-horarios)

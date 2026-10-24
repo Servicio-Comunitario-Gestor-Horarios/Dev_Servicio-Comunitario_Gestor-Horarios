@@ -3,6 +3,7 @@ build-test/
 build-fe/
 build-lite/
 build-rel/
+build-backend/
 Testing/
 .env
 timelapse-*.mp4
