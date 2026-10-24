@@ -4,11 +4,19 @@
 > (`src/backend`, `src/app` y `src/middleware`) expone para que la interfaz Qt de `src/frontend`
 > —implementada por **otro equipo**— consuma la base de datos y la lógica de negocio.
 >
-> No duplica los requisitos: para el QUÉ y el POR QUÉ, ver `specs/001-base-datos-local/spec.md` y
-> `specs/002-generacion-horarios-ipc/spec.md`. Aquí solo se documenta el **contrato de consumo**
-> (qué exponemos, con qué firma, qué estados/errores y cómo debe tratarlos el frontend).
+> No duplica los requisitos: para el QUÉ y el POR QUÉ, ver `specs/001-base-datos-local/spec.md`,
+> `specs/002-generacion-horarios-ipc/spec.md` y `specs/009-tipos-de-aula-y-eventos/spec.md`. Aquí solo
+> se documenta el **contrato de consumo** (qué exponemos, con qué firma, qué estados/errores y cómo
+> debe tratarlos el frontend).
 >
 > Se mantiene con las tareas «Documentar la interfaz expuesta al frontend» de cada spec.
+>
+> **Aviso de alcance (spec 009).** Esta entrega cambia el contrato que consume la interfaz: los
+> descansos del turno pasan a ser **eventos con identidad**, las aulas y materias **exigen un tipo de
+> aula** del catálogo y desaparecen el DTO y los métodos propios de los descansos. `src/frontend`
+> **queda fuera del alcance de la 009** y **no compila** hasta que su equipo migre las llamadas y los
+> formularios; la verificación de la entrega se hace con el preset `backend`
+> (`BUILD_FRONTEND=OFF`). La deuda concreta está en la §5.
 
 ---
 
@@ -95,7 +103,7 @@ nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. 
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 2;   // esquema único (sin migración por versión)
+constexpr int VERSION_ESQUEMA_ACTUAL = 3;   // esquema único (sin migración por versión)
 enum class EstadoApertura { Crear, Abrir, FalloEsquema };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
@@ -107,7 +115,9 @@ bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // catálogo 
 
 `decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `crearEsquema`
 aplica el catálogo completo (`Migracion::aplicarPaso`) y fija `user_version` en una sola transacción;
-si algo falla, revierte.
+si algo falla, revierte. La versión **3** incorpora el catálogo `TiposAula` (con su `clave`
+normalizada) y `Eventos` (identidad y orden); el catálogo esperado incluye ambas tablas y sus
+columnas. Una base con la versión anterior (2) **no se migra**: se rechaza al abrir.
 
 > **Guardia anti-regresión.** `test/backend/test_version_esquema.cpp` congela la **huella SHA-256**
 > del catálogo real (`HUELLAS_CONOCIDAS`, por versión). Si se cambia el DDL hay que **subir
@@ -158,10 +168,10 @@ Para «Crear base de datos nueva» (RF-4, RF-6), llamar a `descartarBaseYCrearNu
 
 `src/backend/include/backend/services/NucleoDatos.hpp`. Fachada única sobre la conexión y los
 servicios de dominio; el frontend la consume **en proceso** (ya no por IPC) para docentes, aulas,
-materias, cursos, planes de estudio, turnos y recesos. El `NucleoDatos` **no es dueño** de la
-conexión ni se instancia en la interfaz: lo construye el `ContextoBaseDatos` del módulo `datos`
-(ver 2.7), que también se lo inyecta a la ventana principal. El frontend recibe un `NucleoDatos*`
-ya construido y operativo.
+materias, tipos de aula, cursos, planes de estudio y turnos con sus eventos. El `NucleoDatos` **no es
+dueño** de la conexión ni se instancia en la interfaz: lo construye el `ContextoBaseDatos` del módulo
+`datos` (ver 2.7), que también se lo inyecta a la ventana principal. El frontend recibe un
+`NucleoDatos*` ya construido y operativo.
 
 ```cpp
 class NucleoDatos {
@@ -176,19 +186,30 @@ public:
                                              const QString& email, const QString& telefono = QString());
     bool                   eliminarDocente(const QString& id);
 
-    // Aulas
+    // Aulas (el tipo es obligatorio y debe existir en el catálogo)
     Resultado<QVector<AulaDTO>> listarAulas() const;
     Resultado<AulaDTO>  crearAula(const QString& nombre, int capacidad,
-                                  const QString& edificio = QString(), const QString& piso = QString());
+                                  const QString& edificio, const QString& piso,
+                                  int idTipoAula);
     Resultado<AulaDTO>  actualizarAula(int id, const QString& nombre, int capacidad,
-                                       const QString& edificio = QString(), const QString& piso = QString());
+                                       const QString& edificio, const QString& piso,
+                                       int idTipoAula);
     bool                eliminarAula(int id);
 
-    // Materias
+    // Materias (mismo tipo obligatorio)
     Resultado<QVector<MateriaDTO>> listarMaterias() const;
-    Resultado<MateriaDTO>  crearMateria(const QString& nombre, const QString& requisitos = QString());
-    Resultado<MateriaDTO>  actualizarMateria(int id, const QString& nombre, const QString& requisitos = QString());
+    Resultado<MateriaDTO>  crearMateria(const QString& nombre, const QString& requisitos,
+                                        int idTipoAula);
+    Resultado<MateriaDTO>  actualizarMateria(int id, const QString& nombre,
+                                             const QString& requisitos, int idTipoAula);
     bool                   eliminarMateria(int id);
+
+    // Tipos de aula (catálogo)
+    Resultado<QVector<TipoAulaDTO>> listarTiposAula() const;
+    Resultado<TipoAulaDTO>          obtenerTipoAula(int id) const;
+    Resultado<TipoAulaDTO>          crearTipoAula(const QString& nombre);
+    Resultado<TipoAulaDTO>          renombrarTipoAula(int id, const QString& nombre);
+    Resultado<bool>                 eliminarTipoAula(int id);  // error si está en uso
 
     // Planes de estudio
     Resultado<QVector<PlanDTO>> listarPlanes() const;
@@ -211,14 +232,23 @@ public:
                                              const QString& turno = QString(), int aula = -1);
     bool                     eliminarCurso(int id);
 
-    // Turnos y recesos
+    // Turnos y eventos (los eventos son la única representación de lo que ocurre
+    // dentro del turno: identidad, nombre, posición, orden y duración)
     Resultado<QVector<TurnoDTO>> listarTurnos() const;
+    Resultado<TurnoDTO> obtenerTurno(const QString& nombre) const;
     Resultado<TurnoDTO> crearTurno(const QString& nombre, const QTime& inicio, const QTime& fin, int numSlots);
-    Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio, const QTime& fin, int numSlots);
+    Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio, const QTime& fin,
+                                        int numSlots, bool eliminarEventosFueraDeRango = false);
     bool                eliminarTurno(const QString& nombre);
-    Resultado<RecesoDTO> agregarReceso(const QString& turno, int despuesDeSlot, int duracion,
-                                       const QTime& inicio = QTime(), const QTime& fin = QTime());
-    bool                eliminarReceso(const QString& turno, int despuesDeSlot);
+    Resultado<EventoDTO> agregarEvento(const QString& turno, const QString& nombre,
+                                       int despuesDeSlot, int duracion,
+                                       const QTime& inicio = QTime(), const QTime& fin = QTime(),
+                                       int orden = 0);
+    Resultado<EventoDTO> actualizarEvento(int id, const QString& nombre, int despuesDeSlot,
+                                          int duracion, const QTime& inicio, const QTime& fin,
+                                          int orden);
+    bool                 eliminarEvento(int id);
+    Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno, int numSlots) const;
 
     // Eliminación en cascada (RF-2)
     QVector<Dependencia> dependientesDe(const QString& dominio, const QString& id) const;
@@ -237,13 +267,14 @@ public:
 | DTO | Campos |
 |---|---|
 | `ProfesorDTO` | `id`, `nombre`, `email`, `telefono`, `QVector<DisponibilidadDTO> disponibilidad`, `QVector<MateriaAsignadaDTO> materias` |
-| `AulaDTO` | `id`, `nombre`, `capacidad`, `edificio`, `piso` |
-| `MateriaDTO` | `id`, `nombre`, `requisitos` |
+| `AulaDTO` | `id`, `nombre`, `capacidad`, `edificio`, `piso`, `idTipoAula`, `tipoAula` (nombre del tipo, solo lectura) |
+| `MateriaDTO` | `id`, `nombre`, `requisitos`, `idTipoAula`, `tipoAula` (solo lectura) |
+| `TipoAulaDTO` | `id`, `nombre` |
 | `PlanDTO` | `codigo`, `nombre`, `descripcion` |
 | `CargaHorariaDTO` | `id`, `codigoPlanEstudio`, `idMateria`, `curso` (año), `horas`, `nombreMateria` |
 | `CursoDTO` | `id`, `anio`, `seccion`, `turno`, `aula` (`-1` si no tiene) |
-| `TurnoDTO` | `nombre`, `inicio`, `fin`, `numSlots`, `QVector<RecesoDTO> recesos` |
-| `RecesoDTO` | `despuesDeSlot`, `duracion` (minutos), `inicio`, `fin` (pueden ser inválidos) |
+| `TurnoDTO` | `nombre`, `inicio`, `fin`, `numSlots`, `QVector<EventoDTO> eventos` (ordenados por posición, orden e id) |
+| `EventoDTO` | `id` (`-1` al crear), `nombre`, `despuesDeSlot`, `orden`, `duracion` (minutos), `inicio`, `fin` (inválidas = ausentes) |
 
 **Contrato de las operaciones:**
 - Los `listar*` devuelven `Resultado<QVector<Dto>>`: distinguen **error de lectura** (`!ok`, con
@@ -275,7 +306,7 @@ depende de qué. `NucleoDatos::dependientesDe`/`eliminarConCascada` usan **estas
 | `profesor` | `Profesores` (`id`) | profesor-materia y disponibilidad |
 | `aula` | `Aulas` (`id`) | **anula** la referencia de los cursos con esa aula (no los borra) |
 | `curso` | `Cursos` (`id`) | (ninguno) |
-| `turno` | `Turnos` (`nombre`) | recesos y **anula** la referencia de los cursos del turno |
+| `turno` | `Turnos` (`nombre`) | **borra** los eventos del turno y **anula** la referencia de los cursos del turno |
 
 `Dependencia` es `{ QString dominio; qint64 id; QString descripcion; }` (`descripcion` ya viene en
 español, lista para el diálogo). `dependientesDe` devuelve vacío para un dominio desconocido o `id`
@@ -290,6 +321,57 @@ vacío. Unas relaciones **borran** el dependiente y otras (aula→cursos, turno�
 listar las `descripcion` y exigir confirmación; si el usuario cancela, no llamar a
 `eliminarConCascada`. Si `eliminarConCascada` devuelve `false` (sin cambios aplicados), el fallo ya
 queda registrado como cambio pendiente: informar y conservar el dato en pantalla (ver 2.5).
+
+#### 2.4.2 Eventos del turno (`ServicioTurnosEventos`)
+
+`src/backend/include/backend/services/ServicioTurnosEventos.hpp`. Un **evento** es lo único que
+ocurre dentro de un turno (un descanso, un acto, una pausa…): tiene `id` propio, nombre, posición
+`despuesDeSlot` (`1..numSlots`), `orden` dentro de la posición (`>= 1`) y `duracion` en minutos.
+
+- **Identidad y orden.** El `id` lo asigna la base y no cambia al editar; `(turno, posición, orden)`
+  es único. Al crear, `orden == 0` pide el **automático** (`máximo + 1` de la posición); al editar,
+  `orden` es **obligatorio**. Borrar **no renumera** los restantes.
+- **Lista.** `TurnoDTO.eventos`, `listarTurnos` y `obtenerTurno` devuelven los eventos ordenados por
+  `(despuesDeSlot, orden, id)`.
+- **Turno inmutable.** `actualizarEvento` edita por identidad y no acepta cambiar el turno del
+  evento; para moverlo de turno se borra y se crea. `despuesDeSlot = 0` se rechaza siempre: el `0`
+  del DTO es un valor de construcción, **no** «sin asignar».
+- **Horas.** `inicio`/`fin` son un par opcional: ambas o ninguna, `fin > inicio` y la diferencia en
+  minutos debe coincidir con `duracion`. Si el evento tiene horas, su intervalo debe caber en la
+  **ventana de su posición**; además no puede solaparse con otro evento del turno.
+- **Duración de la franja.** La rejilla se estima con la **suma de los eventos**:
+  `duracionFranja = (minutos de la ventana del turno − Σ duracion de los eventos) / numSlots`.
+  La ventana de la posición *k* va del fin de la franja *k* al inicio de la *k+1*; la última llega al
+  fin del turno. Si `numSlots <= 0`, la ventana no es positiva o el reparto no llega a un minuto,
+  `duracionFranjaEstimada` devuelve `0` y el servicio **rechaza** el encaje del evento
+  (`calculo_eventos.hpp`, funciones puras).
+- **Reducción de franjas.** Si `actualizarTurno` reduce `numSlots` y hay eventos que quedarían fuera
+  de rango, sin `eliminarEventosFueraDeRango` devuelve el error con los afectados
+  (`eventosFueraDeRango(turno, numSlots)` permite listarlos antes); con `true` los borra en la misma
+  transacción. Cambiar la ventana `[inicio, fin]` que deja fuera un evento con horas también se
+  rechaza.
+- **Cómo lo trata el frontend:** pintar los eventos por `(posición, orden)`; editar y borrar por
+  `id` (nunca por posición); al reducir franjas, pedir confirmación con la lista de
+  `eventosFueraDeRango`; ante `!ok`, mostrar `mensajeError` y no dar el cambio por hecho.
+
+#### 2.4.3 Tipos de aula (`ServicioTiposAula`)
+
+`src/backend/include/backend/services/ServicioTiposAula.hpp`. El catálogo se administra con
+`crearTipoAula`/`renombrarTipoAula`/`listarTiposAula`/`eliminarTipoAula`; las aulas y materias lo
+referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescribir sus filas.
+
+- **Nombre y clave.** El servicio guarda el nombre **recortado** y una **clave normalizada**
+  (`trimmed().toCaseFolded()`) con índice único en la base: «Laboratorio» y «laboratorio», o
+  «Física» y «FÍSICA», son el mismo tipo aunque se escriba directo en la base. El nombre visible
+  conserva mayúsculas y acentos.
+- **Tipo obligatorio.** `crearAula`/`actualizarAula`/`crearMateria`/`actualizarMateria` exigen
+  `idTipoAula > 0` y existente; si el catálogo está vacío se rechaza el alta. Actualizar **sin**
+  tipo no conserva el anterior: se rechaza.
+- **Borrado en uso.** `eliminarTipoAula` devuelve error con la lista de aulas y materias que lo usan
+  y **no borra nada**; no hay cascada ni `SET NULL`.
+- **Cómo lo trata el frontend:** cargar el catálogo con `listarTiposAula()` en los formularios de
+  aula y materia (desplegable obligatorio), ofrecer «gestionar tipos» con el CRUD y, antes de
+  eliminar, mostrar `mensajeError` con los dependientes (no se confirma).
 
 ### 2.5 Estado por registro y cambios pendientes (implementado)
 
@@ -344,7 +426,8 @@ alta o modificación pendiente es `PendienteGuardar`; una baja pendiente es `Pen
 | `curso` | alta | identidad `"<anio>-<seccion>"` normalizada |
 | `curso` | modificación / baja | id (como texto) |
 | `turno` | alta / modificación / baja | nombre del turno |
-| `receso` | agregar / eliminar | `"<turno>-<despuesDeSlot>"` |
+| `evento` | alta | `"<turno>-<despuesDeSlot>-<orden>"` (con el `orden` solicitado; `0` si se pidió el automático) |
+| `evento` | modificación / baja | id del evento (como texto) |
 
 > `eliminarConCascada(dominio, id)` registra el pendiente con el `dominio` de la cascada (p. ej.
 > `"profesor"`) y `registroId = id`.
@@ -571,10 +654,11 @@ horarios y emite `horarioGenerado(datosVisualizacion, rutaArchivo)`. Sin backend
 informativo.
 
 Al cargar la base por primera vez, la vista **deriva de los turnos** el nº de slots por día (suma de
-los slots de todos los turnos) y la **duración del bloque** (franja del turno menos recesos, sobre
-sus slots; 40 min en los datos de prueba del centro); ambos quedan editables. La columna **Turno** de
-cada curso es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún
-sin asignar (los del centro se siembran sin turno; el solver exige uno, V7).
+los slots de todos los turnos) y la **duración del bloque** (franja del turno menos la **suma de las
+duraciones de sus eventos**, sobre sus slots; 40 min en los datos de prueba del centro), ambos
+editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). La columna **Turno** de cada curso
+es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún sin asignar
+(los del centro se siembran sin turno; el solver exige uno, V7).
 
 **Cableado (`MainWindow`):** el `InternalClient` se guarda como miembro y se inyecta en las vistas;
 en `setNucleoDatos` se lo reenvía a la vista de generación con el `NucleoDatos*`. Al recibir
@@ -605,6 +689,8 @@ Release de OR-Tools).
 | `NucleoDatos` | Listas desde la base y CRUD en proceso | RF-2 |
 | `ContextoBaseDatos` (`src/datos`) | El arranque lo crea y entrega `NucleoDatos*` a la ventana (`setNucleoDatos`) | RF-1, RF-2 |
 | `NucleoDatos::dependientesDe` / `eliminarConCascada` | Confirmación de cascada | RF-2 |
+| `EventoDTO` / CRUD de eventos | Alta, edición y baja por identidad; eventos por posición y orden | RF-1, RF-2 |
+| `TipoAulaDTO` / CRUD del catálogo | Desplegable obligatorio en aulas y materias; gestión del catálogo | RF-5 |
 | `estadoPendienteDe` / `GestorPendientes` | Marca por fila + «Reintentar»; aviso al cerrar | RF-3, RF-6, RNF-3/4 |
 | `InstanciaUnica` | Enfocar la instancia existente; salir si no hay acuse | RF-5 |
 | `ServicioGeneracion` | Vista de generación (estados, «Generar», «datos anteriores») | RF-1, RF-3 |
@@ -618,3 +704,38 @@ Release de OR-Tools).
 > Todas las filas están implementadas. La sección 2 corresponde a la spec 001; las filas de
 > `ServicioGeneracion`, `AnalisisSalida`, `CargadorConfiguracionSolver` y el guardado de horarios
 > corresponden a la spec 002.
+
+---
+
+## 5. Deuda del frontend y alcance (spec 009)
+
+La spec 009 cambia **solo** `src/backend` (persistencia y servicios); `src/frontend` **no se toca** y
+**no compila** contra el contrato nuevo. El equipo de interfaz debe migrar estas piezas antes de
+volver a compilar con `BUILD_FRONTEND=ON`:
+
+1. **Formularios de aula y materia.** `crearAula`/`actualizarAula` y `crearMateria`/
+   `actualizarMateria` exigen ya `idTipoAula` (sin valor por defecto). Hay que añadir a los
+   formularios un desplegable con `listarTiposAula()` y pasarlo en el último argumento, y ofrecer la
+   gestión del catálogo (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`).
+2. **`classroom_list_widget.cpp`: tipo por nombre (heurística).** El resumen de aulas clasifica
+   «laboratorio/cancha/deporte/teórica» **por el texto del nombre** del aula. Debe usar
+   `AulaDTO.tipoAula`/`idTipoAula`, que vienen del catálogo; la heurística por nombre ya no es la
+   fuente de verdad (un aula puede llamarse «A-101» y ser un laboratorio).
+3. **`subject_list_widget.cpp`: compatibilidad por texto libre (heurística).** La estimación de
+   ocupación empareja el texto libre de `MateriaDTO.requisitos` con el nombre del aula. Debe usar
+   `MateriaDTO.idTipoAula`/`tipoAula` frente al `tipoAula` de las aulas, y dejar `requisitos` como
+   texto informativo.
+4. **`schedule_generation_widget.cpp`: aritmética en minutos reales y DTO/método antiguos.** La vista
+   calculaba la duración del bloque en minutos reales (`inicio.secsTo(fin)/60`) restando la suma de
+   los descansos y recorría los campos del DTO retirado; debe incluir
+   `backend/services/ServicioTurnosEventos.hpp`, recorrer `turno.eventos` y usar la suma de `duracion`
+   (o directamente `duracionFranjaEstimada(turno)`). La spec 011 cambiará esta fórmula; el frontend
+   debe consumir la función, no replicarla.
+5. **Tests de frontend.** `test_frontend_conversion` y `test_generacion_seed` no se configuran con
+   `BUILD_FRONTEND=OFF`; siguen siendo deuda del equipo de frontend y el segundo fija además el
+   valor 40 de la spec 008, que la 011 revisará.
+
+**Fuera de alcance de la 009:** la interfaz no se adapta, no se añaden pantallas de eventos ni de
+tipos, y la verificación de la entrega es la suite del preset `backend`
+(`ctest --preset backend`), sin los tests de frontend. El contrato 1.0 del solver sigue derivando su
+sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo por el contrato 2.0.

@@ -1202,3 +1202,143 @@ Sin cambios en `docs/`, `src/seed`, `estado.md`, `spec.md`, `plan.md` ni `AGENTS
 - **Quedan menciones de «receso» solo como nombre del evento sembrado** (`«Receso»`) y en
   comentarios del contrato 1.0; no hay ninguna referencia a la tabla como entidad en
   backend/seed/consola.
+
+## T10 - Documentación, deuda del frontend y regresión global (2026-10-24)
+
+### Alcance ejecutado
+
+Solo documentación y cierre: `docs/interfaz-frontend.md`, `docs/guias/consola-datos.md`,
+`docs/guias/datos-prueba.md`, este journal y la marca de `tasks.md`. **Sin cambios** en código de
+negocio, `src/frontend`, `specs/009-*/spec.md`, `plan.md`, `AGENTS.md` ni `MEMORY.md`.
+
+Contenido añadido a la guía de API:
+
+- `EventoDTO`/`TurnoDTO.eventos`, CRUD de eventos por identidad, turno inmutable, orden automático
+  al crear y obligatorio al editar, borrado sin renumerar, par de horas y solapes
+  (§2.4.2).
+- Tipos de aula: `idTipoAula`/`tipoAula` en `AulaDTO` y `MateriaDTO`, CRUD de `ServicioTiposAula`,
+  clave normalizada `trimmed().toCaseFolded()` con índice único, tipo obligatorio y borrado en uso
+  (§2.4.3).
+- Cascada `turno` → eventos (se borran) y cursos (se anula la referencia).
+- Claves de pendiente de evento: alta `"<turno>-<despuesDeSlot>-<orden>"` (orden `0` si se pidió
+  el automático), modificación/baja por id.
+- Fórmula `(ventana − Σ duraciones) / numSlots` con la suma de eventos, también en la vista de
+  generación.
+- §5: deuda del frontend (formularios con tipo, heurística de tipo por nombre en
+  `classroom_list_widget.cpp`, compatibilidad por texto libre en `subject_list_widget.cpp`,
+  aritmética en minutos reales y DTO/include retirados en `schedule_generation_widget.cpp`, tests
+  de frontend) y alcance: la interfaz **no compila** hasta que su equipo migre; verificación con el
+  preset `backend`.
+- Se actualizó `VERSION_ESQUEMA_ACTUAL` documentado de 2 a 3 (hecho consumado de T2) y se indicó
+  que la base v2 se rechaza sin migrar.
+
+En `consola-datos.md`: fuera `turnos receso-agregar`/`receso-eliminar`; documentados `turnos
+eventos`, `evento-agregar`, `evento-actualizar` y `evento-eliminar`, el catálogo `tipos` y el
+`idTipoAula` obligatorio de aulas/materias. En `datos-prueba.md`: fila «Recesos» → «Eventos (un
+«Receso»…)» + fila de tipos de aula, y la salida del seed con `Eventos: 2` y `Tipos de aula: 3`.
+
+### Verificación 1 — grep de documentación
+
+```bash
+grep -in "receso" docs/interfaz-frontend.md docs/guias/consola-datos.md docs/guias/datos-prueba.md
+# docs/guias/consola-datos.md:160:  --cmd 'turnos evento-agregar "manana" "Receso" 2 10 08:20 08:30' \
+# docs/guias/datos-prueba.md:17:| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:20–08:30 y 14:00–14:10) | 2 |
+# docs/guias/datos-prueba.md:143:  horaria, eventos y disponibilidad), no un factor de conversión. El evento «Receso» de 10 minutos
+# exit 0 — las 3 coincidencias son el NOMBRE del evento «Receso»; ninguna RecesoDTO,
+# agregarReceso, receso-* ni «Recesos» como entidad. interfaz-frontend.md: 0 coincidencias.
+```
+
+### Verificación 2 — build y suite sin frontend
+
+```bash
+cmake --build --preset backend --parallel
+# ninja: no work to do. (exit 0)
+
+ctest --preset backend
+# 49/49 Test ... Passed
+# 100% tests passed out of 49 — Total Test time (real) = 5.41 sec
+
+ctest --test-dir build-backend -N | grep -E "frontend_conversion|generacion_seed|Total Tests"
+# Total Tests: 49  (ninguno de los dos tests de frontend se configura)
+```
+
+### Verificación 3 — manual con la base nueva
+
+```bash
+./build-backend/src/seed/gestor-horarios-seed --db /tmp/009-t10.db
+# Base: /tmp/009-t10.db
+# Variante: holgada
+# Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
+# Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
+# ok  (exit 0)
+```
+
+La salida real coincide línea a línea con la documentada en `datos-prueba.md`.
+
+```bash
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10.db --cmd "turnos listar"
+# Apertura: OkAbierta — «ya está en la versión 3»
+# turnos: 2
+#   Mañana | 07:00-12:30 | slots=8 | eventos=1
+#   Tarde  | 12:40-18:10 | slots=8 | eventos=1          -> 2 eventos
+
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10.db \
+  --cmd 'turnos evento-agregar "Mañana" "Acto cívico" 3 10'
+# ok: evento «Acto cívico» agregado al turno «Mañana»   (exit 0)
+
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10.db --cmd "turnos listar"
+#   Mañana | 07:00-12:30 | slots=8 | eventos=2
+#   Tarde  | 12:40-18:10 | slots=8 | eventos=1          -> 3 eventos
+
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10.db --ayuda | grep -in receso
+# (sin salida; exit 1)
+# La ayuda lista evento-agregar / evento-actualizar / evento-eliminar.
+
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10.db --cmd "estado"
+# abierta: sí   (reapertura correcta de la base v3)
+
+cp /tmp/009-t10.db /tmp/009-t10-v2.db && sqlite3 /tmp/009-t10-v2.db "PRAGMA user_version=2;"
+./build-backend/src/consola/gestor-horarios-consola --db /tmp/009-t10-v2.db --cmd "estado"
+# Apertura: FalloEsquema (esquema no esperado)
+# «declara la versión 2 y esta aplicación espera la versión 3. No se migra…»
+# exit 2 — la base v2 sigue fallando al abrir.
+```
+
+También se ejecutó el script de ejemplo de `consola-datos.md` completo (base `/tmp/consola-009-ejemplo.db`):
+`tipos crear`, `materias crear … 1`, `aulas crear … 1`, `turnos crear manana 07:00 12:30 8`,
+`evento-agregar "manana" "Receso" 2 10 08:20 08:30`, `turnos eventos`, `cursos crear 1 A manana 1`,
+`cascada materia 1 --si`: todo `ok`, `pendientes: 0`.
+
+### Verificación 4 — diff
+
+```
+ docs/guias/consola-datos.md |  61 ++++++++++-----
+ docs/guias/datos-prueba.md  |  10 ++-
+ docs/interfaz-frontend.md   | 181 ++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 201 insertions(+), 51 deletions(-)
+```
+
+Más `specs/009-tipos-de-aula-y-eventos/tasks.md` (marca de T10) y este `journal.md`. Sin cambios de
+código.
+
+### Hallazgos / desviaciones
+
+- **Ejemplo de consola con horas: corregido al comprobarlo.** El primer borrador del ejemplo usaba
+  `turnos crear manana 07:00 12:00 6` + evento 08:20–08:30; al ejecutarlo, el servicio lo rechazó
+  correctamente («El intervalo 08:20–08:30 … no cabe en la ventana de la posición 2 (08:36–08:46)»,
+  porque con 6 franjas y 10 min de evento la franja estimada es 48 y la posición 2 empieza a las
+  08:36). Se cambió el ejemplo a un turno de 8 franjas igual al del seed
+  (`07:00–12:30`), donde la franja estimada es 40 y la posición 2 es 08:20–08:30; el comando pasa.
+  No se tocó código: era un error del texto, no del comportamiento. La documentación de la fórmula
+  y de la ventana se mantiene.
+- **Ejemplos de `cursos` actualizados (deuda previa detectada).** El bloque de `cursos` de
+  `consola-datos.md` describía una firma anterior a la implementación (`"<nombre>" … [codigoPlan]`,
+  `cursos asignar/quitar` inexistentes) y el script de ejemplo no habría corrido. Se alineó con la
+  ayuda real de la consola (`<anio> <seccion> [turno] [aula]`) al tocar los ejemplos por el cambio
+  de firmas de 009. No es una decisión de la 009, sino corrección de exactitud del documento.
+- **`VERSION_ESQUEMA_ACTUAL` en la guía**: seguía en 2; se actualizó a 3 (T2) para que la guía no
+  contradiga el binario. Una base v2 se rechaza, sin migración (RNF-4/RF-9).
+- **«receso» solo como nombre del evento.** El grep deja tres coincidencias, todas «Receso» como
+  nombre del evento sembrado o del ejemplo; no queda ninguna entidad, DTO ni comando.
+- **Frontend**: no se tocó. `test_frontend_conversion` y `test_generacion_seed` no se configuran con
+  `BUILD_FRONTEND=OFF`; la deuda quedó documentada en §5 de `docs/interfaz-frontend.md`.

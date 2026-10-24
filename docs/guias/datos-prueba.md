@@ -14,7 +14,8 @@
 | Entidad | Cantidad |
 |---|---|
 | Turnos (Mañana 07:00–12:30 · Tarde 12:40–18:10, 8 franjas de 40 min) | 2 |
-| Recesos (10 min tras la 2.ª franja: 08:20–08:30 y 14:00–14:10) | 2 |
+| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:20–08:30 y 14:00–14:10) | 2 |
+| Tipos de aula (`Aula de estudio`, `Laboratorio`, `Taller`) | 3 |
 | Aulas (13 para cursos + reserva + laboratorio + taller) | 16 |
 | Materias-año del catálogo (51 del 31059 + 6 nuevas de los derivados) | 57 |
 | Planes de estudio (General + 3 áreas de desarrollo) | 4 |
@@ -80,8 +81,8 @@ gestor-horarios-seed --db <ruta> [--variante <v>] [--reemplazar | --solo-docente
 ```
 Base: /tmp/centro.db
 Variante: holgada
-Turnos: 2   Recesos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
-Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325
+Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
+Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
 Materias por año: GEN 9/9/10/11/12 · EXA 9/9/10/12/13 · NAT 9/9/10/12/13 · SOC 9/9/10/12/13
 GEN  General            40/40/40/40/40 h académicas
 EXA  Ciencias Exactas   40/40/40/40/40 h académicas
@@ -139,7 +140,8 @@ variante inexistente sale con código **6** y **no toca ningún dato**.
   construir presets coherentes y ejercitar las cuatro variantes.
 - **La duración de la franja no cambia la carga:** 1 hora académica = 1 bloque, y cada año suma 40
   horas académicas (= 40 bloques). Los **40 minutos** son la duración **real** de la franja (rejilla
-  horaria, receso y disponibilidad), no un factor de conversión.
+  horaria, eventos y disponibilidad), no un factor de conversión. El evento «Receso» de 10 minutos
+  tras la 2.ª franja se descuenta en la fórmula `(ventana − Σ eventos) / franjas`.
 - **Semana de referencia:** 5 días (lunes a viernes); es una propiedad de la configuración que acompaña
   al conjunto y **no se persiste**.
 - **Determinismo:** aplicar el mismo perfil dos veces sobre bases vacías deja los mismos datos

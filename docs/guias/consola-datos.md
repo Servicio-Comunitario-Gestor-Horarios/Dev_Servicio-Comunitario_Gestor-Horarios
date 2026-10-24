@@ -60,21 +60,37 @@ docentes actualizar <id> "<nombre>" <email> [telefono]
 docentes eliminar   <id>
 ```
 
+### Tipos de aula
+```
+tipos listar
+tipos crear     "<nombre>"
+tipos renombrar <id> "<nombre>"
+tipos eliminar  <id>
+```
+
+- El catálogo normaliza el nombre (recorte + plegado de mayúsculas/acentos) y no admite duplicados
+  («Física» y «FÍSICA» son el mismo tipo).
+- `tipos eliminar` falla con la lista de aulas y materias que usan el tipo; no hay cascada.
+
 ### Aulas
 ```
 aulas listar
-aulas crear      "<nombre>" <capacidad> [edificio] [piso]
-aulas actualizar <id> "<nombre>" <capacidad> [edificio] [piso]
+aulas crear      "<nombre>" <capacidad> <idTipoAula> [edificio] [piso]
+aulas actualizar <id> "<nombre>" <capacidad> <idTipoAula> [edificio] [piso]
 aulas eliminar   <id>
 ```
+
+El tipo de aula es **obligatorio** y debe existir en el catálogo (`tipos listar`).
 
 ### Materias
 ```
 materias listar
-materias crear      "<nombre>" ["<requisitos>"]
-materias actualizar <id> "<nombre>" ["<requisitos>"]
+materias crear      "<nombre>" <idTipoAula> ["<requisitos>"]
+materias actualizar <id> "<nombre>" <idTipoAula> ["<requisitos>"]
 materias eliminar   <id>
 ```
+
+El tipo de aula también es **obligatorio** aquí; `requisitos` sigue siendo texto libre.
 
 ### Planes de estudio
 ```
@@ -87,22 +103,30 @@ planes eliminar   <codigo>
 ### Cursos
 ```
 cursos listar
-cursos crear      "<nombre>" [turno] [aulaFija] [numEstudiantes] [codigoPlan]
-cursos actualizar <id> "<nombre>" [turno] [aulaFija] [numEstudiantes] [codigoPlan]
+cursos crear      <anio> <seccion> [turno] [aula]
+cursos actualizar <id> <anio> <seccion> [turno] [aula]
 cursos eliminar   <id>
-cursos asignar    <idCurso> <idMateria> <horasSemanales>
-cursos quitar     <idCurso> <idMateria>
 ```
 
-### Turnos y recesos
+### Turnos y eventos
 ```
 turnos listar
 turnos crear      "<nombre>" <inicio HH:mm> <fin HH:mm> <numSlots>
 turnos actualizar "<nombre>" <inicio HH:mm> <fin HH:mm> <numSlots>
 turnos eliminar   "<nombre>"
-turnos receso-agregar  "<turno>" <despuesDeSlot> <duracion>
-turnos receso-eliminar "<turno>" <despuesDeSlot>
+turnos eventos            "<turno>"
+turnos evento-agregar     "<turno>" "<nombre>" <despuesDeSlot> <duracion> [inicio HH:mm] [fin HH:mm] [orden]
+turnos evento-actualizar  <id> "<nombre>" <despuesDeSlot> <duracion> <orden> [inicio HH:mm] [fin HH:mm]
+turnos evento-eliminar    <id>
 ```
+
+- Los eventos tienen **identidad** (`id`): se editan y borran por `id`, nunca por posición.
+- `despuesDeSlot` va de `1` a `numSlots`; `duracion` en minutos. `orden` al crear es opcional
+  (`0` = automático, máximo + 1 de la posición); al actualizar es **obligatorio**.
+- `inicio`/`fin` son un par opcional: ambos o ninguno; si se dan, la diferencia debe coincidir con la
+  duración y el intervalo debe caber en la ventana de la posición, sin solapes.
+- La lista de `turnos listar` incluye el número de eventos de cada turno; `turnos eventos` los
+  muestra ordenados por posición, orden e id.
 
 ### Cascada, pendientes y estado
 ```
@@ -116,7 +140,7 @@ salir | q                            Termina.
 ```
 
 Dominios válidos para `dependientes`/`cascada`: `plan`, `materia`, `profesor`, `aula`, `curso`,
-`turno`.
+`turno`. Un `turno` arrastra sus **eventos** (se borran) y anula la referencia de sus cursos.
 
 ## 4. Ejemplos
 
@@ -126,13 +150,16 @@ No interactivo (script/smoke):
 ./build/src/consola/gestor-horarios-consola --db /tmp/consola.db \
   --cmd 'docentes crear P1 "Ana Gómez" ana@uni.edu 555' \
   --cmd "docentes listar" \
-  --cmd 'materias crear "Matemática"' \
+  --cmd 'tipos crear "Aula de estudio"' \
+  --cmd "tipos listar" \
+  --cmd 'materias crear "Matemática" 1' \
   --cmd "materias listar" \
-  --cmd 'aulas crear "A1" 30 "Planta Baja"' \
+  --cmd 'aulas crear "A1" 30 1 "Planta Baja"' \
   --cmd 'planes crear CIEN "Ciencias"' \
-  --cmd 'turnos crear manana 07:00 12:00 6' \
-  --cmd 'cursos crear "1ro A" manana -1 20 CIEN' \
-  --cmd "cursos asignar 1 1 4" \
+  --cmd 'turnos crear manana 07:00 12:30 8' \
+  --cmd 'turnos evento-agregar "manana" "Receso" 2 10 08:20 08:30' \
+  --cmd "turnos eventos manana" \
+  --cmd 'cursos crear 1 A manana 1' \
   --cmd "dependientes materia 1" \
   --cmd "cascada materia 1 --si" \
   --cmd "pendientes"
