@@ -1038,3 +1038,118 @@ estado.
   etiquetada «no persistido» para que el diagrama no sugiera una columna que no existe.
 - **`id_tipo_aula` es `NOT NULL`** en ambas tablas: se dibuja `||` en el lado de `TiposAula`
   (exactamente uno), no `|o`.
+
+## T9 - Documentación viva del contrato 2.0 (2026-10-25)
+
+**Requisito:** RF-10. **Plan:** §1.4, §2, §8-T9 y decisión 11. **Base:** `4134209` (T1-T8
+commiteadas). **No se commitea.**
+
+Tarea solo documental: no hay runner ni lógica que pueda romperse, así que la verificación es la del
+«Hecho cuando» (grep) más una **carga real** del ejemplo con `CargadorConfiguracionSolver`.
+
+### Documento creado
+
+`docs/contrato-solver-2.0.md` (raíz de `docs/`, **fuera de `docs/solver/`**, que
+`docs/constitution.md` §7 declara histórico y no obligatorio). Estructura:
+
+1. **Versión 2.0 única** — tabla declaración → resultado → mensaje, comprobación de la versión
+   **antes** que las secciones, mensaje literal del cargador con **archivo + versión + acción**,
+   sellado de `2.0` al escribir, sin conversión y sin tipos por defecto, mención de
+   `datos-prueba/preset-generacion-31059.json` como preset 1.0 que hay que regenerar.
+2. **Forma del contrato** — tabla de las 10 secciones obligatorias + `aula_fija` opcional con sus
+   validaciones, y un apartado por sección (dimensiones, franja, turnos con `inicio`/`fin`,
+   planes, cursos con `aula` como índice y referencia, profesores, materias/aulas con `tipo`).
+3. **Tipos por nombre y clave** — `tipo` obligatorio (V16), V17 en los dos modos, `claveTipo` =
+   `trimmed()` + `toCaseFolded()`, nombre visible conservado, sin sinónimos/jerarquías/acentos.
+4. **Eventos** — campos y reglas V2 (posición `1..slots`, orden `>=1`, duración `>0`, par
+   inicio/fin completo o ausente, `fin-inicio = duracion`, ventana de turno y de posición, solapes y
+   cronología), identidad fuera, `recesos` ignorado como campo desconocido.
+5. **Semántica del aula de referencia** — referencia, coincidencia de tipo, desplazamiento y
+   vuelta, referencia **vacía y bloqueada** solo en franjas con clase desplazada, exclusividad de las
+   desplazadas, no factible → conflicto de aula, modo móvil, y tabla de lecturas erróneas.
+6. **Salida con aula real** — `asignaciones[].aula` es el índice real (fragmento con dos aulas en el
+   mismo día de un curso fijo) y P3/P4 de `ValidadorSalidaSolver` operan sobre él.
+7. **Ejemplo mínimo válido 2.0** — 1 curso, 1 docente, 2 materias de tipos distintos (referencia
+   «Aula de estudio» + «Laboratorio»), 1 evento.
+8. **Contraejemplo 1.0** rechazado, con el mensaje del cargador y remisión al fixture versionado
+   `test/data/preset-1.0.json`.
+9. **Referencias** — 005, 010 (y su `plan.md` §2), 009, `docs/interfaz-frontend.md` §3.2 y **§5**,
+   MER y constitución §7.
+
+No se duplica la guía de servicios: la API del frontend se remite a `docs/interfaz-frontend.md`.
+No se escribió nada en `docs/solver/` (verificado con `git status --porcelain docs/solver/`, vacío).
+
+### Verificación
+
+```text
+$ grep -nE "2\.0|eventos|aula de referencia|tipo|1\.0" docs/contrato-solver-2.0.md
+1:# Contrato 2.0 del solver — referencia viva
+20:## 1. La versión es 2.0 y solo 2.0
+22:El campo `version` es obligatorio y su valor debe ser exactamente `"2.0"`...
+27:| `"version": "2.0"` | se acepta y se valida el resto (V1–V17) | — |
+28:| `"version": "1.0"` | **entrada inválida** | «V1: versión de configuración no reconocida ('1.0')…
+34:- **No hay conversión.** Un preset 1.0 no se reinterpreta, no se completa con tipos por defecto…
+38:  > La configuración de «/ruta/al/preset.json» declara la versión «1.0»; solo se acepta la versión
+65:| `cursos` | arreglo | año, sección, turno, plan, aula de referencia | …
+164:### 2.7 `materias` y `aulas`: los tipos
+177:- **`tipo` es obligatorio en toda aula y en toda materia** (**V16**)…
+212:Los eventos (recesos, actos, intervalos) son **metadata**: el solver **los ignora**…
+244:## 5. Semántica del aula de referencia (modo `aula_fija: true`)
+258:4. **Referencia vacía y bloqueada.** Mientras el curso tiene una clase **desplazada**…
+289:verdad**, también en modo de aula fija (fragmento; la raíz del archivo lleva además `metadata`):
+```
+(`…` = línea recortada para el journal; el `grep` completo devuelve 91 líneas.)
+
+Conteo por término (cubre los cinco puntos del «Hecho cuando»): `2.0` ×19, `eventos` ×20,
+`aula de referencia` ×10, `aula real` ×4, `1.0` ×13. `wc -l`: 423 líneas.
+
+**El ejemplo mínimo es válido de verdad.** Se extrajo el bloque ```json de §7 a
+`/tmp/ejemplo-2.0.json` y se cargó con un verificador temporal (`/tmp/valida_preset.cpp`,
+compilado fuera del repo contra `build-backend/src/backend/libbackend.a` y `CargadorConfiguracionSolver`,
+sin tocar el árbol):
+
+```text
+$ python3 -m json.tool /tmp/ejemplo-2.0.json > /dev/null && echo OK
+OK
+$ /tmp/valida_preset /tmp/ejemplo-2.0.json
+ACEPTADA: version=2.0 aulas=2 materias=2 cursos=1 eventos=1 toJson.version=2.0
+exit=0
+```
+
+El contraejemplo de §8, por el mismo cargador:
+
+```text
+$ /tmp/valida_preset /tmp/contraejemplo-1.0.json
+RECHAZADA: La configuración de «/tmp/contraejemplo-1.0.json» declara la versión «1.0»; solo se
+acepta la versión 2.0. Genere una configuración 2.0 desde los datos con la versión actual.
+exit=1
+```
+
+El texto pegado en el documento (§1 y §8) es **el literal** de
+`CargadorConfiguracionSolver.cpp:59-68`.
+
+```text
+$ git status --short
+?? docs/contrato-solver-2.0.md
+$ git diff --stat
+(ninguna línea: el archivo es nuevo y aún no está rastreado)
+$ git status --porcelain docs/solver/
+(vacío: no se tocó ningún documento histórico)
+```
+
+Superficie acotada a `docs/contrato-solver-2.0.md` (nuevo), `tasks.md` y este journal.
+
+### Hallazgos
+
+- **`slots_por_turno` no se valida ni se usa.** Solo se parsea y se serializa; la rejilla efectiva de
+  un turno es su lista `slot` y la de un evento se acota por `slot.size()`. El documento lo dice así
+  para que nadie lo tome por una validación.
+- **`claveTipo` no normaliza acentos, solo caja.** `trimmed()` + `toCaseFolded()`
+  (`contrato_solver.cpp:29`): `"Física"` = `"FÍSICA"` pero `"Fisica"` ≠ `"Física"`. T3 lo describe
+  como «normaliza acentos»; el comportamiento real y el documentado es **plegado de caja**, y así se
+  escribió (§3). No es un defecto de código, pero conviene no prometer equivalencia `Fisica/Física`.
+- **`capacidad <= 0` no genera aviso.** P3 solo compara cuando `capacidad > 0`
+  (`ValidadorSalidaSolver.cpp:150`); documentado en §2.7 y §6.
+- **El ejemplo se validó por el camino de producción completo** (cargador → `fromJson` → V1–V17), no
+  solo por `json.tool`; no hizo falta CLI nueva ni tocar tests, porque se compiló un `main` efímero en
+  `/tmp` enlazado contra la librería ya construida.
