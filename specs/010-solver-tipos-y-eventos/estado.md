@@ -2,11 +2,12 @@
 
 Fase: plan
 Aprobaciones: spec 2026-10-23
-Base: 5d6b1da77c9da645441a0bebb38e37753f0f7198 (HEAD). **Condición:** el cambio de esquema está **sin commitear** en el árbol; el diff no forma parte de la base y la validación futura no debe imputarlo a la implementación. La base efectiva será el commit que incluya el esquema inicial.
+Base: e72c930 (cierre de la 009; HEAD = e72c930). La 009 está implementada y el árbol limpio.
 Dudas abiertas: ninguna
-Siguiente paso: el planner escribirá `plan.md` y `tasks.md` de la 009 cuando el usuario confirme la base de commit.
+Siguiente paso: QA del plan por el reviewer y aprobación del usuario; tras la aprobación, implementar T1. La 011 (hora académica) va después.
 Veredicto: pendiente
-QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
+QA: APROBADA con las notas del re-QA aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
+QA del plan: escrito el 2026-10-24, ajustado el 2026-10-25 (RF-1 con `Resultado<QJsonObject>`) y corregido tras el QA del plan (11 hallazgos, sección propia); pendiente de la nueva revisión del reviewer y de la aprobación del usuario.
 
 ## Decisiones cerradas (2026-10-23)
 
@@ -28,6 +29,42 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 - **Salida.** Cada clase informa el **aula real** donde se impartió, también en modo de aula fija.
 - **Duda diferida (fuera de alcance): la cancha compartida.** Se deja con exclusividad; si el usuario
   decide compartirla, se abre un cambio de requisitos.
+
+## Correcciones del QA del plan (2026-10-25)
+
+Once hallazgos aplicados; el plan sigue con **10 tareas** (T1–T10, 30/30/30/30/20/20/20/20/20/20 min).
+
+1. **Fixture de T2 versionado.** `datos-prueba/` está en `.gitignore:35`; se sustituye por
+   `test/data/preset-1.0.json` (nuevo, versionado), cargado con `QFINDTESTDATA`, con hash de bytes
+   antes/después. El preset real solo se menciona en la documentación.
+2. **Bloqueo de la referencia.** El bucle recorre solo las claves de `vars.aulaAssignment` con
+   `(d, s, r)` existentes (los turnos mixtos no crean `y` en todas las franjas).
+3. **§7.4 sin detalle.** Solo rango `V1–V15` → `V1–V17`, constancia de que V1 habla de eventos y
+   remisión a la 005/010; no se duplican V2/V16/V17.
+4. **Documentación viva fuera de `docs/solver/`.** `docs/contrato-solver-2.0.md` (la constitución
+   declara `docs/solver/` histórico y no obligatorio).
+5. **T1/T2/T3 reequilibrados.** T1 = contrato 2.0 (incluida la sección `eventos`) + constructor +
+   consumidores que compilan; T2 = versión y cargador; T3 = casos V1/V2/V16/V17 (V1 ya cambiado en
+   T1, aquí solo sus pruebas); los `-R` ya no arrastran tests de otras tareas.
+6. **Benchmark con estrategia fija.** 6 aulas (5 comunes + 1 laboratorio), solo `Tecnología` requiere
+   laboratorio, referencias repartidas por turno; T10 exige factibilidad y < 60 s.
+7. **Seed no generable.** ≈104 bloques de ciencias contra 1 laboratorio × 40 franjas; anotado en el
+   plan y en T10, sin intentar generarlo.
+8. **T5 es solo prueba.** `ValidadorSalidaSolver` ya usa `asignacion.aula`; no cambia producción.
+9. **Un solo nombre de campo.** `SolverConfig` usa `tipo`; la guarda de RF-1 mira `tipoAula` del DTO y
+   los fixtures deben fijar el nombre, no solo `idTipoAula`.
+10. **`TurnoConfig.inicio/fin`** se rellenan en el constructor desde el `TurnoDTO`; sin eso V2 falla.
+11. **Cita corregida:** `test/CMakeLists.txt:120-133`.
+
+## Decisión de plan (2026-10-25)
+
+- **RF-1: la construcción falla si falta un tipo.** `construirJsonEntrada` y la fachada
+  `ConstructorEntradaSolver::construir` devuelven **`Resultado<QJsonObject>`**. Si un aula o una
+  materia de la instantánea no declara tipo, la construcción devuelve `error` con un mensaje en
+  español que nombra la entidad y **no emite JSON**. Se descartan «copiar el tipo vacío y dejar que
+  V16 lo rechace» y «comprobación previa separada». El builder del frontend queda como **rotura
+  conocida** (fuera de alcance; el preset `backend` no lo compila). Detalle en `plan.md` §1.1, §3.1 y
+  decisión 12.
 
 ## Decisiones y correcciones del re-QA (2026-10-23)
 
@@ -59,7 +96,9 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 - **N16 — Numeración.** Se unifica «V16 y V17» en toda la spec; no queda «V16+».
 - **N17 — Identidad del evento.** No viaja en el contrato ni forma parte de la equivalencia; los
   eventos se distinguen por nombre, posición y orden.
-- **N19 — Base.** Anotada la condición del esquema WIP sin commitear (ver cabecera).
+- **N19 — Base.** Fijada en **`e72c930`**, cierre de la 009; HEAD = `e72c930`. La 009 está
+  implementada y el árbol limpio; no hay diff de esquema sin commitear que imputar a la
+  implementación.
 
 ## Supersesión de la 005 (declarada en RF-7)
 
@@ -76,13 +115,17 @@ QA: APROBADA con 5 notas menores, aplicadas el 2026-10-23; spec aprobada por el 
 
 ## Notas de proceso
 
-- **Autoría de la enmienda constitucional.** La skill sdd dice que el implementer no edita
-  `docs/constitution.md`; la 010 la exige como tarea propia del plan. El plan debe asignarla al
-  planner/usuario o contar con autorización explícita para que la ejecute otro agente.
-- **No hay plan ni tareas todavía.** Esta fase termina con la aprobación de la spec.
+- **La enmienda constitucional la ejecuta el planner** al aprobarse el plan; el implementer solo
+  verifica. T7 incluye también la anotación de la 005.
+- **Plan y tareas escritos (2026-10-24).** `plan.md` y `tasks.md` están pendientes de QA del reviewer
+  y de aprobación del usuario; la implementación empieza después, en orden T1–T10.
+- **RF-1 cerrado (2026-10-25).** La construcción devuelve `Resultado<QJsonObject>` y falla si un aula
+  o una materia no declara tipo; la confirmación que estaba pendiente queda resuelta y ya no hay dudas
+  abiertas.
+- **Preset 1.0 de prueba.** `test/data/preset-1.0.json` (versionado) es el fixture de rechazo de T2,
+  leído con `QFINDTESTDATA` y verificado por hash de bytes. `datos-prueba/preset-generacion-31059.json`
+  no está versionado (`.gitignore:35`) y solo se cita en la documentación como ejemplo a regenerar.
 
 ## Tamaño previsto
 
-Diez RF agrupables en **≤10 tareas**: contrato y versión, rechazo de configuraciones anteriores, regla
-de tipo, entrada/salida, validaciones, causas, supersesión, constitución, diagrama y documentación del
-contrato.
+Diez RF en **diez tareas** (20-30 min), con build sin frontend y el benchmark de 60 s en T10.
