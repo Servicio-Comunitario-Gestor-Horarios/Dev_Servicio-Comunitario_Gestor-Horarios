@@ -5,18 +5,24 @@
  * @brief Construcción del JSON de entrada del solver (RF-1).
  *
  * Combina una instantánea de los dominios del cliente (entidades: docentes,
- * aulas, materias, planes, cursos y turnos/recesos) con los parámetros del solver
- * (preset: franja horaria, penalizaciones, planificación, generación y los campos
- * por docente como horas_requeridas/horas_aula, casados por nombre).
+ * aulas, materias, planes, cursos y turnos con sus eventos) con los parámetros del
+ * solver (preset: franja horaria, penalizaciones, planificación, generación y los
+ * campos por docente como horas_requeridas/horas_aula, casados por nombre).
  *
  * Deriva `dimensiones` de los tamaños de los arrays y estampa
  * `meta.fecha_modificacion` con un instante inyectado. No toca la base de datos.
- * Es una función pura (sin E/S): su único efecto es devolver el JSON.
+ * Es una función pura (sin E/S): su único efecto es devolver la entrada 2.0.
+ *
+ * Los tipos de aula viajan por su **nombre** (`AulaDTO::tipoAula` /
+ * `MateriaDTO::tipoAula`). Si un aula o una materia de la instantánea no declara
+ * tipo, la construcción **falla** (RF-1): no se rellena un tipo por defecto ni se
+ * emite JSON.
  */
 
 #include <QDateTime>
 #include <QJsonObject>
 
+#include "backend/resultado.hpp"
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
@@ -37,30 +43,24 @@ struct DatosDominio
     QVector<TurnoDTO>    turnos;   ///< incluye sus eventos
 };
 
-/**
- * @brief Puente temporal (hasta la spec 010): una entrada por evento del turno.
- *
- * El contrato 1.0 no transporta el nombre ni el orden del evento; el constructor
- * solo necesita turno, posición, duración y horario (RF-12).
- */
-QVector<RecesoConfig> recesosDesdeEventos(const TurnoDTO& turno);
-
-/// Construye el JSON de entrada (13 secciones) de forma pura.
+/// Construye la entrada del solver (13 secciones) de forma pura (RF-1).
 ///
-/// `parametros` aporta lo que no es entidad: `version`, `franja_horaria`,
-/// `planificacion`, `generacion`, `penalizaciones` y, por docente (casado por
-/// nombre), `horas_requeridas`, `horas_aula`, `turno`, `plan` y
-/// `materias_suplente`. Las entidades (materias, aulas, cursos, docentes y
-/// turnos/recesos) se toman de `datos`.
-QJsonObject construirJsonEntrada(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora);
+/// `parametros` aporta lo que no es entidad: `franja_horaria`, `aula_fija` y, por
+/// docente (casado por nombre), `horas_requeridas`, `horas_aula`, `turno`, `plan` y
+/// `materias_suplente`. Las entidades (materias, aulas, cursos, docentes y turnos
+/// con sus eventos) se toman de `datos`; la versión de la entrada es siempre 2.0.
+///
+/// Devuelve error (sin emitir JSON) si un aula o una materia de `datos` no declara
+/// tipo de aula.
+Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            const QDateTime& ahora);
 
 /// Fachada del constructor (equivalente a `construirJsonEntrada`).
 class ConstructorEntradaSolver
 {
 public:
-    static QJsonObject construir(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora);
+    static Resultado<QJsonObject> construir(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            const QDateTime& ahora);
 };

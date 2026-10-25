@@ -31,7 +31,7 @@ using namespace operations_research::sat;
 struct VariablesTest : public ::testing::Test {
     SolverConfig makeBaseConfig() {
         SolverConfig cfg;
-        cfg.version = "1.0";
+        cfg.version = "2.0";
 
         // Dimensiones
         cfg.dimensiones = {1, 1, 1, 1, 5, 12};
@@ -43,9 +43,6 @@ struct VariablesTest : public ::testing::Test {
         TurnoConfig manana{"manana", {0, 1, 2, 3, 4, 5}};
         TurnoConfig tarde{"tarde", {6, 7, 8, 9, 10, 11}};
         cfg.turnos.turnos = {manana, tarde};
-
-        // Recesos (vacío)
-        cfg.recesos = {};
 
         // Modo de aula fija (global) + plan embebido
         cfg.aula_fija = true;
@@ -88,7 +85,7 @@ struct VariablesTest : public ::testing::Test {
 TEST_F(VariablesTest, EmptyConfig_NoVariablesCreated) {
     // Arrange
     SolverConfig cfg;
-    cfg.version = "1.0";
+    cfg.version = "2.0";
     cfg.dimensiones = {0, 0, 0, 0, 5, 12};
     cfg.franja_horaria = {60, 6};
     TurnoConfig manana{"manana", {0, 1, 2, 3, 4, 5}};

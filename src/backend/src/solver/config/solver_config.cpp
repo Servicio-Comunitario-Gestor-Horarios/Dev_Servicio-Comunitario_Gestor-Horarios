@@ -85,6 +85,8 @@ TurnosConfig parsearTurnos(const QJsonObject& obj)
         TurnoConfig t;
         t.nombre = leerTexto(o, "nombre");
         t.slot   = leerEnteros(o["slot"].toArray());
+        t.inicio = leerTexto(o, "inicio");
+        t.fin    = leerTexto(o, "fin");
         tc.turnos.append(t);
     }
     return tc;
@@ -96,6 +98,8 @@ QJsonObject aJson(const TurnosConfig& tc)
         QJsonObject obj;
         obj["nombre"] = t.nombre;
         obj["slot"]   = aJson(t.slot);
+        obj["inicio"] = t.inicio;
+        obj["fin"]    = t.fin;
         arr.append(obj);
     }
     QJsonObject obj;
@@ -103,32 +107,37 @@ QJsonObject aJson(const TurnosConfig& tc)
     return obj;
 }
 
-/* ── Recesos ── */
-QVector<RecesoConfig> parsearRecesos(const QJsonArray& arr)
+/* ── Eventos del turno ── */
+QVector<EventoConfig> parsearEventos(const QJsonArray& arr)
 {
-    QVector<RecesoConfig> recesos;
+    QVector<EventoConfig> eventos;
+    eventos.reserve(arr.size());
     for (const QJsonValue& valor : arr) {
         const QJsonObject o = valor.toObject();
-        RecesoConfig r;
-        r.turno           = leerTexto(o, "turno");
-        r.despues_de_slot = leerEntero(o, "despues_de_slot");
-        r.duracion        = leerEntero(o, "duracion");
-        r.inicio          = leerTexto(o, "inicio");
-        r.fin             = leerTexto(o, "fin");
-        recesos.append(r);
+        EventoConfig e;
+        e.nombre           = leerTexto(o, "nombre");
+        e.turno            = leerTexto(o, "turno");
+        e.despues_de_slot  = leerEntero(o, "despues_de_slot");
+        e.orden            = leerEntero(o, "orden");
+        e.duracion         = leerEntero(o, "duracion");
+        e.inicio           = leerTexto(o, "inicio");
+        e.fin              = leerTexto(o, "fin");
+        eventos.append(e);
     }
-    return recesos;
+    return eventos;
 }
-QJsonArray aJson(const QVector<RecesoConfig>& recesos)
+QJsonArray aJson(const QVector<EventoConfig>& eventos)
 {
     QJsonArray arr;
-    for (const RecesoConfig& r : recesos) {
+    for (const EventoConfig& e : eventos) {
         QJsonObject obj;
-        obj["turno"]           = r.turno;
-        obj["despues_de_slot"] = r.despues_de_slot;
-        obj["duracion"]        = r.duracion;
-        obj["inicio"]          = r.inicio;
-        obj["fin"]             = r.fin;
+        obj["nombre"]          = e.nombre;
+        obj["turno"]           = e.turno;
+        obj["despues_de_slot"] = e.despues_de_slot;
+        obj["orden"]           = e.orden;
+        obj["duracion"]        = e.duracion;
+        obj["inicio"]          = e.inicio;
+        obj["fin"]             = e.fin;
         arr.append(obj);
     }
     return arr;
@@ -297,8 +306,10 @@ QVector<MateriaSolverConfig> parsearMaterias(const QJsonArray& arr)
 {
     QVector<MateriaSolverConfig> materias;
     for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
         MateriaSolverConfig m;
-        m.nombre = leerTexto(valor.toObject(), "nombre");
+        m.nombre = leerTexto(o, "nombre");
+        m.tipo   = leerTexto(o, "tipo");
         materias.append(m);
     }
     return materias;
@@ -309,6 +320,7 @@ QJsonArray aJson(const QVector<MateriaSolverConfig>& materias)
     for (const MateriaSolverConfig& m : materias) {
         QJsonObject obj;
         obj["nombre"] = m.nombre;
+        obj["tipo"]   = m.tipo;
         arr.append(obj);
     }
     return arr;
@@ -357,24 +369,26 @@ const TurnoConfig* buscarTurno(const SolverConfig& c, const QString& nombre)
     return nullptr;
 }
 
-/// V1. Estructura: el JSON trae todas las secciones requeridas y una version reconocida (RF-10).
+/// V1. Estructura: la version se comprueba ANTES que las secciones y el JSON 2.0 trae todas las
+/// secciones requeridas, incluida la de eventos (RF-1).
 QString validarEstructura(const QJsonObject& obj)
 {
+    // La version manda: un 1.0 sin `eventos` se rechaza por version, no por «falta eventos».
+    const QString version = obj.value(QLatin1String("version")).toString();
+    if (version.isEmpty())
+        return QStringLiteral("V1: la configuración no declara versión; se espera '2.0'.");
+    if (version != QLatin1String("2.0"))
+        return QStringLiteral("V1: versión de configuración no reconocida ('%1'); se espera '2.0'.")
+            .arg(version);
+
     const QStringList requeridas = {QStringLiteral("version"),      QStringLiteral("dimensiones"),
                                     QStringLiteral("franja_horaria"), QStringLiteral("turnos"),
-                                    QStringLiteral("recesos"),       QStringLiteral("planes"),
+                                    QStringLiteral("eventos"),       QStringLiteral("planes"),
                                     QStringLiteral("cursos"),        QStringLiteral("profesores"),
                                     QStringLiteral("materias"),      QStringLiteral("aulas")};
     for (const QString& clave : requeridas)
         if (!obj.contains(clave))
             return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
-
-    // RF-10: esta spec produce y acepta la version `1.0`; otra (no reconocida) se rechaza con
-    // causa (1) entrada invalida. La version ausente ya se rechaza arriba (seccion requerida).
-    const QString version = obj.value(QLatin1String("version")).toString();
-    if (version != QLatin1String("1.0"))
-        return QStringLiteral("V1: version de configuracion no reconocida ('%1'); se espera '1.0'.")
-            .arg(version);
     return {};
 }
 
@@ -582,7 +596,7 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
     config.dimensiones    = parsearDimensiones(obj["dimensiones"].toObject());
     config.franja_horaria = parsearFranjaHoraria(obj["franja_horaria"].toObject());
     config.turnos         = parsearTurnos(obj["turnos"].toObject());
-    config.recesos        = parsearRecesos(obj["recesos"].toArray());
+    config.eventos        = parsearEventos(obj["eventos"].toArray());
     config.planes         = parsearPlanes(obj["planes"].toArray());
     config.cursos         = parsearCursos(obj["cursos"].toArray());
     config.profesores     = parsearProfesores(obj["profesores"].toArray());
@@ -609,14 +623,14 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
 QJsonObject SolverConfig::toJson() const
 {
     QJsonObject obj;
-    // Al PRODUCIR/serializar se sella siempre una version valida: si el origen no la declaro,
-    // se escribe "1.0" (nunca vacio). La LECTURA sigue rechazando ausente/no reconocida (RF-10).
-    obj["version"]        = version.isEmpty() ? QStringLiteral("1.0") : version;
+    // Al PRODUCIR/serializar se sella SIEMPRE la version 2.0 (nunca vacio ni 1.0). La LECTURA
+    // rechaza ausente, 1.0 o no reconocida (RF-1, RF-2).
+    obj["version"]        = QStringLiteral("2.0");
     obj["aula_fija"]      = aula_fija;
     obj["dimensiones"]    = aJson(dimensiones);
     obj["franja_horaria"] = aJson(franja_horaria);
     obj["turnos"]         = aJson(turnos);
-    obj["recesos"]        = aJson(recesos);
+    obj["eventos"]        = aJson(eventos);
     obj["planes"]         = aJson(planes);
     obj["cursos"]         = aJson(cursos);
     obj["profesores"]     = aJson(profesores);

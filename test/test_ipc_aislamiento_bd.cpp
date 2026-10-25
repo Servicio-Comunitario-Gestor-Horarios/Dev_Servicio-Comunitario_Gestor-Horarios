@@ -30,9 +30,11 @@ private:
         DatosDominio d;
 
         MateriaDTO mat; mat.id = 1; mat.nombre = QStringLiteral("Matemática");
+        mat.idTipoAula = 1; mat.tipoAula = QStringLiteral("Aula de estudio");
         d.materias = {mat};
 
         AulaDTO aula; aula.id = 10; aula.nombre = QStringLiteral("A1"); aula.capacidad = 30;
+        aula.idTipoAula = 1; aula.tipoAula = QStringLiteral("Aula de estudio");
         d.aulas = {aula};
 
         TurnoDTO turno;
@@ -63,7 +65,7 @@ private:
         d.docentes = {prof};
 
         SolverConfig p;
-        p.version = QStringLiteral("1.0");
+        p.version = QStringLiteral("2.0");
         p.dimensiones.num_dias = 5;
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
@@ -78,7 +80,12 @@ private:
         ps.horas_aula = 8;
         p.profesores = {ps};
 
-        return construirJsonEntrada(d, p, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const auto resultado =
+            construirJsonEntrada(d, p, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio)",
+                                       qPrintable(resultado.mensajeError), __FILE__, __LINE__);
+        Q_UNUSED(ok);
+        return resultado.valor;
     }
 
 private slots:

@@ -138,70 +138,81 @@ namespace
     }
 } // namespace
 
-QVector<RecesoConfig> recesosDesdeEventos(const TurnoDTO& turno)
+Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            const QDateTime& ahora)
 {
-    QVector<RecesoConfig> recesos;
-    recesos.reserve(turno.eventos.size());
-    for (const EventoDTO& evento : turno.eventos)
-    {
-        RecesoConfig receso;
-        receso.turno           = turno.nombre;
-        receso.despues_de_slot = evento.despuesDeSlot;
-        receso.duracion        = evento.duracion;
-        receso.inicio          = evento.inicio.isValid()
-                                     ? evento.inicio.toString(QStringLiteral("HH:mm"))
-                                     : QString();
-        receso.fin             = evento.fin.isValid()
-                                     ? evento.fin.toString(QStringLiteral("HH:mm"))
-                                     : QString();
-        recesos.append(receso);
-    }
-    return recesos;
-}
+    // 1. Tipos obligatorios (RF-1). Orden determinista: aulas y luego materias, en el orden de la
+    //    instantánea; el primer defecto detiene la construcción y no se emite JSON.
+    for (const AulaDTO& a : datos.aulas)
+        if (a.tipoAula.trimmed().isEmpty())
+            return Resultado<QJsonObject>::error(
+                QStringLiteral("El aula «%1» no tiene tipo de aula. Asígnelo en el catálogo de "
+                               "tipos antes de generar el horario.")
+                    .arg(a.nombre));
 
-QJsonObject construirJsonEntrada(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora)
-{
+    for (const MateriaDTO& m : datos.materias)
+        if (m.tipoAula.trimmed().isEmpty())
+            return Resultado<QJsonObject>::error(
+                QStringLiteral("La materia «%1» no tiene tipo de aula requerido. Asígnelo antes "
+                               "de generar el horario.")
+                    .arg(m.nombre));
+
     const QVector<TurnoOrdenado> turnosOrdenados = ordenarTurnos(datos.turnos);
 
     SolverConfig salida;
 
-    // Parametros del solver que no son entidad.
-    salida.version        = parametros.version;
+    // Parametros del solver que no son entidad. La entrada es SIEMPRE del contrato 2.0: la
+    // version no se copia del preset (RF-1).
+    salida.version        = QStringLiteral("2.0");
     salida.aula_fija      = parametros.aula_fija;      // modo GLOBAL (del preset)
     salida.franja_horaria = parametros.franja_horaria;
 
-    // Materias: pool global en el orden de la instantánea.
+    // Materias: pool global en el orden de la instantánea; el tipo viaja por su nombre.
     for (const MateriaDTO& m : datos.materias)
-        salida.materias.append(MateriaSolverConfig{m.nombre});
+        salida.materias.append(MateriaSolverConfig{m.nombre, m.tipoAula});
 
-    // Aulas.
+    // Aulas: el tipo de aula sale de los datos, sin valor por defecto.
     for (const AulaDTO& a : datos.aulas)
     {
         AulaSolverConfig aula;
         aula.nombre    = a.nombre;
-        aula.tipo      = QStringLiteral("regular");   // el dominio no distingue tipo aún
+        aula.tipo      = a.tipoAula;
         aula.capacidad = a.capacidad;
         salida.aulas.append(aula);
     }
 
-    // Turnos: slots absolutos por orden de inicio.
+    // Turnos: slots absolutos por orden de inicio + ventana del turno para V2.
     for (const TurnoOrdenado& t : turnosOrdenados)
     {
         TurnoConfig turno;
         turno.nombre = t.nombre;
         for (int k = 0; k < t.numSlots; ++k)
             turno.slot.append(t.offset + k);
+        turno.inicio = t.inicio.isValid() ? t.inicio.toString(QStringLiteral("HH:mm")) : QString();
+        turno.fin    = t.fin.isValid() ? t.fin.toString(QStringLiteral("HH:mm")) : QString();
         salida.turnos.turnos.append(turno);
     }
 
-    // Recesos (puente 1.0): una entrada por evento del turno.
+    // Eventos del turno (contrato 2.0): una entrada por evento, sin identidad.
     for (const TurnoDTO& t : datos.turnos)
     {
-        const QVector<RecesoConfig> recesosDelTurno = recesosDesdeEventos(t);
-        for (const RecesoConfig& receso : recesosDelTurno)
-            salida.recesos.append(receso);
+        for (const EventoDTO& evento : t.eventos)
+        {
+            EventoConfig config;
+            config.nombre          = evento.nombre;
+            config.turno           = t.nombre;
+            config.despues_de_slot = evento.despuesDeSlot;
+            config.orden           = evento.orden;
+            config.duracion        = evento.duracion;
+            config.inicio          = evento.inicio.isValid()
+                                         ? evento.inicio.toString(QStringLiteral("HH:mm"))
+                                         : QString();
+            config.fin             = evento.fin.isValid()
+                                         ? evento.fin.toString(QStringLiteral("HH:mm"))
+                                         : QString();
+            salida.eventos.append(config);
+        }
     }
 
     // Cursos: de la BD (anio/seccion/turno/aula); del preset (plan/num_estudiantes).
@@ -307,12 +318,12 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         ahora.isValid() ? ahora.toString(Qt::ISODate) : QString();
     json["meta"] = meta;
 
-    return json;
+    return Resultado<QJsonObject>::exito(json);
 }
 
-QJsonObject ConstructorEntradaSolver::construir(const DatosDominio& datos,
-                                                const SolverConfig& parametros,
-                                                const QDateTime& ahora)
+Resultado<QJsonObject> ConstructorEntradaSolver::construir(const DatosDominio& datos,
+                                                           const SolverConfig& parametros,
+                                                           const QDateTime& ahora)
 {
     return construirJsonEntrada(datos, parametros, ahora);
 }
