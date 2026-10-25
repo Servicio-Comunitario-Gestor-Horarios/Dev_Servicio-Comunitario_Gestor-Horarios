@@ -71,7 +71,7 @@ struct VariablesTest : public ::testing::Test {
         cfg.profesores = {prof};
 
         // Materias
-        cfg.materias = {{"Matemática"}};
+        cfg.materias = {{"Matemática", "regular"}};
 
         // Aulas
         cfg.aulas = {{"A1", "regular", 30}};
@@ -296,16 +296,21 @@ TEST_F(VariablesTest, TwoProfessorsDifferentAvailability_CorrectPruning) {
 
 // ─── Tests: Aula assignment ─────────────────────────────────────────────────
 
-TEST_F(VariablesTest, FixedAula_NoAulaAssignmentCreated) {
+TEST_F(VariablesTest, AulaFija_CreaAulaAssignmentParaTodasLasFranjasDelCurso) {
     // Arrange
-    SolverConfig cfg = makeBaseConfig();
+    SolverConfig cfg = makeBaseConfig();   // aula_fija = true
     CpModelBuilder model;
 
     // Act
     VariablesSolver vars = crearVariables(model, cfg);
 
-    // Assert
-    EXPECT_TRUE(vars.aulaAssignment.isEmpty());
+    // Assert: la `y` existe también con aula de referencia (D9 ampliada).
+    // 1 curso × 5 días × 6 franjas del turno × 1 aula = 30
+    EXPECT_EQ(vars.aulaAssignment.size(), 30);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+
+    // Slot 6 (tarde) no pertenece al turno mañana del curso.
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 6, 0}));
 }
 
 TEST_F(VariablesTest, MobileAula_CreatesAulaAssignment) {
@@ -326,14 +331,36 @@ TEST_F(VariablesTest, MobileAula_MultipleAulas) {
     SolverConfig cfg = makeBaseConfig();
     cfg.aula_fija = false;
     cfg.dimensiones.num_aulas = 3;
+    cfg.dimensiones.num_materias = 2;
+    cfg.materias = {{"Matemática", "regular"}, {"Química", "lab"}};
+    cfg.planes = {{"General", {{0, 1, 4}, {1, 1, 2}}}};
+    cfg.profesores[0].materias_asignadas = {0, 1};
     cfg.aulas = {{"A1", "regular", 30}, {"A2", "lab", 25}, {"A3", "regular", 40}};
     CpModelBuilder model;
 
     // Act
     VariablesSolver vars = crearVariables(model, cfg);
 
-    // Assert: 1 curso × 5 días × 6 slots × 3 aulas = 90
+    // Assert: el curso requiere los tipos «regular» y «lab» → las 3 aulas.
+    // 1 curso × 5 días × 6 slots × 3 aulas = 90
     EXPECT_EQ(vars.aulaAssignment.size(), 90);
+}
+
+TEST_F(VariablesTest, AulaAssignment_SoloAulasDeLosTiposQueElCursoRequiere) {
+    // Arrange: una sola materia de tipo «regular»; el laboratorio no se crea.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.aula_fija = false;
+    cfg.dimensiones.num_aulas = 2;
+    cfg.aulas = {{"A1", "regular", 30}, {"Lab", "Laboratorio", 20}};
+    CpModelBuilder model;
+
+    // Act
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // Assert
+    EXPECT_EQ(vars.aulaAssignment.size(), 30);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 0, 1}));
 }
 
 TEST_F(VariablesTest, MobileAula_KeysAreCorrect) {
@@ -383,6 +410,13 @@ TEST_F(VariablesTest, MultipleCourses_DifferentTurnos) {
 
     // Assert: curso1(mañana)=30 + curso2(tarde)=30 = 60
     EXPECT_EQ(vars.assignment.size(), 60);
+
+    // `y` para TODOS los cursos (fijos y móviles), solo en las franjas de su turno.
+    EXPECT_EQ(vars.aulaAssignment.size(), 60);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+    EXPECT_TRUE(vars.aulaAssignment.contains({1, 0, 6, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 6, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({1, 0, 0, 0}));
 }
 
 TEST_F(VariablesTest, MultipleMateriasPerCourse) {

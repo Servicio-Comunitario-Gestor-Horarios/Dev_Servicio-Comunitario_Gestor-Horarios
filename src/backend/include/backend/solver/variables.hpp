@@ -23,7 +23,8 @@ using namespace operations_research::sat;
  *
  * Contiene:
  * - assignment         (x): profesor-materia-curso-dia-slot
- * - aulaAssignment     (y): aula de cursos moviles (solo si el modo no es aula fija)
+ * - aulaAssignment     (y): aula REAL de cada clase, para TODOS los cursos (fijos y móviles);
+ *                          solo se crean las aulas de los tipos que el curso requiere
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
  * - exceso             (e): bloques por encima del tope de horas de aula (S1)
  */
@@ -45,7 +46,9 @@ struct VariablesSolver {
  * Crea `z[p][c][m]` para TODO candidato elegible por plan/anio (aunque no tenga ninguna `x`):
  * los recortes por turno/disponibilidad viven en las `x` y D3 (`Σx = bloques·z`) fuerza z=0, de
  * modo que la ausencia de candidato con disponibilidad hace INFEASIBLE a D1 (no se omite).
- * `y[c][d][s][a]` solo con el modo de aulas moviles (config.aula_fija == false).
+ * Crea `y[c][d][s][a]` para TODOS los cursos (fijos y móviles), en las franjas de su turno y solo
+ * para las aulas cuyo tipo requiere alguna materia del curso: es el aula real de la clase (D9
+ * ampliada y RF-3 de la spec 010).
  *
  * @param model Modelo CP-SAT donde se crean las BoolVar
  * @param config Configuración completa del solver

@@ -259,15 +259,14 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
 
         auto [p, m, c, d, s] = it.key();
 
-        // Aula: la fija del curso (indice) en modo fijo; en movil, la asignada.
-        int aula = config.aula_fija ? config.cursos[c].aula : -1;
-        if (aula < 0) {
-            for (auto itA = vars.aulaAssignment.constBegin(); itA != vars.aulaAssignment.constEnd(); ++itA) {
-                auto [ac, ad, as, aa] = itA.key();
-                if (ac == c && ad == d && as == s && SolutionBooleanValue(response, itA.value())) {
-                    aula = aa;
-                    break;
-                }
+        // Aula real de la clase: la única `y[c][d][s][a]` activa, también en modo de aula
+        // fija (RF-4). Una clase desplazada informa el aula donde se imparte, no la referencia.
+        int aula = -1;
+        for (auto itA = vars.aulaAssignment.constBegin(); itA != vars.aulaAssignment.constEnd(); ++itA) {
+            const auto [ac, ad, as, aa] = itA.key();
+            if (ac == c && ad == d && as == s && SolutionBooleanValue(response, itA.value())) {
+                aula = aa;
+                break;
             }
         }
 

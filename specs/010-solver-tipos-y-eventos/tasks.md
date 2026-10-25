@@ -9,7 +9,7 @@
 - [x] **T3. Casos V1 (eventos), V2, V16 y V17.** RF-5
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_validador_entrada|test_contrato_solver'` está verde; los casos de V1 exigen la sección `eventos` y no `recesos` (comportamiento cambiado en T1) y tratan la versión ausente/1.0 como entrada inválida; V2 rechaza nombre vacío, turno inexistente, posición 0/fuera, orden 0, duración 0, par incompleto, `fin<=inicio`, diferencia distinta de la duración, intervalo fuera de la ventana de turno/posición, solapes y cronología invertida; V16 rechaza aula/materia sin tipo; V17 rechaza un tipo requerido sin aulas en ambos modos; `claveTipo` normaliza mayúsculas, espacios y acentos.
 
-- [ ] **T4. Modelo de tipo, aula de referencia, desplazamiento, bloqueo y salida real.** RF-3, RF-4
+- [x] **T4. Modelo de tipo, aula de referencia, desplazamiento, bloqueo y salida real.** RF-3, RF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios|test_variables_cp_sat'` está verde; un curso fijo con materia del tipo de su referencia usa la referencia; una materia de otro tipo se imparte en un aula de ese tipo y el curso vuelve; mientras hay una clase desplazada, otro curso no usa la referencia en esa franja; la exclusividad cubre las desplazadas; el curso móvil usa el tipo exacto; la salida informa el aula real de cada clase; `test_variables_cp_sat` ve la `y` de todos los cursos.
 
 - [ ] **T5. Validador de salida con aulas reales (solo pruebas).** RF-4

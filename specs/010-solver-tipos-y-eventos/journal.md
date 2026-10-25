@@ -352,3 +352,152 @@ tipos equivalentes por clave -> ACEPTA
   consumidor (V17 y su prueba); se añade aquí como función pura, sin duplicar la del servicio de BD.
 - **Fuera de alcance respetado:** sin cambios en el modelo del solver, la regla de asignación (T4), el
   validador de salida (T5) ni la documentación (T7-T9); sin commit.
+
+## T4 - Modelo: tipo, referencia, desplazamiento, bloqueo y salida real (2026-10-25)
+
+**Requisito:** RF-3 y RF-4. **Plan:** §4.1 (variables), §4.2 (restricciones), §4.3 (salida) y
+decisiones 5-9. **Base:** `4142939` (T1-T3 commiteadas; suite 49/49).
+
+### Rojo (tests primero)
+
+Se migraron los fixtures de `test_solver_horarios` y `test_variables_cp_sat` a **tipos coherentes**
+(materias y aulas del mismo tipo, `version` a `"2.0"`) y se añadieron los casos de tipo, referencia,
+desplazamiento, bloqueo, exclusividad de desplazadas, modo móvil y `y` de todos los cursos. Con el
+modelo de T3 (sin tipos, sin `y` en aula fija, salida con la ficha del curso):
+
+```text
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : solver_materiaDeOtroTipoSeDesplazaYVuelve() Actual (asig.aula): 0  Expected (1): 1
+FAIL!  : solver_referenciaBloqueadaMientrasHayClaseDesplazada()
+          Actual (usosDeLaReferenciaBloqueada): 2  Expected (0): 0
+FAIL!  : solver_exclusividadEntreClasesDesplazadas() Actual (enLaboratorio): 0  Expected (4): 4
+FAIL!  : solver_modoMovilEligeAulaDelTipoRequerido() Actual (asig.aula): 0  Expected (2): 2
+Totals: 17 passed, 4 failed, 0 skipped, 0 blacklisted, 63ms
+
+$ ./build-backend/test/test_backend_variables_cp_sat
+[  FAILED  ] VariablesTest.AulaFija_CreaAulaAssignmentParaTodasLasFranjasDelCurso
+[  FAILED  ] VariablesTest.AulaAssignment_SoloAulasDeLosTiposQueElCursoRequiere
+[  FAILED  ] VariablesTest.MultipleCourses_DifferentTurnos
+[  PASSED  ] 18 tests.
+ 3 FAILED TESTS
+```
+
+(`solver_aulaFijaUsaLaReferenciaSiElTipoCoincide` pasaba ya en rojo porque el atajo antiguo
+«aula fija ⇒ aula del curso» devolvía la referencia sin comprobar nada; por eso la prueba decisiva de
+la referencia es la de dos cursos y dos aulas del mismo tipo, ver controles negativos.)
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+[6/6] Linking CXX executable test/test_ipc_aislamiento_bd     # exit 0
+
+$ ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios|test_variables_cp_sat'
+1/1 Test #47: test_solver_horarios .............   Passed    0.15 sec
+100% tests passed out of 1
+
+$ ctest --test-dir build-backend --output-on-failure -R 'variables_cp_sat'
+1/1 Test #46: test_backend_variables_cp_sat ....   Passed    0.06 sec
+```
+
+(`-R 'test_variables_cp_sat'` no casa con el nombre real del test en CTest,
+`test_backend_variables_cp_sat`; se ejecutó aparte. Sin cambios en `test/CMakeLists.txt`.)
+
+Casos (23/23 en `test_solver_horarios`, ejecutando el binario):
+
+```text
+PASS   : solver_aulaFijaUsaLaReferenciaSiElTipoCoincide()
+PASS   : solver_aulaFijaFuerzaLaReferenciaFrenteAOtraAulaDelMismoTipo()
+PASS   : solver_materiaDeOtroTipoSeDesplazaYVuelve()
+PASS   : solver_referenciaBloqueadaMientrasHayClaseDesplazada()
+PASS   : solver_referenciaBloqueadaNoCedeSuFranja()
+PASS   : solver_exclusividadEntreClasesDesplazadas()
+PASS   : solver_modoMovilEligeAulaDelTipoRequerido()
+Totals: 23 passed, 0 failed, 0 skipped, 0 blacklisted, 85ms
+```
+
+`test_backend_variables_cp_sat`: **21/21**, con `AulaFija_CreaAulaAssignmentParaTodasLasFranjasDelCurso`,
+`AulaAssignment_SoloAulasDeLosTiposQueElCursoRequiere` y `MultipleCourses_DifferentTurnos` (la `y` de
+los dos cursos, cada una solo en las franjas de su turno).
+
+### Controles negativos (las pruebas no son vacuas)
+
+Se desactivó cada regla por separado, se recompiló y se ejecutó el binario; después se restauró el
+archivo (el árbol final no contiene ningún control):
+
+```text
+sin bloqueo de la referencia      -> FAIL solver_referenciaBloqueadaNoCedeSuFranja (el modelo pasa a ser factible)
+sin tipo exacto                   -> FAIL solver_exclusividadEntreClasesDesplazadas + solver_modoMovilEligeAulaDelTipoRequerido
+sin implicación de la referencia  -> FAIL solver_aulaFijaFuerzaLaReferenciaFrenteAOtraAulaDelMismoTipo
+```
+
+La primera versión de los casos de bloqueo/referencia era **vácua**: sin la regla seguían en verde
+(el solver elegía la referencia por orden de variables). Se reforzaron: el bloqueo se prueba con un
+caso que sin la reserva es **factible** (`solver_referenciaBloqueadaNoCedeSuFranja`) y la referencia
+con dos cursos cuyas referencias están cruzadas respecto del orden de variables.
+
+### Suite completa
+
+```text
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+48 - test_solver_benchmark (Failed)
+```
+
+**Rojo único: `test_solver_benchmark`.** Su fixture declara `tipo` vacío en las 15 materias
+(`{"Matematica"}, ...`) y tipos en las aulas (`regular`, `laboratorio`, `auditorio`). Con la regla dura
+ninguna clave de materia coincide con ningún aula: no se crea ninguna `y` y D9 deja las clases a 0 →
+INFEASIBLE. **No se tocó el fixture**: su estrategia (6 aulas: 5 comunes + 1 laboratorio, solo
+`Tecnología` en laboratorio, referencias repartidas por turno) es de **T10** (§1.3 del plan). Con esa
+estrategia la `y` sería de **615** variables (7 cursos × 5 días × 3 franjas × 5 aulas comunes + 1 curso
+× 5 × 3 × 6 aulas), frente a las 0 de hoy; el resto de la suite (48/49) está en verde y
+`test_solver_horarios` tarda 85 ms.
+
+### Cambios
+
+- `src/backend/src/solver/variables.cpp`: la `y[c][d][s][a]` se crea para **todos los cursos** (fijos y
+  móviles), en las franjas del turno de cada curso, y **solo para las aulas cuyo tipo requiere alguna
+  materia del curso** (las demás serían siempre 0 por el tipo exacto). Guarda `min(dim.num_aulas,
+  aulas.size())` para no indexar fuera de rango con configuraciones incoherentes.
+- `src/backend/src/solver/restricciones/restricciones_aulas.cpp`:
+  - **D8**: exclusividad solo con `y` (fuera el caso de las `x` de los cursos fijos), agrupada por
+    `(d, s, a)`; cubre las desplazadas.
+  - **D9 ampliada**: `Σ_a y == Σ_{p,m} x` en cada `(c,d,s)`, en los dos modos; si no hay `y` en la
+    franja, la igualdad fija las clases a 0 (la regla de tipo es dura).
+  - **Tipo exacto**: `Σ_p x[p][m][c][d][s] + y[c][d][s][a] <= 1` para toda aula y materia con clave
+    distinta.
+  - **Aula de referencia** (solo modo fijo): coincidencia ⇒ `Σ_p x <= y[c][d][s][r]`; desplazamiento ⇒
+    variable auxiliar implícita (la suma de las `x` de materias de otro tipo) y, por cada `y` **ya
+    creada** de otro curso en `(d, s, r)`, `Σ x_desplazadas + y[c'][d][s][r] <= 1`. Se recorre el mapa
+    de `y` existentes, nunca un índice ciego `c'`.
+- `src/backend/src/solver/solver.cpp`: `extraerSolucion` informa la **`y` activa** de cada clase; fuera
+  el atajo `config.aula_fija ? config.cursos[c].aula : y`.
+- Cabeceras `variables.hpp` y `restricciones_aulas.hpp`: comentarios y firmas de las dos restricciones
+  nuevas; sin cambios de ABI para el resto.
+- `test/backend/test_solver_horarios.cpp`: tipos coherentes y `version` 2.0 en los fixtures; 7 casos
+  nuevos (referencia, referencia forzada, desplazamiento y vuelta con aula real, bloqueo por
+  invariante, bloqueo decisivo, exclusividad de desplazadas, móvil con tipo exacto); helper
+  `dispCompleta(dias, franjasPorDia)`.
+- `test/backend/test_variables_cp_sat.cpp`: materia con tipo; `FixedAula_NoAulaAssignmentCreated` →
+  `AulaFija_CreaAulaAssignmentParaTodasLasFranjasDelCurso`; poda por tipos
+  (`AulaAssignment_SoloAulasDeLosTiposQueElCursoRequiere`); `y` de los dos cursos en
+  `MultipleCourses_DifferentTurnos`; `MobileAula_MultipleAulas` pasa a dos materias (regular y lab).
+- Sin tocar el validador de salida (T5), las causas de infactibilidad (T6), el benchmark (T10), la
+  documentación ni el frontend. `git diff --stat`: 7 archivos (5 de `src/backend`, 2 de `test/`).
+
+### Hallazgos
+
+- **El fixture del benchmark se vuelve infactible** por no declarar tipos (ver arriba): se deja en
+  rojo a propósito y es de T10. No se relajó ninguna regla ni se inventaron tipos.
+- **Poda de la `y` por tipos requeridos** (el plan §4.1 la dibuja para todas las aulas y §10 la
+  propone como alternativa si el modelo crece): una `y` de un tipo que ninguna materia del curso
+  requiere es siempre 0 por el tipo exacto, así que no se crea. Efecto en los conteos de
+  `test_variables_cp_sat` (60 en vez de 90 con un aula de laboratorio sin materia de laboratorio).
+- **`slots` como nombre de parámetro rompe moc** (`Missing access specifier for slots`): `slots` es
+  palabra clave de Qt; el helper usa `franjasPorDia`.
+- **El bloqueo no se puede probar solo con una invariante**: sin la regla, la solución también la
+  cumplía por casualidad. Hizo falta un caso que sin bloqueo sea factible (y con bloqueo infactible) y
+  un caso de referencias cruzadas para detectar la implicación.
+- **Causa (2) del benchmark**: el mensaje actual es «no se pudo identificar una categoría concreta»
+  (la saturación por tipo es de T6); no se tocó.
+

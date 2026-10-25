@@ -2,6 +2,8 @@
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/cp_model.h"
 
+#include <QSet>
+
 VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config) {
     VariablesSolver vars;
     const auto& dim = config.dimensiones;
@@ -38,15 +40,27 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
         }
     }
 
-    // ── y[c][d][s][a]  (solo cursos MÓVILES: D9/D10) ──
-    if (!config.aula_fija) {
-        for (int c = 0; c < dim.num_cursos; ++c) {
-            const QVector<int> slotsCurso = slotsPorTurno.value(config.cursos[c].turno);
-            for (int d = 0; d < dim.num_dias; ++d)
-                for (int s : slotsCurso)
-                    for (int a = 0; a < dim.num_aulas; ++a)
-                        vars.aulaAssignment[{c, d, s, a}] = model.NewBoolVar();
+    // ── y[c][d][s][a]  (aula REAL de la clase: fijos y móviles, D9 ampliada) ──
+    // Solo se crea la `y` de las aulas cuyo tipo requiere alguna materia del curso: una `y`
+    // de otro tipo sería siempre 0 por la regla de tipo exacto (RF-3, spec 010).
+    const int numAulas = qMin(dim.num_aulas, config.aulas.size());
+    for (int c = 0; c < dim.num_cursos; ++c) {
+        const CursoSolverConfig& curso = config.cursos[c];
+
+        QSet<QString> tiposRequeridos;
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
+            const int m = mc.materiaIDx;
+            if (m >= 0 && m < config.materias.size())
+                tiposRequeridos.insert(claveTipo(config.materias[m].tipo));
         }
+
+        const QVector<int> slotsCurso = slotsPorTurno.value(curso.turno);
+        for (int d = 0; d < dim.num_dias; ++d)
+            for (int s : slotsCurso)
+                for (int a = 0; a < numAulas; ++a) {
+                    if (!tiposRequeridos.contains(claveTipo(config.aulas[a].tipo))) continue;
+                    vars.aulaAssignment[{c, d, s, a}] = model.NewBoolVar();
+                }
     }
 
     // ── e[p]  (exceso sobre el tope, S1) ──
