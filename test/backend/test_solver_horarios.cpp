@@ -106,6 +106,37 @@ private:
         return config;
     }
 
+    // Caso del reviewer para el descuento restringido (corrección 5): el tipo «Aula base» se mide
+    // con las franjas de los turnos de los cursos que lo REQUIEREN (2|B y 3|C, turno TB = {0..3}),
+    // pero el bloqueo de A1 lo produce 1|A, que solo cursa laboratorio y va en TL = {4,5}. Sus 2
+    // clases desplazadas caen fuera de las franjas contadas, así que no pueden descontarse: los
+    // 8 bloques de «Aula base» caben en sus 2 aulas × 4 franjas y la causa real es (4), el docente
+    // de laboratorio no dispone de 2 franjas. Si se descuentan (defecto), sale una causa (2) falsa.
+    static SolverConfig configLaboratorioEnTurnoDistinto() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {3, 2, 3, 3, 1, 6};
+        config.franja_horaria = {60, 6};
+        config.turnos.turnos = {{"TB", {0, 1, 2, 3}}, {"TL", {4, 5}}};
+
+        config.materias = {{"Ciencias", "Aula base"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula base", 30}, {"A2", "Aula base", 30},
+                        {"L1", "Laboratorio", 20}};
+        config.planes = {{"Plan C1", {{1, 1, 2}}},   // 1|A: SOLO laboratorio
+                         {"Plan C2", {{0, 2, 4}}},   // 2|B: 4 bloques de «Aula base»
+                         {"Plan C3", {{0, 3, 4}}}};  // 3|C: 4 bloques de «Aula base»
+        config.cursos = {{1, "A", "TL", 20, "Plan C1", 0},    // referencia A1
+                         {2, "B", "TB", 20, "Plan C2", 1},    // referencia A2
+                         {3, "C", "TB", 20, "Plan C3", 0}};   // referencia A1
+        config.profesores = {
+            // Titular de laboratorio con UNA sola franja disponible (slot 4 de TL).
+            {"Prof Lab", 2, 2, "", "", {}, {1}, {}, {{0, {4}}}},
+            {"Prof B", 4, 4, "", "", {}, {0}, {}, dispCompleta(1, 6)},
+            {"Prof C", 4, 4, "", "", {}, {0}, {}, dispCompleta(1, 6)}};
+        return config;
+    }
+
     // Caso del reviewer para la cota por palomar: dos cursos comparten la referencia A1 pero sus
     // turnos son DISTINTOS (1|A usa T1 = {0,1,2,3}; 2|B usa T2 = {2,3}). La colocación voraz
     // repartía los 4 bloques de laboratorio (2 por curso) en 4 franjas distintas porque 2|B solo
@@ -1058,6 +1089,56 @@ private slots:
     // existe (A1 tiene sitio y los 4 bloques de laboratorio caben en los 2 laboratorios).
     void solver_causaDeAulaConTurnosDistintosNoInventaElConflicto() {
         SolverConfig config = configDosCursosConTurnosDistintos();
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY(resultado.errores.isEmpty());
+    }
+
+    // ── Corrección 5 (RF-6): el descuento se limita a las franjas contadas en la capacidad ──
+    // Variante alcanzable en producción: V13 solo exige solape entre la disponibilidad del
+    // docente y el turno del curso, no capacidad, así que un titular con una sola franja pasa la
+    // validación y el modelo es INFEASIBLE. La causa es (4), no una (2) por las franjas que
+    // bloquea 1|A en un turno que la capacidad de «Aula base» ni siquiera cuenta.
+    void solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno() {
+        SolverConfig config = configLaboratorioEnTurnoDistinto();
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "el titular de laboratorio solo tiene 1 franja para 2 bloques");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+        QVERIFY2(texto.contains("1|A"), qPrintable(texto));
+    }
+
+    // Misma entrada con el docente SIN materias asignadas: la causa (4) es «no tiene ningún
+    // docente elegible». V10/V13 la rechazan en el flujo real, pero el solver directo debe
+    // informarla igual y no convertirla en una causa (2) por el descuento.
+    void solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible() {
+        SolverConfig config = configLaboratorioEnTurnoDistinto();
+        config.profesores[0].materias_asignadas = {};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+        QVERIFY2(texto.contains("1|A"), qPrintable(texto));
+    }
+
+    // Control positivo: con el titular de laboratorio disponible en todo el turno el horario
+    // existe (2 bloques en L1 y 8 bloques de «Aula base» en A1/A2).
+    void solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto() {
+        SolverConfig config = configLaboratorioEnTurnoDistinto();
+        config.profesores[0].disponibilidad = dispCompleta(1, 6);
 
         Solver solver;
         auto resultado = solver.resolver(config);

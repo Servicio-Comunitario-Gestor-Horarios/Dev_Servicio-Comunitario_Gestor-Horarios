@@ -1750,8 +1750,10 @@ int franjasBloqueadasPorDesplazamientos(const SolverConfig& config,
 ```
 
 - **Garantía:** con A aulas del tipo t, k clases desplazadas que lo requieren no caben en menos de
-  ⌈k/A⌉ franjas distintas (una clase por franja y aula), así que el bloqueo real no es menor: es una
-  cota inferior **por capacidad del tipo** y el descuento **nunca inventa un conflicto de aula**.
+  ⌈k/A⌉ franjas distintas (una clase por franja y aula): el palomar es una cota inferior **por
+  capacidad del tipo**. Formulación corregida en la corrección 5 (antes decía «el descuento nunca
+  inventa un conflicto de aula» sin limitar de qué franjas se descuenta): **el descuento se limita
+  a las franjas contadas en la capacidad; el palomar es cota inferior**. Sin extrapolaciones.
 - **Límite, dicho en el comentario:** la cota **puede quedarse corta** —la colocación real puede
   necesitar más franjas por competencia con otros grupos, con las clases que se quedan o por turnos
   que no se solapan—, de modo que una entrada infactible puede quedarse **sin** causa (2). Antes se
@@ -1864,3 +1866,192 @@ que discrimina «unión + palomar» de «solo palomar»; R2/S1/S3b no distinguí
   `max` de dos cotas inferiores es cota inferior … nunca inventa un conflicto de aula» → **falso**
   para el conjunto, solo el palomar lo garantiza; (iv) corrección 3, «sin cambios en la unión» →
   superado: la unión ya no existe.
+
+## Corrección 5 · descuento dentro de las franjas contadas (2026-10-25)
+
+**Hallazgo de la quinta validación (RF-6).** Alcance estricto:
+`src/backend/src/solver/solver.cpp`, `test/backend/test_solver_horarios.cpp` y este journal. Base
+`5fc40e0` (árbol limpio, `ctest --preset backend` 49/49). **No se commitea.**
+
+### Defecto · se restaban franjas que nunca se sumaron
+
+En `causaSaturacionPorTipo` la **capacidad** de un tipo se contaba con las franjas de los turnos de
+los cursos que **requieren** ese tipo (`d.franjas`), pero las **franjas bloqueadas** se contaban
+sobre los turnos de los cursos que tienen ese tipo como **aula de referencia**, que pueden ser otros
+turnos. El descuento restaba franjas que no estaban en la suma: podía declarar una causa (2) falsa y
+tapar la causa real.
+
+Caso del reviewer (entrada **válida** para V7/V10/V13/V14/V17):
+`dimensiones={3,2,3,3,1,6}`, `franja={60,6}`, turnos `TB={0,1,2,3}` y `TL={4,5}`; materias
+`Ciencias («Aula base»)` y `Laboratorio («Laboratorio»)`; aulas `A1`, `A2 («Aula base»)` y
+`L1 («Laboratorio»)`; planes `Plan C1{{1,1,2}}`, `Plan C2{{0,2,4}}` y `Plan C3{{0,3,4}}`; cursos
+`1|A` (turno `TL`, referencia `A1`, **solo** laboratorio), `2|B` (turno `TB`, referencia `A2`) y
+`3|C` (turno `TB`, referencia `A1`); docentes `Prof Lab` (materia 1, disponibilidad solo en el slot
+4), `Prof B` y `Prof C` (materia 0, 4 horas).
+
+- **Capacidad contada** de «Aula base»: 2 aulas × 1 día × `{0,1,2,3}` = **8** franjas.
+- **Bloqueo descontado:** solo lo produce `1|A` (2 bloques de laboratorio) en su referencia `A1`,
+  y sus clases caen en `TL = {4,5}`, **fuera** de las 4 franjas contadas. El descuento de 2 era
+  ficticio: 8 − 2 = 6 < 8 → causa (2) falsa.
+- **Antes:** `Causa (2) conflicto de aula: el tipo «Aula base» necesita 8 bloques y sus 2 aulas
+  ofrecen 8 franjas (2 las bloquean clases desplazadas).`
+- **Después:** causa **(4)** `la materia «Laboratorio» del curso 1|A necesita 2 bloques y ningún
+  docente elegible dispone de tantas franjas.` (`Prof Lab` solo tiene el slot 4).
+- **Control positivo:** con `Prof Lab` disponible en todo el turno el modelo da `exito` (los 8
+  bloques caben en las 8 franjas de «Aula base» y los 2 de laboratorio en `L1`).
+
+### Cambio (solo producción)
+
+El descuento se calcula por grupo de referencia y por tipo, **limitado a las franjas contadas**:
+
+```cpp
+struct DesplazamientosDeGrupo {
+    QMap<QString, int> bloques;                   // tipo requerido → bloques desplazados
+    QMap<QString, QSet<int>> franjasAlcanzables;  // tipo requerido → slots donde pueden caer
+};
+
+// cota_t = max(0, ⌈k_t / A_t⌉ − |alcanzables_t \ franjasContadas|), tope en
+// |alcanzables_t ∩ franjasContadas|
+int franjasBloqueadasEnFranjasContadas(const SolverConfig& config,
+                                       const QMap<QString, int>& bloques,
+                                       const QMap<QString, QSet<int>>& franjasAlcanzables,
+                                       const QSet<int>& franjasContadas) {
+    int total = 0;
+    for (auto it = bloques.constBegin(); it != bloques.constEnd(); ++it) {
+        const int aulas = aulasDelTipo(config, it.key());
+        if (aulas <= 0) continue;   // V17: entrada inválida, no conflicto de aula
+        const QSet<int> alcanzables = franjasAlcanzables.value(it.key());
+        int fuera = 0;
+        for (int s : alcanzables)
+            if (!franjasContadas.contains(s)) ++fuera;
+        const int dentro = alcanzables.size() - fuera;
+        const int palomar = (it.value() + aulas - 1) / aulas;              // ⌈k / A⌉
+        total = qMax(total, qMin(qMax(palomar - fuera, 0), dentro));
+    }
+    return total;
+}
+```
+
+- **Por qué esa fórmula y no un simple tope:** el palomar dice que las clases desplazadas necesitan
+  al menos ⌈k/A⌉ franjas distintas; de ellas, como mucho `|alcanzables_t \ franjasContadas|` pueden
+  caer fuera de las contadas, así que al menos la diferencia cae dentro. El tope en
+  `alcanzables_t ∩ franjasContadas` cubre el caso en que el palomar exceda las franjas alcanzables
+  (entrada ya infactible por otra vía). Invariante: **el descuento no excede las franjas sumadas en
+  la capacidad**; el palomar sigue siendo cota inferior y puede quedarse corta.
+- **`franjasAlcanzables`** es la unión de los turnos de los cursos que aportan los bloques de cada
+  tipo en el grupo; se rellena en el mismo recorrido que los bloques.
+- **`palomarPorTipo`** queda como helper aparte (sin restricción) para D8, y `aulasDelTipo` evita
+  duplicar el recuento de aulas del centro.
+- **D8 no necesita la restricción** (comprobado, no supuesto): su capacidad se mide con las franjas
+  de los turnos de **todos** los cursos del grupo, también los desplazados, así que
+  `alcanzables_t ⊆ franjas` y `fuera = 0`; el tope frente a la capacidad en **franjas-día** lo pone
+  el `qMin(bloqueadas, capacidad)` que ya existía. Pasarle el conjunto de slots como
+  `franjasContadas` sería un error de unidades: en S1 el bloqueo son 4 clases = 4 franjas-día de
+  las 6 del aula, no 4 de los 3 slots del día; se probó y S1 bajó a 3 («5 bloques en 6 franjas; 3
+  quedan bloqueadas»), así que ese camino se descartó.
+- **Comentarios:** el del helper y el de D8 ya no afirman «nunca inventa un conflicto de aula»;
+  dicen que el descuento se limita a las franjas contadas y que el palomar es cota inferior (y que
+  puede quedarse corta). Igual el bullet «Garantía» de la corrección 4, reformulado.
+- **Sin cambios** en el modelo (T4), `ValidadorSalidaSolver`, el orden de categorías, el frontend,
+  `spec.md`, `plan.md`, `estado.md` ni `tasks.md`.
+
+### Tests primero (rojo)
+
+Fixture `configLaboratorioEnTurnoDistinto()` (caso exacto del reviewer) y tres casos nuevos:
+
+1. `solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno` — variante **alcanzable en
+   producción** (V13 solo exige solape, no capacidad): `Prof Lab` con `{1}` y disponibilidad
+   `{4}` → causa (4), **sin** causa (2).
+2. `solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible` — misma entrada con
+   `materias_asignadas` **vacío** (V10/V13 la rechazan en el flujo real; el solver directo debe
+   informar causa (4) «no tiene ningún docente elegible», no causa (2)).
+3. `solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto` — control positivo con
+   `Prof Lab` disponible en todo el turno → `exito`.
+
+Con la producción de `5fc40e0` fallaban exactamente los dos negativos (el control ya pasaba):
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno()
+  '!texto.contains("Causa (2)")' returned FALSE. (… Causa (2) conflicto de aula: el tipo «Aula base»
+  necesita 8 bloques y sus 2 aulas ofrecen 8 franjas (2 las bloquean clases desplazadas). …)
+FAIL!  : solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible()
+  '!texto.contains("Causa (2)")' returned FALSE. (… la misma causa (2) …)
+PASS   : solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto()
+Totals: 38 passed, 2 failed, 0 skipped, 0 blacklisted, 253ms
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ctest --test-dir build-backend -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.27 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 40 passed, 0 failed, 0 skipped, 0 blacklisted, 205ms
+
+$ ctest --preset backend
+100% tests passed out of 49
+Total Test time (real) =   5.67 sec
+
+$ git diff --stat
+ src/backend/src/solver/solver.cpp     | 118 ++++++++++++++++++++++++--------
+ test/backend/test_solver_horarios.cpp |  81 ++++++++++++++++++++++++
+ 2 files changed, 157 insertions(+), 42 deletions(-)
+```
+
+### Escenarios antes → después (mensajes medidos)
+
+| Escenario | Antes (`5fc40e0`) | Después |
+|---|---|---|
+| **Reviewer**, `Prof Lab` con 1 franja (alcanzable en producción) | causa (2) «el tipo «Aula base» necesita 8 bloques y sus 2 aulas ofrecen 8 franjas (2 las bloquean clases desplazadas)» | **causa (4)** «la materia «Laboratorio» del curso 1\|A necesita 2 bloques y ningún docente elegible dispone de tantas franjas» |
+| **Reviewer**, `materias_asignadas` vacío | causa (2) (la misma) | **causa (4)** «la materia «Laboratorio» del curso 1\|A no tiene ningún docente elegible» |
+| **Reviewer**, control: `Prof Lab` disponible en todo el turno | `exito` | `exito` |
+| **R2**, 1 laboratorio: 28 bloques en `A1`, 4 de laboratorio, 30 franjas | causa (2) «A1 … (28 bloques en 30 franjas; 4 quedan bloqueadas por clases desplazadas)» | **idéntico** |
+| **R2**, 2 laboratorios (contraprueba) | `exito` | **idéntico** |
+| **S3b**, 2 laboratorios, `Prof B` sin laboratorio | causa (4) «… curso 2\|B no tiene ningún docente elegible» | **idéntico** |
+| **S1**, 1 laboratorio: 5 bloques en `A1`, 4 desplazados | causa (2) «A1 … (5 bloques en 6 franjas; 4 quedan bloqueadas por clases desplazadas)» | **idéntico** |
+| **Saturación por tipo** (T6): «Aula base» 7 bloques, 12 franjas, 6 bloqueadas | causa (2) «… necesita 7 bloques y sus 2 aulas ofrecen 12 franjas (6 las bloquean clases desplazadas)» | **idéntico** |
+| **Corrección 4**: turnos distintos, `Prof B` sin laboratorio | causa (4) «… curso 2\|B no tiene ningún docente elegible» | **idéntico** |
+
+### Regresión temporal (restaurada)
+
+Copiar `git show 5fc40e0:src/backend/src/solver/solver.cpp` sobre el fichero actual (descuento sin
+restringir) deja los tests como están y falla **exactamente** los dos casos nuevos:
+
+```text
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno()
+  '!texto.contains("Causa (2)")' returned FALSE. (… «Aula base» necesita 8 bloques y sus 2 aulas
+  ofrecen 8 franjas (2 las bloquean clases desplazadas). …)
+FAIL!  : solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible()
+  '!texto.contains("Causa (2)")' returned FALSE. (… la misma causa (2) …)
+Totals: 38 passed, 2 failed, 0 skipped, 0 blacklisted, 203ms
+```
+
+Restaurado el `solver.cpp` corregido: build exit 0, `test_solver_horarios` 40/40 y suite 49/49
+(arriba). R2, S1, S3b, la saturación por tipo y el caso de la corrección 4 no distinguen ambos
+comportamientos; los dos negativos nuevos son los únicos que discriminan.
+
+### Hallazgos
+
+- **La capacidad y el bloqueo deben medirse sobre el mismo conjunto de franjas.** El error de la
+  corrección 3 (y de la 4) no era el palomar, sino aplicarlo a un conjunto de franjas distinto del
+  que se sumó: capacidad por los turnos de los cursos que **piden** el tipo, bloqueo por los turnos
+  de los cursos que lo tienen como **referencia**. Con la restricción, el descuento es
+  estructuralmente ≤ lo contado (cada grupo aporta como mucho las franjas de su intersección y hay
+  a lo sumo tantos grupos como aulas del tipo).
+- **La fórmula conserva el palomar como cota inferior.** Restar las franjas alcanzables que quedan
+  fuera (`palomar − fuera`) es más fino que quedarse con la intersección, y sigue sin poder
+  descontar de más; el tope `∩` solo actúa cuando el palomar ya excede lo alcanzable (entrada
+  infactible por otra vía).
+- **D8 no requería el cambio, pero ahora está documentado por qué.** Allí la capacidad y el bloqueo
+  salen del mismo grupo de cursos; el tope ya estaba en el `qMin` con la capacidad en franjas-día.
+  La lección de unidades (slots vs franjas-día) está anotada arriba para no repetir el intento.
+- **Cobertura de las dos variantes de causa (4).** La de disponibilidad insuficiente es la que V13
+  deja pasar (solo exige solape), así que era la que podía producir la causa (2) falsa en
+  producción; la de `materias_asignadas` vacío se cubre también porque es la que usaban las
+  correcciones 2 y 4 para forzar la (4).
