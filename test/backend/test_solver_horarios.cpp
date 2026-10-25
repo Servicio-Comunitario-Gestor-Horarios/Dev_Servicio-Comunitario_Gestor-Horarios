@@ -106,6 +106,33 @@ private:
         return config;
     }
 
+    // Caso del reviewer para la cota por palomar: dos cursos comparten la referencia A1 pero sus
+    // turnos son DISTINTOS (1|A usa T1 = {0,1,2,3}; 2|B usa T2 = {2,3}). La colocación voraz
+    // repartía los 4 bloques de laboratorio (2 por curso) en 4 franjas distintas porque 2|B solo
+    // alcanza {2,3} y 1|A ya había tomado 2 franjas de T1; el palomar ⌈4/2⌉ = 2 (dos laboratorios,
+    // una clase por franja y aula) deja 6 franjas libres de A1 para los 6 bloques que se quedan.
+    static SolverConfig configDosCursosConTurnosDistintos() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, 3, 2, 2, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"T1", {0, 1, 2, 3}}, {"T2", {2, 3}}};
+
+        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula común", 30},
+                        {"Lab1", "Laboratorio", 20},
+                        {"Lab2", "Laboratorio", 20}};
+        config.planes = {{"Plan A", {{0, 1, 4}, {1, 1, 2}}},
+                         {"Plan B", {{0, 2, 2}, {1, 2, 2}}}};
+        config.cursos = {{1, "A", "T1", 20, "Plan A", 0},
+                         {2, "B", "T2", 20, "Plan B", 0}};   // MISMA referencia, turnos distintos
+        config.profesores = {
+            {"Prof A", 6, 6, "T1", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 4)},
+            {"Prof B", 4, 4, "T2", "Plan B", {}, {0, 1}, {}, dispCompleta(2, 4)}};
+        return config;
+    }
+
 private slots:
 
     void configValida_noTieneErrores() {
@@ -1005,6 +1032,38 @@ private slots:
         QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
         QVERIFY2(texto.contains("«Aula base»"), qPrintable(texto));
         QVERIFY2(texto.contains("7 bloques"), qPrintable(texto));
+    }
+
+    // ── Corrección 4 (RF-6): la cota es el palomar, no la colocación voraz ──
+    // Con turnos distintos la unión voraz sobreestimaba el bloqueo (4 franjas) y declaraba una
+    // causa (2) falsa que tapaba la real: 2|B no tiene docente de laboratorio, así que la causa
+    // es (4). El palomar ⌈4/2⌉ = 2 deja 6 franjas de A1 para los 6 bloques que se quedan.
+    void solver_causaDeAulaNoSobreestimaConTurnosDistintos() {
+        SolverConfig config = configDosCursosConTurnosDistintos();
+        // El docente de 2|B solo opta por la materia común (índice 0), no por el laboratorio.
+        config.profesores[1].materias_asignadas = {0};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "2|B no tiene docente de laboratorio");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+        QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("2|B"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+    }
+
+    // Control positivo del mismo dato: con el docente de 2|B cubriendo el laboratorio el horario
+    // existe (A1 tiene sitio y los 4 bloques de laboratorio caben en los 2 laboratorios).
+    void solver_causaDeAulaConTurnosDistintosNoInventaElConflicto() {
+        SolverConfig config = configDosCursosConTurnosDistintos();
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY(resultado.errores.isEmpty());
     }
 };
 

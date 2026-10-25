@@ -13,68 +13,36 @@
 #include "qvariant.h"
 #include <QElapsedTimer>
 #include <QMap>
-#include <QPair>
 #include <QSet>
 #include <QStringList>
-#include <algorithm>
 
 using namespace operations_research::sat;
 
 namespace {
 
-/// Clases desplazadas de un curso y las franjas (slots) en las que pueden caer.
-struct BloqueoDesplazado {
-    int bloques = 0;                    ///< clases del curso que se imparten fuera de su referencia
-    QVector<int> franjas;               ///< slots del turno en los que puede caer cada una
-    QMap<QString, int> bloquesPorTipo;  ///< de esas clases, cuántas requieren cada tipo de aula
-};
+/// Clases desplazadas de un curso, agrupadas por el tipo de aula que requieren.
+using BloquesDesplazadosPorTipo = QMap<QString, int>;
 
-/// Franjas (día, slot) DISTINTAS que las clases desplazadas de un grupo de cursos dejan
-/// bloqueadas en su aula de referencia, como COTA INFERIOR:
+/// Franjas que las clases desplazadas de un grupo de cursos dejan bloqueadas en su aula de
+/// referencia, como COTA INFERIOR por capacidad del tipo (palomar):
 ///
-///   max( unión de las franjas alcanzables por las clases desplazadas,
-///        max_t ⌈bloques desplazados del grupo que requieren t / nº de aulas de t⌉ )
+///   max_t ⌈bloques desplazados del grupo que requieren t / nº de aulas del centro de tipo t⌉
 ///
-/// El primer término es la unión mínima: dos cursos pueden desplazarse a la misma franja si hay
-/// aulas del tipo para ambos, así que se reutilizan las franjas ya bloqueadas por otro curso del
-/// grupo. El segundo añade lo que la unión no puede evitar: con A aulas del tipo t, k clases
-/// desplazadas que lo requieren no caben en menos de ⌈k/A⌉ franjas distintas (palomar; una clase
-/// por franja y aula). Ambos términos son cotas inferiores del bloqueo real, de modo que la
-/// estimación puede quedarse corta pero nunca inventa un conflicto de aula.
+/// Con A aulas del tipo t, k clases desplazadas que lo requieren no caben en menos de ⌈k/A⌉
+/// franjas distintas (palomar; una clase por franja y aula), así que el bloqueo real no puede ser
+/// menor y el descuento nunca inventa un conflicto de aula. La cota puede quedarse corta: la
+/// colocación real puede necesitar más franjas (competencia con otros grupos o con las clases que
+/// se quedan, turnos que no se solapan, etc.), de modo que una entrada infactible puede quedarse
+/// sin causa (2). El nº de aulas es el del CENTRO (no el del grupo): es la capacidad a la que
+/// pueden optar esos bloques. Un tipo sin aulas ya lo rechaza V17, así que no se divide por cero.
 int franjasBloqueadasPorDesplazamientos(const SolverConfig& config,
-                                        const QVector<BloqueoDesplazado>& cursos, int numDias) {
-    QVector<BloqueoDesplazado> orden = cursos;
-    std::stable_sort(orden.begin(), orden.end(),
-                     [numDias](const BloqueoDesplazado& a, const BloqueoDesplazado& b) {
-                         return qMin(a.bloques, numDias * a.franjas.size()) >
-                                qMin(b.bloques, numDias * b.franjas.size());
-                     });
-
-    QSet<QPair<int, int>> bloqueadas;   // (día, slot)
-    for (const BloqueoDesplazado& c : orden) {
-        // Una clase por franja: el curso no puede bloquear más franjas que clases desplaza.
-        int requeridas = qMin(c.bloques, numDias * c.franjas.size());
-        for (int d = 0; d < numDias; ++d)
-            for (int s : c.franjas)
-                if (bloqueadas.contains(qMakePair(d, s))) --requeridas;
-        for (int d = 0; d < numDias; ++d)
-            for (int s : c.franjas) {
-                if (requeridas <= 0) break;
-                if (bloqueadas.contains(qMakePair(d, s))) continue;
-                bloqueadas.insert(qMakePair(d, s));
-                --requeridas;
-            }
-    }
-
-    int total = bloqueadas.size();
-
-    // Palomar por tipo: los bloques desplazados que requieren el mismo tipo compiten por sus
-    // aulas. El nº de aulas es el del CENTRO (no el del grupo): es la capacidad a la que pueden
-    // optar esos bloques. Un tipo sin aulas ya lo rechaza V17, así que no se divide por cero.
+                                        const QVector<BloquesDesplazadosPorTipo>& cursos) {
     QMap<QString, int> desplazadosPorTipo;
-    for (const BloqueoDesplazado& c : cursos)
-        for (auto it = c.bloquesPorTipo.constBegin(); it != c.bloquesPorTipo.constEnd(); ++it)
+    for (const BloquesDesplazadosPorTipo& c : cursos)
+        for (auto it = c.constBegin(); it != c.constEnd(); ++it)
             desplazadosPorTipo[it.key()] += it.value();
+
+    int total = 0;
     for (auto it = desplazadosPorTipo.constBegin(); it != desplazadosPorTipo.constEnd(); ++it) {
         int aulas = 0;
         for (const AulaSolverConfig& a : config.aulas)
@@ -233,31 +201,27 @@ QString causaSaturacionPorTipo(const SolverConfig& config) {
         if (aulas == 0) continue;   // V17: entrada inválida (categoría 1), no conflicto de aula
 
         // Franjas que las clases desplazadas dejan bloqueadas en las referencias de este tipo.
-        // Se agrupa por aula de referencia: dentro de una misma referencia el bloqueo es la cota
-        // inferior (unión de franjas elevada al palomar por tipo de aula), mientras que entre
-        // referencias distintas del mismo tipo las franjas bloqueadas sí se acumulan.
-        QMap<int, QVector<BloqueoDesplazado>> bloqueosPorReferencia;
+        // Se agrupa por aula de referencia: dentro de una misma referencia el bloqueo es el
+        // palomar sobre el conjunto de cursos, mientras que entre referencias distintas del mismo
+        // tipo las franjas bloqueadas sí se acumulan.
+        QMap<int, QVector<BloquesDesplazadosPorTipo>> bloqueosPorReferencia;
         for (int i = 0; i < config.cursos.size(); ++i) {
             if (desplazadosPorCurso[i] == 0) continue;
             const CursoSolverConfig& c = config.cursos[i];
             const QString claveReferencia = claveAula(config, c.aula);
             if (claveReferencia != it.key()) continue;
-            BloqueoDesplazado bloqueo;
-            bloqueo.bloques = desplazadosPorCurso[i];
+            BloquesDesplazadosPorTipo bloqueo;
             for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
                 const QString clave = claveMateria(config, mc.materiaIDx);
                 if (clave.isEmpty() || clave == claveReferencia) continue;
-                bloqueo.bloquesPorTipo[clave] += bloquesMateria(config, mc);
+                bloqueo[clave] += bloquesMateria(config, mc);
             }
-            for (int s : slotsTurno(config, c.turno))
-                if (d.franjas.contains(s)) bloqueo.franjas.append(s);
             bloqueosPorReferencia[c.aula].append(bloqueo);
         }
         int bloqueadas = 0;
         for (auto itBloqueo = bloqueosPorReferencia.constBegin();
              itBloqueo != bloqueosPorReferencia.constEnd(); ++itBloqueo)
-            bloqueadas += franjasBloqueadasPorDesplazamientos(
-                config, itBloqueo.value(), config.dimensiones.num_dias);
+            bloqueadas += franjasBloqueadasPorDesplazamientos(config, itBloqueo.value());
 
         const int capacidad = config.dimensiones.num_dias * d.franjas.size() * aulas;
         const int disponibles = capacidad - qMin(bloqueadas, capacidad);
@@ -294,11 +258,10 @@ QString causaConflictoDeAula(const SolverConfig& config) {
     // D8: aulas de referencia compartidas. Solo las clases que se QUEDAN en la referencia (las
     // del tipo del aula) la ocupan; las de otro tipo se desplazan, pero mientras ocupan su franja
     // dejan la referencia vacía y bloqueada para los demás cursos (RF-3). La capacidad disponible
-    // es la del aula menos esas franjas bloqueadas, estimadas con una COTA INFERIOR: la unión de
-    // franjas (no la suma: dos cursos desplazados a la misma franja bloquean una sola) elevada al
-    // palomar por tipo (con A aulas del tipo, k clases desplazadas no caben en menos de ⌈k/A⌉
-    // franjas). Solo es causa del aula si cada curso cabe por separado en su turno (si no, es
-    // categoría 3).
+    // es la del aula menos esas franjas bloqueadas, estimadas con una COTA INFERIOR por capacidad
+    // del tipo (palomar: con A aulas del tipo, k clases desplazadas no caben en menos de ⌈k/A⌉
+    // franjas). La cota puede quedarse corta; a cambio, nunca inventa un conflicto de aula. Solo es
+    // causa del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
     QMap<int, QVector<int>> cursosPorAula;
     for (int i = 0; i < config.cursos.size(); ++i)
         if (config.cursos[i].aula >= 0)
@@ -306,37 +269,34 @@ QString causaConflictoDeAula(const SolverConfig& config) {
 
     for (auto it = cursosPorAula.constBegin(); it != cursosPorAula.constEnd(); ++it) {
         const QString claveReferencia = claveAula(config, it.key());
-        int total = 0;                            // bloques que se quedan en la referencia
-        QVector<BloqueoDesplazado> desplazados;   // bloqueos de las clases que se van
+        int total = 0;                                        // bloques que se quedan en la referencia
+        QVector<BloquesDesplazadosPorTipo> desplazados;       // bloqueos de las clases que se van
         QSet<int> franjas;
         bool todosCaben = true;
         for (int idx : it.value()) {
             const CursoSolverConfig& c = config.cursos[idx];
             if (bloquesCurso(config, c) > franjasCurso(config, c)) { todosCaben = false; break; }
-            BloqueoDesplazado bloqueo;
-            bloqueo.franjas = slotsTurno(config, c.turno);
+            BloquesDesplazadosPorTipo bloqueo;
             for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
                 const int bloques = bloquesMateria(config, mc);
                 if (!claveReferencia.isEmpty() && claveMateria(config, mc.materiaIDx) == claveReferencia) {
                     total += bloques;
                 } else {
-                    // Clase desplazada: bloquea 1 franja de la referencia; su tipo de aula
-                    // decide cuántas pueden compartir franja.
-                    bloqueo.bloques += bloques;
+                    // Clase desplazada: bloquea 1 franja de la referencia; cuántas pueden
+                    // compartir franja lo decide el nº de aulas del tipo que requiere.
                     const QString clave = claveMateria(config, mc.materiaIDx);
-                    if (!clave.isEmpty()) bloqueo.bloquesPorTipo[clave] += bloques;
+                    if (!clave.isEmpty()) bloqueo[clave] += bloques;
                 }
             }
-            if (bloqueo.bloques > 0) desplazados.append(bloqueo);
+            if (!bloqueo.isEmpty()) desplazados.append(bloqueo);
             for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
         }
         if (!todosCaben) continue;
         const int capacidad = config.dimensiones.num_dias * franjas.size();
-        // Cota inferior de las franjas que el grupo deja bloqueadas: unión de franjas (si dos
-        // cursos se desplazan a la misma, se descuenta una sola) y, como mínimo, las franjas que
-        // exigen el palomar por tipo cuando hay menos aulas que clases desplazadas.
-        const int bloqueadas = franjasBloqueadasPorDesplazamientos(
-            config, desplazados, config.dimensiones.num_dias);
+        // Cota inferior de las franjas que el grupo deja bloqueadas: las que exige el palomar por
+        // tipo (k clases desplazadas que requieren un tipo con A aulas no caben en menos de ⌈k/A⌉
+        // franjas). Puede quedarse corta, pero nunca declara más bloqueo del que el modelo impone.
+        const int bloqueadas = franjasBloqueadasPorDesplazamientos(config, desplazados);
         const int disponibles = capacidad - qMin(bloqueadas, capacidad);
         // Sin clases que se queden, la referencia no compite: el desplazamiento no causa conflicto.
         if (total <= 0) continue;

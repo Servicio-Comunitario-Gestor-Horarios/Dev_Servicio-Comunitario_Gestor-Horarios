@@ -1411,10 +1411,12 @@ laboratorio, la causa real es **(4)**.
 - **Nueva `franjasBloqueadasPorDesplazamientos`** (anónima, junto a los helpers de `solver.cpp`):
   recibe los bloqueos del grupo (`BloqueoDesplazado`: bloques desplazados y slots de su turno) y
   devuelve el número de franjas `(día, slot)` **distintas** de la unión. Procesa primero el curso que
-  más franjas necesita y **reutiliza** las ya bloqueadas por otro curso del grupo, que es la cota
-  optimista: como no se conoce la colocación real, nunca declara más bloqueo del que el modelo puede
-  evitar. Cada curso queda limitado a `min(bloques desplazados, días × franjas de su turno)` porque
-  un curso no tiene dos clases en la misma franja.
+  más franjas necesita y **reutiliza** las ya bloqueadas por otro curso del grupo. Cada curso queda
+  limitado a `min(bloques desplazados, días × franjas de su turno)` porque un curso no tiene dos
+  clases en la misma franja. **Corregido en la corrección 4:** la unión **no** era una cota
+  inferior —es la cuenta de una colocación voraz concreta— y la frase «nunca declara más bloqueo
+  del que el modelo puede evitar» era falsa; el término se eliminó y hoy el helper es solo el
+  palomar por tipo.
 - **D8 (`causaConflictoDeAula`)**: `bloqueadas = franjasBloqueadasPorDesplazamientos(grupo)` en vez
   de la suma de bloques desplazados. El resto (capacidad = `días × franjas del grupo`, guardas
   `todosCaben` y `total <= 0`, mensajes) no cambia.
@@ -1532,11 +1534,13 @@ nombre del test y el journal afirmaban más de lo que probaba. Se eligió la opc
 
 ### Hallazgos
 
-- **La unión es una cota optimista, no un matching exacto.** El helper reutiliza franjas ya
-  bloqueadas del grupo (con el mismo turno devuelve `max(bloques desplazados por curso)`); no busca la
-  colocación óptima. Prefiere no inventar bloqueo antes que declarar causa (2) falsa, que es el
-  defecto que se corrige; si dos cursos tienen turnos disjuntos, la unión es la suma porque no
-  comparten franjas.
+- **La unión no era una cota: era una colocación voraz.** El helper reutilizaba franjas ya
+  bloqueadas del grupo (con el mismo turno devolvía `max(bloques desplazados por curso)`) sin buscar
+  la colocación óptima. **Corregido en la corrección 4:** eso **no es una cota inferior** —es la
+  cuenta de una colocación concreta— y con turnos distintos **sobreestima** (reparte los bloques de
+  cada curso en franjas diferentes y descuenta más de las que el modelo necesita). La frase «prefiere
+  no inventar bloqueo antes que declarar causa (2) falsa» era una intuición, no una propiedad. Hoy el
+  helper es **solo el palomar por tipo** (ver corrección 4).
 - **Grupos por referencia en la saturación por tipo.** Antes se sumaba por curso; ahora se agrupa por
   `c.aula`, así que dos cursos que comparten referencia comparten franjas bloqueadas, pero dos
   referencias distintas del mismo tipo siguen sumando (cada una pierde su propia capacidad).
@@ -1566,7 +1570,7 @@ franjas distintas (una clase por franja y aula), así que `A1` pierde 4 y solo l
 
 ### Cambio (solo producción)
 
-La estimación pasa a ser una **cota inferior** (nunca sobreestima):
+La estimación del bloqueo pasa a incluir el **palomar por tipo**:
 
 ```cpp
 // franjasBloqueadasPorDesplazamientos(config, cursos, numDias)
@@ -1574,10 +1578,12 @@ La estimación pasa a ser una **cota inferior** (nunca sobreestima):
 //   para cada tipo t:  total = max(total, ⌈desplazados_que_requieren_t / aulas_de_t⌉)
 ```
 
-- **Por qué es segura:** (i) el palomar da el mínimo de franjas que necesitan k clases con A aulas
-  del tipo (una por franja y aula), así que el bloqueo real no puede ser menor; (ii) la unión
-  tampoco puede superarlo. El `max` de dos cotas inferiores es cota inferior: puede quedarse corta
-  (más adelante el modelo decide), pero **nunca inventa un conflicto de aula**.
+- **Por qué el palomar es seguro:** el palomar da el mínimo de franjas que necesitan k clases con A
+  aulas del tipo (una por franja y aula), así que el bloqueo real no puede ser menor. **Corregido en
+  la corrección 4:** el otro término, la unión, **no era cota inferior** (es una colocación voraz
+  concreta y puede sobreestimar), así que el `max` de los dos **no** era una cota inferior y la
+  frase «nunca inventa un conflicto de aula» era falsa para el conjunto. Hoy solo queda el palomar,
+  que sí es cota inferior; puede quedarse corta, y eso es lo que hay que decir.
 - **`BloqueoDesplazado` gana `bloquesPorTipo`**: los bloques desplazados de cada curso agrupados
   por la clave del tipo de aula que requieren. El helper suma el mapa del grupo y divide por el
   **nº de aulas del centro de ese tipo** (no del grupo). Si el tipo no tiene aulas (0) no se divide:
@@ -1640,6 +1646,11 @@ $ git diff --stat -- src/backend/src/solver/solver.cpp test/backend/test_solver_
 | **S3b**, 2 laboratorios, docente de laboratorio no elegible para 2\|B | unión 2 → causa (4) | palomar ⌈4/2⌉ = 2 → causa (4), **sin** causa (2) |
 | **S1**, 1 laboratorio: 5 bloques en `A1`, 4 desplazados | unión 4 → causa (2) «5 bloques en 6 franjas; 4 quedan bloqueadas» | unión 4, palomar ⌈4/1⌉ = 4 → la misma causa (2) con la misma cifra |
 
+**Corrección 4:** el término de la unión ya no existe. Las cifras de esta tabla siguen valiendo
+porque en R2 y S1 el palomar ya dominaba el `max` y en S3b la unión valía lo mismo que el palomar
+(2); el caso que distinguía la unión del palomar era otro (turnos distintos), y ahí la unión
+sobreestimaba.
+
 ### Regresiones temporales (todas restauradas)
 
 1. **Volver a la unión pura** (anular el término del palomar). Falla exactamente el caso R2 nuevo,
@@ -1665,12 +1676,191 @@ $ git diff --stat -- src/backend/src/solver/solver.cpp test/backend/test_solver_
 - **El nº de aulas es el del centro.** Para el término del palomar se cuentan todas las aulas del
   tipo en el centro, incluidas las que son referencia de otros cursos: es la opción optimista
   (cota inferior) y evita sobreestimar. Un tipo sin aulas (0) no se divide: V17 lo rechaza antes.
-- **Sin cambios en la unión.** El helper conserva la reutilización de franjas de la corrección 2;
-  solo se le añade el `max` con el palomar. `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos`
-  (S1) fija que la unión no se pierde.
+- **Sin cambios en la unión** (histórico, superado por la corrección 4). El helper conservó la
+  reutilización de franjas de la corrección 2; solo se le añadió el `max` con el palomar.
+  `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos` (S1) fija que la unión no se
+  pierde. Hoy la unión está eliminada y S1 sigue verde porque solo desplaza un curso (su palomar
+  ⌈4/1⌉ = 4 coincide con las 4 franjas que contaba la unión).
 - **La saturación por tipo** hereda el mismo `max`; el caso
   `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` sigue en verde con sus cifras.
 - **Correcciones a este journal (detectadas por el reviewer):** la regresión de «contar las
   desplazadas como ocupantes» da **30/3** (no 31/2) y entre las que fallan está S1 con «9 bloques en
   6 franjas»; la frase «habría fallado con cualquier suma» era falsa (S1 pasa con la mutación de
   suma). Ver la sección de la corrección 2, ya corregida.
+
+## Corrección 4 · solo palomar (2026-10-25)
+
+**Hallazgo de la cuarta validación (RF-6 / criterio 6).** Alcance estricto:
+`src/backend/src/solver/solver.cpp`, `test/backend/test_solver_horarios.cpp` y este journal. Base
+`45ac292` (árbol limpio, `ctest --preset backend` 49/49). Decisión del usuario: quedarse **solo**
+con el palomar. **No se commitea.**
+
+### Defecto · el término de la unión no era una cota inferior
+
+`franjasBloqueadasPorDesplazamientos` devolvía `max(unión voraz, palomar por tipo)` y el comentario
+afirmaba que ambos términos eran cotas inferiores. **La unión no lo era:** coloca las clases
+desplazadas de cada curso con un método voraz (primero el que más franjas necesita, reutilizando las
+ya bloqueadas) y cuenta las franjas de **esa colocación concreta**. Si los cursos del grupo tienen
+**turnos distintos**, la colocación voraz no puede reutilizar franjas que el modelo sí puede
+compartir, así que sobreestima el bloqueo, descuenta de más en el aula de referencia y declara una
+causa (2) **falsa** que tapa la real.
+
+Caso del reviewer (entrada válida para V8/V16/V17): `dimensiones={2,2,3,2,2,4}`, turnos
+`T1={0,1,2,3}` y `T2={2,3}`, aulas `A1 (Aula común), Lab1, Lab2`, materias `Matematica (Aula común)`
+y `Laboratorio (Laboratorio)`, planes `Plan A{{0,1,4},{1,1,2}}` y `Plan B{{0,2,2},{1,2,2}}`, cursos
+`1|A` (T1) y `2|B` (T2) con la **misma referencia** `A1`, `Prof A` con `{0,1}` y `Prof B` con `{0}`
+(sin laboratorio).
+
+- **Antes:** `Causa (2) conflicto de aula: el aula «A1» no da abasto para las clases que se quedan en
+  ella (6 bloques en 8 franjas; 4 quedan bloqueadas por clases desplazadas).` — la unión contaba 4
+  franjas: 1|A tomaba dos de `T1` y 2|B no podía reutilizarlas porque solo alcanza `{2,3}`.
+- **Después:** causa **(4)** (`la materia «Laboratorio» del curso 2|B no tiene ningún docente
+  elegible`). El palomar ⌈4 bloques de laboratorio / 2 laboratorios⌉ = **2** deja 6 franjas de `A1`
+  para los 6 bloques que se quedan, así que el aula no es la causa.
+- **Control positivo:** con `Prof B` cubriendo el laboratorio (`{0,1}`) la misma entrada da `exito`
+  (antes y después).
+
+### Cambio (solo producción)
+
+El helper se queda **solo con el palomar**:
+
+```cpp
+// Clases desplazadas de un curso, agrupadas por el tipo de aula que requieren.
+using BloquesDesplazadosPorTipo = QMap<QString, int>;
+
+// franjasBloqueadasPorDesplazamientos(config, cursos) =
+//     max_t ⌈bloques desplazados del grupo que requieren t / nº de aulas del CENTRO de tipo t⌉
+int franjasBloqueadasPorDesplazamientos(const SolverConfig& config,
+                                        const QVector<BloquesDesplazadosPorTipo>& cursos) {
+    QMap<QString, int> desplazadosPorTipo;
+    for (const BloquesDesplazadosPorTipo& c : cursos)
+        for (auto it = c.constBegin(); it != c.constEnd(); ++it)
+            desplazadosPorTipo[it.key()] += it.value();
+
+    int total = 0;
+    for (auto it = desplazadosPorTipo.constBegin(); it != desplazadosPorTipo.constEnd(); ++it) {
+        int aulas = 0;
+        for (const AulaSolverConfig& a : config.aulas)
+            if (claveTipo(a.tipo) == it.key()) ++aulas;
+        if (aulas <= 0) continue;   // V17: entrada inválida, no conflicto de aula
+        total = qMax(total, (it.value() + aulas - 1) / aulas);   // ⌈k / A⌉
+    }
+    return total;
+}
+```
+
+- **Garantía:** con A aulas del tipo t, k clases desplazadas que lo requieren no caben en menos de
+  ⌈k/A⌉ franjas distintas (una clase por franja y aula), así que el bloqueo real no es menor: es una
+  cota inferior **por capacidad del tipo** y el descuento **nunca inventa un conflicto de aula**.
+- **Límite, dicho en el comentario:** la cota **puede quedarse corta** —la colocación real puede
+  necesitar más franjas por competencia con otros grupos, con las clases que se quedan o por turnos
+  que no se solapan—, de modo que una entrada infactible puede quedarse **sin** causa (2). Antes se
+  anunciaba lo contrario («nunca inventa», pero sin admitir que podía no detectar); ahora la
+  propiedad que se declara es la del palomar.
+- **Código muerto eliminado sin restos:** fuera la colocación voraz (`stable_sort`, `QSet<QPair<int,int>>
+  bloqueadas`), los campos `bloques` y `franjas` de `BloqueoDesplazado` (el struct pasa a
+  `using BloquesDesplazadosPorTipo = QMap<QString, int>`), el parámetro `numDias` del helper y los
+  `#include <QPair>` / `#include <algorithm>`, que solo servían a la unión. Los dos call sites
+  (`causaConflictoDeAula` D8 y `causaSaturacionPorTipo`) construyen el mapa por curso; un curso sin
+  bloques desplazados se detecta con `isEmpty()` en vez de con `bloques > 0`.
+- **Comentarios corregidos:** el del helper, el de D8 y el de la saturación por tipo ya no hablan de
+  unión ni de «cota optimista»; dicen que la garantía es el palomar y que puede quedarse corta.
+- **Sin cambios** en el modelo (T4), en `ValidadorSalidaSolver`, en el orden de categorías, en los
+  mensajes, en el frontend, en `spec.md`, `plan.md`, `estado.md` ni `tasks.md`.
+
+### Tests primero (rojo)
+
+Fixture `configDosCursosConTurnosDistintos()` (caso exacto del reviewer) y dos casos nuevos:
+
+1. `solver_causaDeAulaNoSobreestimaConTurnosDistintos` — `Prof B` con `{0}` → causa (4), **sin**
+   causa (2), con `2|B` y «Laboratorio» en el mensaje.
+2. `solver_causaDeAulaConTurnosDistintosNoInventaElConflicto` — control positivo con `Prof B` con
+   `{0,1}` → `exito` sin errores.
+
+Con la producción de `45ac292` el caso 1 estaba en rojo (y el 2 ya pasaba):
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : TestSolverHorarios::solver_causaDeAulaNoSobreestimaConTurnosDistintos()
+  'texto.contains("Causa (4)")' returned FALSE. (El modelo no tiene solución factible (INFEASIBLE).
+  Causa (2) conflicto de aula: el aula «A1» no da abasto para las clases que se quedan en ella
+  (6 bloques en 8 franjas; 4 quedan bloqueadas por clases desplazadas).
+  Entorno: 2 docentes, 2 cursos, 2 materias, 3 aulas.)
+PASS   : TestSolverHorarios::solver_causaDeAulaConTurnosDistintosNoInventaElConflicto()
+Totals: 36 passed, 1 failed, 0 skipped, 0 blacklisted, 209ms
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ctest --test-dir build-backend -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.27 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 37 passed, 0 failed, 0 skipped, 0 blacklisted, 209ms
+
+$ ctest --preset backend
+100% tests passed out of 49
+Total Test time (real) =   5.73 sec
+
+$ git diff --stat
+ specs/010-solver-tipos-y-eventos/journal.md |  47 +++++++----
+ src/backend/src/solver/solver.cpp           | 118 +++++++++-------------------
+ test/backend/test_solver_horarios.cpp       |  59 ++++++++++++++
+ 3 files changed, 128 insertions(+), 96 deletions(-)
+```
+
+### Escenarios antes → después (mensajes medidos)
+
+| Escenario | Antes (unión + palomar) | Después (solo palomar) |
+|---|---|---|
+| **Turnos distintos** (nuevo): 6 bloques en `A1`, 4 de laboratorio, 2 laboratorios, `Prof B` sin laboratorio | causa (2) «el aula «A1» … (6 bloques en 8 franjas; 4 quedan bloqueadas)» | **causa (4)** «la materia «Laboratorio» del curso 2\|B no tiene ningún docente elegible» |
+| **Turnos distintos** (control): `Prof B` con laboratorio | `exito` | `exito` |
+| **R2**, 1 laboratorio: 28 bloques en `A1`, 4 de laboratorio, 30 franjas | causa (2) «28 bloques en 30 franjas; 4 quedan bloqueadas» (palomar ⌈4/1⌉ = 4) | **idéntico** |
+| **R2**, 2 laboratorios (contraprueba) | `exito` (palomar ⌈4/2⌉ = 2) | **idéntico** |
+| **S3b**, 2 laboratorios, `Prof B` sin laboratorio | causa (4) «… curso 2\|B no tiene ningún docente elegible» | **idéntico** |
+| **S1**, 1 laboratorio: 5 bloques en `A1`, 4 desplazados | causa (2) «5 bloques en 6 franjas; 4 quedan bloqueadas» (unión 4 = palomar 4) | **idéntico** |
+
+Ninguna aserción de mensaje cambió: R2, S1, S3b y la saturación por tipo conservan sus cifras.
+
+### Regresión temporal (restaurada)
+
+Copiar `git show 45ac292:src/backend/src/solver/solver.cpp` sobre el fichero actual (reintroduce el
+término de la unión con el palomar) deja el árbol de tests como está y falla **exactamente** el caso
+nuevo, con el defecto del reviewer:
+
+```text
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : TestSolverHorarios::solver_causaDeAulaNoSobreestimaConTurnosDistintos()
+  'texto.contains("Causa (4)")' returned FALSE. (… Causa (2) conflicto de aula: el aula «A1» no da
+  abasto para las clases que se quedan en ella (6 bloques en 8 franjas; 4 quedan bloqueadas …).)
+Totals: 36 passed, 1 failed, 0 skipped, 0 blacklisted, 206ms
+```
+
+Restaurado el `solver.cpp` del palomar: build exit 0, `test_solver_horarios` 37/37 y suite 49/49
+(arriba). El resto de casos de aula no cambian con la regresión, así que el nuevo test es el único
+que discrimina «unión + palomar» de «solo palomar»; R2/S1/S3b no distinguían ambos términos.
+
+### Hallazgos
+
+- **El palomar sí es cota inferior; la unión no lo era.** El error de la corrección 3 fue agrupar dos
+  términos bajo la etiqueta «cota inferior» sin comprobar el primero: la unión es una **colocación
+  concreta** (voraz), no un mínimo. Se elimina en lugar de «acotarla», porque cualquier cota basada
+  en turnos exige resolver una colocación (matching) que el modelo ya resuelve.
+- **Puede quedarse corta y hay que decirlo.** Con el palomar solo, una entrada infactible puede
+  quedarse sin causa (2) cuando el bloqueo real excede ⌈k/A⌉ (p. ej. competencia de las mismas
+  franjas con otros grupos del centro, o el propio turno del curso que limita la reutilización). Es
+  el precio de no volver a declarar causas (2) falsas; los escenarios R2/S1/S3b y el caso del
+  reviewer quedan cubiertos.
+- **`BloquesDesplazadosPorTipo` no necesita el recuento total de bloques.** El palomar solo mira los
+  bloques por tipo; el total (`bloques`/`desplazadosPorCurso`) sigue existiendo donde se usa
+  (`causaSaturacionPorTipo` para decidir si un curso desplaza algo) pero ya no viaja al helper.
+- **Correcciones a este journal:** (i) corrección 2, «nunca declara más bloqueo del que el modelo
+  puede evitar» → **falso**, la unión podía sobreestimar; (ii) corrección 2, hallazgo «la unión es
+  una cota optimista» → **falso**, es una colocación voraz sin garantía; (iii) corrección 3, «el
+  `max` de dos cotas inferiores es cota inferior … nunca inventa un conflicto de aula» → **falso**
+  para el conjunto, solo el palomar lo garantiza; (iv) corrección 3, «sin cambios en la unión» →
+  superado: la unión ya no existe.
