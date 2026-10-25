@@ -1153,3 +1153,144 @@ Superficie acotada a `docs/contrato-solver-2.0.md` (nuevo), `tasks.md` y este jo
 - **El ejemplo se validó por el camino de producción completo** (cargador → `fromJson` → V1–V17), no
   solo por `json.tool`; no hizo falta CLI nueva ni tocar tests, porque se compiló un `main` efímero en
   `/tmp` enlazado contra la librería ya construida.
+
+## T10 - Regresión global y benchmark con tipos (2026-10-25)
+
+**Requisito:** RNF-2 (benchmark < 60 s), RNF-5 (suite backend sin frontend), RNF-6 (trazabilidad).
+**Plan:** §1.3 (estrategia fija del benchmark), §8-T10 y §10 (riesgo de degradación con `y` para todos
+los cursos). **Base:** `9c5c301` (T1-T9 commiteadas; único rojo `test_solver_benchmark`). **No se
+commitea.**
+
+### Rojo de partida (el que había que cerrar)
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_benchmark$'
+1/1 Test #48: test_solver_benchmark ............***Failed    0.84 sec
+QDEBUG : ...benchmark_solverGrandeResuelve() Tiempo total: 55 ms
+QDEBUG : ...benchmark_solverGrandeResuelve() Status: FALLO
+QDEBUG : ...benchmark_solverGrandeResuelve() Errores: QList("El modelo no tiene solución factible
+  (INFEASIBLE).", "Causa: no se pudo identificar una categoría concreta; ...", ...)
+FAIL!  : ... 'resultado.exito' returned FALSE.
+0% tests passed, 1 tests failed out of 1
+```
+
+### Cambio 1 - fixture del benchmark a la estrategia de `plan.md` §1.3
+
+`test/backend/test_solver_benchmark.cpp` (`crearConfigGrande`), solo fixture y rótulos; **ni una línea
+de modelo, contrato, validador ni spec**:
+
+- `version` de `"1.0"` a `"2.0"` (migración obligatoria del contrato).
+- `dimensiones.num_aulas` 5 → **6**.
+- **6 aulas**: índices 0-4 con tipo `"Aula común"` (0 `Aula 101`/30, 1 `Aula 102`/25, 2 `Aula
+  202`/35, 3 `Aula 201`/30, 4 `Aula 203`/100) y el índice **5 `Laboratorio`/20**. El antiguo
+  «Auditorio» era el índice 4 y pasa a `Aula 203`, como fija el plan.
+- **15 materias tipadas**: todas `"Aula común"` salvo `Tecnologia` (índice **14**), que exige
+  `"Laboratorio"`. Es la única materia de laboratorio del fixture.
+- **Referencias por turno sin repetir aula** (sin cambios de índices respecto del fixture anterior):
+  mañana 1A→0, 1B→1, 2A→2, 3A→3, 4A→4; tarde 2B→0, 3B→1, 4B→2. Ninguna aula se comparte dentro de
+  un turno y solo 4B (plan `Ciencias`) desplaza sus 3 bloques de Tecnología.
+- El `qDebug` de cabecera dice ahora «6 aulas».
+
+Las dos aserciones que pedía el plan ya existían y se mantienen: `QVERIFY(resultado.exito)` y
+`QVERIFY(elapsed < 60000)`.
+
+**Decisión no cubierta por el plan (solo nombres del fixture):** el plan fija índices y tipos pero no
+qué nombre recibe el aula del índice 2 (antes `Lab Ciencias`, ahora debe ser común). Se renombra a
+`Aula 202` y se deja `Aula 201` en su índice 3 de siempre, para no duplicar nombres; capacidades
+conservadas del fixture anterior (y 20 para el laboratorio). Ningún nombre interviene en el modelo.
+
+### Evidencia de que el fixture ejercita de verdad la regla de tipo
+
+Instrumentación **temporal** (`qDebug` de cada asignación, retirada antes de la evidencia final; el
+diff entregado no la contiene) sobre la solución del benchmark:
+
+```text
+TEMP curso indice 7 turno "tarde"
+TEMP  dia 0 slot 3 materia 3 aula 2
+TEMP  dia 0 slot 4 materia 0 aula 2
+TEMP  dia 0 slot 5 materia 3 aula 2
+TEMP  dia 1 slot 4 materia 14 aula 5     <- Tecnologia en el laboratorio
+TEMP  dia 2 slot 4 materia 3 aula 2
+TEMP  dia 2 slot 5 materia 0 aula 2
+TEMP  dia 3 slot 3 materia 14 aula 5     <- Tecnologia en el laboratorio
+TEMP  dia 3 slot 5 materia 14 aula 5     <- Tecnologia en el laboratorio
+TEMP  dia 4 slot 4 materia 0 aula 2
+```
+
+Curso índice 7 = 4B (tarde, `Ciencias`): sus **3** clases de Tecnología van al aula **5** y las demás
+vuelven a la referencia **2**. Los otros siete cursos usan su referencia en **todas** sus clases
+(índices 0,1,2,3,4, y 0/1 en la tarde). El antiguo `Lab Ciencias` estaba en el índice 2 y habría hecho
+que 2A y 4B compartieran «laboratorio»; con el laboratorio en el índice 5 la referencia 2 queda libre
+en las franjas desplazadas de 4B (su única otra usuaria, 2A, es de mañana).
+
+### Cambio 2 - nota de no-generabilidad del seed
+
+`docs/guias/datos-prueba.md` §6 (límites), viñeta nueva tras «No genera presets del solver»: con la
+regla de tipo de la 010 el conjunto sembrado **no es generable** (≈104 bloques de ciencias frente a
+1 laboratorio × 40 franjas), la 009 ya retiró la promesa, no se intenta generar y `test_generacion_seed`
+queda fuera del preset `backend`; la generabilidad se recuperará con los **datos reales del liceo**.
+
+### Verificación
+
+```text
+$ cmake --build --preset backend --parallel
+[1/4] Automatic MOC for target test_solver_benchmark
+[2/3] Building CXX object test/CMakeFiles/test_solver_benchmark.dir/backend/test_solver_benchmark.cpp.o
+[3/3] Linking CXX executable test/test_solver_benchmark
+exit=0
+```
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_benchmark$'
+1/1 Test #48: test_solver_benchmark ............   Passed    0.32 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_benchmark
+QDEBUG : ...benchmark_solverGrandeResuelve() Dimensiones: 10 prof, 15 materias, 6 aulas, 8 cursos, 5 dias, 6 slots
+QDEBUG : ...benchmark_solverGrandeResuelve() Tiempo total: 135 ms
+QDEBUG : ...benchmark_solverGrandeResuelve() Status: EXITO
+QDEBUG : ...benchmark_solverGrandeResuelve() Total asignaciones: 80
+Totals: 4 passed, 0 failed, 0 skipped, 0 blacklisted, 268ms
+```
+
+**Tiempo del solver: 135 ms** (tope 60 000 ms; 0,8 s de reloj CTest incluye arranque de Qt). La
+primera corrida tras el build dio **144 ms**; el orden de magnitud se mantiene muy por debajo del
+límite, así que el riesgo de §10 (más variables por la `y` de todos los cursos) no se materializa.
+
+```text
+$ ctest --preset backend
+...
+48/49 Test #48: test_solver_benchmark ..............   Passed    0.32 sec
+49/49 Test #49: test_ipc_aislamiento_bd ............   Passed    0.08 sec
+
+100% tests passed out of 49
+Total Test time (real) =   5.65 sec
+
+$ ctest --test-dir build-backend -N
+Total Tests: 49
+$ ctest --test-dir build-backend -N | grep -E "frontend|generacion_seed"
+(sin test_frontend_conversion ni test_generacion_seed)
+```
+
+```text
+$ grep -n "generab" docs/guias/datos-prueba.md
+141:- **El conjunto sembrado no es generable con la regla de tipo (spec 010).** Desde la 010 toda clase se
+146:  resoluble del solver. La **009 ya retiró la promesa de generabilidad** del seed y la 010 no la
+148:  del preset `backend`. La generabilidad se recuperará con los **datos reales del liceo** (decisión del
+
+$ git diff --stat
+ docs/guias/datos-prueba.md             |  9 ++++++++
+ test/backend/test_solver_benchmark.cpp | 38 ++++++++++++++++++++--------------
+ 2 files changed, 32 insertions(+), 15 deletions(-)
+```
+
+### Hallazgos
+
+- **El benchmark es el único punto de la suite que ejercitaba la escala grande; ahora también la regla
+  de tipo.** Sin el aula de laboratorio en un índice propio, el fixture anterior no probaba la
+  exclusividad entre clases desplazadas; con 4B desplazando 3 bloques al aula 5 sí lo hace.
+- **80 asignaciones** en la solución (10 bloques por curso × 8 cursos): el fixture está saturado al
+  100 % de las franjas útiles (5 días × 3 franjas por turno), así que es un caso exigente y no un
+  escenario holgado.
+- **`test_backend_variables_cp_sat`** es el nombre real del test de variables (el plan y `tasks.md`
+  lo llaman `test_variables_cp_sat`); no se toca el nombre, solo se anota para futuras búsquedas.

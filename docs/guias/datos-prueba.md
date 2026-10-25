@@ -138,6 +138,15 @@ variante inexistente sale con código **6** y **no toca ningún dato**.
   docente** (turno, plan, años, horas de aula) y las **suplencias con su `peso`** viven en el preset
   (spec 005), que este conjunto **no** genera. Solo garantiza que los datos persistidos permiten
   construir presets coherentes y ejercitar las cuatro variantes.
+- **El conjunto sembrado no es generable con la regla de tipo (spec 010).** Desde la 010 toda clase se
+  imparte en un aula cuyo **tipo** coincide con el tipo de aula que exige su materia, y el conjunto
+  siembra **un solo laboratorio** (8 franjas × 5 días = **40 franjas**). La demanda de las materias que
+  piden laboratorio ronda los **≈104 bloques** de ciencias por semana, así que **no existe horario
+  factible** para este centro con esa regla: el conjunto es un fixture de persistencia, no un caso
+  resoluble del solver. La **009 ya retiró la promesa de generabilidad** del seed y la 010 no la
+  recupera; por eso **no se intenta generar** el horario del seed y `test_generacion_seed` queda fuera
+  del preset `backend`. La generabilidad se recuperará con los **datos reales del liceo** (decisión del
+  usuario), no con este conjunto ficticio.
 - **La duración de la franja no cambia la carga:** 1 hora académica = 1 bloque, y cada año suma 40
   horas académicas (= 40 bloques). Los **40 minutos** son la duración **real** de la franja (rejilla
   horaria, eventos y disponibilidad), no un factor de conversión. El evento «Receso» de 10 minutos
