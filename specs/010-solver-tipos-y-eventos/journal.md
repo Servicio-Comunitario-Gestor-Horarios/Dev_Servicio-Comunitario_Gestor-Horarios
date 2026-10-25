@@ -1482,17 +1482,25 @@ Total Test time (real) =   5.65 sec
    Totals: 32 passed, 1 failed
    ```
 
-2. **Contar las clases desplazadas como ocupantes** del aula de referencia (`total += bloques` para
-   toda materia), la regresión alternativa del hallazgo 1: fallan dos tests, con este reparto:
+2. **Contar las clases desplazadas como ocupantes del aula de referencia en lugar de como
+   bloqueo** (la rama `else` suma al `total` y deja de sumar a `bloqueo.bloques`), la regresión
+   alternativa del hallazgo 1: fallan **tres** tests, uno de ellos S1 (reproducido sobre `232bd19`):
 
    ```text
    FAIL!  : solver_falloCausaConflictoDeAulaPorReferenciaSaturada()
      'texto.contains("10 bloques")' returned FALSE. (Causa (2) … el aula «Aula 1» … 12 bloques en
      6 franjas)                                            ← «12» = 10 que se quedan + 2 desplazadas
+   FAIL!  : solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos()
+     'texto.contains("5 bloques en 6 franjas; 4 quedan bloqueadas")' returned FALSE.
+     (Causa (2) … el aula «A1» … 9 bloques en 6 franjas)   ← «9» = 6 de 1|A (2 + 4) + 3 de 2|B
    FAIL!  : solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula()
      'texto.contains("Causa (4)")' returned FALSE. (… Causa (2) …)
-   Totals: 31 passed, 2 failed
+   Totals: 30 passed, 3 failed
    ```
+
+   (Corrección de la anotación anterior, que decía «fallan dos tests … 31 passed, 2 failed»: era
+   falsa. Si además de contarlas como ocupantes se mantiene el bloqueo, el reparto es 27/6; la
+   mutación con la que se midió —y la que da 30/3— sustituye el bloqueo por la ocupación.)
 
 3. Tras restaurar ambas mutaciones: build exit 0, `test_solver_horarios` 33/33 y suite 49/49 (arriba).
 
@@ -1500,7 +1508,10 @@ El caso S1 del reviewer (`solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplaz
 comunes + 4 de laboratorio, 2|B con 3 comunes, `A1` + 1 laboratorio, 2 días × 3 franjas) **sigue
 dando causa (2)**: 5 bloques que se quedan frente a `6 − 4 = 2` disponibles. Se le añadió la
 aserción del mensaje `«5 bloques en 6 franjas; 4 quedan bloqueadas»`, que fija el número de la unión
-(solo desplaza 1|A; sus 4 franjas se cuentan una vez) y habría fallado con cualquier suma.
+(solo desplaza 1|A; sus 4 franjas se cuentan una vez). **Corrección:** la frase anterior —«habría
+fallado con cualquier suma»— era falsa: con la mutación de suma del punto 1 este caso sigue pasando
+(4 bloques desplazados = 4 franjas con un solo curso desplazándose), así que no discrimina suma vs
+unión; quien lo hace es `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula`.
 
 ### Hallazgo 1 · test que ya no discriminaba
 
@@ -1533,3 +1544,133 @@ nombre del test y el journal afirmaban más de lo que probaba. Se eligió la opc
   descuento por bloqueo no inventa conflictos; solo cambia el nombre y el comentario.
 - **Sin cambios** en el modelo (T4), `ValidadorSalidaSolver` (T5), frontend, `spec.md`, `plan.md` ni
   `estado.md`.
+
+## Corrección 3 · cota inferior por tipo (2026-10-25)
+
+**Hallazgo pendiente de la tercera validación (RF-6 / criterio 6).** Alcance estricto:
+`src/backend/src/solver/solver.cpp`, `test/backend/test_solver_horarios.cpp` y este journal. Base
+`232bd19` (árbol limpio, `ctest --preset backend` 49/49). **No se commitea.**
+
+### Hallazgo · la unión pura era optimista con pocas aulas del tipo desplazado
+
+`franjasBloqueadasPorDesplazamientos` devolvía solo la **unión** de franjas: suponía que todas las
+clases desplazadas del grupo caben en las mismas franjas. Eso exige que haya aulas suficientes del
+tipo desplazado. Si hay **menos aulas que clases que las necesitan**, no caben: el aula de
+referencia pierde más franjas y una entrada válida puede ser INFEASIBLE quedándose en «no se pudo
+identificar una categoría concreta».
+
+Caso R2 del reviewer: 5 días × 6 franjas = 30; dos cursos comparten `A1`, cada uno 14 bloques
+comunes + 2 de laboratorio; **1 solo laboratorio**. Los 4 bloques de laboratorio necesitan 4
+franjas distintas (una clase por franja y aula), así que `A1` pierde 4 y solo le quedan 26 para los
+28 bloques comunes: infactible **por aula**. Con 2 laboratorios el mismo dato es factible.
+
+### Cambio (solo producción)
+
+La estimación pasa a ser una **cota inferior** (nunca sobreestima):
+
+```cpp
+// franjasBloqueadasPorDesplazamientos(config, cursos, numDias)
+//   total = unión de (día, slot) alcanzables por las clases desplazadas del grupo
+//   para cada tipo t:  total = max(total, ⌈desplazados_que_requieren_t / aulas_de_t⌉)
+```
+
+- **Por qué es segura:** (i) el palomar da el mínimo de franjas que necesitan k clases con A aulas
+  del tipo (una por franja y aula), así que el bloqueo real no puede ser menor; (ii) la unión
+  tampoco puede superarlo. El `max` de dos cotas inferiores es cota inferior: puede quedarse corta
+  (más adelante el modelo decide), pero **nunca inventa un conflicto de aula**.
+- **`BloqueoDesplazado` gana `bloquesPorTipo`**: los bloques desplazados de cada curso agrupados
+  por la clave del tipo de aula que requieren. El helper suma el mapa del grupo y divide por el
+  **nº de aulas del centro de ese tipo** (no del grupo). Si el tipo no tiene aulas (0) no se divide:
+  V17 ya lo rechaza como entrada inválida.
+- **D8 (`causaConflictoDeAula`)** usa la cota inferior en lugar de la unión pura; **la saturación
+  por tipo** (`causaSaturacionPorTipo`) la aplica también, agrupando por aula de referencia y
+  sumando entre referencias distintas del mismo tipo, igual que antes.
+- **Sin cambios** en el modelo (T4), en el resto de causas, en el frontend, en `spec.md`,
+  `plan.md`, `estado.md` ni `tasks.md`.
+
+### Tests primero (rojo)
+
+Fixture compartido `configDosCursosCasiLlenosConLaboratorios(int laboratorios)` (caso R2: 5 días ×
+6 franjas, `A1` compartida, 14 + 2 bloques por curso) y dos casos nuevos:
+
+1. `solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio` — 1 laboratorio → causa (2)
+   con el aula y las cifras (`«28 bloques en 30 franjas; 4 quedan bloqueadas»`).
+2. `solver_causaDeAulaConLaboratoriosSuficientesNoInventaElConflicto` — 2 laboratorios, mismo dato
+   → `exito` (control de que la cota no inventa el conflicto).
+
+Con la producción anterior el caso 1 estaba en rojo (y el 2 ya pasaba):
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio()
+  'texto.contains("Causa (2)")' returned FALSE. (El modelo no tiene solución factible (INFEASIBLE).
+  Causa: no se pudo identificar una categoría concreta; revise horas, aulas y disponibilidad de
+  docentes.  Entorno: 2 docentes, 2 cursos, 2 materias, 2 aulas.)
+PASS   : solver_causaDeAulaConLaboratoriosSuficientesNoInventaElConflicto()
+Totals: 34 passed, 1 failed, 0 skipped, 0 blacklisted, 201ms
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0 (ninja: no work to do)
+$ ctest --test-dir build-backend -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.26 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 35 passed, 0 failed, 0 skipped, 0 blacklisted, 197ms
+
+$ ctest --preset backend
+100% tests passed out of 49
+
+$ git diff --stat -- src/backend/src/solver/solver.cpp test/backend/test_solver_horarios.cpp
+ src/backend/src/solver/solver.cpp     | 87 +++++++++++++++++++++++++----------
+ test/backend/test_solver_horarios.cpp | 59 ++++++++++++++++++++++++
+ 2 files changed, 122 insertions(+), 24 deletions(-)
+```
+
+### Números de los tres escenarios (antes → después)
+
+| Escenario | Antes (unión pura) | Después (max unión/palomar) |
+|---|---|---|
+| **R2**, 1 laboratorio: 28 bloques en `A1`, 4 de laboratorio, 30 franjas | unión 2 → 28 disponibles ≥ 28 → INFEASIBLE **sin categoría** | palomar ⌈4/1⌉ = 4 → 26 disponibles < 28 → **causa (2)**: «28 bloques en 30 franjas; 4 quedan bloqueadas» |
+| **R2**, 2 laboratorios (contraprueba) | 2 franjas → factible | palomar ⌈4/2⌉ = 2 → 28 disponibles ≥ 28 → **exito** (sin cambio) |
+| **S3b**, 2 laboratorios, docente de laboratorio no elegible para 2\|B | unión 2 → causa (4) | palomar ⌈4/2⌉ = 2 → causa (4), **sin** causa (2) |
+| **S1**, 1 laboratorio: 5 bloques en `A1`, 4 desplazados | unión 4 → causa (2) «5 bloques en 6 franjas; 4 quedan bloqueadas» | unión 4, palomar ⌈4/1⌉ = 4 → la misma causa (2) con la misma cifra |
+
+### Regresiones temporales (todas restauradas)
+
+1. **Volver a la unión pura** (anular el término del palomar). Falla exactamente el caso R2 nuevo,
+   con el mensaje «no se pudo identificar»; S1 y S3b siguen pasando (su bloqueo real ya lo daba la
+   unión). `Totals: 34 passed, 1 failed`.
+2. **Volver a la suma** (que el helper devuelva la suma de bloques desplazados, comportamiento
+   previo a la corrección 2). Falla exactamente S3b
+   (`solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula`): causa (2) falsa
+   «… (4 bloques en 6 franjas; 4 quedan bloqueadas …)» en lugar de la (4). El caso R2 sigue en
+   verde con la suma (también declara causa (2): 4 franjas bloqueadas dejan 26 para 28 bloques),
+   así que R2 no discrimina suma vs cota; S3b sí. `Totals: 34 passed, 1 failed`.
+3. Tras restaurar ambas mutaciones: build exit 0, `test_solver_horarios` 35/35 y suite 49/49
+   (arriba).
+
+### Hallazgos
+
+- **Cota inferior, no colocación exacta.** El término del palomar ignora que otras aulas del mismo
+  tipo pueden estar ocupadas por otros grupos o por clases que se quedan; el modelo real puede
+  necesitar aún más franjas. Se prefiere quedarse corto antes que declarar causa (2) falsa, que es
+  el defecto que se corrige. Un caso que siga INFEASIBLE y sin categoría con la cota es posible,
+  pero ya no es el R2: haría falta una interacción que la cota no modela (p. ej. competencia entre
+  tipos por las mismas franjas).
+- **El nº de aulas es el del centro.** Para el término del palomar se cuentan todas las aulas del
+  tipo en el centro, incluidas las que son referencia de otros cursos: es la opción optimista
+  (cota inferior) y evita sobreestimar. Un tipo sin aulas (0) no se divide: V17 lo rechaza antes.
+- **Sin cambios en la unión.** El helper conserva la reutilización de franjas de la corrección 2;
+  solo se le añade el `max` con el palomar. `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos`
+  (S1) fija que la unión no se pierde.
+- **La saturación por tipo** hereda el mismo `max`; el caso
+  `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` sigue en verde con sus cifras.
+- **Correcciones a este journal (detectadas por el reviewer):** la regresión de «contar las
+  desplazadas como ocupantes» da **30/3** (no 31/2) y entre las que fallan está S1 con «9 bloques en
+  6 franjas»; la frase «habría fallado con cualquier suma» era falsa (S1 pasa con la mutación de
+  suma). Ver la sección de la corrección 2, ya corregida.

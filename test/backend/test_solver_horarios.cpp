@@ -77,6 +77,35 @@ private:
         return config;
     }
 
+    // Caso R2 del reviewer: dos cursos comparten la referencia A1 (5 días × 6 franjas = 30) y
+    // cada uno cursa 14 bloques comunes + 2 de laboratorio. Con un solo laboratorio los 4
+    // bloques de laboratorio necesitan 4 franjas distintas (una clase por franja y aula), así
+    // que A1 pierde 4 franjas y solo le quedan 26 para 28 bloques comunes: infactible por
+    // aula. Con 2 laboratorios los mismos 4 bloques caben en 2 franjas (una por aula) y el
+    // mismo dato es factible. Cada curso tiene su docente propio y con disponibilidad completa
+    // (16 bloques ≤ 30 franjas), así que la causa solo puede ser de aula.
+    static SolverConfig configDosCursosCasiLlenosConLaboratorios(int laboratorios) {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, laboratorios + 1, 2, 5, 6};
+        config.franja_horaria = {60, 6};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3, 4, 5}}};
+
+        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula común", 30}};
+        for (int i = 1; i <= laboratorios; ++i)
+            config.aulas.append({QStringLiteral("Lab %1").arg(i), "Laboratorio", 20});
+        config.planes = {{"Plan A", {{0, 1, 14}, {1, 1, 2}}},
+                         {"Plan B", {{0, 2, 14}, {1, 2, 2}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
+                         {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
+        config.profesores = {
+            {"Prof A", 16, 16, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(5, 6)},
+            {"Prof B", 16, 16, "manana", "Plan B", {}, {0, 1}, {}, dispCompleta(5, 6)}};
+        return config;
+    }
+
 private slots:
 
     void configValida_noTieneErrores() {
@@ -907,6 +936,36 @@ private slots:
         QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
         QVERIFY2(texto.contains("2|B"), qPrintable(texto));
         QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+    }
+
+    // ── Corrección 3 (RF-6): las franjas bloqueadas no caben si hay menos aulas del tipo ──
+    // La unión pura era optimista: suponía que los 4 bloques de laboratorio de los dos cursos
+    // caben en las mismas 2 franjas. Con un solo laboratorio necesitan 4 franjas distintas
+    // (palomar), A1 pierde 4 y los 28 bloques comunes ya no caben en 26: causa (2) con cifras.
+    void solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio() {
+        SolverConfig config = configDosCursosCasiLlenosConLaboratorios(1);
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "4 bloques de laboratorio necesitan 4 franjas del único laboratorio");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("A1"), qPrintable(texto));
+        QVERIFY2(texto.contains("28 bloques en 30 franjas; 4 quedan bloqueadas"), qPrintable(texto));
+        QVERIFY2(!texto.contains("no se pudo identificar"), qPrintable(texto));
+    }
+
+    // Contraprueba del mismo dato: con 2 laboratorios los 4 bloques caben en 2 franjas, A1
+    // conserva 28 y el horario existe. El aula no inventa el conflicto.
+    void solver_causaDeAulaConLaboratoriosSuficientesNoInventaElConflicto() {
+        SolverConfig config = configDosCursosCasiLlenosConLaboratorios(2);
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY(resultado.errores.isEmpty());
     }
 
     // La saturación por tipo también descuenta las franjas bloqueadas en las referencias de ese
