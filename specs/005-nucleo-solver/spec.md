@@ -125,11 +125,14 @@ construir después.
 
 Esta spec cubre el **solver y todo lo suyo**: su **núcleo**, el **contrato de configuración** (forma
 del JSON y su serialización), el **modelo** (invariantes duras y función objetivo), las
-**validaciones previas** (V1–V15) y la **construcción de la entrada del solver** desde los datos
+**validaciones previas** (V1–V17) y la **construcción de la entrada del solver** desde los datos
 persistidos más el preset (RF-13). La **persistencia** de los datos del curso (año, sección, turno y
 aula) y sus **servicios** son de la **spec 004**, que **precede** a esta spec y le aporta los datos ya
 persistidos; esta spec (005) los **lee y arma** la entrada. La **gestión de los presets** como
 archivos **no** entra aquí.
+
+> **Superado en el rango por la 010 (2026-10-25).** Este alcance decía **V1–V15**; el catálogo vigente
+> de validaciones previas es **V1–V17** (la 010 añade V16 y V17). El resto del alcance no cambia.
 
 Una decisión de modelado clave guía esta spec: minimizar el «déficit de horas» es **inerte** (la suma
 de horas asignadas es constante, porque las horas totales de cada materia-curso están fijadas por una
@@ -311,10 +314,13 @@ y no obligan.
 - **Causa de un resultado no factible:** la categoría —y la entidad afectada, cuando sea identificable—
   que explica por qué no existe solución que respete todas las invariantes duras. Categorías, en el
   **orden** en que se comprueban e informan: **(1) entrada inválida** (falla una validación previa
-  V1–V15, incluida la versión/parseo del contrato); **(2) conflicto de aula** (invariantes D8/D9/D10);
+  V1–V17, incluida la versión/parseo del contrato); **(2) conflicto de aula** (invariantes D8/D9/D10);
   **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de asignación de
   docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría aplicable.
   Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
+  > **Superado en el rango por la 010 (2026-10-25).** Esta definición decía **V1–V15**; el catálogo
+  > vigente es **V1–V17** (la 010 añade V16 y V17). El orden de categorías y el resto de la definición
+  > no cambian.
 
 ## Catálogo de reglas
 
@@ -566,8 +572,11 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   sección) como clave**, sin escribir un nombre (ni almacenado ni derivado) por curso (coherente con
   el contrato de salida de la spec 002).
 
-### RF-11. Validación previa (V1–V15)
+### RF-11. Validación previa (V1–V17)
 
+> **Título superado por la 010 (2026-10-25).** Este título decía **V1–V15**; el catálogo vigente es
+> **V1–V17**.
+>
 > **Ampliado por la 010 (2026-10-25).** El catálogo de validaciones previas pasa a **V1–V17**: la 010
 > añade **V16** (toda aula y toda materia declara tipo) y **V17** (cada tipo requerido tiene al menos
 > un aula del centro, en los dos modos) y cambia **V1** (sección de eventos y versión 2.0). El detalle
@@ -805,10 +814,16 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
    (obligatorios, RF-7), la **salida se indexa por esa identidad** (el nombre derivado es presentación,
    no del solver), trata el **modo de aula fija como global** (parte del preset) con plan por curso y
    número de estudiantes (**opcional**), deriva las materias del plan, admite años de docente y `peso`
-   de suplente (aceptado, sin uso), declara la versión `1.0` y su serialización es consistente y
+   de suplente (aceptado, sin uso), declara la versión `2.0` y su serialización es consistente y
    equivalente (RF-7 a RF-10).
-4. La validación previa incluye V1–V15, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
+   > **Superado en la versión por la 010 (2026-10-25).** Este criterio decía `1.0`; la versión vigente
+   > del contrato es **`2.0`** y `1.0`, ausente o desconocida se rechaza como entrada inválida. El
+   > resto del criterio sigue vigente.
+4. La validación previa incluye V1–V17, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
    `peso` no negativo y el de `duracion_minutos > 0`) (RF-11).
+   > **Superado en el rango por la 010 (2026-10-25).** Este criterio decía V1–V15; la 010 añade
+   > **V16** (aula y materia declaran tipo) y **V17** (cada tipo requerido tiene aulas, en ambos
+   > modos). V1–V12 siguen enumeradas aquí; el detalle de V1, V2, V16 y V17 vive en la 010.
 5. La entrada del solver se construye desde los datos persistidos más el preset, embebe solo los planes
    referenciados y traduce el aula del curso a su índice; el solver no consulta la base de datos
    (RF-13).

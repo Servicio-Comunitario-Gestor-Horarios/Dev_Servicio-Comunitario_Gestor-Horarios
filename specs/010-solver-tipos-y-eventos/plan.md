@@ -74,9 +74,23 @@ Base: e72c930
 - `src/backend/src/solver/solver.cpp`: `extraerSolucion` informa el aula real de **todas** las
   clases (la `y`), no la fija por defecto; `causaConflictoDeAula`/`causaEntradaInvalida` amplían la
   saturación por tipo y la falta de tipos.
-- `src/backend/src/services/ValidadorSalidaSolver.cpp`: **sin cambios de producción.** P3 y P4 ya
-  operan sobre `asignacion.aula` (el aula real que emite el solver) y no sobre el aula fija; la única
-  deuda es de pruebas (T5), no de código.
+- `src/backend/src/services/ValidadorSalidaSolver.cpp`: **P3 sin cambios de producción** (opera sobre
+  `asignacion.aula`, el aula real que emite el solver). **P4 sí cambia, por la desviación autorizada
+  del apartado siguiente** (claves por recurso, no por franja).
+
+> **Desviación autorizada fuera del plan (2026-10-25, commit `06fc70e`): P4.**
+> `ValidadorSalidaSolver` indexaba la ocupación **solo por `(día, slot)`**, así que dos clases
+> cualesquiera en la misma franja se denunciaban como «docente en dos clases» y «aula ocupada», aunque
+> el docente y el aula fueran distintos; `ServicioGeneracion` convierte un conflicto de P4 en
+> `CalculoFallido`, de modo que con más de un curso (el seed tiene 13) toda generación real se
+> marcaba como fallida. **El usuario autorizó arreglarlo fuera del plan de la 010.** Arreglo: clave
+> `ClaveOcupacion{recurso, día, slot}` y dos mapas separados, `ocupacionProfesor` por **(profesor,
+> día, slot)** y `ocupacionAula` por **(aula, día, slot)**; un recurso sin asignar (negativo) no
+> ocupa franja, y un índice positivo fuera de rango se indexa por su valor bruto (dos clases con la
+> misma aula inexistente sí colisionan y el mensaje la nombra «(desconocida)»). Se conservan P1, P2,
+> P3 y el resto de P4 (mismo curso dos veces en la franja). Alternativa descartada: dejar el defecto
+> documentado y no tocar producción; mantiene rota la generación con más de un curso y la 010 no
+> podría validarse con datos reales.
 
 ### 1.3 Verificación y pruebas
 
@@ -95,11 +109,13 @@ Base: e72c930
 - `test/backend/test_solver_horarios.cpp`: referencia, desplazamiento y vuelta, bloqueo del aula de
   referencia, exclusividad de desplazadas, móvil, salida con aula real, saturación de laboratorio.
 - `test/backend/test_variables_cp_sat.cpp`: compila sin `RecesoConfig` (T1) y comprueba la `y` de
-  todos los cursos (T4).
+  todos los cursos (T4). **Ojo con el nombre:** el test se registra en CTest como
+  **`test_backend_variables_cp_sat`** (`test/CMakeLists.txt:118`), así que `-R 'test_variables_cp_sat'`
+  **no casa**; usar `-R 'variables_cp_sat'` o el nombre completo.
 - `test/backend/test_solver_benchmark.cpp`: el escenario grande con tipos (estrategia fija en el
   apartado siguiente).
-- `test/backend/test_validador_salida.cpp`: salida con aulas reales (**solo pruebas**; el validador
-  no cambia).
+- `test/backend/test_validador_salida.cpp`: salida con aulas reales; **P3 es solo pruebas**, pero
+  **P4 cambia** por la desviación autorizada de §1.2 (claves por docente y por aula, `06fc70e`).
 - No se tocan `test/frontend/*` ni `test/CMakeLists.txt:120-133`: siguen fuera con
   `BUILD_FRONTEND=OFF`.
 
@@ -434,6 +450,14 @@ opera sobre `asig.aula` real; el curso fijo puede tener clases en aulas distinta
     Alternativas descartadas: (a) copiar el tipo vacío y dejar que **V16** lo rechace al cargar; y
     (b) una comprobación previa separada al estilo de `ValidadorEntradaSolver`. Ambas alejan el fallo
     de su causa y permiten construir una entrada que nunca podrá validarse.
+13. **P4 indexa por recurso, no por franja (desviación autorizada por el usuario, 2026-10-25,
+    `06fc70e`).** `ValidadorSalidaSolver` usa una clave `(recurso, día, slot)`: `ocupacionProfesor`
+    por `(profesor, día, slot)` y `ocupacionAula` por `(aula, día, slot)`. Sin esto, dos cursos en
+    paralelo en aulas y con docentes distintos se denuncian como conflicto y `ServicioGeneracion`
+    devuelve `CalculoFallido` con cualquier horario real. Está **fuera del plan original** (§1.2 lo
+    daba por «sin cambios de producción»): lo autorizó el usuario al detectarse en T5.
+    Alternativa descartada: dejarlo como defecto documentado y no tocar producción; deja la
+    generación real inutilizable y la validación de la 010 no se habría podido hacer con datos reales.
 
 ## 6. Supersesión enumerada de la 005
 
@@ -551,26 +575,31 @@ cronológico invertido; V16 rechaza aula/materia sin tipo; V17 rechaza un tipo r
 
 ```
 cmake --build --preset backend --parallel
-ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios|test_variables_cp_sat'
+ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios|variables_cp_sat'
 ```
 
 Esperado: build y verde. Un curso fijo con materia del tipo de su referencia usa la referencia; una
 materia de otro tipo se imparte en un aula de ese tipo y el curso vuelve; mientras hay una clase
 desplazada, otro curso no usa la referencia en esa franja; la exclusividad cubre las desplazadas; un
 curso móvil usa un aula del tipo exacto; la salida informa el aula real de cada clase;
-`test_variables_cp_sat` ve la `y` de todos los cursos.
+`test_backend_variables_cp_sat` (nombre real en CTest; `-R 'test_variables_cp_sat'` no casa) ve la `y`
+de todos los cursos.
 
-### T5. Validador de salida con aulas reales (20 min; solo pruebas)
+### T5. Validador de salida con aulas reales (20 min; P3 solo pruebas)
 
 ```
 cmake --build --preset backend --parallel
 ctest --test-dir build-backend --output-on-failure -R '^test_validador_salida$'
 ```
 
-Esperado: build y verde **sin tocar producción**: `ValidadorSalidaSolver` ya valida P3/P4 sobre
-`asignacion.aula` (el aula real) y no sobre el aula fija, así que no cambia. Solo se migran los
-fixtures (tipos coherentes) y se añade el caso de un curso fijo con clases en aulas distintas: no se
-marca como si todas estuvieran en su referencia y la capacidad se comprueba contra el aula real.
+Esperado: build y verde. **P3 no cambia** (ya valida sobre `asignacion.aula`, el aula real); se migran
+los fixtures (tipos coherentes) y se añade el caso de un curso fijo con clases en aulas distintas: no
+se marca como si todas estuvieran en su referencia y la capacidad se comprueba contra el aula real.
+**Desviación autorizada (2026-10-25, `06fc70e`):** P4 **sí** cambia respecto de este plan (§1.2):
+`ocupacionProfesor` y `ocupacionAula` se indexan por `(profesor, día, slot)` y `(aula, día, slot)`, no
+solo por franja. Los casos que lo cubren son `dosCursosEnParalelo_conAulasYdocentesDistintos_esPresentable`,
+`docenteYaulaSinAsignar_noSonConflictoEntreSi`, `aulaInexistenteRepetidaEnLaFranja_noPresentable` y los
+de solape aislado por recurso.
 
 ### T6. Causas de infactibilidad (20 min)
 
@@ -640,7 +669,7 @@ El frontend sigue fuera hasta que su equipo migre.
 | RF-1 | T1, T2 | `test_constructor_entrada` (2.0, tipos, eventos, `inicio/fin`, ida y vuelta; **aula/materia sin tipo → `ok == false` con mensaje que nombra la entidad**), `test_contrato_solver` (forma y sellado 2.0 en T1), `test_cargador_configuracion` (2.0 válido en T2) |
 | RF-2 | T2 | `test_cargador_configuracion` (1.0/sin versión, fixture versionado, archivo, versión, acción, bytes intactos) |
 | RF-3 | T4 | `test_solver_horarios` (referencia, desplazamiento/vuelta, bloqueo, exclusividad, móvil) |
-| RF-4 | T4, T5 | `test_solver_horarios` (aula real) y `test_validador_salida` (P3/P4; solo pruebas) |
+| RF-4 | T4, T5 | `test_solver_horarios` (aula real) y `test_validador_salida` (P3 sin cambios y P4 con claves por docente/aula, `06fc70e`) |
 | RF-5 | T3 | `test_validador_entrada` (V1/V2/V16/V17) |
 | RF-6 | T6 | `test_solver_horarios` (saturación → conflicto de aula; tipo sin aulas → entrada inválida) |
 | RF-7 | T7 | `grep` de la 005 (V1 eventos/V1–V17/D10/salida/RF-7/1.0) |
@@ -661,8 +690,9 @@ El frontend sigue fuera hasta que su equipo migre.
   como O(cursos² × franjas), pero es lineal en franjas y pequeña frente a `x`.
 - **La 011** cambiará `duracion_minutos` (30–90) y la procedencia de la configuración; aquí no se
   toca; V2 solo mantiene `>0`.
-- **La constitución y la 005** las edita el planner; si el implementer no puede marcarlas, T7 queda
-  “la ejecuta el planner” y el cierre no se declara hasta que estén.
+- **La constitución y la 005** las edita el planner; el implementer no. **Ya aplicadas** en
+  `f054b2e` (§5, §7.1.5, §7.3, §7.4 y §7.5 más la anotación de la 005), así que T7 no bloquea el
+  cierre.
 - **El frontend** no compila; `full`/`dev-frontend` siguen rojos; la verificación es el preset
   `backend`, como en la 009.
 - **Rotura conocida del builder del frontend.** `src/frontend/src/services/entrada_solver_builder.cpp`

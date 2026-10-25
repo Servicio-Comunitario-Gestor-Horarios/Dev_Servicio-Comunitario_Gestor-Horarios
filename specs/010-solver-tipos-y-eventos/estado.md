@@ -1,13 +1,31 @@
 # Estado 010
 
-Fase: plan
-Aprobaciones: spec 2026-10-23
-Base: e72c930 (cierre de la 009; HEAD = e72c930). La 009 está implementada y el árbol limpio.
+Fase: validacion
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-25
+Base: e72c930 (base del plan, cierre de la 009) · aa7ee74 (HEAD, base efectiva de la implementación y del diff de la re-validación)
 Dudas abiertas: ninguna
-Siguiente paso: QA del plan por el reviewer y aprobación del usuario; tras la aprobación, implementar T1. La 011 (hora académica) va después.
+Siguiente paso: re-validación del reviewer contra `aa7ee74` (suite 49/49); con `VEREDICTO: APROBADO`, el planner marca la spec `implementada (fecha)` y cierra este estado. La 011 (hora académica) va después.
 Veredicto: pendiente
 QA: APROBADA con las notas del re-QA aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
-QA del plan: escrito el 2026-10-24, ajustado el 2026-10-25 (RF-1 con `Resultado<QJsonObject>`) y corregido tras el QA del plan (11 hallazgos, sección propia); pendiente de la nueva revisión del reviewer y de la aprobación del usuario.
+QA del plan: escrito el 2026-10-24, ajustado el 2026-10-25 (RF-1 con `Resultado<QJsonObject>`) y corregido tras el QA del plan (11 hallazgos, sección propia); aprobado por el usuario el 2026-10-25 junto con `tasks.md`.
+Notas: T1–T10 implementadas y commiteadas (T7 = `f054b2e`, desviación autorizada de P4 = `06fc70e`); la corrección del hallazgo de validación está en `aa7ee74` y falta la re-validación.
+
+## Validación (2026-10-25)
+
+- **Veredicto del reviewer: CAMBIOS NECESARIOS.** Hallazgo principal (RF-6): `causaConflictoDeAula`
+  contaba solo los bloques que se quedan en el aula de referencia y **no descontaba** las franjas que
+  dejan bloqueadas las clases desplazadas del grupo; la saturación por tipo tampoco. Una entrada
+  válida podía ser INFEASIBLE y quedarse sin categoría de causa («no se pudo identificar una
+  categoría concreta»).
+- **Corregido en `aa7ee74`** (solo `src/backend/src/solver/solver.cpp` y
+  `test/backend/test_solver_horarios.cpp`): capacidad disponible = franjas del grupo menos un bloque
+  por bloque desplazado (limitado al turno del curso) y, por tipo, se descuentan las franjas
+  bloqueadas en las referencias de ese tipo. Tres casos nuevos y uno ajustado; `ctest --preset
+  backend` **49/49** en `aa7ee74`.
+- **Aplicado antes del veredicto**: la desviación **autorizada por el usuario fuera del plan** sobre
+  P4 (`06fc70e`): `ValidadorSalidaSolver` indexa la ocupación por `(profesor, día, slot)` y
+  `(aula, día, slot)` en lugar de solo por franja.
+- **Falta la re-validación** del reviewer contra `aa7ee74`; todavía no hay `VEREDICTO: APROBADO`.
 
 ## Decisiones cerradas (2026-10-23)
 
@@ -110,30 +128,34 @@ Once hallazgos aplicados; el plan sigue con **10 tareas** (T1–T10, 30/30/30/30
 - Versión **1.0** (definición, RF-10 y criterio de finalización).
 - **V1** que exige la sección de recesos.
 - **D9 se amplía** y **D8 se extiende**; **V8 se mantiene**.
-- El resto de la 005 sigue vigente. La anotación en el texto de la 005 la hará el planner en la fase
-  de plan; el implementer no edita specs.
+- El resto de la 005 sigue vigente. La anotación en el texto de la 005 la hizo el planner en T7
+  (commiteada en `f054b2e`); el implementer no edita specs.
 
 ## Notas de proceso
 
-- **La enmienda constitucional la ejecuta el planner** al aprobarse el plan; el implementer solo
-  verifica. T7 incluye también la anotación de la 005.
-- **Plan y tareas escritos (2026-10-24).** `plan.md` y `tasks.md` están pendientes de QA del reviewer
-  y de aprobación del usuario; la implementación empieza después, en orden T1–T10.
+- **La enmienda constitucional la ejecuta el planner.** Hecha en `f054b2e` (T7) junto con la
+  anotación de supersesión de la 005; el implementer solo verifica.
+- **Plan y tareas aprobados (2026-10-25).** `plan.md` y `tasks.md` se escribieron el 2026-10-24 y el
+  usuario los aprobó el 2026-10-25; la implementación se hizo en orden T1–T10 y está commiteada.
 - **RF-1 cerrado (2026-10-25).** La construcción devuelve `Resultado<QJsonObject>` y falla si un aula
   o una materia no declara tipo; la confirmación que estaba pendiente queda resuelta y ya no hay dudas
   abiertas.
 - **Preset 1.0 de prueba.** `test/data/preset-1.0.json` (versionado) es el fixture de rechazo de T2,
   leído con `QFINDTESTDATA` y verificado por hash de bytes. `datos-prueba/preset-generacion-31059.json`
   no está versionado (`.gitignore:35`) y solo se cita en la documentación como ejemplo a regenerar.
-- **T7 (2026-10-25), a medias.** La anotación de supersesión de
-  `specs/005-nucleo-solver/spec.md` está hecha por el **planner**: aula fija, **D8/D9 ampliadas**,
-  **D10**, salida con **aula real**, **RF-7**, versión **1.0**, **V1** (eventos), **V2** (+ **011**
-  futura en `duracion_minutos`), **V8 mantenida** y el catálogo a **V1–V17**. **La enmienda de
-  `docs/constitution.md` sigue pendiente:** el subagente planner no tiene permiso de escritura fuera de
-  `specs/` (`edit`/`write` denegados en `docs/`). El parche exacto de §5, §7.1.5, §7.3, §7.4 y §7.5
-  está en `/tmp/opencode/constitution-t7.patch` y pasa `git apply --check`; se aplica con
-  `git apply /tmp/opencode/constitution-t7.patch`. **T7 no se marca** hasta que la constitución esté
-  enmendada.
+- **T7 (2026-10-25), hecha y commiteada (`f054b2e`).** La enmienda de `docs/constitution.md` (§5,
+  §7.1.5, §7.3, §7.4 y §7.5) **y** la anotación de supersesión de
+  `specs/005-nucleo-solver/spec.md` están aplicadas: aula fija, **D8/D9 ampliadas**, **D10**, salida
+  con **aula real**, **RF-7**, versión **1.0**, **V1** (eventos), **V2** (+ **011** futura en
+  `duracion_minutos`), **V8 mantenida** y el catálogo a **V1–V17**. El parche del planner
+  (`/tmp/opencode/constitution-t7.patch`, §5/§7.1.5/§7.3/§7.4/§7.5) lo aplicó el coordinator, porque
+  el subagente planner no escribe fuera de `specs/`; el implementer lo verificó con los dos `grep` de
+  la tarea. **No queda nada pendiente de la constitución ni de la 005.**
+- **Desviación autorizada fuera del plan: P4 (2026-10-25, `06fc70e`).** El usuario autorizó arreglar
+  el defecto preexistente de `ValidadorSalidaSolver` (la ocupación se indexaba solo por franja):
+  ahora las claves son `(profesor, día, slot)` y `(aula, día, slot)`. Sin este arreglo, cualquier
+  horario con dos cursos en paralelo se marcaba `CalculoFallido` en `ServicioGeneracion`. Detalle en
+  `plan.md` §1.2 y en `journal.md` («P4 · claves por aula y docente»).
 
 ## Tamaño previsto
 
