@@ -125,6 +125,15 @@ Once hallazgos aplicados; el plan sigue con **10 tareas** (T1–T10, 30/30/30/30
 - **Preset 1.0 de prueba.** `test/data/preset-1.0.json` (versionado) es el fixture de rechazo de T2,
   leído con `QFINDTESTDATA` y verificado por hash de bytes. `datos-prueba/preset-generacion-31059.json`
   no está versionado (`.gitignore:35`) y solo se cita en la documentación como ejemplo a regenerar.
+- **T7 (2026-10-25), a medias.** La anotación de supersesión de
+  `specs/005-nucleo-solver/spec.md` está hecha por el **planner**: aula fija, **D8/D9 ampliadas**,
+  **D10**, salida con **aula real**, **RF-7**, versión **1.0**, **V1** (eventos), **V2** (+ **011**
+  futura en `duracion_minutos`), **V8 mantenida** y el catálogo a **V1–V17**. **La enmienda de
+  `docs/constitution.md` sigue pendiente:** el subagente planner no tiene permiso de escritura fuera de
+  `specs/` (`edit`/`write` denegados en `docs/`). El parche exacto de §5, §7.1.5, §7.3, §7.4 y §7.5
+  está en `/tmp/opencode/constitution-t7.patch` y pasa `git apply --check`; se aplica con
+  `git apply /tmp/opencode/constitution-t7.patch`. **T7 no se marca** hasta que la constitución esté
+  enmendada.
 
 ## Tamaño previsto
 
