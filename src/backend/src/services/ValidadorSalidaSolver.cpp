@@ -8,6 +8,26 @@
 
 namespace
 {
+    /// Clave de ocupación de P4: un recurso (docente o aula) ocupado en una franja concreta.
+    ///
+    /// P4 debe distinguir el recurso: dos clases en la misma franja solo chocan si comparten
+    /// docente o aula, no por coincidir en el día y el slot.
+    struct ClaveOcupacion
+    {
+        int recurso = -1;  ///< índice de profesor o de aula
+        int dia = -1;
+        int slot = -1;
+
+        bool operator<(const ClaveOcupacion& otro) const
+        {
+            if (recurso != otro.recurso)
+                return recurso < otro.recurso;
+            if (dia != otro.dia)
+                return dia < otro.dia;
+            return slot < otro.slot;
+        }
+    };
+
     /// Indice del curso de `config` con esa clave de identidad (`claveCurso`), o -1.
     int indiceCurso(const SolverConfig& config, const QString& clave)
     {
@@ -33,9 +53,10 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
 {
     AnalisisSalida analisis;
 
-    // Ocupación por (día, slot) para detectar solapamientos (P4).
-    QMap<QPair<int, int>, QString> ocupacionProfesor;  // -> nombre de curso
-    QMap<QPair<int, int>, QString> ocupacionAula;
+    // Ocupación de cada recurso en cada franja para detectar solapamientos (P4): las claves
+    // incluyen el docente / el aula, no solo el día y el slot.
+    QMap<ClaveOcupacion, QString> ocupacionProfesor;  // -> nombre de curso
+    QMap<ClaveOcupacion, QString> ocupacionAula;
 
     // Conteos para P1 y P2.
     // (curso, materia) -> nº de asignaciones
@@ -55,8 +76,6 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
 
             for (const AsignacionOutput& asig : dia.asignaciones)
             {
-                const QPair<int, int> clave{dia.dia, asig.slot};
-
                 // P4: el mismo curso, dos veces en el mismo slot.
                 if (slotsDelCurso.contains(asig.slot))
                 {
@@ -68,42 +87,54 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                 }
                 slotsDelCurso.insert(asig.slot);
 
-                // P4: profesor en dos sitios a la vez.
-                if (ocupacionProfesor.contains(clave))
+                // P4: profesor en dos sitios a la vez. Un docente sin asignar (índice
+                // negativo) no ocupa la franja: dos clases sin docente no chocan entre sí.
+                if (asig.profesor >= 0)
                 {
-                    const int idx = asig.profesor;
-                    const QString nombreProf =
-                        (idx >= 0 && idx < config.profesores.size())
-                            ? config.profesores[idx].nombre
-                            : QStringLiteral("(desconocido)");
-                    analisis.conflictos.append(
-                        QStringLiteral("El docente «%1» está en dos clases a la vez (día %2, slot %3).")
-                            .arg(nombreProf)
-                            .arg(dia.dia)
-                            .arg(asig.slot));
-                }
-                else
-                {
-                    ocupacionProfesor[clave] = nombreCurso;
+                    const ClaveOcupacion clave{asig.profesor, dia.dia, asig.slot};
+                    if (ocupacionProfesor.contains(clave))
+                    {
+                        const int idx = asig.profesor;
+                        const QString nombreProf =
+                            (idx < config.profesores.size())
+                                ? config.profesores[idx].nombre
+                                : QStringLiteral("(desconocido)");
+                        analisis.conflictos.append(
+                            QStringLiteral("El docente «%1» está en dos clases a la vez (día %2, slot %3).")
+                                .arg(nombreProf)
+                                .arg(dia.dia)
+                                .arg(asig.slot));
+                    }
+                    else
+                    {
+                        ocupacionProfesor[clave] = nombreCurso;
+                    }
                 }
 
-                // P4: aula en dos sitios a la vez.
-                if (ocupacionAula.contains(clave))
+                // P4: aula en dos sitios a la vez. Un aula sin asignar (índice negativo) no
+                // ocupa la franja. Un índice positivo fuera de rango se indexa tal cual: no
+                // choca con las aulas del catálogo, pero dos clases que informan la misma
+                // aula inexistente sí colisionan y se nombran como desconocida.
+                if (asig.aula >= 0)
                 {
-                    const int idx = asig.aula;
-                    const QString nombreAula =
-                        (idx >= 0 && idx < config.aulas.size())
-                            ? config.aulas[idx].nombre
-                            : QStringLiteral("(desconocida)");
-                    analisis.conflictos.append(
-                        QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
-                            .arg(nombreAula)
-                            .arg(dia.dia)
-                            .arg(asig.slot));
-                }
-                else
-                {
-                    ocupacionAula[clave] = nombreCurso;
+                    const ClaveOcupacion clave{asig.aula, dia.dia, asig.slot};
+                    if (ocupacionAula.contains(clave))
+                    {
+                        const int idx = asig.aula;
+                        const QString nombreAula =
+                            (idx < config.aulas.size())
+                                ? config.aulas[idx].nombre
+                                : QStringLiteral("(desconocida)");
+                        analisis.conflictos.append(
+                            QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
+                                .arg(nombreAula)
+                                .arg(dia.dia)
+                                .arg(asig.slot));
+                    }
+                    else
+                    {
+                        ocupacionAula[clave] = nombreCurso;
+                    }
                 }
 
                 // Conteos P1/P2.

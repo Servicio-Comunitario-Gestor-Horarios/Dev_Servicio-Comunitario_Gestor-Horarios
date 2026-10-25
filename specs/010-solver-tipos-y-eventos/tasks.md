@@ -12,8 +12,9 @@
 - [x] **T4. Modelo de tipo, aula de referencia, desplazamiento, bloqueo y salida real.** RF-3, RF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios|test_variables_cp_sat'` está verde; un curso fijo con materia del tipo de su referencia usa la referencia; una materia de otro tipo se imparte en un aula de ese tipo y el curso vuelve; mientras hay una clase desplazada, otro curso no usa la referencia en esa franja; la exclusividad cubre las desplazadas; el curso móvil usa el tipo exacto; la salida informa el aula real de cada clase; `test_variables_cp_sat` ve la `y` de todos los cursos.
 
-- [ ] **T5. Validador de salida con aulas reales (solo pruebas).** RF-4
+- [x] **T5. Validador de salida con aulas reales (solo pruebas).** RF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_validador_salida$'` está verde **sin cambios en `ValidadorSalidaSolver`** (ya valida P3/P4 sobre `asignacion.aula`); se migran los fixtures a tipos coherentes y un curso fijo con clases en aulas distintas no se marca como si todas estuvieran en su referencia; la capacidad se comprueba contra el aula real.
+    - Nota (2026-10-25): el único cambio en `ValidadorSalidaSolver` es el arreglo de P4 autorizado **fuera del plan** (claves por aula y docente); ver journal, «P4 · claves por aula y docente». `test_validador_salida` 14/14.
 
 - [ ] **T6. Causas de infactibilidad por tipo y referencia.** RF-6
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'` está verde; un laboratorio insuficiente para varios cursos desplazados produce **conflicto de aula** (sin reasignar a otro tipo ni liberar la referencia); un tipo sin aulas es **entrada inválida** (V16/V17); las demás invariantes conservan su categoría.

@@ -501,3 +501,270 @@ estrategia la `y` sería de **615** variables (7 cursos × 5 días × 3 franjas 
 - **Causa (2) del benchmark**: el mensaje actual es «no se pudo identificar una categoría concreta»
   (la saturación por tipo es de T6); no se tocó.
 
+## T5 - Validador de salida sobre el aula real (2026-10-25)
+
+**Requisito:** RF-4. **Plan:** §1.2 (sin cambios de producción), §1.3 (`test_validador_salida`,
+solo pruebas) y §8-T5. **Base:** `0edc6f8` (T1-T4 commiteadas; suite 48/49, rojo único el
+benchmark).
+
+### Por qué no cambia la producción
+
+`ValidadorSalidaSolver` ya cumple lo que la 010 necesita: P3 compara la capacidad con
+`config.aulas[asig.aula].capacidad` y P4 nombra el aula con `asig.aula`, es decir, con el **aula
+real** que emite el solver desde T4, no con `config.cursos[c].aula` (la referencia). Ningún caso
+nuevo hizo falta en verde por un cambio de código: los 3 casos se escribieron primero y pasaron en
+la primera ejecución. `git diff` no toca `src/`:
+
+```text
+ test/backend/test_validador_salida.cpp | 129 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 126 insertions(+), 3 deletions(-)
+```
+
+### Rojo (tests primero)
+
+Los casos nuevos se escribieron antes de tocar nada y **pasaron ya en la primera ejecución** (no
+había nada que implementar):
+
+```text
+$ ./build-backend/test/test_validador_salida
+PASS   : TestValidadorSalida::aulaFijaConClasesEnAulasDistintas_usaElAulaRealDeCadaClase()
+PASS   : TestValidadorSalida::dosClasesDesplazadasEnElMismoAulaYfranja_noPresentable()
+PASS   : TestValidadorSalida::aulaInexistente_noIndexaFueraDeRangoYseRechazaAlColisionar()
+Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+```
+
+Por eso el valor de la tarea está en los **controles negativos** (abajo): demuestran que los casos
+no son vacuos.
+
+### Controles negativos (mutaciones temporales, restauradas)
+
+Cada mutación se aplicó, se recompiló, se ejecutó el binario y se restauró el archivo (el árbol
+final solo tiene el test modificado):
+
+```text
+A) producción: P3 usa el aula de referencia del curso en vez de asig.aula
+   -> FAIL aulaFijaConClasesEnAulasDistintas_usaElAulaRealDeCadaClase
+      Actual (a.avisos.size()): 0  Expected (1): 1
+   (sin aviso de capacidad del laboratorio: el caso detecta el atajo «todo en la referencia»)
+
+B) datos del caso: la clase desplazada se informa en la referencia (aula 0 en vez de 1)
+   -> FAIL aulaFijaConClasesEnAulasDistintas_usaElAulaRealDeCadaClase
+      Actual (a.avisos.size()): 0  Expected (1): 1
+
+C) producción: se desactiva la comprobación P4 de aula (ocupacionAula)
+   -> FAIL solapamientoDeAula_noPresentable            (no dice «aula «A1»»)
+   -> FAIL dosClasesDesplazadasEnElMismoAulaYfranja... (no dice «aula «Laboratorio»»)
+   -> FAIL aulaInexistente_noIndexaFueraDeRango...     (no dice «aula «(desconocida)»»)
+   Totals: 8 passed, 3 failed
+```
+
+El control C destapó una aserción **débil** en la primera versión: los mensajes se buscaban en
+`conflictos + avisos`, y el aviso P3 de capacidad («…aula «Laboratorio»…») hacía pasar la
+comprobación aunque P4 no dijera nada. Ahora se busca solo en `a.conflictos` (helper
+`conflictos()`); con eso, C falla en los 3 casos como debe.
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ctest --test-dir build-backend --output-on-failure -R '^test_validador_salida$'
+1/1 Test #24: test_validador_salida ............   Passed    0.01 sec
+100% tests passed out of 1
+
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+	 48 - test_solver_benchmark (Failed)
+```
+
+**Rojo único: `test_solver_benchmark`**, el fixture sin tipos que migra T10 (ya documentado en T4).
+El resto, 48/49.
+
+### Cambios
+
+- `test/backend/test_validador_salida.cpp` (único archivo):
+  - `configBase()` migrado a **tipos coherentes** con la regla dura: `Matemática`→«Aula de
+    estudio», `Tecnología`→«Laboratorio»; aulas `A1` («Aula de estudio», 30) y `Laboratorio`
+    («Laboratorio», 30). Fuera el tipo `"regular"` y la materia sin tipo.
+  - `configConMateriaDesplazada()` y `horarioConMateriaDesplazada()`: curso 1A en modo de aula
+    fija con 1 h de Matemática en su referencia y 1 h de Tecnología **desplazada** al laboratorio;
+    el laboratorio (capacidad 10) no aloja los 20 estudiantes y la referencia (30) sí.
+  - Caso nuevo `aulaFijaConClasesEnAulasDistintas_usaElAulaRealDeCadaClase`: presentable, cero
+    conflictos y **exactamente un aviso**, el de la capacidad del **laboratorio** (con el nombre
+    del aula real y sin mencionar A1). Si el validador usara la referencia para todas las clases,
+    no habría ningún aviso.
+  - Caso nuevo `dosClasesDesplazadasEnElMismoAulaYfranja_noPresentable` y caso
+    `solapamientoDeAula_noPresentable` reforzado: el conflicto de P4 nombra el aula real («A1»,
+    «Laboratorio»). `aulaInexistente_noIndexaFueraDeRangoYseRechazaAlColisionar`: un aula fuera
+    de rango no se indexa en P3 y el conflicto la nombra «(desconocida)».
+  - Helpers `conflictos()` (solo P4) y `texto()` (diagnóstico de fallo).
+- Sin tocar `src/backend` (ni el validador de salida ni el modelo), el validador de entrada, la
+  documentación ni el frontend. Sin commit.
+
+### Hallazgos (fuera del alcance de T5, requieren decisión)
+
+- **P4 no distingue aulas ni profesores.** `ocupacionAula` y `ocupacionProfesor` se indexan por
+  `(día, slot)` **sin** el índice de aula o de profesor, así que **dos clases cualesquiera en la
+  misma franja** se denuncian como conflicto. Sonda temporal (añadida, ejecutada y retirada) con
+  1A en A1 y 1B en el laboratorio, mismo día/slot:
+
+  ```text
+  FAIL!  : sondaDosCursosEnAulasDistintasMismaFranja() 'a.presentable()' returned FALSE.
+    El docente «(desconocido)» está en dos clases a la vez (día 0, slot 0).
+    El aula «Laboratorio» está ocupada por dos clases a la vez (día 0, slot 0).
+  ```
+
+  Es un defecto **preexistente** (el archivo no ha cambiado en la 009/010) y no lo cubre ningún
+  test; con él, cualquier horario real con clases en paralelo haría que `ServicioGeneracion`
+  (`analisis.presentable()` ⇒ `CalculoFallido`) rechace el resultado. La clave debería incluir el
+  índice de aula y el de profesor. **No se toca**: el plan de T5 prohíbe cambios de producción y
+  el arreglo es un cambio de comportamiento de P4 (spec 002/005) que necesita su propia decisión.
+- **Un aula inexistente, sola, no se rechaza.** Sin colisión, `asig.aula` fuera de rango se salta
+  en P3 (guarda de rango) y no genera conflicto en P4; la salida queda «presentable». El caso de
+  T5 lo cubre solo en la colisión, que es donde hoy se detecta y se nombra «(desconocida)». Un
+  rechazo por rango sería una validación nueva (no está en la 010).
+
+### Cierre de T5 (2026-10-25)
+
+**Estado final:** T5 queda cerrada con los tres casos de RF-4 y el arreglo de P4 autorizado fuera
+del plan (ver `## P4 · claves por aula y docente (2026-10-25)`). El párrafo «Por qué no cambia la
+producción» de arriba describe T5 **antes** del arreglo: con P4 indexando solo por día/slot, el
+caso de dos cursos en paralelo fallaba y algunos casos de T5 pasaban por el motivo equivocado.
+Cambios respecto a lo escrito arriba:
+
+- `aulaInexistente_noIndexaFueraDeRangoYseRechazaAlColisionar` pasa a llamarse
+  `aulaInexistenteRepetidaEnLaFranja_noPresentable`: con P4 arreglado, un aula 7 en 1A **no**
+  colisiona con el laboratorio (aula 1) de 1B; la colisión tiene que ser real, así que ahora 1A y
+  1B informan **el mismo** aula 7 en la misma franja y el conflicto la nombra «(desconocida)». El
+  caso conserva la comprobación de que un aula inexistente **sola** no es conflicto (P4 solo
+  detecta colisiones; P3 no indexa fuera de rango).
+- `dosClasesDesplazadasEnElMismoAulaYfranja_noPresentable` sigue fallando **por aula repetida**
+  (las dos clases comparten el laboratorio en el mismo slot y el docente de 1B no está asignado:
+  no hay conflicto de docente que enmascare la aserción). Ya no lo hace por el defecto de P4.
+- `solapamientoDeProfesor_noPresentable` usa aula distinta (1) y `solapamientoDeAula_noPresentable`
+  deja el docente de 1B sin asignar (-1), con aserciones que excluyen el conflicto del otro
+  recurso: cada caso falla por una sola razón.
+- El único cambio en `ValidadorSalidaSolver` es el de P4; P3 sigue comparando la capacidad con
+  `asig.aula` y el caso del aula real no se ha tocado.
+
+Verificación final (mismos comandos del plan):
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ctest --test-dir build-backend --output-on-failure -R 'test_validador_salida|test_servicio_generacion'
+2/2 tests passed, 0 tests failed out of 2
+$ ./build-backend/test/test_validador_salida
+Totals: 14 passed, 0 failed, 0 skipped, 0 blacklisted
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+	 48 - test_solver_benchmark (Failed)      # fixture sin tipos, T10
+```
+
+## P4 · claves por aula y docente (2026-10-25)
+
+**Requisito:** P4 de la salida (RF-3/RF-4) y desbloqueo de la generación real con más de un curso.
+**Autorizado por el usuario fuera del plan de la 010.** **Base:** `0edc6f8` (T1-T4 commiteadas).
+
+### Defecto
+
+`ValidadorSalidaSolver.cpp` indexaba la ocupación **solo por `(día, slot)`**: cualquier segunda
+clase en la misma franja se denunciaba como «docente en dos clases» y «aula ocupada por dos
+clases», aunque el docente y el aula fueran distintos. `ServicioGeneracion.cpp:191` convierte un
+conflicto de P4 en `CalculoFallido`, así que con más de un curso (el seed tiene 13) toda
+generación real se marcaría como fallida. Los tests no lo veían porque el fixture tenía un solo
+curso.
+
+### Rojo (tests primero, producción sin tocar)
+
+Casos nuevos en `test_validador_salida.cpp`:
+
+- `dosCursosEnParalelo_conAulasYdocentesDistintos_esPresentable` (el caso que hoy falla y debe
+  pasar): 1A en A1 con Ana y 1B en el laboratorio con Beto, mismas dos franjas; cada curso cubre
+  sus 2 horas.
+- `docenteYaulaSinAsignar_noSonConflictoEntreSi`: dos cursos en la misma franja sin docente ni
+  aula (`-1`) no colisionan.
+- `mismoCursoDosVecesEnLaFranja_noPresentable`: P4 de curso se conserva.
+- `solapamientoDeProfesor_noPresentable` / `solapamientoDeAula_noPresentable` aislados por
+  recurso.
+
+Con la producción anterior (HEAD) y los tests nuevos:
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ./build-backend/test/test_validador_salida
+FAIL!  : dosCursosEnParalelo_conAulasYdocentesDistintos_esPresentable()
+          'a.conflictos.isEmpty()' returned FALSE. (El docente «Beto» está en dos clases a la vez
+          (día 0, slot 0).
+          El aula «Laboratorio» está ocupada por dos clases a la vez (día 0, slot 0).
+          El docente «Beto» está en dos clases a la vez (día 0, slot 1).
+          El aula «Laboratorio» está ocupada por dos clases a la vez (día 0, slot 1).)
+FAIL!  : mismoCursoDosVecesEnLaFranja_noPresentable()   (ve «docente «Beto»» además del curso)
+FAIL!  : solapamientoDeAula_noPresentable()             (ve «docente «(desconocido)»» además del aula)
+FAIL!  : solapamientoDeProfesor_noPresentable()         (ve «aula «…»» aunque las aulas son distintas)
+FAIL!  : docenteYaulaSinAsignar_noSonConflictoEntreSi()
+Totals: 9 passed, 5 failed, 0 skipped, 0 blacklisted
+```
+
+(El detalle completo quedó en `/tmp/opencode/p4/rojo.txt`.) Los cinco fallos son la firma del
+defecto: el validador veía colisión en el recurso que **no** se compartía.
+
+### Arreglo
+
+- Clave `ClaveOcupacion{recurso, día, slot}` (con `operator<`) y dos mapas:
+  `ocupacionProfesor` indexado por **(profesor, día, slot)** y `ocupacionAula` por **(aula, día,
+  slot)**. Dos mapas separados ⇒ un aula nunca choca con un docente.
+- **Índices inválidos:** un recurso negativo (`profesor < 0`, `aula < 0` = sin asignar) **no ocupa
+  franja**, así que dos clases sin docente/aula no chocan entre sí. Un índice **positivo fuera de
+  rango** se indexa por su valor bruto: no colisiona con las aulas/docentes del catálogo, pero dos
+  clases que informan la **misma** aula inexistente sí colisionan y el mensaje la nombra
+  «(desconocida)» (P3 conserva su guarda de rango, no indexa fuera de rango).
+- Se conserva intacto el resto de P4 (mismo curso dos veces en la franja), P1, P2 y P3.
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ./build-backend/test/test_validador_salida
+PASS   : dosCursosEnParalelo_conAulasYdocentesDistintos_esPresentable()
+PASS   : docenteYaulaSinAsignar_noSonConflictoEntreSi()
+PASS   : mismoCursoDosVecesEnLaFranja_noPresentable()
+PASS   : aulaInexistenteRepetidaEnLaFranja_noPresentable()
+PASS   : dosClasesDesplazadasEnElMismoAulaYfranja_noPresentable()
+Totals: 14 passed, 0 failed, 0 skipped, 0 blacklisted
+
+$ ctest --test-dir build-backend --output-on-failure -R 'test_validador_salida|test_servicio_generacion'
+2/2 tests passed, 0 tests failed out of 2
+
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+	 48 - test_solver_benchmark (Failed)
+```
+
+### Control negativo (mutación reversible)
+
+Se copió el archivo arreglado a `/tmp/opencode/p4/`, se restauró la versión de HEAD
+(`git checkout -- src/backend/src/services/ValidadorSalidaSolver.cpp`), se recompiló y se ejecutó
+el mismo binario; después se restauró el arreglo y se volvió a verificar:
+
+```text
+# producción anterior
+$ ./build-backend/test/test_validador_salida
+Totals: 9 passed, 5 failed
+# (incluye el FAIL! de dosCursosEnParalelo_conAulasYdocentesDistintos_esPresentable)
+
+# arreglo restaurado
+$ cmake --build --preset backend --parallel        # exit 0
+$ ./build-backend/test/test_validador_salida
+Totals: 14 passed, 0 failed
+```
+
+### Efecto sobre otros tests
+
+- Único consumidor de `analizarSalidaSolver`: `ServicioGeneracion` (`test_servicio_generacion`
+  sigue verde sin cambios; su `respuestaConSolapamiento` comparte aula y docente, así que sigue
+  siendo un conflicto real).
+- Suite completa igual que antes del arreglo: **48/49**, único rojo `test_solver_benchmark`
+  (fixture sin tipos que migra T10). Ningún otro test cambia de estado.
+- `git diff --stat`: `test/backend/test_validador_salida.cpp` y
+  `src/backend/src/services/ValidadorSalidaSolver.cpp` (más `tasks.md` y este journal). Sin tocar
+  frontend, `spec.md`, `plan.md` ni `estado.md`.
+
