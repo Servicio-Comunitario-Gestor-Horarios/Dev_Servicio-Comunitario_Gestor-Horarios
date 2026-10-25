@@ -768,3 +768,99 @@ Totals: 14 passed, 0 failed
   `src/backend/src/services/ValidadorSalidaSolver.cpp` (más `tasks.md` y este journal). Sin tocar
   frontend, `spec.md`, `plan.md` ni `estado.md`.
 
+
+## T6 - Causas de un resultado no factible: saturación por tipo y por referencia (2026-10-25)
+
+**Requisito:** RF-6 (causas de un resultado no factible), en `src/backend/src/solver/solver.cpp`
+(`causaEntradaInvalida`, `causaConflictoDeAula` y la nueva `causaSaturacionPorTipo`).
+**Base:** `06fc70e` (T1-T5 commiteadas). Sin cambios en el modelo (T4), el validador de salida (T5)
+ni la documentación. **No se commitea** (lo verifica el usuario).
+
+### Tests primero (rojo)
+
+Cinco casos nuevos en `test/backend/test_solver_horarios.cpp`:
+
+- `solver_falloCausaConflictoDeAulaPorSaturacionDeTipo`: dos cursos con referencia propia que
+  desplazan 5 bloques cada uno al **único** laboratorio (10 bloques frente a 8 franjas).
+- `solver_falloCausaConflictoDeAulaPorSaturacionDeTipoEnModoMovil`: mismo escenario con
+  `aula_fija = false`.
+- `solver_falloCausaConflictoDeAulaPorReferenciaSaturada`: dos cursos comparten la referencia
+  Aula 1 y dejan en ella 10 bloques de su tipo frente a 6 franjas.
+- `solver_causaDeAulaNoCuentaLasClasesDesplazadas`: los bloques totales compartidos (10) superan
+  las 6 franjas de la referencia, pero solo se quedan 6; la causa real es (4).
+- `solver_falloTipoSinAulas_esEntradaInvalida`: materia «Laboratorio» sin ningún aula de ese tipo.
+
+Con la producción anterior (HEAD) y los tests nuevos:
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ./build-backend/test/test_solver_horarios
+FAIL!  : solver_falloCausaConflictoDeAulaPorSaturacionDeTipo()
+          'texto.contains("Causa (2)")' returned FALSE. (… Causa: no se pudo identificar …)
+FAIL!  : solver_falloCausaConflictoDeAulaPorSaturacionDeTipoEnModoMovil()   (mismo síntoma)
+FAIL!  : solver_falloCausaConflictoDeAulaPorReferenciaSaturada()
+          'texto.contains("10 bloques")' returned FALSE. (ve «12 bloques en 6 franjas»: sumaba
+          también la clase desplazada)
+FAIL!  : solver_causaDeAulaNoCuentaLasClasesDesplazadas()
+          '!texto.contains("Causa (2)")' returned FALSE. (reportaba aula «Aula 1» por los 10
+          bloques totales)
+FAIL!  : solver_falloTipoSinAulas_esEntradaInvalida()
+          'texto.contains("Causa (1)")' returned FALSE. (… no se pudo identificar …)
+Totals: 23 passed, 5 failed, 0 skipped, 0 blacklisted
+```
+
+(Salida completa en `/tmp/opencode/t6/rojo.txt`.)
+
+### Cambios
+
+- **`causaEntradaInvalida` (categoría 1).** Tras las guardas de dimensiones, turno y plan, recorre
+  las materias de cada curso y, si un tipo requerido no tiene ninguna aula (comparación por
+  `claveTipo`), devuelve entrada inválida nombrando materia, curso y tipo. Es V17 en la llamada
+  directa al solver; el tipo sin aulas no se reporta como conflicto de aula.
+- **`causaSaturacionPorTipo` (categoría 2, nueva).** Demanda por clave de tipo = bloques de las
+  materias de todos los cursos que lo requieren; capacidad = nº de aulas de ese tipo × días ×
+  franjas que aportan los turnos de los cursos que lo piden (unión de slots). Si la demanda supera
+  la capacidad, mensaje con **tipo visible, demanda y capacidad**. Tipos sin aulas y tipos sin
+  franjas se saltan (los juzgan las categorías 1 y 3).
+- **`causaConflictoDeAula` (categoría 2).**
+  - Modo móvil: se conserva la guarda global y después se aplica la saturación por tipo.
+  - Modo aula fija: la comprobación de aulas de referencia compartidas pasa a contar **solo las
+    clases que se quedan** en la referencia (materias del tipo del aula); las desplazadas ya no
+    inflan el aula de referencia. Se conserva la guarda «si un curso no cabe en su turno, la causa
+    es de persona» y, tras el bucle, se aplica la saturación por tipo.
+- **Orden de categorías intacto:** entrada inválida → conflicto de aula → persona → asignación.
+  La saturación por tipo cede ante la categoría (3) cuando algún curso no cabe en su turno, para
+  no ocultar una causa existente.
+
+### Hallazgo durante la implementación (regresión detectada y corregida)
+
+La primera versión de `causaSaturacionPorTipo` hacía que
+`solver_falloCausaConflictoDePersona` (4 bloques en un turno de 2 franjas) pasara de categoría (3)
+a categoría (2). Se corrigió con la guarda «algún curso no cabe en su turno ⇒ no se informa
+saturación por tipo», que devuelve la categoría (3) a ese caso (y también a la guarda `todosCaben`
+que ya tenía D8).
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel        # exit 0
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.19 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 28 passed, 0 failed, 0 skipped, 0 blacklisted
+
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+	 48 - test_solver_benchmark (Failed)
+```
+
+Único rojo: `test_solver_benchmark`, el fixture sin tipos que migra T10. Ningún otro test cambia de
+estado (49 configurados, 48 en verde).
+
+### Alcance
+
+`git diff --stat`: `src/backend/src/solver/solver.cpp` (+101/-10) y
+`test/backend/test_solver_horarios.cpp` (+159), más `tasks.md` y este journal. Sin tocar el modelo
+(T4), `ValidadorSalidaSolver` (T5), frontend, `spec.md`, `plan.md` ni `estado.md`.

@@ -62,8 +62,20 @@ QString nombreMateria(const SolverConfig& config, int idx) {
     return (idx >= 0 && idx < config.materias.size()) ? config.materias[idx].nombre : QString::number(idx);
 }
 
+/// Clave normalizada del tipo requerido por la materia `m` ("" si el índice no existe).
+QString claveMateria(const SolverConfig& config, int m) {
+    if (m < 0 || m >= config.materias.size()) return QString();
+    return claveTipo(config.materias[m].tipo);
+}
+
+/// Clave normalizada del tipo del aula `a` ("" si el índice no existe).
+QString claveAula(const SolverConfig& config, int a) {
+    if (a < 0 || a >= config.aulas.size()) return QString();
+    return claveTipo(config.aulas[a].tipo);
+}
+
 /// Categoría (1) entrada inválida: la configuración no es consistente como entrada del solver.
-/// En el flujo real, V1–V15 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
+/// En el flujo real, V1–V17 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
 /// y las llamadas directas al solver con una configuración inconsistente.
 QString causaEntradaInvalida(const SolverConfig& config) {
     const DimensionesConfig& d = config.dimensiones;
@@ -73,6 +85,12 @@ QString causaEntradaInvalida(const SolverConfig& config) {
         d.num_cursos     != config.cursos.size())
         return QStringLiteral("Causa (1) entrada inválida: las dimensiones declaradas no coinciden con los tamaños de las listas.");
 
+    QSet<QString> tiposDeAula;
+    for (const AulaSolverConfig& a : config.aulas) {
+        const QString clave = claveTipo(a.tipo);
+        if (!clave.isEmpty()) tiposDeAula.insert(clave);
+    }
+
     for (const CursoSolverConfig& c : config.cursos) {
         if (c.turno.isEmpty())
             return QStringLiteral("Causa (1) entrada inválida: el curso %1 no declara turno.")
@@ -80,11 +98,69 @@ QString causaEntradaInvalida(const SolverConfig& config) {
         if (materiasDelCurso(config, c).isEmpty())
             return QStringLiteral("Causa (1) entrada inválida: el curso %1 no tiene materias en su plan '%2'.")
                 .arg(claveCurso(c.anio, c.seccion)).arg(c.plan);
+
+        // V17 (RF-5): el tipo requerido por una materia tiene que tener aulas. Es entrada
+        // inválida, no conflicto de aula: el modelo no puede cumplir la regla de tipo.
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
+            const QString clave = claveMateria(config, mc.materiaIDx);
+            if (clave.isEmpty() || tiposDeAula.contains(clave)) continue;
+            return QStringLiteral("Causa (1) entrada inválida: la materia «%1» del curso %2 requiere "
+                                  "el tipo de aula «%3» y no hay ninguna aula de ese tipo.")
+                .arg(nombreMateria(config, mc.materiaIDx))
+                .arg(claveCurso(c.anio, c.seccion))
+                .arg(config.materias[mc.materiaIDx].tipo.trimmed());
+        }
     }
     return {};
 }
 
-/// Categoría (2) conflicto de aula (D8/D9/D10). Devuelve "" si no aplica.
+/// Categoría (2) conflicto de aula: la demanda de un tipo supera la capacidad de sus aulas.
+/// Demanda = bloques de las materias que requieren el tipo (en todos los cursos); capacidad =
+/// nº de aulas de ese tipo × días × franjas que aportan los turnos de los cursos que lo piden.
+/// Un tipo sin aulas es entrada inválida (V17), así que aquí solo se miden tipos con aulas.
+QString causaSaturacionPorTipo(const SolverConfig& config) {
+    // Si un curso no cabe en su propio turno, la causa es de persona (categoría 3): la
+    // saturación de un tipo no debe ocultar esa categoría.
+    for (const CursoSolverConfig& c : config.cursos)
+        if (bloquesCurso(config, c) > franjasCurso(config, c)) return {};
+
+    struct DemandaTipo {
+        int bloques = 0;
+        QString nombre;          ///< nombre visible del tipo, tal como lo declara la materia
+        QSet<int> franjas;       ///< slots que aportan los turnos de los cursos que lo requieren
+    };
+    QMap<QString, DemandaTipo> demanda;
+
+    for (const CursoSolverConfig& c : config.cursos) {
+        const QVector<int> franjasTurno = slotsTurno(config, c.turno);
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
+            const QString clave = claveMateria(config, mc.materiaIDx);
+            if (clave.isEmpty()) continue;   // V16 lo rechaza como entrada inválida
+            DemandaTipo& d = demanda[clave];
+            d.bloques += bloquesMateria(config, mc);
+            if (d.nombre.isEmpty()) d.nombre = config.materias[mc.materiaIDx].tipo.trimmed();
+            for (int s : franjasTurno) d.franjas.insert(s);
+        }
+    }
+
+    for (auto it = demanda.constBegin(); it != demanda.constEnd(); ++it) {
+        const DemandaTipo& d = it.value();
+        if (d.franjas.isEmpty()) continue;   // curso sin turno válido: lo juzga la categoría (3)
+
+        int aulas = 0;
+        for (const AulaSolverConfig& a : config.aulas)
+            if (claveTipo(a.tipo) == it.key()) ++aulas;
+        if (aulas == 0) continue;   // V17: entrada inválida (categoría 1), no conflicto de aula
+
+        const int capacidad = config.dimensiones.num_dias * d.franjas.size() * aulas;
+        if (d.bloques > capacidad)
+            return QStringLiteral("Causa (2) conflicto de aula: el tipo «%1» necesita %2 bloques y sus %3 aulas ofrecen %4 franjas.")
+                .arg(d.nombre).arg(d.bloques).arg(aulas).arg(capacidad);
+    }
+    return {};
+}
+
+/// Categoría (2) conflicto de aula (D8/D9/D10 y saturación por tipo). Devuelve "" si no aplica.
 QString causaConflictoDeAula(const SolverConfig& config) {
     if (!config.aula_fija) {
         // D9: cursos móviles en un centro sin aulas.
@@ -100,34 +176,39 @@ QString causaConflictoDeAula(const SolverConfig& config) {
         if (total > capacidad)
             return QStringLiteral("Causa (2) conflicto de aula: los cursos móviles necesitan %1 bloques y las %2 aulas ofrecen %3 franjas.")
                 .arg(total).arg(config.dimensiones.num_aulas).arg(capacidad);
-        return {};
+        return causaSaturacionPorTipo(config);
     }
 
-    // D8: aulas fijas compartidas. Solo es causa del aula si cada curso cabe por separado
-    // (si un curso no cabe en su turno, la causa es de persona: categoría 3).
+    // D8: aulas de referencia compartidas. Solo cuentan las clases que se QUEDAN en la
+    // referencia (las del tipo del aula): las de otro tipo se desplazan y no la ocupan. Solo es
+    // causa del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
     QMap<int, QVector<int>> cursosPorAula;
     for (int i = 0; i < config.cursos.size(); ++i)
         if (config.cursos[i].aula >= 0)
             cursosPorAula[config.cursos[i].aula].append(i);
 
     for (auto it = cursosPorAula.constBegin(); it != cursosPorAula.constEnd(); ++it) {
+        const QString claveReferencia = claveAula(config, it.key());
         int total = 0;
         QSet<int> franjas;
         bool todosCaben = true;
         for (int idx : it.value()) {
             const CursoSolverConfig& c = config.cursos[idx];
-            const int bloques = bloquesCurso(config, c);
-            if (bloques > franjasCurso(config, c)) { todosCaben = false; break; }
-            total += bloques;
+            if (bloquesCurso(config, c) > franjasCurso(config, c)) { todosCaben = false; break; }
+            for (const PlanMateriaConfig& mc : materiasDelCurso(config, c))
+                if (!claveReferencia.isEmpty() && claveMateria(config, mc.materiaIDx) == claveReferencia)
+                    total += bloquesMateria(config, mc);
             for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
         }
         if (!todosCaben) continue;
         const int capacidad = config.dimensiones.num_dias * franjas.size();
         if (total > capacidad)
-            return QStringLiteral("Causa (2) conflicto de aula: el aula «%1» no da abasto para los cursos que la comparten (%2 bloques en %3 franjas).")
+            return QStringLiteral("Causa (2) conflicto de aula: el aula «%1» no da abasto para las clases que se quedan en ella (%2 bloques en %3 franjas).")
                 .arg(nombreAula(config, it.key())).arg(total).arg(capacidad);
     }
-    return {};
+
+    // Saturación de un tipo de aula (RF-6): la competición por el mismo tipo no se reasigna.
+    return causaSaturacionPorTipo(config);
 }
 
 /// Categoría (3) conflicto de persona (D4/D11: el curso no cabe en su turno declarado).

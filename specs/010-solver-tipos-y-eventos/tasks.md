@@ -16,8 +16,9 @@
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_validador_salida$'` está verde **sin cambios en `ValidadorSalidaSolver`** (ya valida P3/P4 sobre `asignacion.aula`); se migran los fixtures a tipos coherentes y un curso fijo con clases en aulas distintas no se marca como si todas estuvieran en su referencia; la capacidad se comprueba contra el aula real.
     - Nota (2026-10-25): el único cambio en `ValidadorSalidaSolver` es el arreglo de P4 autorizado **fuera del plan** (claves por aula y docente); ver journal, «P4 · claves por aula y docente». `test_validador_salida` 14/14.
 
-- [ ] **T6. Causas de infactibilidad por tipo y referencia.** RF-6
+- [x] **T6. Causas de infactibilidad por tipo y referencia.** RF-6
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'` está verde; un laboratorio insuficiente para varios cursos desplazados produce **conflicto de aula** (sin reasignar a otro tipo ni liberar la referencia); un tipo sin aulas es **entrada inválida** (V16/V17); las demás invariantes conservan su categoría.
+    - Nota (2026-10-25): implementado con la nueva `causaSaturacionPorTipo` y la referencia compartida contando solo las clases que se quedan; `test_solver_horarios` 28/28 y suite 48/49 (solo `test_solver_benchmark`, T10). Ver journal, «T6 - Causas de un resultado no factible».
 
 - [ ] **T7. Supersesión de la 005 y enmienda constitucional (la ejecuta el planner).** RF-7, RF-8
     - Hecho cuando: el planner ha aplicado el texto de §5, §7.1.5, §7.3, §7.4 y §7.5 de `docs/constitution.md` y la anotación de V1/V1–V17/D10/salida/RF-7/versión 1.0 en `specs/005-nucleo-solver/spec.md`; el implementer solo verifica con `grep -n "aula de referencia\|V1–V17\|tipos de aula\|evento.*metadata" docs/constitution.md` y `grep -n "eventos" specs/005-nucleo-solver/spec.md`. Sin este paso la 005 y la constitución siguen describiendo el aula fija y la 1.0.
