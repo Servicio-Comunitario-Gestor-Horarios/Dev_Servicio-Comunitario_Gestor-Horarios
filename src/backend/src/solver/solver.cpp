@@ -13,12 +13,52 @@
 #include "qvariant.h"
 #include <QElapsedTimer>
 #include <QMap>
+#include <QPair>
 #include <QSet>
 #include <QStringList>
+#include <algorithm>
 
 using namespace operations_research::sat;
 
 namespace {
+
+/// Clases desplazadas de un curso y las franjas (slots) en las que pueden caer.
+struct BloqueoDesplazado {
+    int bloques = 0;          ///< clases del curso que se imparten fuera de su referencia
+    QVector<int> franjas;     ///< slots del turno en los que puede caer cada una
+};
+
+/// Franjas (día, slot) DISTINTAS que las clases desplazadas de un grupo de cursos dejan
+/// bloqueadas en su aula de referencia. Dos cursos pueden desplazarse a la misma franja (cada
+/// uno ocupa un aula distinta del tipo requerido), así que el bloqueo es una UNIÓN de franjas y
+/// no la suma de bloques: una franja compartida se cuenta una sola vez. Como la colocación real
+/// no se conoce aquí, se toma la unión mínima: se reutilizan las franjas ya bloqueadas por otro
+/// curso del grupo (cota optimista: nunca declara más bloqueo del que el modelo puede evitar).
+int franjasBloqueadasPorDesplazamientos(const QVector<BloqueoDesplazado>& cursos, int numDias) {
+    QVector<BloqueoDesplazado> orden = cursos;
+    std::stable_sort(orden.begin(), orden.end(),
+                     [numDias](const BloqueoDesplazado& a, const BloqueoDesplazado& b) {
+                         return qMin(a.bloques, numDias * a.franjas.size()) >
+                                qMin(b.bloques, numDias * b.franjas.size());
+                     });
+
+    QSet<QPair<int, int>> bloqueadas;   // (día, slot)
+    for (const BloqueoDesplazado& c : orden) {
+        // Una clase por franja: el curso no puede bloquear más franjas que clases desplaza.
+        int requeridas = qMin(c.bloques, numDias * c.franjas.size());
+        for (int d = 0; d < numDias; ++d)
+            for (int s : c.franjas)
+                if (bloqueadas.contains(qMakePair(d, s))) --requeridas;
+        for (int d = 0; d < numDias; ++d)
+            for (int s : c.franjas) {
+                if (requeridas <= 0) break;
+                if (bloqueadas.contains(qMakePair(d, s))) continue;
+                bloqueadas.insert(qMakePair(d, s));
+                --requeridas;
+            }
+    }
+    return bloqueadas.size();
+}
 
 /// Slots declarados por el turno `nombre`, o vacío si no existe.
 QVector<int> slotsTurno(const SolverConfig& config, const QString& nombre) {
@@ -168,17 +208,25 @@ QString causaSaturacionPorTipo(const SolverConfig& config) {
         if (aulas == 0) continue;   // V17: entrada inválida (categoría 1), no conflicto de aula
 
         // Franjas que las clases desplazadas dejan bloqueadas en las referencias de este tipo.
-        // Solo cuentan las que caen dentro de las franjas que este tipo puede usar.
-        int bloqueadas = 0;
+        // Se agrupa por aula de referencia: dentro de una misma referencia el bloqueo es una
+        // unión de franjas (dos cursos pueden desplazarse a la misma), mientras que entre
+        // referencias distintas del mismo tipo las franjas bloqueadas sí se acumulan.
+        QMap<int, QVector<BloqueoDesplazado>> bloqueosPorReferencia;
         for (int i = 0; i < config.cursos.size(); ++i) {
             if (desplazadosPorCurso[i] == 0) continue;
             const CursoSolverConfig& c = config.cursos[i];
             if (claveAula(config, c.aula) != it.key()) continue;
-            int solapes = 0;
+            BloqueoDesplazado bloqueo;
+            bloqueo.bloques = desplazadosPorCurso[i];
             for (int s : slotsTurno(config, c.turno))
-                if (d.franjas.contains(s)) ++solapes;
-            bloqueadas += qMin(desplazadosPorCurso[i], config.dimensiones.num_dias * solapes);
+                if (d.franjas.contains(s)) bloqueo.franjas.append(s);
+            bloqueosPorReferencia[c.aula].append(bloqueo);
         }
+        int bloqueadas = 0;
+        for (auto itBloqueo = bloqueosPorReferencia.constBegin();
+             itBloqueo != bloqueosPorReferencia.constEnd(); ++itBloqueo)
+            bloqueadas += franjasBloqueadasPorDesplazamientos(itBloqueo.value(),
+                                                              config.dimensiones.num_dias);
 
         const int capacidad = config.dimensiones.num_dias * d.franjas.size() * aulas;
         const int disponibles = capacidad - qMin(bloqueadas, capacidad);
@@ -215,8 +263,9 @@ QString causaConflictoDeAula(const SolverConfig& config) {
     // D8: aulas de referencia compartidas. Solo las clases que se QUEDAN en la referencia (las
     // del tipo del aula) la ocupan; las de otro tipo se desplazan, pero mientras ocupan su franja
     // dejan la referencia vacía y bloqueada para los demás cursos (RF-3). La capacidad disponible
-    // es la del aula menos esas franjas bloqueadas: 1 franja por bloque desplazado. Solo es causa
-    // del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
+    // es la del aula menos esas franjas bloqueadas, contadas como franjas DISTINTAS: dos cursos
+    // desplazados a la misma franja del mismo aula bloquean una sola (unión, no suma). Solo es
+    // causa del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
     QMap<int, QVector<int>> cursosPorAula;
     for (int i = 0; i < config.cursos.size(); ++i)
         if (config.cursos[i].aula >= 0)
@@ -224,24 +273,31 @@ QString causaConflictoDeAula(const SolverConfig& config) {
 
     for (auto it = cursosPorAula.constBegin(); it != cursosPorAula.constEnd(); ++it) {
         const QString claveReferencia = claveAula(config, it.key());
-        int total = 0;         // bloques que se quedan en la referencia
-        int bloqueadas = 0;    // franjas que bloquean las clases desplazadas del grupo
+        int total = 0;                            // bloques que se quedan en la referencia
+        QVector<BloqueoDesplazado> desplazados;   // bloqueos de las clases que se van
         QSet<int> franjas;
         bool todosCaben = true;
         for (int idx : it.value()) {
             const CursoSolverConfig& c = config.cursos[idx];
             if (bloquesCurso(config, c) > franjasCurso(config, c)) { todosCaben = false; break; }
+            BloqueoDesplazado bloqueo;
+            bloqueo.franjas = slotsTurno(config, c.turno);
             for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
                 const int bloques = bloquesMateria(config, mc);
                 if (!claveReferencia.isEmpty() && claveMateria(config, mc.materiaIDx) == claveReferencia)
                     total += bloques;
                 else
-                    bloqueadas += bloques;   // clase desplazada: bloquea 1 franja de la referencia
+                    bloqueo.bloques += bloques;   // clase desplazada: bloquea 1 franja de la referencia
             }
+            if (bloqueo.bloques > 0) desplazados.append(bloqueo);
             for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
         }
         if (!todosCaben) continue;
         const int capacidad = config.dimensiones.num_dias * franjas.size();
+        // Franjas DISTINTAS que el grupo deja bloqueadas: si dos cursos se desplazan a la misma
+        // franja del mismo aula, se descuenta una sola.
+        const int bloqueadas =
+            franjasBloqueadasPorDesplazamientos(desplazados, config.dimensiones.num_dias);
         const int disponibles = capacidad - qMin(bloqueadas, capacidad);
         // Sin clases que se queden, la referencia no compite: el desplazamiento no causa conflicto.
         if (total <= 0) continue;

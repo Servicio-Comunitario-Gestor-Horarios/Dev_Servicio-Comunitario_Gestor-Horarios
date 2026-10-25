@@ -51,6 +51,32 @@ private:
         return config;
     }
 
+    // Caso del reviewer para la unión de franjas bloqueadas: dos cursos comparten la referencia
+    // A1 y cada uno cursa 2 bloques comunes + 2 de laboratorio. Hay 2 laboratorios y un docente
+    // por curso, así que ambos pueden desplazar sus clases a las MISMAS franjas: A1 solo pierde
+    // 2 franjas y los 4 bloques que se quedan caben en 6 − 2.
+    static SolverConfig configDosCursosDesplazadosALaMismaFranja() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, 3, 2, 2, 3};
+        config.franja_horaria = {60, 3};
+        config.turnos.turnos = {{"manana", {0, 1, 2}}};
+
+        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula común", 30},
+                        {"Lab 1", "Laboratorio", 20},
+                        {"Lab 2", "Laboratorio", 20}};
+        config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 2}}},
+                         {"Plan B", {{0, 2, 2}, {1, 2, 2}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
+                         {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
+        config.profesores = {
+            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
+            {"Prof B", 6, 6, "manana", "Plan B", {}, {0, 1}, {}, dispCompleta(2, 3)}};
+        return config;
+    }
+
 private slots:
 
     void configValida_noTieneErrores() {
@@ -717,14 +743,22 @@ private slots:
         QVERIFY2(texto.contains("6 franjas"), qPrintable(texto));
     }
 
-    // ── T6/RF-6: la referencia solo se llena con las clases que se quedan, y los
-    // desplazamientos bloquean franjas que se descuentan de su capacidad ──
-    void solver_causaDeAulaNoCuentaLasClasesDesplazadas() {
+    // ── T6/RF-6: con capacidad de sobra en la referencia, el aula no oculta la causa real ──
+    // Este fixture NO discrimina la regla «las clases desplazadas no se cuentan como ocupantes»
+    // del aula de referencia: los 10 bloques del grupo (6 se quedan + 4 desplazados) caben en
+    // las 12 franjas de la semana aunque se cuenten las desplazadas como ocupantes, así que el
+    // veredicto no cambia. Lo que comprueba es que el descuento por bloqueo no convierte en
+    // conflicto un aula con capacidad de sobra y que la causa real —2|B sin docente elegible—
+    // se informa como (4). Quien discrimina «no se cuentan las desplazadas» es
+    // `solver_falloCausaConflictoDeAulaPorReferenciaSaturada` (exige el mensaje «10 bloques»,
+    // no 12) y `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula` (con el recuento
+    // por suma de bloques desplazados, la causa (2) taparía la (4)).
+    void solver_causaDeAulaConSemanaAnchaNoInventaElConflicto() {
         // 1|A (2 bloques en la referencia + 4 de laboratorio) y 2|B (4 en la referencia)
-        // comparten el Aula 1. Los bloques totales del grupo (10) superan las 6 franjas del
-        // turno, pero solo 2 + 4 = 6 se quedan en el aula y 1|A bloquea 4 franjas con sus
-        // clases desplazadas: 6 + 4 = 10 ≤ 12 franjas del aula, así que no hay conflicto de
-        // aula. La causa real es de asignación (4): 2|B no tiene docente elegible.
+        // comparten el Aula 1 durante 6 días × 2 franjas = 12 franjas. Solo 2 + 4 = 6 bloques
+        // se quedan en el aula y 1|A bloquea 4 franjas con sus clases desplazadas: quedan 8
+        // franjas para 6 bloques, así que el aula no es la causa. La causa real es de
+        // asignación (4): 2|B no tiene docente elegible.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -808,6 +842,7 @@ private slots:
         const QString texto = resultado.errores.join("\n");
         QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
         QVERIFY2(texto.contains("A1"), qPrintable(texto));
+        QVERIFY2(texto.contains("5 bloques en 6 franjas; 4 quedan bloqueadas"), qPrintable(texto));
         QVERIFY2(!texto.contains("no se pudo identificar"), qPrintable(texto));
     }
 
@@ -839,6 +874,39 @@ private slots:
 
         QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
         QVERIFY(resultado.errores.isEmpty());
+    }
+
+    // ── Corrección 2 (RF-6): el bloqueo de la referencia es una UNIÓN de franjas, no una suma ──
+    // Dos cursos que comparten A1 y se desplazan a la misma franja (cada uno a un laboratorio
+    // distinto) bloquean una sola franja de la referencia. Caso positivo del reviewer: los 4
+    // bloques que se quedan caben en 6 − 2 franjas, así que el dato es factible.
+    void solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja() {
+        SolverConfig config = configDosCursosDesplazadosALaMismaFranja();
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY(resultado.errores.isEmpty());
+    }
+
+    // Mismo dato, pero el docente de 2|B no cubre el laboratorio: la causa real es (4). Con el
+    // descuento por SUMA de bloques desplazados, A1 «perdía» 4 franjas (2 por curso) y la causa
+    // (2) tapaba la (4). Con la unión pierde 2 y se informa la causa correcta.
+    void solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula() {
+        SolverConfig config = configDosCursosDesplazadosALaMismaFranja();
+        // El docente de 2|B solo opta por la materia común (índice 0), no por el laboratorio.
+        config.profesores[1].materias_asignadas = {0};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "2|B no tiene docente de laboratorio");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+        QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("2|B"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
     }
 
     // La saturación por tipo también descuenta las franjas bloqueadas en las referencias de ese

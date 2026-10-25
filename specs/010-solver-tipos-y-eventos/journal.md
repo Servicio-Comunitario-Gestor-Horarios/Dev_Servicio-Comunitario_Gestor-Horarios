@@ -1344,6 +1344,11 @@ regla corregida (1|A llenaba las 6 franjas y bloqueaba A1 en 4; 2|B solo cabía 
 causa (2) que aparecía era legítima; con la semana más ancha el aula vuelve a tener capacidad tras
 el descuento y el test sigue exigiendo la causa (4) que le da nombre, sin cambiar su intención de
 fondo (los bloques desplazados no se cuentan como bloques que se quedan).
+**Corrección 2 (2026-10-25):** con ese fixture el test ya **no discrimina** la regla «las clases
+desplazadas no se cuentan como ocupantes» (los 10 bloques caben en 12 franjas aun contándolas como
+ocupantes, así que el veredicto no cambia). Se renombró a
+`solver_causaDeAulaConSemanaAnchaNoInventaElConflicto` y su comentario declara qué comprueba y qué
+test discrimina la regla; ver «Corrección 2 · unión de franjas bloqueadas».
 
 ```text
 $ cmake --build --preset backend --parallel
@@ -1380,3 +1385,151 @@ $ git diff --stat
   con `aula_fija` y cursos con referencia.
 - **V8** obliga a que todo curso declare aula en modo fijo, así que no hay referencias ausentes que
   bloqueen por tipo.
+
+## Corrección 2 · unión de franjas bloqueadas (2026-10-25)
+
+**Hallazgos 1 y 2 de la segunda validación (RF-6).** Alcance estricto:
+`src/backend/src/solver/solver.cpp`, `test/backend/test_solver_horarios.cpp` y este journal. Base
+`d7728e6` (árbol limpio, `ctest --preset backend` 49/49). **No se commitea.**
+
+### Hallazgo 2 · el bloqueo de la referencia es una unión de franjas, no una suma
+
+`causaConflictoDeAula` (D8) descontaba **un bloqueo por cada bloque desplazado** de cada curso del
+grupo y `causaSaturacionPorTipo` hacía lo mismo respecto de las referencias del tipo. Si dos cursos
+que comparten aula de referencia se desplazan **en la misma franja** (posible cuando hay ≥ 2 aulas
+del tipo desplazado), esa franja se descontaba dos veces y se declaraba causa (2) cuando el bloqueo
+real no era de aulas.
+
+Caso del reviewer: 2 cursos comparten `A1`, cada uno 2 bloques comunes + 2 de laboratorio, 2
+laboratorios, turno 2 días × 3 franjas. Los 4 bloques que se quedan en `A1` caben en `6 − 2 = 4`
+franjas porque ambos pueden desplazarse a las mismas 2 franjas (cada uno a un laboratorio distinto).
+Con el docente de laboratorio para ambos el dato es **factible**; si el docente de `2|B` no cubre el
+laboratorio, la causa real es **(4)**.
+
+#### Cambio (solo producción)
+
+- **Nueva `franjasBloqueadasPorDesplazamientos`** (anónima, junto a los helpers de `solver.cpp`):
+  recibe los bloqueos del grupo (`BloqueoDesplazado`: bloques desplazados y slots de su turno) y
+  devuelve el número de franjas `(día, slot)` **distintas** de la unión. Procesa primero el curso que
+  más franjas necesita y **reutiliza** las ya bloqueadas por otro curso del grupo, que es la cota
+  optimista: como no se conoce la colocación real, nunca declara más bloqueo del que el modelo puede
+  evitar. Cada curso queda limitado a `min(bloques desplazados, días × franjas de su turno)` porque
+  un curso no tiene dos clases en la misma franja.
+- **D8 (`causaConflictoDeAula`)**: `bloqueadas = franjasBloqueadasPorDesplazamientos(grupo)` en vez
+  de la suma de bloques desplazados. El resto (capacidad = `días × franjas del grupo`, guardas
+  `todosCaben` y `total <= 0`, mensajes) no cambia.
+- **Saturación por tipo**: los bloqueos se **agrupan por aula de referencia**; dentro de una
+  referencia se aplica la unión y entre referencias distintas del mismo tipo las franjas se siguen
+  acumulando. El filtro por `d.franjas` (slots que el tipo puede usar) se aplica a las franjas del
+  bloqueo, como antes.
+
+#### Tests primero (rojo)
+
+Fixture compartido `configDosCursosDesplazadosALaMismaFranja()` (caso exacto del reviewer) y dos
+casos nuevos en `test/backend/test_solver_horarios.cpp`:
+
+1. `solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja` — positivo: mismo dato con docente de
+   laboratorio para ambos cursos → `exito`.
+2. `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula` — el docente de `2|B` solo opta por
+   la materia común (no por el laboratorio) → `Causa (4)` y **ninguna** `Causa (2)`.
+
+Con la producción anterior (suma de bloques desplazados) el caso 2 estaba en rojo:
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'
+FAIL!  : TestSolverHorarios::solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula()
+  'texto.contains("Causa (4)")' returned FALSE. (El modelo no tiene solución factible (INFEASIBLE).
+  Causa (2) conflicto de aula: el aula «A1» no da abasto para las clases que se quedan en ella
+  (4 bloques en 6 franjas; 4 quedan bloqueadas por clases desplazadas).
+  Entorno: 2 docentes, 2 cursos, 2 materias, 3 aulas.)
+Totals: 32 passed, 1 failed, 0 skipped, 0 blacklisted, 148ms
+```
+
+El positivo `solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja` pasa en rojo y en verde: el modelo
+es factible y las causas no se evalúan; su papel es fijar que la colocación en la misma franja existe
+(hay 2 laboratorios), que es lo que hace legítima la unión.
+
+#### Verde
+
+```text
+$ cmake --build --preset backend --parallel          # exit 0 (ninja: no work to do)
+$ ctest --test-dir build-backend -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.20 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 33 passed, 0 failed, 0 skipped, 0 blacklisted, 144ms
+
+$ ctest --preset backend
+49/49 Test #49: test_ipc_aislamiento_bd ............   Passed    0.08 sec
+100% tests passed out of 49
+Total Test time (real) =   5.65 sec
+```
+
+#### Regresiones temporales (todas restauradas)
+
+1. **Volver a contar por suma** (mutación del helper: devolver la suma de bloques desplazados por
+   curso, que es el comportamiento anterior). Falla exactamente el caso nuevo, con la causa (2)
+   falsa, y **sigue pasando** el caso de saturación real del reviewer
+   (`solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos`): la unión no pierde ese caso.
+
+   ```text
+   FAIL!  : solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula()
+     'texto.contains("Causa (4)")' returned FALSE. (… Causa (2) … el aula «A1» … 4 bloques en 6
+     franjas; 4 quedan bloqueadas por clases desplazadas …)
+   PASS   : solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos()
+   Totals: 32 passed, 1 failed
+   ```
+
+2. **Contar las clases desplazadas como ocupantes** del aula de referencia (`total += bloques` para
+   toda materia), la regresión alternativa del hallazgo 1: fallan dos tests, con este reparto:
+
+   ```text
+   FAIL!  : solver_falloCausaConflictoDeAulaPorReferenciaSaturada()
+     'texto.contains("10 bloques")' returned FALSE. (Causa (2) … el aula «Aula 1» … 12 bloques en
+     6 franjas)                                            ← «12» = 10 que se quedan + 2 desplazadas
+   FAIL!  : solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula()
+     'texto.contains("Causa (4)")' returned FALSE. (… Causa (2) …)
+   Totals: 31 passed, 2 failed
+   ```
+
+3. Tras restaurar ambas mutaciones: build exit 0, `test_solver_horarios` 33/33 y suite 49/49 (arriba).
+
+El caso S1 del reviewer (`solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos`: 1|A con 2
+comunes + 4 de laboratorio, 2|B con 3 comunes, `A1` + 1 laboratorio, 2 días × 3 franjas) **sigue
+dando causa (2)**: 5 bloques que se quedan frente a `6 − 4 = 2` disponibles. Se le añadió la
+aserción del mensaje `«5 bloques en 6 franjas; 4 quedan bloqueadas»`, que fija el número de la unión
+(solo desplaza 1|A; sus 4 franjas se cuentan una vez) y habría fallado con cualquier suma.
+
+### Hallazgo 1 · test que ya no discriminaba
+
+`solver_causaDeAulaNoCuentaLasClasesDesplazadas` (ampliado a 6 días en `aa7ee74`) pasaba también con
+la regresión que cuenta las clases desplazadas como ocupantes del aula de referencia: 10 bloques
+(6 que se quedan + 4 desplazados) caben en las 12 franjas, así que el veredicto no cambiaba y el
+nombre del test y el journal afirmaban más de lo que probaba. Se eligió la opción (b):
+
+- Renombrado a **`solver_causaDeAulaConSemanaAnchaNoInventaElConflicto`**, con un comentario que dice
+  lo que comprueba (con capacidad de sobra el aula no inventa la causa (2) y se informa la (4) de
+  2|B) y lo que **no** comprueba.
+- **Qué test discrimina «no se cuentan las clases desplazadas»**: hoy
+  `solver_falloCausaConflictoDeAulaPorReferenciaSaturada`, porque exige el mensaje `«10 bloques»`
+  (solo las clases que se quedan) y la regresión de ocupantes lo convierte en `«12 bloques»` (ver
+  regresión temporal 2), y el nuevo
+  `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula`, donde la causa (2) taparía la (4).
+- Párrafo del journal de `aa7ee74` corregido (remite a esta sección).
+
+### Hallazgos
+
+- **La unión es una cota optimista, no un matching exacto.** El helper reutiliza franjas ya
+  bloqueadas del grupo (con el mismo turno devuelve `max(bloques desplazados por curso)`); no busca la
+  colocación óptima. Prefiere no inventar bloqueo antes que declarar causa (2) falsa, que es el
+  defecto que se corrige; si dos cursos tienen turnos disjuntos, la unión es la suma porque no
+  comparten franjas.
+- **Grupos por referencia en la saturación por tipo.** Antes se sumaba por curso; ahora se agrupa por
+  `c.aula`, así que dos cursos que comparten referencia comparten franjas bloqueadas, pero dos
+  referencias distintas del mismo tipo siguen sumando (cada una pierde su propia capacidad).
+- **`solver_causaDeAulaConSemanaAnchaNoInventaElConflicto` se conserva** como control de que el
+  descuento por bloqueo no inventa conflictos; solo cambia el nombre y el comentario.
+- **Sin cambios** en el modelo (T4), `ValidadorSalidaSolver` (T5), frontend, `spec.md`, `plan.md` ni
+  `estado.md`.
