@@ -2,15 +2,76 @@
 
 Fase: validacion
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-25
-Base: e72c930 (base del plan, cierre de la 009) · aa7ee74 (HEAD, base efectiva de la implementación y del diff de la re-validación)
-Dudas abiertas: ninguna
-Siguiente paso: re-validación del reviewer contra `aa7ee74` (suite 49/49); con `VEREDICTO: APROBADO`, el planner marca la spec `implementada (fecha)` y cierra este estado. La 011 (hora académica) va después.
-Veredicto: pendiente
+Base: e72c930 (base del plan, cierre de la 009) · implementación: 0096b36 (plan/tareas), 3a3e724 (T1), d2fbda1 (T2), 4142939 (T3), 0edc6f8 (T4), 06fc70e (P4, desviación autorizada), 37cd2e1 (T6), f054b2e (T7), 4134209 (T8), 9c5c301 (T9), 35cd5f0 (T10) · correcciones de validación: aa7ee74, 232bd19, 45ac292, 5fc40e0, de61050 (HEAD) · d7728e6 (docs del estado)
+Dudas abiertas: 1. La estimación de franjas bloqueadas del aula de referencia mezcla unidades —el palomar cuenta pares día×franja y el descuento compara con valores de franja—, así que con una semana de 2 o más días puede descontar de más y declarar causa (2) cuando la causa real es (4). Detalle y contraejemplo en «Validación 6 · defecto abierto».
+Siguiente paso: Rediseñar el diagnóstico de causas en una **spec nueva** (decisión del usuario, 2026-10-25) en vez de seguir parchando este cálculo. La 010 queda **parada en validación**, con T1–T10 implementadas y validadas en todo lo demás, y **no se marca `implementada`** hasta que el rediseño resuelva el defecto.
+Veredicto: CAMBIOS NECESARIOS (2026-10-25)
 QA: APROBADA con las notas del re-QA aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
 QA del plan: escrito el 2026-10-24, ajustado el 2026-10-25 (RF-1 con `Resultado<QJsonObject>`) y corregido tras el QA del plan (11 hallazgos, sección propia); aprobado por el usuario el 2026-10-25 junto con `tasks.md`.
-Notas: T1–T10 implementadas y commiteadas (T7 = `f054b2e`, desviación autorizada de P4 = `06fc70e`); la corrección del hallazgo de validación está en `aa7ee74` y falta la re-validación.
+Notas: T1–T10 implementadas y commiteadas (T7 = `f054b2e`, desviación autorizada de P4 = `06fc70e`). Sobre el cálculo de causas se aplicaron **cinco correcciones sucesivas** (`aa7ee74`, `232bd19`, `45ac292`, `5fc40e0`, `de61050`): parches sobre una heurística aritmética, justo lo que el usuario quiere evitar; por eso la spec queda parada. El resto de la 010 pasó la validación. Detalle en «Validación 6 · defecto abierto» y «Correcciones 1-5».
+
+## Validación 6 · defecto abierto (2026-10-25)
+
+**La 010 se para aquí a petición del usuario, no se cierra.** Decisión textual (2026-10-25): «vamos
+a comitear, y dejar aquí esta spec, y vamos a ver bien cómo podemos hacerlo para no poner parches
+sobre parches».
+
+### Dudas abiertas
+
+1. **La estimación de franjas bloqueadas del aula de referencia mezcla unidades (RF-6, causas de un
+   resultado no factible).** Para decidir la causa «conflicto de aula» (categoría 2) se estima cuántas
+   franjas de la referencia dejan bloqueadas las clases desplazadas. Esa estimación usa el **palomar**
+   —⌈bloques desplazados / aulas del tipo⌉—, que cuenta **pares día×franja** distintos que las clases
+   desplazadas necesitan; pero el descuento resta esa cifra de un conjunto medido en **franjas del
+   día** (valores de *slot*): `fuera` y `dentro` se cuentan sobre los slots alcanzables y el resultado
+   se resta del palomar. Con una semana de **1 día** ambas unidades coinciden y el cálculo acierta;
+   con **2 o más días** el descuento puede ser mayor que el bloqueo real, de modo que se declara
+   **causa (2) conflicto de aula** cuando la causa real es **(4) conflicto de asignación de
+   docente** —y, como la categoría 2 se evalúa antes que la 3 y la 4, tapa la causa verdadera.
+
+   **Contraejemplo reproducible del reviewer** (2 días, turnos `TB={5,6}` y `TX={4,5}`; `R1` del tipo
+   «Aula base» es la referencia de `2|Y`, que la llena con 2 bloques/día de ciencias, y de `1|X`, que
+   solo tiene 2 bloques de laboratorio con **1** laboratorio en el centro; el docente de laboratorio
+   dispone de **una** franja): el modelo es INFEASIBLE por docente, pero el diagnóstico dice «el tipo
+   «Aula base» necesita 4 bloques y sus 1 aulas ofrecen 4 franjas (1 las bloquean clases
+   desplazadas)». Con ese docente disponible en (día 0, franja 4) y (día 1, franja 4) —ambas **fuera**
+   de lo contado— el mismo dato es **factible**: el bloqueo real dentro de lo contado es 0.
+
+   No se corrige en la 010. Requiere rediseñar el diagnóstico de causas (ver «Siguiente paso»).
+
+## Correcciones 1-5 del cálculo de causas: parches sucesivos (2026-10-25)
+
+El mismo cálculo acumuló **cinco correcciones** el mismo día, cada una arreglando lo que la validación
+anterior había destapado en la fórmula anterior:
+
+| # | Commit | Qué cambió |
+|---|---|---|
+| 1 | `aa7ee74` | El aula de referencia descuenta un bloqueo por bloque desplazado (antes no descontaba nada): una entrada válida se quedaba sin categoría de causa. |
+| 2 | `232bd19` | El bloqueo pasa de **suma** de bloques desplazados a **unión voraz** de franjas, para no descontar dos veces la misma franja. |
+| 3 | `45ac292` | Se añade la **cota inferior por tipo (palomar)** y se toma el máximo con la unión: con pocas aulas del tipo desplazado la unión se quedaba corta. |
+| 4 | `5fc40e0` | Se **elimina la unión** y queda solo el palomar: la unión no era cota inferior y sobreestimaba con turnos distintos. |
+| 5 | `de61050` | El descuento se **limita a las franjas contadas** en la capacidad: antes restaba franjas de otro turno que nunca se habían sumado. |
+
+**Son parches sucesivos sobre una heurística aritmética**, no un diseño: cada vuelta encontró que la
+cota anterior no era lo que su comentario afirmaba (una suma que no descontaba, una resta de
+conjuntos, una unión que no era cota, un `max` de dos términos, un descuento de franjas nunca
+sumadas) y la siguiente ajustó la fórmula. Eso es exactamente lo que el usuario quiere evitar; de ahí
+la decisión de **rediseñar el diagnóstico de causas** en una spec nueva en lugar de una sexta
+corrección. La 6.ª validación encontró el defecto de unidades descrito arriba.
+
+### Lo que sí pasó la validación
+
+El resto de la 010 se validó y no está en discusión: **contrato 2.0** y rechazo de versiones
+anteriores (RF-1, RF-2), **validaciones de eventos y tipos** V2/V16/V17 (RF-5), **regla de tipo**,
+**aula de referencia con bloqueo** y desplazamiento con vuelta (RF-3), **salida con aula real** y
+arreglo de **P4** (RF-4), **supersesión de la 005** y **enmienda constitucional** (RF-7, RF-8),
+**MER completo** (RF-9), **contrato 2.0 documentado** (RF-10) y **benchmark con tipos por debajo de
+60 s** (RNF-2); suite **49/49** en `de61050`.
 
 ## Validación (2026-10-25)
+
+> **Histórico.** Este fue el primer ciclo de validación; lo superan «Validación 6 · defecto abierto»
+> y «Correcciones 1-5». Se conserva como registro del hallazgo original.
 
 - **Veredicto del reviewer: CAMBIOS NECESARIOS.** Hallazgo principal (RF-6): `causaConflictoDeAula`
   contaba solo los bloques que se quedan en el aula de referencia y **no descontaba** las franjas que

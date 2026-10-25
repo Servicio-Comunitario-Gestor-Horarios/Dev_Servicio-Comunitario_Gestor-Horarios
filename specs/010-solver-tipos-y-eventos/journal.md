@@ -1295,6 +1295,22 @@ $ git diff --stat
 - **`test_backend_variables_cp_sat`** es el nombre real del test de variables (el plan y `tasks.md`
   lo llaman `test_variables_cp_sat`); no se toca el nombre, solo se anota para futuras búsquedas.
 
+## Aviso · las garantías de las correcciones 1-5 están superadas (2026-10-25)
+
+> **Leer antes de las cinco secciones de corrección que siguen (correcciones 1 a 5).** Las
+> afirmaciones de garantía que aparecen en ellas —«nunca inventa un conflicto de aula»,
+> «estructuralmente ≤ lo contado», «el descuento no excede las franjas sumadas»— están **superadas**:
+> el cálculo que describen sigue mezclando unidades (el palomar cuenta pares día×franja y el descuento
+> compara con valores de franja), así que con una semana de 2 o más días puede descontar de más y
+> declarar causa (2) cuando la causa real es (4). El defecto, con el contraejemplo reproducible, está
+> en `specs/010-solver-tipos-y-eventos/estado.md` → «Validación 6 · defecto abierto».
+>
+> El historial **no se borra**: cada sección queda como registro de lo que se probó y de por qué se
+> cambió. Pero ninguna de esas frases de garantía debe citarse como vigente, y las afirmaciones
+> optimistas que ya se corrigieron dentro de cada sección no son la última palabra sobre la materia.
+> El usuario decidió **rediseñar el diagnóstico de causas** en una spec nueva (pendiente de abrir) en
+> vez de seguir parchando la heurística; esa spec es la que sustituirá a estas cinco correcciones.
+
 ## Corrección de validación · causa de referencia bloqueada (2026-10-25)
 
 **Hallazgo 1 de la validación de la 010 (RF-6).** `causaConflictoDeAula` (D8) contaba solo los
