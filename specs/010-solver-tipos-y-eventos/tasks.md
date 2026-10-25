@@ -20,11 +20,13 @@
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'` está verde; un laboratorio insuficiente para varios cursos desplazados produce **conflicto de aula** (sin reasignar a otro tipo ni liberar la referencia); un tipo sin aulas es **entrada inválida** (V16/V17); las demás invariantes conservan su categoría.
     - Nota (2026-10-25): implementado con la nueva `causaSaturacionPorTipo` y la referencia compartida contando solo las clases que se quedan; `test_solver_horarios` 28/28 y suite 48/49 (solo `test_solver_benchmark`, T10). Ver journal, «T6 - Causas de un resultado no factible».
 
-- [ ] **T7. Supersesión de la 005 y enmienda constitucional (la ejecuta el planner).** RF-7, RF-8
+- [x] **T7. Supersesión de la 005 y enmienda constitucional (la ejecuta el planner).** RF-7, RF-8
     - Hecho cuando: el planner ha aplicado el texto de §5, §7.1.5, §7.3, §7.4 y §7.5 de `docs/constitution.md` y la anotación de V1/V1–V17/D10/salida/RF-7/versión 1.0 en `specs/005-nucleo-solver/spec.md`; el implementer solo verifica con `grep -n "aula de referencia\|V1–V17\|tipos de aula\|evento.*metadata" docs/constitution.md` y `grep -n "eventos" specs/005-nucleo-solver/spec.md`. Sin este paso la 005 y la constitución siguen describiendo el aula fija y la 1.0.
+    - Nota (2026-10-25): la enmienda se aplicó en `f054b2e` (planner con parche aplicado por el coordinator) sobre `docs/constitution.md` §5/§7.1.5/§7.3/§7.4/§7.5 y con las notas de supersesión en `specs/005-nucleo-solver/spec.md`. Verificado por el implementer con los dos `grep` de la tarea; ver journal, «T7 - Enmienda constitucional y supersesión de la 005».
 
-- [ ] **T8. Diagrama entidad-relación completo.** RF-9
+- [x] **T8. Diagrama entidad-relación completo.** RF-9
     - Hecho cuando: `docs/Diagrama-MER.md` incluye `TiposAula`, `Aulas`/`Materias` con `id_tipo_aula`, `Turnos`, `Eventos` con nombre/posición/orden y `Cursos` con `turno`/`aula`, con sus relaciones; `grep -n "TiposAula\|Eventos\|Turnos\|Cursos\|id_tipo_aula" docs/Diagrama-MER.md` los muestra. No es solo «quitar recesos».
+    - Nota (2026-10-25): diagrama completado con el esquema real de la 009 (`migracion.cpp`); 11 entidades y 11 relaciones. Validado renderizando con `@mermaid-js/mermaid-cli`. Ver journal, «T8 - Diagrama entidad-relación completo».
 
 - [ ] **T9. Documentación viva del contrato 2.0.** RF-10
     - Hecho cuando: `docs/contrato-solver-2.0.md` (raíz de `docs/`, **fuera de `docs/solver/`**) describe la forma 2.0, los tipos por nombre/clave, los eventos, la salida con aula real, la semántica del aula de referencia (desplazamiento, vuelta, vacía/bloqueada), el rechazo de 1.0 con archivo/versión/acción y no duplica la guía de servicios de la 009; `grep -n "2.0\|eventos\|aula de referencia\|1.0\|aula real" docs/contrato-solver-2.0.md` lo confirma; no se escribe nada en `docs/solver/`.

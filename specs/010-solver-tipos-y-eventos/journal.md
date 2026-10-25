@@ -864,3 +864,177 @@ estado (49 configurados, 48 en verde).
 `git diff --stat`: `src/backend/src/solver/solver.cpp` (+101/-10) y
 `test/backend/test_solver_horarios.cpp` (+159), más `tasks.md` y este journal. Sin tocar el modelo
 (T4), `ValidadorSalidaSolver` (T5), frontend, `spec.md`, `plan.md` ni `estado.md`.
+
+## T7 - Enmienda constitucional y supersesión de la 005 (2026-10-25)
+
+**Requisito:** RF-7 y RF-8. **Tarea:** T7 de `tasks.md`. **Commit:** `f054b2e`
+(`docs(normativa): enmienda de §5 y §7 por tipos de aula y eventos`), del planner con un parche
+aplicado por el coordinator; el implementer solo verifica.
+
+```text
+$ git show --stat --oneline f054b2e
+f054b2e docs(normativa): enmienda de §5 y §7 por tipos de aula y eventos
+ docs/constitution.md                       | 14 ++++----
+ specs/005-nucleo-solver/spec.md            | 55 ++++++++++++++++++++++++++++++
+ specs/010-solver-tipos-y-eventos/estado.md |  9 +++++
+ 3 files changed, 72 insertions(+), 6 deletions(-)
+```
+
+### Verificación (los dos `grep` del «Hecho cuando»)
+
+```text
+$ grep -n "aula de referencia\|V1–V17\|tipos de aula\|evento.*metadata" docs/constitution.md
+34:- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, tipos de aula, asignaturas,
+    cursos, turnos, eventos y configuración del solver) nunca se borran ni se sobrescriben sin
+    confirmación explícita.
+64:5. **Aula.** … cada curso declara un **aula de referencia**: la usa cuando su tipo coincide, y
+    las clases cuya materia requiere otro tipo se imparten en un aula de ese tipo y el curso
+    **vuelve** a la referencia en las demás. Mientras un curso tiene una clase desplazada en una
+    franja, su aula de referencia queda **vacía y bloqueada** en esa franja. …
+78:- **Cursos:** … el modo de aula fija es **global** … activo → el aula del curso es su **aula de
+    referencia** (§7.1.5: desplazamiento y vuelta) …
+89:Antes de construir el modelo se ejecutan las validaciones V1–V17; … **V1** espera la sección de
+    **eventos** (no la de recesos); el contenido de V1, V2, V16 y V17 vive en la spec 005 y en la 010.
+93:… El **evento** de turno es metadata que el solver ignora; el horario del profesor se deriva por
+    post-proceso.
+
+$ grep -n "eventos" specs/005-nucleo-solver/spec.md
+495:> **tipo de aula** de aulas y materias y la sección de **eventos**.
+573:> un aula del centro, en los dos modos) y cambia **V1** (sección de eventos y versión 2.0). …
+582:    > secciones y exige la sección de **eventos** del turno; ya **no** exige la sección `recesos`.
+584:    > `eventos`, `planes`, `cursos`, `profesores`, `materias` y `aulas`.
+589:    > temporalidad de los eventos** (`nombre`, turno existente, posición, orden, duración y par
+```
+
+Los cinco puntos de la enmienda (§5 dominios protegidos con tipos de aula y eventos, §7.1.5
+invariante del aula, §7.3 contrato de configuración con turno/plan obligatorios, §7.4 rango
+`V1–V17` con V1 hablando de eventos, §7.5 «el evento es metadata») y la anotación de supersesión
+de la 005 están en el commit. **T7 no ha requerido cambios del implementer**:
+`git status --short` en ese momento no mostraba `docs/constitution.md` ni `specs/005-*/spec.md`
+modificados, así que la tarea se marca por enmienda ya aplicada.
+
+## T8 - Diagrama entidad-relación completo (2026-10-25)
+
+**Requisito:** RF-9. **Plan:** §1.4, §8-T8 y decisión 11. **Base:** `f054b2e` (T1-T7 commiteadas;
+suite 48/49, rojo único `test_solver_benchmark`). **No se commitea.**
+
+Tarea solo documental: no hay runner ni lógica que pueda romperse, así que la verificación es la del
+«Hecho cuando» (grep) más una validación real de sintaxis Mermaid.
+
+### Modelo tomado de la fuente
+
+No se inventó nada: el esquema se copió de `src/backend/src/database/migracion.cpp` (T1 de la 009),
+que es el estado real tras la 009.
+
+- `TiposAula` (líneas 26-42): `id`, `nombre` (`CHECK(trim(nombre)=nombre AND length>0)`), `clave`
+  (`CHECK(length>0)`) y **`CREATE UNIQUE INDEX TiposAula_clave ON TiposAula(clave)`**. La clave es la
+  forma normalizada que calcula `ServicioTiposAula` (recorte + plegado), tal como comenta el esquema;
+  se anota en el diagrama (`text clave UK "…normalizado…"`).
+- `Aulas.id_tipo_aula` (línea 52) y `Materias.id_tipo_aula` (línea 76): `INTEGER NOT NULL
+  REFERENCES TiposAula(id)`, **obligatorias**; se dibujan como `TiposAula ||--o{ Aulas` y
+  `TiposAula ||--o{ Materias` (un tipo, cero o muchas aulas/materias; cada aula/materia exige
+  exactamente un tipo).
+- `Turnos` (líneas 128-138): `nombre TEXT PRIMARY KEY`, `inicio`, `fin`, `slots`
+  (`CHECK(slots>0)`).
+- `Eventos` (líneas 140-159): `id PK`, `nombre`, `turno REFERENCES Turnos(nombre)`, `despues_de_slot`
+  (`>=1`), `orden` (`>=1`), `duracion` (`>0`), `inicio`/`fin` con `CHECK((inicio IS NULL) = (fin IS
+  NULL))` y **`UNIQUE(turno, despues_de_slot, orden)`**. El diagrama lleva el único en el comentario
+  de `despues_de_slot` («UK junto con turno y orden») y la relación `Turnos ||--o{ Eventos`.
+  **Cascada:** el esquema **no** declara `ON DELETE CASCADE`; la cascada es de servicio
+  (`ServicioTurnosEventos.cpp:402`: «Los eventos referencian el turno sin ON DELETE CASCADE: se borran
+  primero»). Se dibuja la relación con la etiqueta «aloja (los eventos se borran con el turno)» para
+  no afirmar una cascada de FK que no existe.
+- `Cursos` (líneas 161-176): `id`, `anio` (`>=1`), `seccion` (1 carácter), `turno REFERENCES
+  Turnos(nombre)` **nullable**, `aula REFERENCES Aulas(id)` **nullable**, `UNIQUE(anio, seccion)`.
+  Se dibujan `Turnos |o--o{ Cursos` y `Aulas |o--o{ Cursos` (el aula es la **referencia** del curso).
+- **Relación con `PlanEstudio`:** no hay FK persistida. En el esquema, `PlanEstudio_Materia.curso` es
+  el año del plan y el plan **del curso** viaja en el preset, no en la base (005: «el plan del curso
+  **no** se persiste»). Por eso la relación se dibuja **no identificante** (`Cursos }o..o{
+  PlanEstudio: "plan del curso (no persistido)"`, línea discontinua) en lugar de inventar una FK.
+
+Se conservan todas las entidades y relaciones previas (`Profesores`, `Disponibilidad_Profesor`,
+`Profesor-Materia`, `PlanEstudio`, `PlanEstudio-Materia`, `Aulas`, `Materias`) y el estilo del
+documento: un único bloque de código mermaid con `erDiagram`, sin prosa alrededor; solo se
+añadieron comentarios `%%` de cabecera y comentarios de atributo.
+
+### Verificación
+
+```text
+$ grep -nE "TiposAula|Eventos|Turnos|Cursos|id_tipo_aula|clave" docs/Diagrama-MER.md
+5:    %% reflejan REFERENCES reales y las UK los índices/claves únicos.
+7:    TiposAula {
+10:        text clave UK "nombre normalizado (recorte + plegado Unicode); índice único TiposAula_clave"
+21:        int id_tipo_aula FK "obligatoria -> TiposAula.id"
+39:        int id_tipo_aula FK "obligatoria -> TiposAula.id"
+76:    Turnos {
+85:    Eventos {
+88:        text turno FK "-> Turnos.nombre"
+98:    Cursos {
+102:        text turno FK "opcional -> Turnos.nombre"
+108:    TiposAula ||--o{ Aulas: clasifica
+109:    TiposAula ||--o{ Materias: "es requerido por"
+115:    Turnos ||--o{ Eventos: "aloja (los eventos se borran con el turno)"
+116:    Turnos |o--o{ Cursos: agrupa
+117:    Aulas |o--o{ Cursos: "es aula de referencia de"
+118:    Cursos }o..o{ PlanEstudio: "plan del curso (no persistido)"
+```
+
+Sintaxis Mermaid comprobada con la herramienta real (no a ojo):
+
+```text
+$ npx -y @mermaid-js/mermaid-cli -i docs/Diagrama-MER.md -o /tmp/opencode/mer/MER.svg
+Found 1 mermaid charts in Markdown input
+ ✅ ./MER-1.svg
+
+$ npx -y @mermaid-js/mermaid-cli -i docs/Diagrama-MER.md -o /tmp/opencode/mer/MER.png --size 2400
+ ✅ ./MER-1.png
+```
+
+Comprobaciones sobre el SVG/PNG generados (para descartar que Mermaid se comiera entidades o
+relaciones en silencio):
+
+```text
+entidades renderizadas: 11   (TiposAula, Aulas, Profesores, Materias, Disponibilidad_Profesor,
+                              Profesor-Materia, PlanEstudio, PlanEstudio-Materia, Turnos, Eventos,
+                              Cursos)
+relaciones sólidas:     10
+relaciones discontinuas: 1   (Cursos..PlanEstudio)
+comentarios de atributo: 68  (incluye los dos «obligatoria -> TiposAula.id»)
+cardinalidades:          markers onlyOne / zeroOrOne / oneOrMore / zeroOrMore presentes
+```
+
+El PNG se revisó visualmente: los 11 recuadros, sus columnas PK/FK/UK y las etiquetas de relación se
+leen sin solapes.
+
+Suite sin cambios (solo documentación):
+
+```text
+$ ctest --test-dir build-backend
+98% tests passed, 1 tests failed out of 49
+	 48 - test_solver_benchmark (Failed)      # fixture sin tipos, T10
+```
+
+`test_solver_benchmark` ya estaba rojo en la base `f054b2e` y es de T10; ningún otro test cambia de
+estado.
+
+### Cambios
+
+- `docs/Diagrama-MER.md`: añadidas `TiposAula` (con `clave` UK y su índice único), `id_tipo_aula` FK
+  obligatoria en `Aulas` y `Materias`, `Turnos`, `Eventos` (posición/orden/duración y el único
+  `(turno, despues_de_slot, orden)`) y `Cursos` (FK de turno y aula, único `(anio, seccion)`); las
+  relaciones con `TiposAula`, `Turnos`, `Aulas` y la relación no persistida con `PlanEstudio`.
+  Entidades y relaciones previas intactas.
+- `specs/010-solver-tipos-y-eventos/tasks.md`: T7 y T8 marcadas con su nota.
+- Sin tocar código, `spec.md`, `plan.md` ni `estado.md`. `git diff --stat`: `docs/Diagrama-MER.md` y
+  `specs/010-solver-tipos-y-eventos/tasks.md`, más este journal.
+
+### Hallazgos
+
+- **El MER no puede mostrar una cascada de FK en `Eventos`.** El esquema de la 009 no declara `ON
+  DELETE CASCADE`; la cascada (dominio `turno`) es de `ServicioTurnosEventos` y del registro de
+  pendientes. Se refleja como etiqueta de la relación, no como comportamiento declarativo de SQLite.
+- **`Cursos` no tiene FK a `PlanEstudio`.** El plan del curso vive en el preset (005, I1); la única
+  huella persistida es `PlanEstudio_Materia.curso` (año). La relación se dibuja discontinua y
+  etiquetada «no persistido» para que el diagrama no sugiera una columna que no existe.
+- **`id_tipo_aula` es `NOT NULL`** en ambas tablas: se dibuja `||` en el lado de `TiposAula`
+  (exactamente uno), no `|o`.
