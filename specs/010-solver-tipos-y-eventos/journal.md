@@ -220,3 +220,135 @@ $ ctest --test-dir build-backend
   `src/frontend/src/services/generacion_tipos.hpp:46`: no llaman a `fromJson` con ese valor (serializan
   y `toJson` sella 2.0), así que no dependen del aceptar 1.0; su limpieza es de T4/T10 y del frontend.
   `test_servicio_generacion` y `test_ipc_aislamiento_bd` no cargan presets 1.0.
+
+## T3 - Casos V1 (eventos), V2, V16 y V17 (2026-10-25)
+
+**Requisito:** RF-5. **Plan:** §1.1 (`claveTipo`), §2.3 (validaciones) y §8-T3.
+**Base:** `d2fbda1` (T1-T2 commiteadas; suite 49/49).
+
+### Rojo (tests primero)
+
+Se añadieron los casos de V1 (sección `eventos`, `recesos`, versión ausente y 1.0), V2
+(nombre, turno, posición, orden, duración, par, `fin<=inicio`, diferencia con las horas, ventana de
+turno y de posición, solapes, cronología invertida y `duracion_minutos`), V16 (aula/materia) y V17
+(tipo sin aulas en ambos modos, tipos equivalentes por clave, tipo no requerido) a
+`test_validador_entrada`, y `claveTipo` a `test_contrato_solver`. Con la producción de T2 (V2 solo
+tipos/rangos, sin V16/V17):
+
+```text
+$ ./build-backend/test/test_validador_entrada
+FAIL!  : TestValidadorEntrada::v2_eventoSinNombre_falla() '!resultado.ok' returned FALSE. ()
+FAIL!  : TestValidadorEntrada::v2_eventoTurnoInexistente_falla() ...
+FAIL!  : ... (posición 0/fuera, orden 0, duración 0, par incompleto, fin no posterior,
+          duración que no coincide, fuera de ventana, turno sin ventana, solape, cronología)
+FAIL!  : TestValidadorEntrada::v16_aulaSinTipo_falla() '!resultado.ok' returned FALSE. ()
+FAIL!  : TestValidadorEntrada::v16_aulaSinCampoTipo_falla() ...
+FAIL!  : TestValidadorEntrada::v16_materiaSinTipo_falla() ...
+FAIL!  : TestValidadorEntrada::v17_tipoRequeridoSinAulas_falla() ...
+FAIL!  : TestValidadorEntrada::v17_tipoRequeridoSinAulas_fallaConAulasMoviles() ...
+Totals: 32 passed, 18 failed, 0 skipped, 0 blacklisted, 22ms
+```
+
+Los casos de V1 pasaron ya en el primer intento: el comportamiento se cambió en T1 (versión antes
+que secciones, `eventos` en vez de `recesos`) y aquí solo se reescribieron sus pruebas. Rojo de
+`claveTipo` (la función no existía; el plan la asignaba al contrato y T1 no la añadió):
+
+```text
+$ cmake --build --preset backend --parallel
+test_contrato_solver.cpp:243:18: error: ‘claveTipo’ no se declaró en este ámbito
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel      # EXIT=0 (ninja: no work to do en la 2.ª pasada)
+
+$ ctest --test-dir build-backend --output-on-failure -R 'test_validador_entrada|test_contrato_solver'
+1/2 Test #23: test_validador_entrada ...........   Passed    0.03 sec
+2/2 Test #42: test_contrato_solver .............   Passed    0.01 sec
+100% tests passed out of 2
+
+$ ctest --test-dir build-backend
+100% tests passed, 0 tests failed out of 49
+```
+
+Casos nuevos/juzgados de `test_validador_entrada` (50/50 en verde, ejecutando el binario):
+
+```text
+PASS   : v1_seccionEventosAusente_falla()          PASS   : v2_eventoFueraDeLaVentanaDeSuPosicion_falla()
+PASS   : v1_recesosEnVezDeEventos_falla()          PASS   : v2_eventoConHorarioYturnoSinVentana_falla()
+PASS   : v1_versionAusente_falla()                 PASS   : v2_eventosSolapados_fallan()
+PASS   : v1_version1_0_falla()                     PASS   : v2_eventosConCronologiaInvertida_fallan()
+PASS   : v2_eventoConHorarioValido_pasa()          PASS   : v2_duracionMinutosUno_pasa()
+PASS   : v2_eventoSinHorario_pasa()                PASS   : v2_duracionMinutosCero_falla()
+PASS   : v2_eventoSinNombre_falla()                PASS   : v16_aulaSinTipo_falla()
+PASS   : v2_eventoTurnoInexistente_falla()         PASS   : v16_aulaSinCampoTipo_falla()
+PASS   : v2_eventoPosicionCero_falla()             PASS   : v16_materiaSinTipo_falla()
+PASS   : v2_eventoPosicionFueraDeRango_falla()     PASS   : v17_tipoRequeridoSinAulas_falla()
+PASS   : v2_eventoOrdenCero_falla()                PASS   : v17_..._fallaConAulasMoviles()
+PASS   : v2_eventoDuracionCero_falla()             PASS   : v17_tipoIgualSalvoMayusculasYEspacios_pasa()
+PASS   : v2_eventoParIncompleto_falla()            PASS   : v17_tipoDeclaradoQueNingunaMateriaRequiere_pasa()
+PASS   : v2_eventoFinNoPosteriorAlInicio_falla()
+PASS   : v2_eventoDuracionNoCoincideConLasHoras_falla()
+Totals: 50 passed, 0 failed, 0 skipped, 0 blacklisted, 36ms
+
+$ ./build-backend/test/test_contrato_solver
+PASS   : TestContratoSolver::claveTipo_normalizaRecorteYPlegado()
+Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 2ms
+```
+
+Mensajes reales (capturados con un programa desechable fuera del repo, ya borrado):
+
+```text
+V2: el evento «Receso» declara una duración de 9 min, que no coincide con sus horas (10 min).
+V2: el intervalo 08:00–08:10 del evento «Receso» no cabe en la ventana de la posición 2 (08:36–08:46).
+V2: el turno «manana» no declara una ventana inicio/fin válida (inicio «», fin «») y tiene eventos con horario.
+V2: los eventos del turno «manana» se solapan o van en orden cronológico invertido; revise sus horas.
+V2: el evento «Receso» declara la posición 7; debe estar entre 1 y 6.
+V16: el aula «A1» no declara tipo de aula (campo 'tipo' vacío).
+V16: la materia «Matemática» no declara tipo de aula requerido (campo 'tipo' vacío).
+V17: el tipo de aula «Laboratorio» requerido por la materia «Matemática» del curso 1A no tiene ninguna aula en el centro.
+duracion_minutos = 1 -> ACEPTA
+tipos equivalentes por clave -> ACEPTA
+```
+
+### Cambios
+
+- `src/backend/src/solver/config/solver_config.cpp`: **V2 de eventos** (`validarEventos`, tras
+  `validarTiposYRangos`): nombre no vacío, turno existente, posición `1..turno.slot.size()`, orden
+  `>= 1`, duración `> 0`, par inicio/fin completo o ausente, horas `HH:mm`, `fin > inicio`,
+  `fin − inicio = duración`; después, por turno, `duracionFranjaEstimada`, `eventoDentroDeVentana` y
+  `haySolapeCronologico` sobre `EventoDTO`/`TurnoDTO` convertidos. **V16** (`validarTiposDeclarados`,
+  aulas y después materias) y **V17** (`validarTiposConAulas`, ambos modos, comparación por
+  `claveTipo`), añadidas tras V15 en el orden del plan. `duracion_minutos` sigue exigiendo solo `> 0`
+  (la 011 lo estrecha a 30–90).
+- `src/backend/include/backend/solver/config/contrato_solver.hpp` y `.cpp`: `claveTipo(nombre)` pura
+  (`trimmed().toCaseFolded()`), la misma noción que `ServicioTiposAula::claveTipo`, sin BD.
+- `test/backend/test_validador_entrada.cpp`: helpers `conEventos`/`conAulas`/`conMaterias`/`evento` y
+  `exigeRechazoV2|V16|V17`; 5 casos de V1, 17 de V2, 3 de V16 y 4 de V17.
+- `test/backend/test_contrato_solver.cpp`: `claveTipo_normalizaRecorteYPlegado` (espacios, mayúsculas,
+  acentos, vacío); fixture `config2_0` con el evento dentro de la ventana de su posición.
+- Fixtures preexistentes que **V2 rechazaba** por aritmética de ventana (no por el contrato):
+  `test_constructor_entrada` (evento 08:20–08:30 → 07:48–07:58, posición 1) y
+  `test_cargador_configuracion` (09:15–09:45 → 08:30–09:00, posición 2), con sus assertions. La ventana
+  de una posición va del **inicio** de la posición a **inicio + suma de duraciones** de sus eventos; el
+  comentario de T2 suponía que llegaba al fin del turno.
+
+### Hallazgos
+
+- **No hizo falta parar por datos ausentes:** el número de franjas de un turno sale de
+  `TurnoConfig::slot.size()` (el constructor emite ahí los slots absolutos del día), que es lo que
+  `TurnoDTO::numSlots` necesita. Nada nuevo en el contrato.
+- **Sin ventana en el turno, con eventos sin horario, se acepta.** La comprobación de rejilla
+  (`duracionFranjaEstimada`) solo se aplica si el turno declara `inicio`/`fin`; si un evento declara
+  horario y el turno no declara ventana, se rechaza con mensaje propio. Así una configuración antigua
+  sin ventana sigue siendo válida mientras sus eventos no declaren horas, y el constructor no puede
+  emitir una entrada con eventos con horario y turno sin ventana.
+- **V17 obliga a que el fixture de «el nombre visible se conserva» declare el tipo también en el
+  aula:** `tipoSeConservaTalCualSeDeclaro` ponía la materia como `"  Laboratorio  "` con el aula
+  `"Aula de estudio"`, que con la regla dura es un tipo sin aulas; ahora el aula declara
+  `" LABORATORIO "` y la igualdad se resuelve por clave (y se comprueba que el nombre no se reescribe).
+- **`claveTipo` faltaba del cierre de T1.** El plan (§1.1) la asignaba al contrato y T3 es el primer
+  consumidor (V17 y su prueba); se añade aquí como función pura, sin duplicar la del servicio de BD.
+- **Fuera de alcance respetado:** sin cambios en el modelo del solver, la regla de asignación (T4), el
+  validador de salida (T5) ni la documentación (T7-T9); sin commit.

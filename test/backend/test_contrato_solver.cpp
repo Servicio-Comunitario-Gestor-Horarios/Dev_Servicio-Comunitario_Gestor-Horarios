@@ -49,8 +49,10 @@ private:
         receso["despues_de_slot"]  = 2;
         receso["orden"]            = 1;
         receso["duracion"]         = 10;
-        receso["inicio"]           = QStringLiteral("08:20");
-        receso["fin"]              = QStringLiteral("08:30");
+        // Ventana de la posición 2: turno 07:00–12:00 (300 min) − 15 min de eventos = 285;
+        // 285 / 6 = 47 min de franja → la posición 2 abarca 08:34–08:49.
+        receso["inicio"]           = QStringLiteral("08:34");
+        receso["fin"]              = QStringLiteral("08:44");
         QJsonObject acto;
         acto["nombre"]          = QStringLiteral("Acto cívico");
         acto["turno"]           = QStringLiteral("manana");
@@ -173,8 +175,8 @@ private slots:
         QCOMPARE(config.valor.eventos[0].despues_de_slot, 2);
         QCOMPARE(config.valor.eventos[0].orden, 1);
         QCOMPARE(config.valor.eventos[0].duracion, 10);
-        QCOMPARE(config.valor.eventos[0].inicio, QStringLiteral("08:20"));
-        QCOMPARE(config.valor.eventos[0].fin, QStringLiteral("08:30"));
+        QCOMPARE(config.valor.eventos[0].inicio, QStringLiteral("08:34"));
+        QCOMPARE(config.valor.eventos[0].fin, QStringLiteral("08:44"));
         // El horario es opcional: el segundo evento no lo declara.
         QCOMPARE(config.valor.eventos[1].nombre, QStringLiteral("Acto cívico"));
         QCOMPARE(config.valor.eventos[1].orden, 2);
@@ -215,8 +217,8 @@ private slots:
         QCOMPARE(evento[QStringLiteral("despues_de_slot")].toInt(), 2);
         QCOMPARE(evento[QStringLiteral("orden")].toInt(), 1);
         QCOMPARE(evento[QStringLiteral("duracion")].toInt(), 10);
-        QCOMPARE(evento[QStringLiteral("inicio")].toString(), QStringLiteral("08:20"));
-        QCOMPARE(evento[QStringLiteral("fin")].toString(), QStringLiteral("08:30"));
+        QCOMPARE(evento[QStringLiteral("inicio")].toString(), QStringLiteral("08:34"));
+        QCOMPARE(evento[QStringLiteral("fin")].toString(), QStringLiteral("08:44"));
     }
 
     /// RF-1: guardar y volver a cargar reproduce tipos, eventos y ventana de turno sin pérdida.
@@ -237,6 +239,18 @@ private slots:
         QCOMPARE(segunda.valor.turnos.turnos[0].inicio, QStringLiteral("07:00"));
     }
 
+    /// RF-5: la clave de tipo normaliza recorte y plegado Unicode; solo sirve para comparar.
+    void claveTipo_normalizaRecorteYPlegado()
+    {
+        QCOMPARE(claveTipo(QStringLiteral("  Laboratorio  ")), QStringLiteral("laboratorio"));
+        QCOMPARE(claveTipo(QStringLiteral("laboratorio")), QStringLiteral("laboratorio"));
+        QCOMPARE(claveTipo(QStringLiteral("Física")), claveTipo(QStringLiteral("FÍSICA")));
+        QCOMPARE(claveTipo(QStringLiteral("ÁULA de Estudio ")),
+                 claveTipo(QStringLiteral("áula de estudio")));
+        QCOMPARE(claveTipo(QStringLiteral("   ")), QString());
+        QCOMPARE(claveTipo(QString()), QString());
+    }
+
     /// RF-1: la normalización de tipos es solo para comparar; el nombre visible se conserva tal cual.
     void tipoSeConservaTalCualSeDeclaro()
     {
@@ -245,9 +259,15 @@ private slots:
         materia[QStringLiteral("tipo")] = QStringLiteral("  Laboratorio  ");
         o[QStringLiteral("materias")] = QJsonArray{materia};
 
+        // El aula declara el mismo tipo con otra caja y otros espacios: V17 compara por clave.
+        QJsonObject aula = o[QStringLiteral("aulas")].toArray()[0].toObject();
+        aula[QStringLiteral("tipo")] = QStringLiteral(" LABORATORIO ");
+        o[QStringLiteral("aulas")] = QJsonArray{aula};
+
         const auto config = SolverConfig::fromJson(o);
         QVERIFY2(config.ok, qPrintable(config.mensajeError));
         QCOMPARE(config.valor.materias[0].tipo, QStringLiteral("  Laboratorio  "));
+        QCOMPARE(config.valor.aulas[0].tipo, QStringLiteral(" LABORATORIO "));
         QCOMPARE(config.valor.toJson()[QStringLiteral("materias")].toArray()[0].toObject()
                      [QStringLiteral("tipo")].toString(),
                  QStringLiteral("  Laboratorio  "));

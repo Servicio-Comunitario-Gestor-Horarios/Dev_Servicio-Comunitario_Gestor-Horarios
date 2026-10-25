@@ -1,12 +1,27 @@
 #include "backend/solver/config/solver_config.hpp"
 
+#include "backend/services/calculo_eventos.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QPair>
 #include <QStringList>
+#include <QTime>
 
 namespace {
+
+const QString FORMATO_HORA = QStringLiteral("HH:mm");
+
+QString formatearHora(const QTime& hora)
+{
+    return hora.isValid() ? hora.toString(FORMATO_HORA) : QStringLiteral("—");
+}
+
+QString formatearIntervalo(const QTime& inicio, const QTime& fin)
+{
+    return QStringLiteral("%1–%2").arg(formatearHora(inicio), formatearHora(fin));
+}
 
 int leerEntero(const QJsonObject& obj, const char* clave, int porDefecto = 0)
 {
@@ -404,6 +419,126 @@ QString validarTiposYRangos(const SolverConfig& c)
     return {};
 }
 
+/// V2 (eventos). Forma y temporalidad de los eventos del turno (RF-5 de la 010).
+///
+/// Reutiliza las funciones puras de `calculo_eventos` de la 009 —`duracionFranjaEstimada`,
+/// `ventanaDePosicion`, `eventoDentroDeVentana` y `haySolapeCronologico`— convirtiendo
+/// `EventoConfig`/`TurnoConfig` a `EventoDTO`/`TurnoDTO`, de modo que la semántica es la misma que
+/// la del servicio de turnos. Puro: no lee el reloj. La 011 es la que estrecha `duracion` a 30–90;
+/// aquí solo se exige mayor que 0.
+QString validarEventos(const SolverConfig& c)
+{
+    // 1. Forma de cada evento y referencia a su turno.
+    for (const EventoConfig& e : c.eventos) {
+        if (e.nombre.trimmed().isEmpty())
+            return QStringLiteral("V2: el evento del turno «%1» situado en la posición %2 no declara "
+                                  "nombre (campo 'nombre' vacío).")
+                .arg(e.turno).arg(e.despues_de_slot);
+
+        const TurnoConfig* turno = buscarTurno(c, e.turno);
+        if (!turno)
+            return QStringLiteral("V2: el evento «%1» referencia el turno «%2», que no existe.")
+                .arg(e.nombre, e.turno);
+
+        const int numSlots = turno->slot.size();
+        if (e.despues_de_slot < 1 || e.despues_de_slot > numSlots)
+            return QStringLiteral("V2: el evento «%1» declara la posición %2; debe estar entre 1 y %3.")
+                .arg(e.nombre).arg(e.despues_de_slot).arg(numSlots);
+
+        if (e.orden < 1)
+            return QStringLiteral("V2: el evento «%1» declara el orden %2; debe ser mayor o igual que 1.")
+                .arg(e.nombre).arg(e.orden);
+
+        if (e.duracion <= 0)
+            return QStringLiteral("V2: el evento «%1» declara la duración %2; debe ser mayor que 0.")
+                .arg(e.nombre).arg(e.duracion);
+
+        const bool hayInicio = !e.inicio.isEmpty();
+        const bool hayFin    = !e.fin.isEmpty();
+        if (hayInicio != hayFin)
+            return QStringLiteral("V2: el evento «%1» declara una sola de sus horas (inicio «%2», fin "
+                                  "«%3»); el par inicio/fin debe estar completo o ausente.")
+                .arg(e.nombre, e.inicio, e.fin);
+
+        if (!hayInicio)
+            continue;
+
+        const QTime inicio = QTime::fromString(e.inicio, FORMATO_HORA);
+        const QTime fin    = QTime::fromString(e.fin, FORMATO_HORA);
+        if (!inicio.isValid() || !fin.isValid())
+            return QStringLiteral("V2: el evento «%1» declara horas que no son HH:mm (inicio «%2», fin "
+                                  "«%3»).")
+                .arg(e.nombre, e.inicio, e.fin);
+
+        if (fin <= inicio)
+            return QStringLiteral("V2: el evento «%1» declara fin «%2», que no es posterior a su "
+                                  "inicio «%3».")
+                .arg(e.nombre, e.fin, e.inicio);
+
+        const int minutos = inicio.secsTo(fin) / 60;
+        if (minutos != e.duracion)
+            return QStringLiteral("V2: el evento «%1» declara una duración de %2 min, que no coincide "
+                                  "con sus horas (%3 min).")
+                .arg(e.nombre).arg(e.duracion).arg(minutos);
+    }
+
+    // 2. Temporalidad por turno: ventana del turno, ventana de la posición, cronología y solapes.
+    for (const TurnoConfig& t : c.turnos.turnos) {
+        TurnoDTO dto;
+        dto.nombre   = t.nombre;
+        dto.inicio   = QTime::fromString(t.inicio, FORMATO_HORA);
+        dto.fin      = QTime::fromString(t.fin, FORMATO_HORA);
+        dto.numSlots = t.slot.size();
+
+        bool hayHoras = false;
+        for (const EventoConfig& e : c.eventos) {
+            if (e.turno != t.nombre)
+                continue;
+            EventoDTO evento;
+            evento.nombre        = e.nombre;
+            evento.despuesDeSlot = e.despues_de_slot;
+            evento.orden         = e.orden;
+            evento.duracion      = e.duracion;
+            evento.inicio        = QTime::fromString(e.inicio, FORMATO_HORA);
+            evento.fin           = QTime::fromString(e.fin, FORMATO_HORA);
+            hayHoras = hayHoras || evento.inicio.isValid();
+            dto.eventos.append(evento);
+        }
+        if (dto.eventos.isEmpty())
+            continue;
+
+        // Un evento con horario exige la ventana del turno: sin ella no hay rejilla que comprobar.
+        if (hayHoras && (!dto.inicio.isValid() || !dto.fin.isValid()))
+            return QStringLiteral("V2: el turno «%1» no declara una ventana inicio/fin válida (inicio "
+                                  "«%2», fin «%3») y tiene eventos con horario.")
+                .arg(t.nombre, t.inicio, t.fin);
+
+        if (dto.inicio.isValid() && dto.fin.isValid() && duracionFranjaEstimada(dto) <= 0)
+            return QStringLiteral("V2: los eventos del turno «%1» no caben en su ventana de %2 a %3.")
+                .arg(t.nombre, formatearHora(dto.inicio), formatearHora(dto.fin));
+
+        for (const EventoDTO& evento : dto.eventos) {
+            if (!evento.inicio.isValid() || !evento.fin.isValid())
+                continue;
+            if (eventoDentroDeVentana(evento, dto, evento.despuesDeSlot))
+                continue;
+
+            const QPair<QTime, QTime> ventana = ventanaDePosicion(dto, evento.despuesDeSlot);
+            return QStringLiteral("V2: el intervalo %1 del evento «%2» no cabe en la ventana de la "
+                                  "posición %3 (%4).")
+                .arg(formatearIntervalo(evento.inicio, evento.fin), evento.nombre)
+                .arg(evento.despuesDeSlot)
+                .arg(formatearIntervalo(ventana.first, ventana.second));
+        }
+
+        if (haySolapeCronologico(dto.eventos))
+            return QStringLiteral("V2: los eventos del turno «%1» se solapan o van en orden "
+                                  "cronológico invertido; revise sus horas.")
+                .arg(t.nombre);
+    }
+    return {};
+}
+
 /// V3. Las dimensiones coinciden con los tamanos de las listas.
 QString validarDimensiones(const SolverConfig& c)
 {
@@ -584,6 +719,60 @@ QString validarAulasMoviles(const SolverConfig& c)
     return {};
 }
 
+/// V16. Toda aula y toda materia declaran un tipo no vacio (RF-5 de la 010).
+///
+/// No se completa ningun tipo por defecto: una configuracion sin tipos se rechaza nombrando la
+/// entidad. Orden determinista: aulas y despues materias, en el orden de la configuracion.
+QString validarTiposDeclarados(const SolverConfig& c)
+{
+    for (const AulaSolverConfig& a : c.aulas)
+        if (a.tipo.trimmed().isEmpty())
+            return QStringLiteral("V16: el aula «%1» no declara tipo de aula (campo 'tipo' vacío).")
+                .arg(a.nombre);
+
+    for (const MateriaSolverConfig& m : c.materias)
+        if (m.tipo.trimmed().isEmpty())
+            return QStringLiteral("V16: la materia «%1» no declara tipo de aula requerido (campo "
+                                  "'tipo' vacío).")
+                .arg(m.nombre);
+    return {};
+}
+
+/// V17. El tipo requerido por cada materia de un curso tiene al menos un aula en el centro
+/// (comparacion por `claveTipo`), en los DOS modos de aula (RF-5 de la 010).
+///
+/// No se rechaza por un tipo declarado que ninguna materia requiera. Un tipo vacio lo rechaza
+/// antes V16, y un indice de materia fuera de rango lo rechaza antes V4.
+QString validarTiposConAulas(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(c, cu)) {
+            if (mc.materiaIDx < 0 || mc.materiaIDx >= c.materias.size())
+                continue;   // V4 ya lo rechaza; aqui solo se evita leer fuera de rango
+
+            const MateriaSolverConfig& materia = c.materias[mc.materiaIDx];
+            const QString claveRequerida = claveTipo(materia.tipo);
+            if (claveRequerida.isEmpty())
+                continue;   // V16 ya lo rechaza
+
+            bool hayAula = false;
+            for (const AulaSolverConfig& aula : c.aulas)
+                if (claveTipo(aula.tipo) == claveRequerida) {
+                    hayAula = true;
+                    break;
+                }
+
+            if (!hayAula)
+                return QStringLiteral("V17: el tipo de aula «%1» requerido por la materia «%2» del "
+                                      "curso %3%4 no tiene ninguna aula en el centro.")
+                    .arg(materia.tipo, materia.nombre)
+                    .arg(cu.anio)
+                    .arg(cu.seccion);
+        }
+    }
+    return {};
+}
+
 } // namespace
 
 Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
@@ -608,11 +797,13 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
         return Resultado<SolverConfig>::error(v1);
 
     const QStringList errores = {
-        validarTiposYRangos(config),       validarDimensiones(config),       validarIndicesMaterias(config),
+        validarTiposYRangos(config),       validarEventos(config),
+        validarDimensiones(config),        validarIndicesMaterias(config),
         validarIndicesProfesores(config),  validarIndicesAulas(config),      validarTurnosDeCursos(config),
         validarAulasDeCursos(config),      validarNumeroEstudiantes(config), validarListasNoVacias(config),
         validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCoherenciaHoras(config),
-        validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config)};
+        validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config),
+        validarTiposDeclarados(config),    validarTiposConAulas(config)};
     for (const QString& error : errores)
         if (!error.isEmpty())
             return Resultado<SolverConfig>::error(error);

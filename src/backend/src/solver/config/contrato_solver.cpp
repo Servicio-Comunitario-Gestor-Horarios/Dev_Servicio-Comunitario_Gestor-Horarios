@@ -28,6 +28,10 @@ QString claveCurso(int anio, const QString& seccion) {
     return QStringLiteral("%1|%2").arg(anio).arg(seccion);
 }
 
+QString claveTipo(const QString& nombre) {
+    return nombre.trimmed().toCaseFolded();
+}
+
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig &config, const CursoSolverConfig &curso){
     for (const PlanSolverConfig& plan : config.planes) {
         if (plan.codigo != curso.plan) {

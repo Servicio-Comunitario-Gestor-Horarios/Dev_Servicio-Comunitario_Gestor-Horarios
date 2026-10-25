@@ -56,15 +56,16 @@ private:
         turnos["turnos"] = QJsonArray{turno};
         o["turnos"] = turnos;
 
-        // Evento del turno: después de la franja 2, dentro de su ventana (08:30-09:45).
+        // Evento del turno: después de la franja 2, dentro de su ventana (08:30–09:00): la
+        // ventana de la posición abarca exactamente la suma de las duraciones de sus eventos.
         QJsonObject evento;
         evento["nombre"]          = QStringLiteral("Receso");
         evento["turno"]           = QStringLiteral("manana");
         evento["despues_de_slot"] = 2;
         evento["orden"]           = 1;
         evento["duracion"]        = 30;
-        evento["inicio"]          = QStringLiteral("09:15");
-        evento["fin"]             = QStringLiteral("09:45");
+        evento["inicio"]          = QStringLiteral("08:30");
+        evento["fin"]             = QStringLiteral("09:00");
         o["eventos"] = QJsonArray{evento};
 
         // Planes EMBEBIDOS (materias + horas + año).
@@ -210,8 +211,8 @@ private slots:
         QCOMPARE(evento["despues_de_slot"].toInt(), 2);
         QCOMPARE(evento["orden"].toInt(), 1);
         QCOMPARE(evento["duracion"].toInt(), 30);
-        QCOMPARE(evento["inicio"].toString(), QStringLiteral("09:15"));
-        QCOMPARE(evento["fin"].toString(), QStringLiteral("09:45"));
+        QCOMPARE(evento["inicio"].toString(), QStringLiteral("08:30"));
+        QCOMPARE(evento["fin"].toString(), QStringLiteral("09:00"));
     }
 
     void camposDesconocidos_seToleran()

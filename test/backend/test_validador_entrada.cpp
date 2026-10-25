@@ -163,6 +163,85 @@ private:
         return j;
     }
 
+    /// Devuelve el JSON con la sección `eventos` sustituida por `eventos`.
+    QJsonObject conEventos(QJsonObject j, const QJsonArray& eventos) const
+    {
+        j[QStringLiteral("eventos")] = eventos;
+        return j;
+    }
+
+    /// Devuelve el JSON con la sección `aulas` sustituida (y V3 coherente).
+    QJsonObject conAulas(QJsonObject j, const QJsonArray& aulas) const
+    {
+        j[QStringLiteral("aulas")] = aulas;
+        QJsonObject dim = j[QStringLiteral("dimensiones")].toObject();
+        dim[QStringLiteral("num_aulas")] = aulas.size();
+        j[QStringLiteral("dimensiones")] = dim;
+        return j;
+    }
+
+    /// Devuelve el JSON con la sección `materias` sustituida (y V3 coherente).
+    QJsonObject conMaterias(QJsonObject j, const QJsonArray& materias) const
+    {
+        j[QStringLiteral("materias")] = materias;
+        QJsonObject dim = j[QStringLiteral("dimensiones")].toObject();
+        dim[QStringLiteral("num_materias")] = materias.size();
+        j[QStringLiteral("dimensiones")] = dim;
+        return j;
+    }
+
+    /// Evento del turno de la mañana (`dominio()`: 07:00–12:00, 6 franjas).
+    ///
+    /// Las horas son opcionales: si se omiten, el evento no declara horario (par ausente).
+    QJsonObject evento(const QString& nombre, int posicion, int orden, int duracion,
+                       const QString& inicio = QString(), const QString& fin = QString()) const
+    {
+        QJsonObject e;
+        e[QStringLiteral("nombre")]           = nombre;
+        e[QStringLiteral("turno")]            = QStringLiteral("manana");
+        e[QStringLiteral("despues_de_slot")]  = posicion;
+        e[QStringLiteral("orden")]            = orden;
+        e[QStringLiteral("duracion")]         = duracion;
+        if (!inicio.isEmpty())
+            e[QStringLiteral("inicio")] = inicio;
+        if (!fin.isEmpty())
+            e[QStringLiteral("fin")] = fin;
+        return e;
+    }
+
+    /// Exige que la entrada se rechace por V2 y que el mensaje contenga `fragmento`.
+    void exigeRechazoV2(const QJsonObject& j, const QString& fragmento) const
+    {
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.startsWith(QStringLiteral("V2:")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(fragmento), qPrintable(resultado.mensajeError));
+    }
+
+    /// Exige que la entrada se rechace por V16 y que el mensaje nombre `entidad`.
+    void exigeRechazoV16(const QJsonObject& j, const QString& entidad) const
+    {
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.startsWith(QStringLiteral("V16:")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(entidad), qPrintable(resultado.mensajeError));
+    }
+
+    /// Exige que la entrada se rechace por V17 nombrando el tipo, la materia y el curso.
+    void exigeRechazoV17(const QJsonObject& j, const QString& tipo, const QString& materia,
+                         const QString& curso) const
+    {
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.startsWith(QStringLiteral("V17:")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(tipo), qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(materia), qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(curso), qPrintable(resultado.mensajeError));
+    }
+
     void ponerMateriaIdxCurso(QJsonObject& curso, int valor) const
     {
         QJsonArray materias = curso["materias"].toArray();
@@ -190,6 +269,57 @@ private slots:
         const auto resultado = validarEntradaSolver(j);
         QVERIFY(!resultado.ok);
         QVERIFY(!resultado.mensajeError.isEmpty());
+    }
+
+    /// V1 (010): la sección esperada es `eventos`; si falta, se rechaza nombrándola.
+    void v1_seccionEventosAusente_falla()
+    {
+        QJsonObject j = jsonValido();
+        j.remove(QStringLiteral("eventos"));
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.startsWith(QStringLiteral("V1:")));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("eventos")));
+    }
+
+    /// V1 (010): `recesos` ya no es la sección esperada. Una entrada con `recesos` y sin
+    /// `eventos` se rechaza por la sección de eventos, no por la de recesos.
+    void v1_recesosEnVezDeEventos_falla()
+    {
+        QJsonObject j = jsonValido();
+        j.remove(QStringLiteral("eventos"));
+        QJsonObject receso;
+        receso[QStringLiteral("nombre")]          = QStringLiteral("Receso");
+        receso[QStringLiteral("turno")]           = QStringLiteral("manana");
+        receso[QStringLiteral("despues_de_slot")] = 2;
+        receso[QStringLiteral("duracion")]        = 10;
+        j[QStringLiteral("recesos")] = QJsonArray{receso};
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("eventos")));
+        QVERIFY(!resultado.mensajeError.contains(QStringLiteral("recesos")));
+    }
+
+    /// V1: la versión se comprueba antes que las secciones; sin versión no se acepta.
+    void v1_versionAusente_falla()
+    {
+        QJsonObject j = jsonValido();
+        j.remove(QStringLiteral("version"));
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("versión")));
+    }
+
+    /// V1: un 1.0 se rechaza por versión (se espera 2.0), aunque traiga `eventos`.
+    void v1_version1_0_falla()
+    {
+        QJsonObject j = jsonValido();
+        j[QStringLiteral("version")] = QStringLiteral("1.0");
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("1.0")));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("2.0")));
     }
 
     void v3_dimensionesNoCoinciden_falla()
@@ -368,6 +498,270 @@ private slots:
     {
         QJsonObject j = conFranjasUtiles40(jsonValido());
         ponerHorasPlan(j, 40);
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    // ─── V2: forma y temporalidad de los eventos (010) ─────────────────────
+
+    /// V2: un evento con horario coherente y dentro de la ventana de su posición pasa.
+    /// Turno 07:00–12:00 con 6 franjas y un evento de 10 min: la franja repartida es
+    /// (300 − 10) / 6 = 48 min, así que la posición 2 abarca 08:36–08:46.
+    void v2_eventoConHorarioValido_pasa()
+    {
+        const QJsonObject j = conEventos(
+            jsonValido(), QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
+                                            QStringLiteral("08:36"), QStringLiteral("08:46"))});
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    /// V2: el par inicio/fin es opcional; ausente, no hay intervalo que comprobar.
+    void v2_eventoSinHorario_pasa()
+    {
+        const QJsonObject j = conEventos(
+            jsonValido(), QJsonArray{evento(QStringLiteral("Acto cívico"), 2, 1, 15)});
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v2_eventoSinNombre_falla()
+    {
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QString(), 2, 1, 10)}),
+                       QStringLiteral("nombre"));
+    }
+
+    void v2_eventoTurnoInexistente_falla()
+    {
+        QJsonObject e = evento(QStringLiteral("Receso"), 2, 1, 10);
+        e[QStringLiteral("turno")] = QStringLiteral("noche");
+        exigeRechazoV2(conEventos(jsonValido(), QJsonArray{e}), QStringLiteral("noche"));
+    }
+
+    void v2_eventoPosicionCero_falla()
+    {
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 0, 1, 10)}),
+                       QStringLiteral("posición 0"));
+    }
+
+    void v2_eventoPosicionFueraDeRango_falla()
+    {
+        // El turno tiene 6 franjas: la posición 7 está fuera (1..6).
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 7, 1, 10)}),
+                       QStringLiteral("posición 7"));
+    }
+
+    void v2_eventoOrdenCero_falla()
+    {
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 0, 10)}),
+                       QStringLiteral("orden 0"));
+    }
+
+    void v2_eventoDuracionCero_falla()
+    {
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 0)}),
+                       QStringLiteral("duración 0"));
+    }
+
+    void v2_eventoParIncompleto_falla()
+    {
+        // Solo inicio: el par debe estar completo o ausente.
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
+                                                    QStringLiteral("08:36"))}),
+                       QStringLiteral("inicio/fin"));
+    }
+
+    void v2_eventoFinNoPosteriorAlInicio_falla()
+    {
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
+                                                    QStringLiteral("08:40"),
+                                                    QStringLiteral("08:40"))}),
+                       QStringLiteral("posterior"));
+    }
+
+    void v2_eventoDuracionNoCoincideConLasHoras_falla()
+    {
+        // 08:36–08:46 son 10 min; la duración declara 9.
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 9,
+                                                    QStringLiteral("08:36"),
+                                                    QStringLiteral("08:46"))}),
+                       QStringLiteral("no coincide"));
+    }
+
+    void v2_eventoFueraDeLaVentanaDeSuPosicion_falla()
+    {
+        // La posición 2 abarca 08:36–08:46; el intervalo 08:00–08:10 es anterior.
+        exigeRechazoV2(conEventos(jsonValido(),
+                                  QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
+                                                    QStringLiteral("08:00"),
+                                                    QStringLiteral("08:10"))}),
+                       QStringLiteral("ventana"));
+    }
+
+    /// V2: un evento con horario exige que su turno declare la ventana inicio/fin.
+    void v2_eventoConHorarioYturnoSinVentana_falla()
+    {
+        QJsonObject j = conEventos(
+            jsonValido(), QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
+                                            QStringLiteral("08:36"), QStringLiteral("08:46"))});
+        QJsonObject turnos = j[QStringLiteral("turnos")].toObject();
+        QJsonArray arrTurnos = turnos[QStringLiteral("turnos")].toArray();
+        QJsonObject manana = arrTurnos[0].toObject();
+        manana.remove(QStringLiteral("inicio"));
+        manana.remove(QStringLiteral("fin"));
+        arrTurnos[0] = manana;
+        turnos[QStringLiteral("turnos")] = arrTurnos;
+        j[QStringLiteral("turnos")] = turnos;
+
+        exigeRechazoV2(j, QStringLiteral("ventana"));
+    }
+
+    /// V2: dos eventos de la misma posición con intervalos que se pisan se rechazan.
+    /// La suma de duraciones (12 min) deja la ventana de la posición en 08:36–08:48.
+    void v2_eventosSolapados_fallan()
+    {
+        const QJsonArray eventos{
+            evento(QStringLiteral("Receso"), 2, 1, 6, QStringLiteral("08:36"),
+                   QStringLiteral("08:42")),
+            evento(QStringLiteral("Acto"), 2, 2, 6, QStringLiteral("08:40"),
+                   QStringLiteral("08:46"))};
+        exigeRechazoV2(conEventos(jsonValido(), eventos), QStringLiteral("solapan"));
+    }
+
+    /// V2: en la misma posición, un evento posterior en `orden` no puede empezar antes.
+    /// La ventana de la posición 2 es 08:36–08:45 (suma de duraciones 9 min).
+    void v2_eventosConCronologiaInvertida_fallan()
+    {
+        const QJsonArray eventos{
+            evento(QStringLiteral("Primero declarado"), 2, 1, 4, QStringLiteral("08:41"),
+                   QStringLiteral("08:45")),
+            evento(QStringLiteral("Segundo declarado"), 2, 2, 5, QStringLiteral("08:36"),
+                   QStringLiteral("08:41"))};
+        exigeRechazoV2(conEventos(jsonValido(), eventos),
+                       QStringLiteral("orden cronológico"));
+    }
+
+    /// La 011 es la que estrecha `duracion_minutos` a 30–90: aquí solo se exige mayor que 0.
+    void v2_duracionMinutosUno_pasa()
+    {
+        QJsonObject j = jsonValido();
+        QJsonObject franja = j[QStringLiteral("franja_horaria")].toObject();
+        franja[QStringLiteral("duracion_minutos")] = 1;
+        j[QStringLiteral("franja_horaria")] = franja;
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v2_duracionMinutosCero_falla()
+    {
+        QJsonObject j = jsonValido();
+        QJsonObject franja = j[QStringLiteral("franja_horaria")].toObject();
+        franja[QStringLiteral("duracion_minutos")] = 0;
+        j[QStringLiteral("franja_horaria")] = franja;
+
+        exigeRechazoV2(j, QStringLiteral("duracion_minutos"));
+    }
+
+    // ─── V16: toda aula y toda materia declaran tipo ───────────────────────
+
+    void v16_aulaSinTipo_falla()
+    {
+        QJsonObject j = jsonValido();
+        QJsonArray aulas = j[QStringLiteral("aulas")].toArray();
+        QJsonObject aula = aulas[0].toObject();
+        aula[QStringLiteral("tipo")] = QString();
+        aulas[0] = aula;
+        j[QStringLiteral("aulas")] = aulas;
+
+        exigeRechazoV16(j, QStringLiteral("A1"));
+    }
+
+    void v16_aulaSinCampoTipo_falla()
+    {
+        QJsonObject j = jsonValido();
+        QJsonArray aulas = j[QStringLiteral("aulas")].toArray();
+        QJsonObject aula = aulas[0].toObject();
+        aula.remove(QStringLiteral("tipo"));
+        aulas[0] = aula;
+        j[QStringLiteral("aulas")] = aulas;
+
+        exigeRechazoV16(j, QStringLiteral("A1"));
+    }
+
+    void v16_materiaSinTipo_falla()
+    {
+        QJsonObject j = jsonValido();
+        QJsonArray materias = j[QStringLiteral("materias")].toArray();
+        QJsonObject materia = materias[0].toObject();
+        materia[QStringLiteral("tipo")] = QStringLiteral("   ");
+        materias[0] = materia;
+        j[QStringLiteral("materias")] = materias;
+
+        exigeRechazoV16(j, QStringLiteral("Matemática"));
+    }
+
+    // ─── V17: el tipo requerido por una materia tiene aulas ────────────────
+
+    void v17_tipoRequeridoSinAulas_falla()
+    {
+        QJsonObject materia = QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Matemática")},
+                                          {QStringLiteral("tipo"), QStringLiteral("Laboratorio")}};
+        exigeRechazoV17(conMaterias(jsonValido(), QJsonArray{materia}),
+                        QStringLiteral("Laboratorio"), QStringLiteral("Matemática"),
+                        QStringLiteral("1A"));
+    }
+
+    /// V17 vale en los dos modos de aula: también con aulas móviles.
+    void v17_tipoRequeridoSinAulas_fallaConAulasMoviles()
+    {
+        QJsonObject j = conMaterias(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Matemática")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")}}});
+        j[QStringLiteral("aula_fija")] = false;
+        j = conCurso(j, [](QJsonObject& c) { c[QStringLiteral("aula")] = -1; });
+
+        exigeRechazoV17(j, QStringLiteral("Laboratorio"), QStringLiteral("Matemática"),
+                        QStringLiteral("1A"));
+    }
+
+    /// Los tipos se comparan por clave normalizada: mayúsculas y espacios extremos no cuentan.
+    void v17_tipoIgualSalvoMayusculasYEspacios_pasa()
+    {
+        QJsonObject j = conMaterias(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Matemática")},
+                                   {QStringLiteral("tipo"), QStringLiteral("  aula de ESTUDIO ")}}});
+        j = conAulas(
+            j, QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("A1")},
+                                      {QStringLiteral("tipo"), QStringLiteral("AULA DE ESTUDIO")},
+                                      {QStringLiteral("capacidad"), 30}}});
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    /// V17 no rechaza un tipo declarado que ninguna materia requiera.
+    void v17_tipoDeclaradoQueNingunaMateriaRequiere_pasa()
+    {
+        QJsonObject j = conAulas(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("A1")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Aula de estudio")},
+                                   {QStringLiteral("capacidad"), 30}},
+                       QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Lab")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                                   {QStringLiteral("capacidad"), 20}}});
+
         const auto resultado = validarEntradaSolver(j);
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }

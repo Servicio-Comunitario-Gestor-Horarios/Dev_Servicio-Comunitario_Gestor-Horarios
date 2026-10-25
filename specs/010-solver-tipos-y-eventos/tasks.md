@@ -6,7 +6,7 @@
 - [x] **T2. Rechazo de 1.0/sin versión, cargador y tests de versión.** RF-1, RF-2
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_cargador_configuracion$'` está verde; el fixture **versionado** `test/data/preset-1.0.json` se localiza con `QFINDTESTDATA` (ruta no vacía) y se rechaza identificando la ruta, la versión y la acción; sus **bytes no cambian** (hash antes/después); un 2.0 válido carga, `toJson` sella 2.0 y no se completan tipos por defecto; no se usa `datos-prueba/` (ignorado por git).
 
-- [ ] **T3. Casos V1 (eventos), V2, V16 y V17.** RF-5
+- [x] **T3. Casos V1 (eventos), V2, V16 y V17.** RF-5
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R 'test_validador_entrada|test_contrato_solver'` está verde; los casos de V1 exigen la sección `eventos` y no `recesos` (comportamiento cambiado en T1) y tratan la versión ausente/1.0 como entrada inválida; V2 rechaza nombre vacío, turno inexistente, posición 0/fuera, orden 0, duración 0, par incompleto, `fin<=inicio`, diferencia distinta de la duración, intervalo fuera de la ventana de turno/posición, solapes y cronología invertida; V16 rechaza aula/materia sin tipo; V17 rechaza un tipo requerido sin aulas en ambos modos; `claveTipo` normaliza mayúsculas, espacios y acentos.
 
 - [ ] **T4. Modelo de tipo, aula de referencia, desplazamiento, bloqueo y salida real.** RF-3, RF-4

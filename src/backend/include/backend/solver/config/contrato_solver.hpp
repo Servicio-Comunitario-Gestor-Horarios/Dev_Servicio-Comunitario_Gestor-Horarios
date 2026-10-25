@@ -25,6 +25,13 @@ int bloquesAula(int horas_aula, int duracion_minutos);
 
 QString claveCurso(int anio, const QString& seccion);
 
+/// Clave normalizada del nombre de un tipo de aula: `trimmed().toCaseFolded()`.
+///
+/// Es la misma noción que usa el catálogo (`ServicioTiposAula::claveTipo`), pero pura: el
+/// parser/validador del contrato y el modelo del solver comparan tipos por esta clave. Solo
+/// sirve para comparar; el nombre visible se conserva tal cual (RF-5).
+QString claveTipo(const QString& nombre);
+
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig& config, const CursoSolverConfig& curso);
 
 /// ¿El docente `prof` opta por la materia `materiaIDx` (titular o suplente declarado)?
