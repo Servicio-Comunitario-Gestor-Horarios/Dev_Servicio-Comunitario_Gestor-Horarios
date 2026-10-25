@@ -3,7 +3,7 @@
 - [x] **T1. Contrato 2.0, constructor con `Resultado` y consumidores.** RF-1
     - Hecho cuando: `cmake --build --preset backend --parallel` compila **todo el árbol de tests** (sin `RecesoConfig`; `test_variables_cp_sat`, `test_ipc_aislamiento_bd` y `test_servicio_generacion` adaptados) y `ctest --test-dir build-backend --output-on-failure -R 'test_contrato_solver|test_constructor_entrada|test_servicio_generacion'` está verde; el contrato declara 2.0, `materias[].tipo`, `aulas[].tipo`, `turnos[].inicio/fin`, exige la sección `eventos` (no `recesos`), rechaza `recesos` como sección requerida y sella 2.0; el constructor copia tipos, rellena `inicio/fin` desde el `TurnoDTO` y devuelve `Resultado<QJsonObject>`; un **aula sin tipo** y una **materia sin tipo** hacen fallar la construcción (`ok == false`) con mensaje que nombra la entidad y sin JSON; con tipos, `ok == true` y la entrada 2.0 es ida y vuelta sin pérdida. Los casos de rechazo/default de versión son T2; la reescritura de los casos V1/V2/V16/V17, T3.
 
-- [ ] **T2. Rechazo de 1.0/sin versión, cargador y tests de versión.** RF-1, RF-2
+- [x] **T2. Rechazo de 1.0/sin versión, cargador y tests de versión.** RF-1, RF-2
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_cargador_configuracion$'` está verde; el fixture **versionado** `test/data/preset-1.0.json` se localiza con `QFINDTESTDATA` (ruta no vacía) y se rechaza identificando la ruta, la versión y la acción; sus **bytes no cambian** (hash antes/después); un 2.0 válido carga, `toJson` sella 2.0 y no se completan tipos por defecto; no se usa `datos-prueba/` (ignorado por git).
 
 - [ ] **T3. Casos V1 (eventos), V2, V16 y V17.** RF-5

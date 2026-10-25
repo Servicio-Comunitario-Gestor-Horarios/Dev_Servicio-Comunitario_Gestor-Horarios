@@ -87,3 +87,136 @@ Suite completa (`ctest --test-dir build-backend --output-on-failure`): **48/49**
   `construyeJsonEstructuralmenteCompleto` (`!json.contains("recesos")`).
 - **Pendiente de T3:** V2 (forma/temporalidad de eventos), V16 y V17 no se implementaron aquí; sus
   casos viven en `test_validador_entrada`, que hoy sigue verde sin ellos.
+
+## T2 - Rechazo de configuraciones anteriores (2026-10-25)
+
+**Requisito:** RF-1 (2.0 válido) y RF-2 (rechazo de 1.0/sin versión). **Plan:** §1.3, §2.4 y §8-T2.
+**Base:** `3a3e724`.
+
+### Rojo (tests primero)
+
+Rojo de partida (el que dejó T1), sobre el test todavía en 1.0:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_cargador_configuracion$'
+Totals: 6 passed, 8 failed, 0 skipped, 0 blacklisted, 2ms
+FAIL!  : guardarYcargar_roundtrip() 'config.ok' returned FALSE.
+          (V1: versión de configuración no reconocida ('1.0'); se espera '2.0'.)
+FAIL!  : camposDesconocidos_seToleran() 'config.ok' returned FALSE.
+FAIL!  : version_1_0_pasa() 'config.ok' returned FALSE.
+FAIL!  : versionNoReconocida_falla() 'config.mensajeError.contains("1.0")' returned FALSE.
+FAIL!  : configSinVersionDeclarada_seSellaYRecarga() 'parseada.ok' returned FALSE.
+FAIL!  : configPorDefectoYaDeclaraVersion_1_0() Actual "2.0" vs Expected "1.0"
+FAIL!  : guardarCarpetaInexistente_error() 'config.ok' returned FALSE.
+FAIL!  : listarPresets_devuelveJsonOrdenados() 'config.ok' returned FALSE.
+```
+
+Tras reescribir el test (2.0 válido, 1.0 rechazado, fixture versionado) y **antes** de tocar el
+cargador, quedaban solo los dos casos del cargador en rojo:
+
+```text
+Totals: 17 passed, 2 failed, 0 skipped, 0 blacklisted, 7ms
+FAIL!  : preset1_0_seRechazaConArchivoVersionYaccion() 'mensaje.contains(ruta)' returned FALSE.
+          (V1: versión de configuración no reconocida ('1.0'); se espera '2.0'.)
+FAIL!  : presetSinVersion_seRechazaConArchivoYaccion() 'resultado.mensajeError.contains(ruta)'
+          returned FALSE. (V1: la configuración no declara versión; se espera '2.0'.)
+```
+
+El rechazo por versión de `fromJson` y el sellado 2.0 de `toJson` ya venían de T1: lo que faltaba era
+el **envoltorio del cargador** con archivo y acción.
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+[54/54] Linking CXX executable test/test_cargador_configuracion        # exit 0
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_cargador_configuracion$'
+1/1 Test #21: test_cargador_configuracion .......   Passed    0.02 sec
+100% tests passed, 0 tests failed out of 1
+```
+
+Casos (19/19, ejecutando el binario):
+
+```text
+PASS   : cargarArchivoInexistente_error()
+PASS   : cargarArchivoCorrupto_error()
+PASS   : guardarYcargar_roundtrip()
+PASS   : guardarYcargar_conservaTiposYeventos()
+PASS   : camposDesconocidos_seToleran()
+PASS   : version_1_0_seRechaza()
+PASS   : versionAusente_seRechaza()
+PASS   : versionNoReconocida_seRechaza()
+PASS   : preset1_0_seRechazaConArchivoVersionYaccion()
+PASS   : presetSinVersion_seRechazaConArchivoYaccion()
+PASS   : config2_0ConErrorDeSeccion_noApuntaAVersion()
+PASS   : configSinVersionDeclarada_seSellaA_2_0()
+PASS   : configPorDefectoYaDeclaraVersion_2_0()
+PASS   : toJson_noCompletaTiposPorDefecto()
+PASS   : guardarCarpetaInexistente_error()
+PASS   : listarPresets_devuelveJsonOrdenados()
+PASS   : listarPresets_directorioInexistente_error()
+Totals: 19 passed, 0 failed, 0 skipped, 0 blacklisted, 11ms
+```
+
+Mensaje real del preset 1.0 (capturado con un `qInfo` temporal, ya retirado; el binario se recompiló y
+se volvió a verificar después):
+
+```text
+La configuración de «/home/luis/Repos/Gestor-Horarios/test/backend/../data/preset-1.0.json»
+declara la versión «1.0»; solo se acepta la versión 2.0.
+Genere una configuración 2.0 desde los datos con la versión actual.
+```
+
+(La ruta sale tal cual la recibe el cargador: `QFINDTESTDATA` devuelve
+`test/backend/../data/preset-1.0.json`. No se canonicaliza en el cargador para no reescribir la ruta
+que da el llamador.)
+
+Suite completa:
+
+```text
+$ ctest --test-dir build-backend
+100% tests passed, 0 tests failed out of 49
+```
+
+### Cambios
+
+- `src/backend/src/services/CargadorConfiguracionSolver.cpp`: `cargar` deja de devolver el error de
+  `fromJson` sin más. Si la versión del JSON **no** es `2.0` (ausente, `1.0` o desconocida), devuelve
+  un error que nombra el archivo, la versión declarada («no declara versión» si falta) y la acción
+  («Genere una configuración 2.0 desde los datos con la versión actual.»). Cualquier otro error de
+  validación de un 2.0 se devuelve intacto (no se disfraza de rechazo de versión). No se convierte ni
+  se reinterpreta nada.
+- `src/backend/include/backend/services/CargadorConfiguracionSolver.hpp`: una nota en el comentario de
+  cabecera sobre el rechazo de versiones anteriores (RF-2); sin cambios de firma.
+- `test/data/preset-1.0.json` (**nuevo, versionado**): configuración 1.0 completa y válida para el
+  contrato 1.0 (las 10 secciones con `recesos`, con un receso, sin `eventos` y sin `tipo` en materias
+  ni aulas). sha256 `6e881f83cf459945a761c3a2570a76abfda65d9f5bd1f11b9a8350cf0453e79a`.
+- `test/backend/test_cargador_configuracion.cpp`: `configValida()` pasa a 2.0 con `eventos`,
+  `turnos[].inicio/fin` y `tipo` coherente en materia y aula; los casos de versión se reescriben
+  (`version_1_0_pasa` → `version_1_0_seRechaza`, `configPorDefectoYaDeclaraVersion_1_0` →
+  `..._2_0`, `configSinVersionDeclarada_seSellaYRecarga` → `..._seSellaA_2_0`) y se añaden el fixture
+  con hash de bytes, el archivo sin versión, el 2.0 con error de sección (no se confunde con versión),
+  la conservación de tipos/eventos y la ausencia de tipos por defecto al serializar.
+- Sin tocar V1/V2/V16/V17 del validador (T3), el modelo del solver (T4+) ni el frontend.
+
+### Hallazgos
+
+- **El envoltorio se decide por la versión del JSON, no por el texto del error.** `fromJson` no
+  devuelve un código de error de versión (solo un mensaje), así que el cargador relee
+  `objeto["version"]` tras el fallo. Es seguro porque V1 comprueba la versión **antes** que las
+  secciones: si la versión no es 2.0, el fallo es necesariamente de versión. Evita acoplar el cargador
+  al texto de V1 (que puede cambiar de redacción).
+- **El evento de `configValida()` tiene horario válido por construcción:** turno 07:00–12:00 (300 min),
+  6 franjas, un evento de 30 min → `duracionFranjaEstimada` = 45; la ventana de la posición 2 es
+  08:30–09:45 y el evento 09:15–09:45 cabe. Se elige así para que siga siendo válido cuando T3
+  implemente V2 reutilizando las funciones puras de la 009.
+- **El 2.0 sin tipos no se prueba como rechazo aquí** (es V16, T3). En T2 lo que se fija es que ni
+  `toJson` ni la carga inventan un tipo: `toJson_noCompletaTiposPorDefecto` exige cadena vacía.
+- **Consumidores que dependían de aceptar 1.0: ninguno en backend.** `CargadorConfiguracionSolver::cargar`
+  solo se llama desde el frontend (`src/frontend/src/views/schedule_generation_widget.cpp:842`, que ya
+  gestiona `Resultado` y está fuera de alcance y sin compilar). Quedan `version = "1.0"` en configs
+  construidas en C++ de `test_solver_horarios`, `test_solver_benchmark` y en
+  `src/frontend/src/services/generacion_tipos.hpp:46`: no llaman a `fromJson` con ese valor (serializan
+  y `toJson` sella 2.0), así que no dependen del aceptar 1.0; su limpieza es de T4/T10 y del frontend.
+  `test_servicio_generacion` y `test_ipc_aislamiento_bd` no cargan presets 1.0.
