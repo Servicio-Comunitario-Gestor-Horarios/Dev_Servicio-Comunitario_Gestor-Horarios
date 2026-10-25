@@ -143,6 +143,21 @@ QString causaSaturacionPorTipo(const SolverConfig& config) {
         }
     }
 
+    // Bloques desplazados de cada curso: los que no son del tipo de su aula de referencia. Cada
+    // uno ocupa una franja propia y, mientras tanto, deja la referencia vacía y bloqueada
+    // (RF-3): consume una franja de las aulas de ese tipo aunque no se imparta en ellas.
+    QVector<int> desplazadosPorCurso(config.cursos.size(), 0);
+    if (config.aula_fija) {
+        for (int i = 0; i < config.cursos.size(); ++i) {
+            const CursoSolverConfig& c = config.cursos[i];
+            const QString claveReferencia = claveAula(config, c.aula);
+            if (claveReferencia.isEmpty()) continue;   // sin referencia no hay bloqueo
+            for (const PlanMateriaConfig& mc : materiasDelCurso(config, c))
+                if (claveMateria(config, mc.materiaIDx) != claveReferencia)
+                    desplazadosPorCurso[i] += bloquesMateria(config, mc);
+        }
+    }
+
     for (auto it = demanda.constBegin(); it != demanda.constEnd(); ++it) {
         const DemandaTipo& d = it.value();
         if (d.franjas.isEmpty()) continue;   // curso sin turno válido: lo juzga la categoría (3)
@@ -152,10 +167,28 @@ QString causaSaturacionPorTipo(const SolverConfig& config) {
             if (claveTipo(a.tipo) == it.key()) ++aulas;
         if (aulas == 0) continue;   // V17: entrada inválida (categoría 1), no conflicto de aula
 
+        // Franjas que las clases desplazadas dejan bloqueadas en las referencias de este tipo.
+        // Solo cuentan las que caen dentro de las franjas que este tipo puede usar.
+        int bloqueadas = 0;
+        for (int i = 0; i < config.cursos.size(); ++i) {
+            if (desplazadosPorCurso[i] == 0) continue;
+            const CursoSolverConfig& c = config.cursos[i];
+            if (claveAula(config, c.aula) != it.key()) continue;
+            int solapes = 0;
+            for (int s : slotsTurno(config, c.turno))
+                if (d.franjas.contains(s)) ++solapes;
+            bloqueadas += qMin(desplazadosPorCurso[i], config.dimensiones.num_dias * solapes);
+        }
+
         const int capacidad = config.dimensiones.num_dias * d.franjas.size() * aulas;
-        if (d.bloques > capacidad)
+        const int disponibles = capacidad - qMin(bloqueadas, capacidad);
+        if (d.bloques > disponibles) {
+            if (bloqueadas > 0)
+                return QStringLiteral("Causa (2) conflicto de aula: el tipo «%1» necesita %2 bloques y sus %3 aulas ofrecen %4 franjas (%5 las bloquean clases desplazadas).")
+                    .arg(d.nombre).arg(d.bloques).arg(aulas).arg(capacidad).arg(qMin(bloqueadas, capacidad));
             return QStringLiteral("Causa (2) conflicto de aula: el tipo «%1» necesita %2 bloques y sus %3 aulas ofrecen %4 franjas.")
                 .arg(d.nombre).arg(d.bloques).arg(aulas).arg(capacidad);
+        }
     }
     return {};
 }
@@ -179,9 +212,11 @@ QString causaConflictoDeAula(const SolverConfig& config) {
         return causaSaturacionPorTipo(config);
     }
 
-    // D8: aulas de referencia compartidas. Solo cuentan las clases que se QUEDAN en la
-    // referencia (las del tipo del aula): las de otro tipo se desplazan y no la ocupan. Solo es
-    // causa del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
+    // D8: aulas de referencia compartidas. Solo las clases que se QUEDAN en la referencia (las
+    // del tipo del aula) la ocupan; las de otro tipo se desplazan, pero mientras ocupan su franja
+    // dejan la referencia vacía y bloqueada para los demás cursos (RF-3). La capacidad disponible
+    // es la del aula menos esas franjas bloqueadas: 1 franja por bloque desplazado. Solo es causa
+    // del aula si cada curso cabe por separado en su turno (si no, es categoría 3).
     QMap<int, QVector<int>> cursosPorAula;
     for (int i = 0; i < config.cursos.size(); ++i)
         if (config.cursos[i].aula >= 0)
@@ -189,22 +224,34 @@ QString causaConflictoDeAula(const SolverConfig& config) {
 
     for (auto it = cursosPorAula.constBegin(); it != cursosPorAula.constEnd(); ++it) {
         const QString claveReferencia = claveAula(config, it.key());
-        int total = 0;
+        int total = 0;         // bloques que se quedan en la referencia
+        int bloqueadas = 0;    // franjas que bloquean las clases desplazadas del grupo
         QSet<int> franjas;
         bool todosCaben = true;
         for (int idx : it.value()) {
             const CursoSolverConfig& c = config.cursos[idx];
             if (bloquesCurso(config, c) > franjasCurso(config, c)) { todosCaben = false; break; }
-            for (const PlanMateriaConfig& mc : materiasDelCurso(config, c))
+            for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
+                const int bloques = bloquesMateria(config, mc);
                 if (!claveReferencia.isEmpty() && claveMateria(config, mc.materiaIDx) == claveReferencia)
-                    total += bloquesMateria(config, mc);
+                    total += bloques;
+                else
+                    bloqueadas += bloques;   // clase desplazada: bloquea 1 franja de la referencia
+            }
             for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
         }
         if (!todosCaben) continue;
         const int capacidad = config.dimensiones.num_dias * franjas.size();
-        if (total > capacidad)
+        const int disponibles = capacidad - qMin(bloqueadas, capacidad);
+        // Sin clases que se queden, la referencia no compite: el desplazamiento no causa conflicto.
+        if (total <= 0) continue;
+        if (total > disponibles) {
+            if (bloqueadas > 0)
+                return QStringLiteral("Causa (2) conflicto de aula: el aula «%1» no da abasto para las clases que se quedan en ella (%2 bloques en %3 franjas; %4 quedan bloqueadas por clases desplazadas).")
+                    .arg(nombreAula(config, it.key())).arg(total).arg(capacidad).arg(qMin(bloqueadas, capacidad));
             return QStringLiteral("Causa (2) conflicto de aula: el aula «%1» no da abasto para las clases que se quedan en ella (%2 bloques en %3 franjas).")
                 .arg(nombreAula(config, it.key())).arg(total).arg(capacidad);
+        }
     }
 
     // Saturación de un tipo de aula (RF-6): la competición por el mismo tipo no se reasigna.

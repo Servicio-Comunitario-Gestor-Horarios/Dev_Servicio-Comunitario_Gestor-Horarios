@@ -717,16 +717,18 @@ private slots:
         QVERIFY2(texto.contains("6 franjas"), qPrintable(texto));
     }
 
-    // ── T6/RF-6: para la referencia solo cuentan las clases que se quedan en ella ──
+    // ── T6/RF-6: la referencia solo se llena con las clases que se quedan, y los
+    // desplazamientos bloquean franjas que se descuentan de su capacidad ──
     void solver_causaDeAulaNoCuentaLasClasesDesplazadas() {
-        // Los bloques totales que comparten la referencia (6 + 4 = 10) superan sus 6 franjas,
-        // pero 2|B solo tiene Matemática y 1|A desplaza sus 4 bloques de laboratorio: las clases
-        // que se quedan en el Aula 1 son 2 + 4 = 6. La causa real es de asignación (4): 2|B no
-        // tiene docente elegible.
+        // 1|A (2 bloques en la referencia + 4 de laboratorio) y 2|B (4 en la referencia)
+        // comparten el Aula 1. Los bloques totales del grupo (10) superan las 6 franjas del
+        // turno, pero solo 2 + 4 = 6 se quedan en el aula y 1|A bloquea 4 franjas con sus
+        // clases desplazadas: 6 + 4 = 10 ≤ 12 franjas del aula, así que no hay conflicto de
+        // aula. La causa real es de asignación (4): 2|B no tiene docente elegible.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {1, 2, 2, 2, 3, 2};
+        config.dimensiones = {1, 2, 2, 2, 6, 2};
         config.franja_horaria = {60, 2};
         config.turnos.turnos = {{"manana", {0, 1}}};
 
@@ -738,7 +740,7 @@ private slots:
                          {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
         config.profesores = {
             // Solo cubre el año 1: la materia de 2|B no tiene docente elegible.
-            {"Prof A", 6, 6, "", "", {1}, {0, 1}, {}, dispCompleta(3, 2)}};
+            {"Prof A", 6, 6, "", "", {1}, {0, 1}, {}, dispCompleta(6, 2)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -773,6 +775,109 @@ private slots:
         QVERIFY2(texto.contains("Causa (1)"), qPrintable(texto));
         QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
         QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+    }
+
+    // ── Corrección de validación (RF-6): el bloqueo de la referencia cuenta como capacidad ──
+    // Escenario exacto del reviewer: entrada 2.0 válida e INFEASIBLE que se quedaba sin causa.
+    void solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos() {
+        // 1|A y 2|B comparten la referencia «A1» (Aula común). 1|A tiene 2 bloques comunes
+        // + 4 de laboratorio: sus 6 clases ocupan las 6 franjas del turno (2 días × 3), así
+        // que en las 4 franjas del laboratorio A1 queda vacía y bloqueada. 2|B necesita
+        // 3 franjas en A1 y solo le quedan 2 libres (las de las clases comunes de 1|A).
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, 2, 2, 2, 3};
+        config.franja_horaria = {60, 3};
+        config.turnos.turnos = {{"manana", {0, 1, 2}}};
+
+        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula común", 30}, {"Lab", "Laboratorio", 20}};
+        config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 4}}},
+                         {"Plan B", {{0, 2, 3}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
+                         {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
+        config.profesores = {
+            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
+            {"Prof B", 3, 3, "manana", "Plan B", {}, {0}, {}, dispCompleta(2, 3)}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "las franjas bloqueadas dejan sin sitio a 2|B");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("A1"), qPrintable(texto));
+        QVERIFY2(!texto.contains("no se pudo identificar"), qPrintable(texto));
+    }
+
+    // Control negativo de la corrección: con capacidad suficiente no se inventa la causa (2).
+    void solver_causaDeAulaConCapacidadSuficienteNoInventaElConflicto() {
+        // Mismo escenario, pero 2|B tiene su propia referencia (A2, otra aula común): A1
+        // conserva sus 2 franjas libres y el dato es factible.
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, 3, 2, 2, 3};
+        config.franja_horaria = {60, 3};
+        config.turnos.turnos = {{"manana", {0, 1, 2}}};
+
+        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"A1", "Aula común", 30},
+                        {"A2", "Aula común", 30},
+                        {"Lab", "Laboratorio", 20}};
+        config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 4}}},
+                         {"Plan B", {{0, 2, 3}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
+                         {2, "B", "manana", 20, "Plan B", 1}};   // referencias distintas
+        config.profesores = {
+            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
+            {"Prof B", 3, 3, "manana", "Plan B", {}, {0}, {}, dispCompleta(2, 3)}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY(resultado.errores.isEmpty());
+    }
+
+    // La saturación por tipo también descuenta las franjas bloqueadas en las referencias de ese
+    // tipo: aquí el conflicto no se ve referencia a referencia, solo al sumar el tipo.
+    void solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas() {
+        // 1|A ocupa sus 6 franjas con laboratorio y bloquea su referencia A1 (tipo «Aula base»)
+        // en todas ellas; 2|B llena A2 con 6 bloques de «Aula base»; 3|C necesita 1 bloque de
+        // «Aula base» y no le queda ninguna franja de ese tipo (12 menos las 6 bloqueadas).
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {3, 3, 4, 3, 1, 6};
+        config.franja_horaria = {60, 6};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3, 4, 5}}};
+
+        config.materias = {{"Matematica", "Aula base"},
+                           {"Laboratorio", "Laboratorio"},
+                           {"Educacion Fisica", "Cancha"}};
+        config.aulas = {{"A1", "Aula base", 30}, {"A2", "Aula base", 30},
+                        {"Lab", "Laboratorio", 20}, {"Cancha", "Cancha", 40}};
+        config.planes = {{"Plan A", {{1, 1, 6}}},
+                         {"Plan B", {{0, 2, 6}}},
+                         {"Plan C", {{0, 3, 1}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan A", 0},     // referencia A1
+                         {2, "B", "manana", 20, "Plan B", 1},     // referencia A2
+                         {3, "C", "manana", 20, "Plan C", 3}};    // referencia Cancha
+        config.profesores = {
+            {"Prof A", 6, 6, "manana", "Plan A", {}, {1}, {}, dispCompleta(1, 6)},
+            {"Prof B", 6, 6, "manana", "Plan B", {}, {0}, {}, dispCompleta(1, 6)},
+            {"Prof C", 1, 1, "manana", "Plan C", {}, {0}, {}, dispCompleta(1, 6)}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "el tipo «Aula base» no tiene franjas libres para 3|C");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Aula base»"), qPrintable(texto));
+        QVERIFY2(texto.contains("7 bloques"), qPrintable(texto));
     }
 };
 

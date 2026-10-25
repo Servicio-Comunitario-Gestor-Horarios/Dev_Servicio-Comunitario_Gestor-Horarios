@@ -1294,3 +1294,89 @@ $ git diff --stat
   escenario holgado.
 - **`test_backend_variables_cp_sat`** es el nombre real del test de variables (el plan y `tasks.md`
   lo llaman `test_variables_cp_sat`); no se toca el nombre, solo se anota para futuras búsquedas.
+
+## Corrección de validación · causa de referencia bloqueada (2026-10-25)
+
+**Hallazgo 1 de la validación de la 010 (RF-6).** `causaConflictoDeAula` (D8) contaba solo los
+bloques que se quedan en el aula de referencia y no descontaba las franjas que las clases
+desplazadas del grupo dejan bloqueadas; `causaSaturacionPorTipo` tampoco. Una entrada válida podía
+ser INFEASIBLE y quedarse con «no se pudo identificar una categoría concreta».
+
+### Cambio (solo `src/backend/src/solver/solver.cpp`)
+
+- **D8 (aula de referencia compartida):** capacidad disponible = `días × franjas del grupo` menos
+  `min(bloques desplazados del grupo, capacidad)`. La causa (2) se informa si los bloques que se
+  quedan superan esa capacidad disponible. El bloqueo es **1 franja por bloque desplazado** (RF-3).
+  Si no hay bloques que se queden (`total <= 0`), la referencia no compite y no se informa causa: el
+  descuento nunca convierte en conflicto un aula que nadie usa.
+- **Saturación por tipo:** se restan de la capacidad del tipo las franjas bloqueadas en las
+  referencias **de ese tipo**, limitadas a las franjas que el tipo puede usar (`días × slots de la
+  referencia ∩ franjas del tipo`), para no penalizar franjas fuera del turno.
+- Los mensajes de causa (2) conservan su forma cuando no hay bloqueo y añaden «N quedan bloqueadas
+  por clases desplazadas» cuando lo hay; el orden de categorías (1 → 2 → 3 → 4) no cambia.
+
+### Tests (primero en rojo)
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'   # ANTES del cambio
+FAIL!  : TestSolverHorarios::solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos()
+  'texto.contains("Causa (2)")' returned FALSE.
+  El modelo no tiene solución factible (INFEASIBLE).
+  Causa: no se pudo identificar una categoría concreta; revise horas, aulas y disponibilidad de docentes.
+  Entorno: 2 docentes, 2 cursos, 2 materias, 2 aulas.
+Totals: 29 passed, 1 failed, 0 skipped, 0 blacklisted, 141ms
+```
+
+Reproduce el escenario del reviewer (A1 compartida; 1|A 2 comunes + 4 de laboratorio; 2|B 3
+comunes; 2 días × 3 franjas; A1 + laboratorio). Añadidos a `test/backend/test_solver_horarios.cpp`:
+
+1. `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos` — exige causa (2) y el aula
+   «A1», y que **no** aparezca «no se pudo identificar» (el caso rojo de arriba).
+2. `solver_causaDeAulaConCapacidadSuficienteNoInventaElConflicto` — control negativo: mismo dato con
+   una segunda aula común como referencia de 2|B (contraprueba del reviewer) → `exito` y sin errores.
+3. `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` — el descuento por tipo: el conflicto
+   no se ve referencia a referencia (A1 sin bloques que se queden; A2 al 100 %), solo al restar del
+   tipo las 6 franjas que 1|A bloquea; sin el descuento el caso se quedaba sin causa.
+
+**Test existente ajustado (misma causa):** `solver_causaDeAulaNoCuentaLasClasesDesplazadas` cambia
+de 3 a 6 días (12 franjas) y su comentario. Su fixture era **realmente infactible por aula** con la
+regla corregida (1|A llenaba las 6 franjas y bloqueaba A1 en 4; 2|B solo cabía en 2), así que la
+causa (2) que aparecía era legítima; con la semana más ancha el aula vuelve a tener capacidad tras
+el descuento y el test sigue exigiendo la causa (4) que le da nombre, sin cambiar su intención de
+fondo (los bloques desplazados no se cuentan como bloques que se quedan).
+
+```text
+$ cmake --build --preset backend --parallel
+ninja: no work to do.        # build previo de esta misma corrección: exit 0
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'
+1/1 Test #47: test_solver_horarios .............   Passed    0.21 sec
+100% tests passed out of 1
+(PASS de los tres casos nuevos y del ajustado; Totals: 31 passed, 0 failed)
+
+$ ctest --preset backend
+49/49 Test #49: test_ipc_aislamiento_bd ............   Passed    0.08 sec
+100% tests passed out of 49
+Total Test time (real) =   5.93 sec
+```
+
+```text
+$ git diff --stat
+ src/backend/src/solver/solver.cpp     |  63 +++++++++++++++---
+ test/backend/test_solver_horarios.cpp | 119 ++++++++++++++++++++++++++++++++--
+ 2 files changed, 167 insertions(+), 15 deletions(-)
+```
+
+### Hallazgos
+
+- **Cota pedida, no exacta.** Se cuenta 1 franja bloqueada por bloque desplazado, como indica el
+  hallazgo, y se limita al turno del curso que desplaza. Es una **cota conservadora**: si dos cursos
+  del mismo grupo desplazan en la misma franja (posible con ≥2 aulas del tipo desplazado), la franja
+  se descuenta dos veces y el cálculo puede declarar un conflicto que la colocación real evitaría.
+  No se implementa la cota exacta (requeriría un matching de colocación) porque el hallazgo fija la
+  regla; queda anotado para el reviewer. El guardia `total <= 0` evita que el descuento convierta en
+  conflicto una referencia que nadie usa.
+- **`causaSaturacionPorTipo` ya estaba en el camino** de los dos modos; el cálculo nuevo solo actúa
+  con `aula_fija` y cursos con referencia.
+- **V8** obliga a que todo curso declare aula en modo fijo, así que no hay referencias ausentes que
+  bloqueen por tipo.
