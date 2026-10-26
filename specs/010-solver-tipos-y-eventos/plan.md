@@ -1,21 +1,200 @@
 # Plan 010 - Solver: tipos de aula y eventos del turno
 
-Base: e72c930
+Base: 49d39dc
 
-> **Alcance.** Implementa la spec 010 (10 RF) sobre el cierre de la 009. La 009 ya dejó el modelo
-> persistido: `Eventos` con identidad/orden, `TiposAula` con clave normalizada, `id_tipo_aula`
-> obligatorio, `ServicioTiposAula`/`ServicioTurnosEventos`, huella con tipos y eventos y el puente
-> `ConstructorEntradaSolver::recesosDesdeEventos` hacia la sección `recesos` del contrato 1.0. La 010
-> sustituye ese puente por el **contrato 2.0**, introduce la **regla dura de tipo** con **aula de
-> referencia**, las validaciones **V16/V17**, la salida con **aula real**, la supersesión de la 005,
-> la enmienda de la constitución, el MER completo y la documentación del contrato. El frontend sigue
-> fuera; se verifica con `cmake --build --preset backend --parallel` y `ctest --preset backend`.
+> **Dos entregas en una sola spec.** La primera (**T1–T10**, 2026-10-25) está **implementada y
+> commiteada** y se conserva entera: contrato 2.0 y rechazo de versiones (RF-1, RF-2), V16/V17 y eventos
+> (RF-5), regla de tipo, aula de referencia con desplazamiento/bloqueo y salida con aula real (RF-3,
+> RF-4), P4 autorizado, supersesión de la 005 y enmienda constitucional (RF-7, RF-8), MER (RF-9),
+> documentación del contrato (RF-10) y benchmark (RNF-2). **Lo único que se sustituye** es el
+> diagnóstico de causas (RF-6), la validación de entrada nueva (**V18**) y los textos que los citan.
 >
-> **Estado de partida.** La suite de la 009 está en verde (49/49). El solver actual usa
-> `aulaAssignment[c][d][s][a]` solo para cursos móviles, la salida de un curso con aula fija informa
-> siempre su aula, el parser acepta solo `1.0`/`recesos`, y no existen tipos en el contrato. La 011
-> (hora académica) viene después y es la que estrecha V2 a 30–90 y cambia la procedencia de
-> `duracion_minutos`: **no se adelanta aquí**.
+> **Qué se sustituye en este plan.**
+> - **§1.2, §1.3 y §3:** se retiran `palomarPorTipo`, `franjasBloqueadasEnFranjasContadas` y el conteo
+>   por aula de referencia; `causaSaturacionPorTipo` se **reescribe** como conteo de capacidad del tipo;
+>   se añaden las funciones puras del tipo `FranjaSemana` y la constante del tipo general.
+> - **§4.4:** causas nuevas (conteo por tipo y «no atribuible»).
+> - **§5:** la decisión **9** queda superada; se añaden las decisiones 14–18.
+> - **§7:** la enmienda constitucional se reduce a lo que este cambio **añade** (§7.1.5, §7.3, §7.4 y
+>   «Comportamiento»); lo que aplicó T7 no se reescribe.
+> - **§8–§10:** se añaden **T11–T16**, la trazabilidad de V18/RF-6 y los riesgos nuevos.
+>
+> **Lo que no se toca:** el **esquema** (no hay columna nueva: el tipo general es una convención de
+> nombre), la **009** (no se reabre), el **contrato** (sigue en 2.0 y sin sección nueva), el
+> **frontend**, el **seed** (solo se verifica que siembra `Aula de estudio`) y el **motor** (`x`/`y`,
+> objetivo y resto de restricciones).
+>
+> **Cómo leer lo ya ejecutado.** Las secciones §1–§10 describen la entrega completa; las verificaciones
+> de **T1–T10** (§8) se conservan como registro de lo ya hecho y **no se re-ejecutan** salvo la regresión
+> global de **T16**. La evaluación de viabilidad exigida por el usuario abre el plan (§0).
+
+
+## 0. Evaluación de viabilidad del conteo de capacidad del tipo
+
+El usuario la exigió antes de implementar. Demuestra, con el código de `49d39dc`, por qué el único test
+de la categoría (2) es correcto **para lo que la spec promete**: probar la infactibilidad si falla y no
+concluir si no falla.
+
+### 0.1 Qué hay hoy en el modelo (con líneas)
+
+| Pieza | Dónde | Qué fija |
+|---|---|---|
+| Tipo exacto | `restricciones_aulas.cpp:89-112` (`restriccionTipoExacto`) | `y[c][d][s][a]` solo puede ser 1 si el tipo del aula coincide con el de la materia activa en esa franja |
+| D8 exclusividad | `restricciones_aulas.cpp:41-56` (`restriccionAulaNoSolapada`) | `AddAtMostOne` de todas las `y` con la misma `(d, s, a)` |
+| D9 una aula | `restricciones_aulas.cpp:60-85` (`restriccionCursoOcupaUnAula`) | `Σ_a y[c][d][s][a] == Σ_{p,m} x[p][m][c][d][s]` |
+| D11 / `x` | `variables.cpp:17-44` | la `x` solo se crea para `s ∈ slotsDisponibles(...)`, que es subconjunto del turno del curso |
+| `y` | `variables.cpp:46-68` | la `y` solo se crea para aulas cuyo tipo requiere **alguna** materia del curso, y solo en franjas del turno |
+| D1/D3 | `restricciones_profesores.cpp:27-63` | un docente por materia-curso y `Σ x = bloques · z` |
+
+### 0.2 Por qué si falla, prueba la infactibilidad
+
+Sea `t` un tipo de aula, `A_t` su número de aulas en el centro y
+`F_t = { (d, s) : d < num_dias ∧ s ∈ ⋃_{c : c requiere t} turno(c).slot }`.
+La spec define **capacidad(t)** como `A_t × |F_t|`: celdas `(aula de tipo t, día, franja)`.
+
+En cualquier solución, cada bloque de una materia que requiere `t` produce exactamente una clase (D3),
+que ocupa exactamente un aula (D9) y esa aula es de tipo `t` (tipo exacto). Ninguna otra clase puede
+ocupar la misma celda `(aula, día, franja)` (D8), y la celda está en `F_t` porque la `x` de esa clase
+solo existe en franjas del turno de su curso y ese curso aporta demanda de `t`. Por tanto las
+`demanda(t)` clases **se inyectan** en las `A_t × |F_t|` celdas de `t`; si
+`demanda(t) > A_t × |F_t|`, no existe solución. No es una cota: es un conteo de celdas.
+
+Las tres premisas son del modelo, no del diagnóstico: (i) la demanda se cuenta con `materiasDelCurso` y
+`bloquesMateria`, exactamente los bloques que crean `x` y que D3 obliga a programar; (ii) `F_t` incluye
+las franjas de **todos** los cursos que aportan esa demanda; (iii) `A_t` cuenta **todas** las aulas del
+tipo del centro.
+
+La **excepción de precedencia** de RF-6 (0.6) no afecta a esta prueba: si el conteo falla, sigue
+probando la infactibilidad; lo único que cambia es **qué categoría se informa** cuando además un curso
+no cabe en su turno.
+
+### 0.3 Por qué si no falla, no concluye
+
+Es necesario, no suficiente. Quedan fuera, al menos:
+
+- **Ventanas de turno entre cursos (condición de Hall).** Fixture verificado y reproducible (es
+  `solver_causaNoAtribuiblePorVentanasDeTurno` en T14):
+  - `dimensiones = {3, 1, 1, 3, 1, 7}` (3 profesores, 1 materia, 1 aula, 3 cursos, **1 día**, 7
+    franjas); `franja_horaria = {60, 7}`; `aula_fija = false` (modo móvil, sin referencias).
+  - `materias = {{"Matemática", "Aula de estudio"}}`; `aulas = {{"A1", "Aula de estudio", 30}}`.
+  - `planes = {{"PA", {{0, 1, 1}}}, {"PB", {{0, 2, 1}}}, {"PC", {{0, 3, 1}}}}`: para cada año, 1 bloque
+    (`horasSemanales = 1`) de la materia 0.
+  - `cursos = {{1, "A", "TB", 20, "PA", -1}, {2, "B", "TB", 20, "PB", -1},
+    {3, "C", "TC", 20, "PC", -1}}`; turnos `TB = {4}` y `TC = {5,6}`.
+  - `profesores` (orden `{nombre, horas_requeridas, horas_aula, turno, plan, anios,
+    materias_asignadas, materias_suplente, disponibilidad}`): `Prof A` = `{"Prof A", 1, 1, "", "", {1},
+    {0}, {}, {{0, {4}}}}`; `Prof B` = `{"Prof B", 1, 1, "", "", {2}, {0}, {}, {{0, {4}}}}`; `Prof C` =
+    `{"Prof C", 1, 1, "", "", {3}, {0}, {}, {{0, {5,6}}}}`. **Ninguno declara `turno` ni `plan`** (vacío
+    = cualquiera); `anios` es el año de su curso y `materias_asignadas = {0}`.
+  - `F_t = {4} ∪ {5,6} = {4,5,6}` → **capacidad = 1 aula × 3 franjas = 3**.
+  - **demanda = 1 + 1 + 1 = 3**: demanda **igual** a capacidad, así que **el conteo no falla**.
+  - El modelo es **INFEASIBLE**: `1|A` y `2|B` solo pueden ir en la celda `(0,4)` y el aula es una; no
+    pueden compartirla (D8). `3|C` sí tiene dos celdas disponibles.
+  - Desenlace: (1) no aplica; (2) no falla; (3) cada curso cabe en su turno (1 ≤ 1 y 1 ≤ 2); (4) cada
+    docente tiene al menos una franja de su ventana → **causa no atribuible**.
+  El conteo mide la **unión** de las ventanas, no su composición: `{1|A, 2|B}` necesita 2 celdas y solo
+  tiene 1 (Hall).
+- **Referencia compartida (modo fijo).** Las clases cuyo tipo coincide **deben** ir al aula de referencia
+  (RF-3), no a cualquier aula del tipo. Dos cursos que la comparten pueden necesitar más franjas de esa
+  aula de las que tiene con el tipo sobrado (el fixture `configDosCursosCasiLlenosConLaboratorios`: 28
+  bloques frente a 30 de capacidad del tipo, pero solo 26 franjas utilizables en la referencia).
+- **Disponibilidad de docentes**, que es la categoría (4), no (2).
+
+**Lo que no se lista, y por qué.** El «acoplamiento entre tipos dentro de un curso (D4)» **no** produce
+infactibilidad por sí solo: V14 acota la suma de bloques del curso a las franjas de su turno, así que un
+curso siempre puede colocar sus bloques en su ventana si existen aulas de cada tipo. El acoplamiento que
+sí rompe el conteo es el de **ventanas entre cursos** (primer caso) y el de la **referencia compartida**
+(segundo).
+
+En todos esos casos el desenlace es **causa no atribuible**: RF-6 no permite inventar una categoría y el
+solver no corrige la entrada.
+
+### 0.4 Por qué antes sí podía dar falsos positivos
+
+El código de `49d39dc` restaba del conteo una **estimación** de las franjas que las clases desplazadas
+dejan bloqueadas en su referencia (`palomarPorTipo`, ⌈bloques desplazados / aulas del tipo⌉, y
+`franjasBloqueadasEnFranjasContadas`), calculada en **pares día×franja** y restada de un conjunto medido
+en **franjas del día**, con el descuento limitado a las franjas contadas. Con dos o más días el descuento
+podía superar el bloqueo real y declarar (2) donde la causa era (4) —el contraejemplo del reviewer, que
+entra como test de regresión en T14—. El conteo nuevo **no resta nada** y **no cuenta referencias**: ese
+camino ya no existe.
+
+### 0.5 Hipótesis de las que depende y qué revisar si cambian
+
+- **Tipo exacto, D8, D9 y D11** (0.1): si alguna deja de ser dura, la prueba de necesidad cae y hay que
+  rehacerla. No se prevé.
+- **`num_dias` y las franjas de los turnos describen la rejilla real**: si aparecen días parciales o
+  franjas fuera de turno, `F_t` deja de contener todas las celdas posibles.
+- **Un solo tipo general por convención de nombre** (`aula de estudio`): de ello depende **V18**, no el
+  conteo. Si se admiten varios tipos generales o cambia el nombre, se revisa V18 y la spec.
+- **V14** no interviene en la prueba de necesidad (la `x` ya está restringida al turno); sí explica por
+  qué (2) y (3) no compiten en el flujo real (0.6).
+- **Reserva vigente del aula de referencia**: el conteo la ignora a propósito. Si se retirara, algunos
+  datos pasarían de «no atribuible» a factibles; el conteo seguiría siendo necesario y sin falsos
+  positivos.
+- **Aforo y capacidad física** del aula: no participan (fuera de alcance, spec 005).
+
+### 0.6 (3) sobre (2): excepción de precedencia aprobada (2026-10-26)
+
+`causaSaturacionPorTipo` devuelve vacío si algún curso necesita más bloques que franjas de su turno
+(`solver.cpp:191-194`), y `causaConflictoDeAula` hace lo mismo por grupo (`:313-315`, bloque que se
+elimina). El usuario aprobó el 2026-10-26 **mantener ese guard y enmendar RF-6**: «cuando un curso no
+cabe en su turno, la causa es (3) conflicto de persona aunque el conteo de capacidad del tipo también
+falle, porque es el motivo concreto y comprobable». La spec ya recoge la **excepción de precedencia** en
+RF-6, en la definición de «Causa», en RF-7 (punto (c)) y en el criterio 6, acotada a ese único caso. En
+consecuencia:
+
+- La versión reescrita de `causaSaturacionPorTipo` **conserva el guard** y su comentario cita RF-6.
+- `solver_falloCausaConflictoDePersona` (4 bloques en un turno de 2 franjas, 1 aula → demanda 4 >
+  capacidad 2) **sigue dando (3)** y se convierte en la prueba de la excepción; no se reescribe.
+- Fuera de ese caso, (2) se informa antes que (3) sin cambios.
+
+### 0.7 Inventario exacto: qué se elimina, qué se reescribe, qué se añade
+
+Líneas de `49d39dc` en `src/backend/src/solver/solver.cpp`:
+
+| Elemento | Líneas | Destino |
+|---|---|---|
+| `struct DesplazamientosDeGrupo` | 26-29 | **se elimina** |
+| `aulasDelTipo` | 33-38 | **se mueve** a `contrato_solver` (pura y con test) |
+| `palomarPorTipo` | 40-59 | **se elimina** |
+| `franjasBloqueadasEnFranjasContadas` | 61-90 | **se elimina** |
+| `slotsTurno` | 92-98 | **se añade** la versión pública en `contrato_solver` (T11); la copia local de `solver.cpp` **se retira en T13**, junto con sus últimos usos (`114`, `204`, `249`, `286`, `327`). T11 no toca `solver.cpp` (evita actualizar llamadas que T13 borra) |
+| `bloquesMateria`, `bloquesCurso` | 100-110 | se conservan |
+| `franjasCurso` (`num_dias × slots`) | 112-115 | **se sustituye** por `franjasSemanales` (`|franjasDelCurso|`) |
+| `nombreAula` | 126-128 | **se elimina** (solo lo usaban los mensajes por aula) |
+| `claveAula` | 140-144 | **se elimina** (id.) |
+| `causaEntradaInvalida` | 146-184 | se conserva |
+| `causaSaturacionPorTipo` | 186-274 | **se reescribe**: solo `demanda(t) > capacidad(t)`; sin `bloqueosPorReferencia`, sin descuento y sin producto manual; **conserva el guard** de la excepción de precedencia de RF-6 |
+| Bloque por aula de referencia (`cursosPorAula`, `total`, `bloqueadas`, mensajes) | 295-348 | **se elimina** |
+| Rama de aulas móviles | 278-293 | **se elimina**: el caso «modo móvil sin aulas» lo rechaza (1) por **V15** (`solver_config.cpp:714-720`) en el flujo real, y el chequeo de tipo sin aulas (V17) cubre el resto |
+| `causaConflictoDeAula` (resto) | 277-352 | **se elimina**; `primeraCausaNoFactible` llama a (2) directamente |
+| `causaConflictoDePersona`, `causaConflictoDeAsignacion` | 354-389 | se conservan |
+| `primeraCausaNoFactible` | 391-400 | se conserva el orden (1)(2)(3)(4) |
+| Completo de `causaEntradaInvalida` (comentario) | 147 | **se actualiza** «V1–V17» → «V1–V18» (I3) |
+| Fallback de `analizarFallo` | 537-542 | **se reescribe**: mensaje de **causa no atribuible** |
+
+Notas del inventario:
+
+- **`claveAula`:** se elimina **solo** la de `solver.cpp` (140-144). El `claveAula` estático de
+  `restricciones_aulas.cpp:26` (usado en `:98` y `:130`) es **otro helper** y **se conserva**.
+- **Mensaje de (2):** usa el **nombre visible** del tipo tal como lo declara la primera materia que lo
+  requiere (`tipo.trimmed()`), **no** la clave. Los tests conservados asertan `«Laboratorio»`,
+  `«Aula base»`… (I6).
+- **`slotsDelTurno` de `contrato_solver.cpp:54-60`:** su único consumidor es `slotsDisponibles`; en T11 se
+  sustituye por la función pública `slotsTurno` y se elimina la copia privada.
+
+Otros archivos:
+
+- `contrato_solver.hpp/.cpp` (backend, sin OR-Tools): **se añaden** `FranjaSemana` (con `==`, `<` y
+  `qHash`), `slotsTurno`, `franjasDelCurso`, `franjasSemanales`, `demandaDelTipo`, `franjasDelTipo`,
+  `aulasDelTipo`, `capacidadDelTipo` y `tipoGeneralAula()`; se retira el `slotsDelTurno` privado.
+- `solver_config.cpp`: **se añade** `validarReferenciaGeneral` (V18) después de `validarTiposConAulas`
+  (`:746`) y en la lista de errores (`:799-806`).
+- Tests: `test/backend/test_solver_horarios.cpp` (causas), `test/backend/test_validador_entrada.cpp`
+  (V18) y **nuevo** `test/backend/test_capacidad_tipo.cpp` con
+  `add_gtest(test_capacidad_tipo backend/test_capacidad_tipo.cpp backend)` en `test/CMakeLists.txt`
+  (junto a `:96`).
 
 ## 1. Archivos y responsabilidades
 
@@ -59,7 +238,7 @@ Base: e72c930
 - `src/backend/src/services/CargadorConfiguracionSolver.cpp`: al rechazar por versión, añade el
   **archivo** y la **acción** («genere una configuración 2.0 desde los datos»).
 - `src/backend/src/services/ValidadorEntradaSolver.cpp`: sigue siendo el punto de entrada; la
-  validación V1–V17 vive en `fromJson`.
+  validación V1–V18 vive en `fromJson`.
 - `src/backend/include/backend/solver/config/contrato_solver.hpp` / `.cpp`: `QString claveTipo(const
   QString&)` pura (trim + `toCaseFolded`), usada por el parser/validador y el modelo.
 - `src/backend/CMakeLists.txt`: sin fuentes nuevas; los cambios son en las existentes.
@@ -72,8 +251,9 @@ Base: e72c930
   aula por clase para todos los cursos, **tipo exacto**, **aula de referencia** (coincidencia por
   tipo), **desplazamiento** y **aula de referencia vacía/bloqueada**.
 - `src/backend/src/solver/solver.cpp`: `extraerSolucion` informa el aula real de **todas** las
-  clases (la `y`), no la fija por defecto; `causaConflictoDeAula`/`causaEntradaInvalida` amplían la
-  saturación por tipo y la falta de tipos.
+  clases (la `y`), no la fija por defecto; el diagnóstico de causas (**reescrito en T13**) se queda
+  solo con el conteo de capacidad del tipo, sin cotas ni descuentos, y con el desenlace **no
+  atribuible** (§4.4). Las funciones de capacidad viven en `contrato_solver` (T11), no aquí.
 - `src/backend/src/services/ValidadorSalidaSolver.cpp`: **P3 sin cambios de producción** (opera sobre
   `asignacion.aula`, el aula real que emite el solver). **P4 sí cambia, por la desviación autorizada
   del apartado siguiente** (claves por recurso, no por franja).
@@ -105,9 +285,11 @@ Base: e72c930
 - `test/backend/test_cargador_configuracion.cpp`: 2.0 válido, 1.0 rechazado con archivo/versión y
   acción (fixture versionado, bytes intactos), ida y vuelta 2.0, tipos/eventos.
 - `test/backend/test_validador_entrada.cpp`: V1 (versión/eventos), V2 (forma/temporalidad), V16,
-  V17.
+  V17 y **V18** (referencia de otro tipo, modo móvil, centro sin tipo general).
 - `test/backend/test_solver_horarios.cpp`: referencia, desplazamiento y vuelta, bloqueo del aula de
-  referencia, exclusividad de desplazadas, móvil, salida con aula real, saturación de laboratorio.
+  referencia, exclusividad de desplazadas, móvil, salida con aula real y **causas (T13/T14)**.
+- **`test/backend/test_capacidad_tipo.cpp` (nuevo, `add_gtest`, target `backend`)**: unidades del tipo
+  `FranjaSemana` y de `demandaDelTipo`/`capacidadDelTipo` (T11); no necesita OR-Tools.
 - `test/backend/test_variables_cp_sat.cpp`: compila sin `RecesoConfig` (T1) y comprueba la `y` de
   todos los cursos (T4). **Ojo con el nombre:** el test se registra en CTest como
   **`test_backend_variables_cp_sat`** (`test/CMakeLists.txt:118`), así que `-R 'test_variables_cp_sat'`
@@ -116,7 +298,7 @@ Base: e72c930
   apartado siguiente).
 - `test/backend/test_validador_salida.cpp`: salida con aulas reales; **P3 es solo pruebas**, pero
   **P4 cambia** por la desviación autorizada de §1.2 (claves por docente y por aula, `06fc70e`).
-- No se tocan `test/frontend/*` ni `test/CMakeLists.txt:120-133`: siguen fuera con
+- No se tocan `test/frontend/*` ni `test/CMakeLists.txt:127-141`: siguen fuera con
   `BUILD_FRONTEND=OFF`.
 
 **Migración de fixtures (obligatoria al retirar `RecesoConfig` y endurecer el tipo).** Todo test que
@@ -228,12 +410,13 @@ La identidad del evento no viaja; los eventos se distinguen por `nombre`, `turno
 `orden`. Los campos desconocidos se toleran. La sección `recesos` no se acepta como sección
 requerida; en un 2.0 se ignora como campo desconocido.
 
-### 2.3 Validaciones (V1, V2, V16, V17)
+### 2.3 Validaciones (V1, V2, V16, V17 y V18)
 
 - **V1 — estructura y versión:** la versión se comprueba **antes** que las secciones. Ausente,
   `1.0` o desconocida → error de versión; se espera `2.0`. Las secciones requeridas son
   `version`, `dimensiones`, `franja_horaria`, `turnos`, `eventos`, `planes`, `cursos`,
-  `profesores`, `materias`, `aulas`.
+  `profesores`, `materias`, `aulas`. **No hay sección de tipos ni de marca general** (cambio del
+  2026-10-26).
 - **V2 — forma y temporalidad de eventos:** nombre no vacío; turno existente; posición
   `1..slots`; orden `>=1`; duración `>0`; par inicio/fin completo o ausente; `fin>inicio`;
   `fin−inicio = duración`; intervalo dentro de la ventana del turno y de su posición; orden
@@ -245,7 +428,11 @@ requerida; en un 2.0 se ignora como campo desconocido.
 - **V17 — tipo con aulas:** para cada materia de un curso, su tipo requerido tiene al menos un aula
   en el centro (comparación por `claveTipo`), **en los dos modos**. Error con tipo, materia y curso.
   No se rechaza por un tipo declarado que ninguna materia requiera.
-- Orden: V1 → V2…V15 → V16 → V17, como en la 005/009.
+- **V18 — referencia del tipo general (nuevo, T12):** con el modo de aula fija activo, el aula de
+  referencia de cada curso debe ser del tipo de `tipoGeneralAula()` (`Aula de estudio`, por
+  `claveTipo`); si no, error `V18` con curso, aula y tipo. Con el modo inactivo no aplica. **No hay
+  dato nuevo** en el contrato ni en la base. Detalle en §3.2.
+- Orden: V1 → V2…V15 → V16 → V17 → V18, como en la 005/009.
 - La 011 (posterior) estrecha `duracion_minutos` a 30–90; aquí solo se mantiene `>0`.
 
 ### 2.4 Rechazo de 1.0 y presets
@@ -270,9 +457,30 @@ requerida; en un 2.0 se ignora como campo desconocido.
 - `validarEventos(const SolverConfig&)` (en `solver_config.cpp`) construye los `TurnoDTO` y
   `EventoDTO` de la 009 y usa `duracionFranjaEstimada`, `ventanaDePosicion`,
   `eventoDentroDeVentana` y `haySolapeCronologico`; no lee el reloj.
-- `causaConflictoDeAula` amplía la capacidad por tipo: para cada tipo, bloques de las materias que lo
-  requieren frente a `días × franjas × aulas de ese tipo`; la referencia bloqueada no se cuenta como
-  disponible.
+- **`FranjaSemana` y las funciones de capacidad (T11), en `contrato_solver` (backend, sin OR-Tools).**
+  **Ámbito (M5):** el `struct` y las funciones van en **ámbito global** de
+  `backend/solver/config/contrato_solver.hpp`, **junto a `claveTipo`**, que ya es global; el
+  `namespace ContratoSolver` solo contiene constantes (`PESO_HORAS`, `COSTE_SUPLENTE`,
+  `COSTE_MAX_SUPLENTE`) y **no** se amplía. La constante del tipo general es `tipoGeneralAula()`
+  (global), no `ContratoSolver::tipoGeneralAula()`.
+  - `struct FranjaSemana { int dia = 0; int slot = 0; }` con `operator==` y `operator<` (`día`, luego
+    `slot`) y `qHash` (`qHashMulti`), de modo que sirve en `QSet` y en `QMap` sin ambigüedad de
+    unidades: una franja es un par `(día, slot)`, no un `slot` repetido por día.
+  - `QVector<int> slotsTurno(const SolverConfig&, const QString& turno)`; se retira el
+    `slotsDelTurno` privado de `contrato_solver.cpp:54-60` y su consumidor pasa a `slotsTurno`. **La
+    copia local de `solver.cpp:92-98` NO se toca en T11**: se retira en T13, con sus usos y sus bloques
+    (M4).
+  - `QSet<FranjaSemana> franjasDelCurso(const SolverConfig&, const CursoSolverConfig&)`:
+    `{ (d, s) : d < num_dias ∧ s ∈ slotsTurno(turno del curso) }`.
+  - `int franjasSemanales(...)`: `|franjasDelCurso|`; **sustituye** el producto manual
+    `num_dias × slotsTurno(...).size()` (la sustitución en `solver.cpp` es de T13).
+  - `QSet<FranjaSemana> franjasDelTipo(const SolverConfig&, const QString& clave)`: unión de
+    `franjasDelCurso` de los cursos con al menos una materia que requiere el tipo.
+  - `int demandaDelTipo(...)`: suma de `bloquesMateria(materiasDelCurso(...))` de las materias cuya
+    clave de tipo coincide.
+  - `int aulasDelTipo(...)` y `int capacidadDelTipo(...)` = `aulasDelTipo × |franjasDelTipo|`.
+  - `QString tipoGeneralAula()` → `"Aula de estudio"` (**una sola constante** para V18 y su test).
+  - Todas puras y deterministas (sin reloj, sin E/S); se prueban en `test_capacidad_tipo`.
 - El constructor conserva el instante inyectado (`ahora`): no lee el reloj y sigue siendo
   determinista.
 
@@ -336,6 +544,38 @@ construirJsonEntrada(datos, parametros, ahora):
   que no define igualdad).
 - `ConstructorEntradaSolver.hpp` añade `#include "backend/resultado.hpp"`; no hay fuentes nuevas ni
   cambios en `src/backend/CMakeLists.txt`.
+
+### 3.2 V18: aula de referencia del tipo general (T12)
+
+Vive en **`solver_config.cpp`** (parser/validador), no en el motor ni en la base: la regla es de
+**entrada**, y el modelo no cambia (la `y` y la reserva ya funcionan con cualquier aula).
+
+```
+validarReferenciaGeneral(config):                 # se ejecuta DESPUÉS de validarTiposConAulas
+    si !config.aula_fija: return ""               # modo móvil: el aula del curso se ignora (V8)
+    para cada curso cu en config.cursos, en orden:
+        si cu.aula < 0 o cu.aula >= config.aulas.size(): continue   # V6/V8 ya lo rechazan
+        aula = config.aulas[cu.aula]
+        si claveTipo(aula.tipo) != claveTipo(tipoGeneralAula()):     # «Aula de estudio»
+            return "V18: el aula «<aula.nombre>», referencia del curso <anio><seccion>, es del tipo
+                    «<aula.tipo>»; el aula de referencia debe ser del tipo general «Aula de estudio».
+                    Asigne al curso un aula del tipo general."
+    return ""
+```
+
+- Se registra en la lista de errores **después** de `validarTiposConAulas` (`solver_config.cpp:799-806`),
+  de modo que el orden es V16 → V17 → V18 (RF-5).
+- El tipo general sale de **una sola constante**, `tipoGeneralAula()` (global en `contrato_solver.hpp`),
+  no de `ContratoSolver::` (M5); no hay columna en `TiposAula`, ni sección en el contrato, ni consulta a
+  la base. La comparación es la misma `claveTipo` del contrato, así que `"AULA DE ESTUDIO"` o
+  `"  aula de estudio "` también valen.
+- El mensaje nombra **curso, aula y tipo** (RF-5, RNF-3) y dice la **acción disponible** (asignar al
+  curso un aula del tipo general), coherente con RNF-3.
+- **No se duplica en el motor.** `causaEntradaInvalida` no comprueba V18: el motor es agnóstico al
+  nombre del tipo (el tipo exacto ya se cumple por la `y`) y duplicarla invalidaría los fixtures
+  unitarios que llaman al solver directamente con tipos de referencia arbitrarios. Alternativa
+  descartada: duplicarla y renombrar todos los tipos de los fixtures a `Aula de estudio`; más ruido,
+  ninguna cobertura nueva.
 
 ## 4. Modelo del solver (pseudocódigo)
 
@@ -407,9 +647,54 @@ opera sobre `asig.aula` real; el curso fijo puede tener clases en aulas distinta
 
 ### 4.4 Causas
 
-- V16/V17 → entrada inválida (antes de resolver).
-- Saturación por tipo o por referencia bloqueada sin solución → **conflicto de aula**.
-- El solver no libera la reserva ni reasigna a otro tipo para hacer factible.
+Diagnóstico **completo** en `solver.cpp` tras el cambio (T13). Orden fijo (1)(2)(3)(4) y desenlace «no
+atribuible»:
+
+```
+primeraCausaNoFactible(config):
+    causa = causaEntradaInvalida(config)          # (1): V16/V17 (tipos) + turno/materias del curso
+    si causa != "": return causa
+
+    causa = causaSaturacionPorTipo(config)        # (2): único test = conteo de capacidad del tipo
+    si causa != "": return causa
+
+    causa = causaConflictoDePersona(config)       # (3): el curso no cabe en las franjas de su turno
+    si causa != "": return causa
+
+    return causaConflictoDeAsignacion(config)     # (4): materia-curso sin docente suficiente
+    # "" (ninguna categoría) => analizarFallo informa «causa no atribuible»
+
+causaSaturacionPorTipo(config):
+    # Excepción de precedencia de RF-6 (aprobada el 2026-10-26): si un curso no cabe en su turno, la
+    # causa es (3) y una (2) mecánica taparía el motivo concreto. Es el guard actual, ahora normativo.
+    para cada curso c: si bloquesCurso(c) > franjasSemanales(c): return ""
+
+    demanda[t] = suma de bloquesMateria de las materias (de todos los cursos) cuya clave de tipo es t
+    para cada tipo t en orden de clave (determinista):
+        si aulasDelTipo(t) == 0: continue         # V17 lo rechaza antes como (1)
+        si franjasDelTipo(t).isEmpty(): continue  # turno inexistente => (3); idem
+        si demanda[t] > capacidadDelTipo(t):
+            return "Causa (2) conflicto de aula: el tipo «<nombre visible de t>» necesita <demanda>
+                    bloques y sus <aulas> aulas ofrecen <capacidad> franjas."
+    return ""
+
+analizarFallo(...):                               # INFEASIBLE
+    errores.append("El modelo no tiene solución factible (INFEASIBLE).")
+    causa = primeraCausaNoFactible(config)
+    si causa != "": errores.append(causa)
+    si no:          errores.append("Causa: no atribuible. Ninguna categoría de (1) a (4) explica el
+                                    fallo; revise la capacidad de los tipos de aula, las franjas de
+                                    los turnos y la disponibilidad de los docentes.")
+```
+
+- **(1)** se conserva tal cual (incluye la falta de tipos y la falta de aulas del tipo requerido).
+- **(2)** no descuenta bloqueos, no cuenta aulas de referencia y no usa cotas: `demanda(t)` frente a
+  `capacidad(t)` (definición de la spec, §3).
+- **(3)** se informa **antes que (2)** cuando un curso no cabe en su turno: es la **excepción de
+  precedencia** de RF-6 (aprobada el 2026-10-26) y el guard la implementa. **(4)** no cambia.
+- El mensaje de (2) nombra el **nombre visible** del tipo, la demanda y la capacidad; ya no nombra un
+  aula (el conteo es por tipo). El de «no atribuible» no nombra ninguna entidad.
+- El solver no libera la reserva ni reasigna a otro tipo para hacer factible; no inventa tipos.
 
 ## 5. Decisiones (con alternativa descartada)
 
@@ -433,8 +718,11 @@ opera sobre `asig.aula` real; el curso fijo puede tener clases en aulas distinta
 7. **Salida con la `y` real.** Alternativa descartada: informar la fija del curso; es el defecto
    actual y contradice RF-4.
 8. **V17 en ambos modos.** Alternativa descartada: solo móvil; la regla del usuario es dura siempre.
-9. **Causa de saturación por tipo en `causaConflictoDeAula`.** Alternativa descartada: confiar solo
-   en el estado INFEASIBLE sin categoría; RF-6 exige la causa.
+9. **Causa de saturación por tipo en `causaConflictoDeAula`.** ~~Alternativa descartada: confiar solo
+   en el estado INFEASIBLE sin categoría; RF-6 exige la causa.~~
+   > **Superada el 2026-10-26.** La categoría (2) deja de ser «saturación por tipo o referencia
+   > bloqueada»: es **solo** el conteo de capacidad del tipo (decisión 15) y el fallback es «no
+   > atribuible» (decisión 17). El `causaConflictoDeAula` de esta decisión **se elimina**.
 10. **Constitución y 005 las edita el planner.** El implementer solo verifica; la skill se lo
     prohíbe. Alternativa descartada: que las edite el implementer; no autorizado.
 11. **MER y contrato documental en documentos vivos.** `docs/Diagrama-MER.md` completo y
@@ -458,61 +746,101 @@ opera sobre `asig.aula` real; el curso fijo puede tener clases en aulas distinta
     daba por «sin cambios de producción»): lo autorizó el usuario al detectarse en T5.
     Alternativa descartada: dejarlo como defecto documentado y no tocar producción; deja la
     generación real inutilizable y la validación de la 010 no se habría podido hacer con datos reales.
+14. **Excepción de precedencia de (3) sobre (2) (decisión del usuario, 2026-10-26).** La spec
+    **enmienda RF-6** (y la definición de «Causa», RF-7 y el criterio 6): si un curso no cabe en su
+    turno, la causa es **(3)** aunque la capacidad del tipo también falle. `causaSaturacionPorTipo`
+    implementa la excepción con el guard (`solver.cpp:191-194`); el orden (1)(2)(3)(4) no cambia fuera
+    de ese caso. Alternativa descartada (QA del 2026-10-26, antes de aprobar la enmienda): quitar el
+    guard y aceptar (2) mecánica; se descartó porque oculta el motivo concreto y comprobable.
+15. **Causa (2): solo conteo de capacidad del tipo (2026-10-26).** `demanda(t)` frente a
+    `capacidad(t) = aulas(t) × días × franjas de la unión de turnos`; **sin** descuento de bloqueos y
+    **sin** conteo por aula de referencia. Es el único test de (2), **salvo la excepción de (3)**.
+    Alternativa descartada: conservar el conteo por referencia sin bloqueos; con varios cursos su
+    cuenta exacta exige resolver el empaquetamiento (lo que la heurística aproximaba) y, con un solo
+    curso, no puede fallar.
+16. **Tipo `FranjaSemana` (decisión del usuario, 2026-10-26).** Un `(día, slot)` con `==`, `<` y
+    `qHash` en `contrato_solver`, **en ámbito global junto a `claveTipo`**, usado por las cuentas de
+    capacidad; elimina los productos manuales por `num_dias` (`solver.cpp:114, 263, 288, 330`). Se
+    **acota a las cuentas**: no se refactorizan `x`/`y` ni el resto del modelo. Alternativa descartada:
+    seguir multiplicando a mano (fue el origen del error de unidades) y tipar también `x`/`y` (refactor
+    sin efecto en RF-6).
+17. **«Causa no atribuible» como desenlace explícito (2026-10-26).** Si (1)–(4) no aplican,
+    `analizarFallo` informa «Causa: no atribuible» sin nombrar entidad. Alternativa descartada:
+    mantener el mensaje genérico «no se pudo identificar una categoría concreta» (no dice el desenlace
+    y sugiere que el sistema falló) o inventar la categoría más probable (prohibido por RF-6).
+18. **V18 en el validador, con una constante y sin tocar el motor (2026-10-26).** `validarReferenciaGeneral`
+    en `fromJson`, con `tipoGeneralAula()` (global, como `claveTipo`); no hay columna ni sección nueva y
+    la comprobación es la misma `claveTipo`. Alternativa descartada: duplicarla en
+    `causaEntradaInvalida` (obligaría a renombrar los tipos de todos los fixtures unitarios del motor
+    sin aportar cobertura).
 
 ## 6. Supersesión enumerada de la 005
 
 La 010 supersede: la definición «Curso con aula fija: usa siempre su aula»; **D10**; el **criterio 2**
 («D1–D11 y D13») **salvo D10**; la salida «con aula fija, su aula fija»; **RF-7** de la 005; la
-versión **1.0** (definición, RF-10 y criterio); y **V1** (sección de recesos). **D9 se amplía** (un
-aula por clase, del tipo requerido), **D8 se extiende** a las desplazadas y **V8 se mantiene**. El
-resto de la 005 sigue vigente. La anotación en el texto de la 005 la hace el planner (T7).
+versión **1.0** (definición, RF-10 y criterio); y **V1** (sección de recesos). **D9 se generaliza**
+(**todas** las clases —fijas y móviles— ocupan exactamente un aula, del tipo requerido), **D8 se
+extiende** a las desplazadas y **V8 se mantiene**. El resto de la 005 sigue vigente. La anotación en el
+texto de la 005 la hizo el planner en **T7** (`f054b2e`).
 
-## 7. Enmienda de la constitución (la ejecuta el planner)
+**Añadido del 2026-10-26 (lo anota el planner en T15):**
 
-Texto exacto (sustitución literal; las líneas son las de `docs/constitution.md` en `e72c930`):
+- **Definición «Causa de un resultado no factible»** (`005:314-320`): (a) la categoría (2) se decide por
+  el **conteo de capacidad del tipo** y su descripción deja de citar «(invariantes D8/D9/D10)» (D10 está
+  supersedida; la (2) ya no es solo exclusividad); (b) «las categorías **cubren** todas las invariantes
+  duras D1–D11 y D13» pasa a «se informa la primera categoría aplicable y, si ninguna lo es, la causa se
+  informa como **no atribuible**»; (c) se añade la **excepción de precedencia** de RF-6 (un curso que no
+  cabe en su turno es (3) aunque la capacidad del tipo también falle).
+- **RF-6 «Comportamiento y contrato del solver»** (`005:484-487`): el párrafo «la causa se informa con
+  las categorías … en su orden» se sustituye por el orden y las condiciones de RF-6 de la 010
+  (**incluida la excepción de precedencia de (3) sobre (2)**) y por la causa no atribuible; las cuatro
+  categorías y su orden no cambian.
+- **Catálogo de validaciones:** **V1–V17 → V1–V18** (la 010 añade V18).
 
-- **§5, línea 34 — protección de datos.** Sustituir la línea completa por:
-  > - Los datos del usuario en SQLite (planes de estudio, docentes, aulas, tipos de aula, asignaturas,
-  >   cursos, turnos, eventos y configuración del solver) nunca se borran ni se sobrescriben sin
-  >   confirmación explícita.
+## 7. Enmienda de la constitución (la ejecuta el planner, T15)
 
-  (Añade «tipos de aula»; sustituye «recesos» por «eventos».)
-- **§7.1.5, línea 64 — invariante del aula.** Sustituir la línea completa por:
-  > 5. **Aula.** Toda clase se imparte en un aula cuyo **tipo** coincide con el tipo de aula requerido
-  >    por su materia. Con el modo de aula fija **inactivo**, el solver elige un aula del tipo
-  >    requerido en cada franja en que el curso tiene clase; con el modo **activo**, cada curso declara
-  >    un **aula de referencia**: la usa cuando su tipo coincide, y las clases cuya materia requiere
-  >    otro tipo se imparten en un aula de ese tipo y el curso **vuelve** a la referencia en las demás.
-  >    Mientras un curso tiene una clase desplazada en una franja, su aula de referencia queda **vacía
-  >    y bloqueada** en esa franja. La **exclusividad de aula** rige también las clases desplazadas.
-- **§7.3, líneas 75–84 — contrato de configuración.** Tres sustituciones y una viñeta nueva:
-  1. En **Cursos**, sustituir «activo → cada curso usa su aula fija; inactivo → aulas móviles que
-     decide el solver» por «activo → el aula del curso es su **aula de referencia** (§7.1.5:
-     desplazamiento y vuelta); inactivo → el solver elige el aula de cada clase».
-  2. En **Aulas**, añadir tras «no por nombre; la interfaz y el CSV traducen índice→nombre»:
-     «Cada aula declara su **tipo** y cada materia el **tipo de aula requerido**; la igualdad es
-     exacta sobre la **clave normalizada** (sin espacios extremos y sin distinguir mayúsculas),
-     aunque el nombre visible del tipo se conserva.»
-  3. Viñeta nueva después de **Aulas**:
-     «- **Eventos:** la entrada lleva los eventos de cada turno (nombre, posición, orden, duración y
-     horario opcional), que el solver ignora; sustituyen a la sección de recesos. La **identidad**
-     del evento no viaja en el contrato.»
-  4. Al final de la sección: «La versión del contrato es **2.0**; una configuración `1.0` o sin
-     versión se rechaza.»
-- **§7.4, línea 87 — validación previa.** Solo dos cosas: (1) sustituir el rango «V1–V15» por
-  «**V1–V17**»; (2) añadir al final del párrafo: «**V1** espera la sección de **eventos** (no la de
-  recesos); el contenido de V1, V2, V16 y V17 vive en la spec 005 y en la 010.» Se mantienen íntegras
-  las frases de V13, V7, V10/V11, V14 y V15. **No se duplica** el detalle de V2/V16/V17: la constitución
-  fija el rango y la remisión (RF-8), y el detalle normativo es de la 005, que la 010 anota en T7.
-- **§7.5, línea 91 — fuera de alcance.** Sustituir «El receso es metadata que el solver ignora» por
-  «El **evento** de turno es metadata que el solver ignora». El resto de la línea no cambia.
-- **005:** anotar en `specs/005-nucleo-solver/spec.md` que V1 pasa a eventos, el catálogo a V1–V17 y
-  la supersesión de D10/definición/salida/RF-7/versión 1.0. El detalle de V1/V16/V17 vive en la 005
-  y la 010; la constitución solo fija el rango y la remisión.
+> **Lo que aplicó T7 (`f054b2e`) no se reescribe:** §5, §7.1.5 (aula de referencia con desplazamiento,
+> vuelta y bloqueo), §7.3 (referencia, tipos por clave, eventos, versión 2.0), §7.4 (V1–V17 y V1 de
+> eventos) y §7.5 (eventos) ya están en `docs/constitution.md`. **Este cambio solo añade cinco cosas.**
+
+Líneas de `docs/constitution.md` en `49d39dc`:
+
+- **§7.1.5, línea 64 — invariante del aula.** Añadir al final del punto 5, sin tocar el resto:
+  > El **aula de referencia es siempre del tipo general/ordinario del centro** (el tipo de clave
+  > normalizada `aula de estudio`); las aulas de los demás tipos **nunca** quedan reservadas.
+
+- **§7.3, línea 78 — viñeta de Cursos.** Añadir a la frase del aula: «… su aula proviene de los datos
+  del curso y **debe ser del tipo general/ordinario** (V18) …», y añadir, si no está, «La configuración
+  **no** lleva ningún dato que distinga los tipos generales: la convención es el nombre del tipo.» (No
+  repetir «el aula del curso es su aula de referencia»: ya está en esa línea.)
+
+- **§7.4, línea 89 — validación previa.** Sustituir **V1–V17** por **V1–V18** y añadir V18 a la
+  remisión final (hoy «el contenido de V1, V2, V16 y V17»). No se duplica el contenido de V18.
+
+- **§7 «Comportamiento», línea 56.** «declara el problema no factible **con la causa**» pasa a
+  «declara el problema no factible **con la causa cuando una categoría la explica y sin atribuirla
+  cuando ninguna aplica**».
+
+- **`specs/005-nucleo-solver/spec.md`** (lo mismo que §6): anotar la supersesión de la definición de
+  causa y de RF-6 (005:314-320 y 005:484-487) y el rango **V1–V18**.
+
+**Verificación de T15** (texto exacto, sin depender del número de línea):
+
+```
+grep -n "tipo general" docs/constitution.md
+grep -n "V1–V18" docs/constitution.md specs/005-nucleo-solver/spec.md
+grep -n "sin atribuirla" docs/constitution.md
+grep -n "no atribuible" specs/005-nucleo-solver/spec.md
+```
 
 ## 8. Verificación por tarea
 
 Comandos desde la raíz. Compilación siempre: `cmake --build --preset backend --parallel`.
+
+> **T1–T10: ejecutadas y commiteadas (2026-10-25, HEAD `49d39dc`, suite 49/49).** Su verificación se
+> conserva como registro y **no se re-ejecuta**; la regresión final es **T16**. Las tareas nuevas de
+> este cambio son **seis** (T11–T16), de **20–30 min**, en orden de dependencia y con el límite de 10
+> tareas del proyecto.
 
 ### T1. Contrato 2.0, constructor con `Resultado` y consumidores (30 min)
 
@@ -662,51 +990,284 @@ anota en `docs/guias/datos-prueba.md` §6 (límites) que la demanda de ciencias 
 `grep -n "regla de tipo\|no es generable\|no genera horarios" docs/guias/datos-prueba.md` lo confirma.
 El frontend sigue fuera hasta que su equipo migre.
 
+### T11. `FranjaSemana` y funciones puras de capacidad y demanda (30 min)
+
+```
+cmake --build --preset backend --parallel
+ctest --test-dir build-backend --output-on-failure -R 'test_capacidad_tipo|test_contrato_solver|test_backend_variables_cp_sat'
+```
+
+Esperado: build y verde. En `contrato_solver` (target `backend`, sin OR-Tools) y **en ámbito global,
+junto a `claveTipo`** (el `namespace ContratoSolver` solo lleva constantes y no se amplía): `FranjaSemana`
+con `==`, `<` y `qHash`; `slotsTurno`, `franjasDelCurso`, `franjasSemanales`, `demandaDelTipo`,
+`franjasDelTipo`, `aulasDelTipo`, `capacidadDelTipo` y `tipoGeneralAula()`. Se retira **solo** el
+`slotsDelTurno` privado de `contrato_solver.cpp:54-60` (su consumidor pasa a `slotsTurno`); **la copia
+local de `solver.cpp:92-98` se queda** y se retira en T13 con sus usos (M4): T11 **no toca
+`solver.cpp`**. En `test_capacidad_tipo` (nuevo, `add_gtest`, target `backend`): **unidades** —2 días ×
+2 franjas producen 4 `FranjaSemana` distintas, no 2—; unión de turnos `{4,5} ∪ {5,6} = 3`
+franjas/día; `demandaDelTipo` suma los bloques de todos los cursos y no los de un tipo ajeno;
+`capacidadDelTipo = aulas × |franjasDelTipo|`; orden/igualdad/`qHash` coherentes; `tipoGeneralAula()` es
+`"Aula de estudio"` y `claveTipo` de `"  AULA DE ESTUDIO "` coincide. **Rojo primero**: el test no
+compila hasta que existan las firmas.
+
+### T12. V18 en el validador con la constante del tipo general (25 min)
+
+```
+cmake --build --preset backend --parallel
+ctest --test-dir build-backend --output-on-failure -R 'test_validador_entrada'
+```
+
+Esperado: build y verde. Se añade `validarReferenciaGeneral` (§3.2) **después** de
+`validarTiposConAulas`, con el mensaje que nombra **curso, aula y tipo** y la **acción** (asignar al
+curso un aula del tipo general); el tipo general sale de `tipoGeneralAula()` (global, junto a
+`claveTipo`). Casos nuevos: `v18_referenciaSobreLaboratorio_falla` (aula de referencia = laboratorio,
+materias del tipo general → `V18:` con `1A`, nombre del aula y `Laboratorio` y la acción);
+`v18_referenciaSobreTipoNoGeneral_falla` (catálogo con `Aula regular` y solo materias de laboratorio →
+V17 pasa y V18 rechaza); `v18_aulasMoviles_noAplica` (`aula_fija=false`, `aula=-1` → pasa, y también
+con una materia que requiere el tipo general si hay aulas de ese tipo);
+`v18_sinAulaGeneralEnModoFijo_llegaPorV17` (materias del tipo general sin aulas de ese tipo → `V17:`);
+`v18_sinAulaGeneralEnModoMovil_llegaPorV17` (móvil, materia que requiere el tipo general y ningún aula
+de ese tipo → `V17:`, V18 no aplica); `v18_referenciaGeneralPorClave_pasa` (`"  AULA DE ESTUDIO "`).
+`jsonValido_pasa` sigue en verde (su referencia ya es `Aula de estudio`).
+
+### T13. Causa (2) por capacidad: producción y tests acoplados (30 min)
+
+> **Por qué una sola tarea y no dos (M2).** El cambio de producción y los seis tests que fijan la
+> conducta nueva no se pueden separar sin cerrar una tarea con la suite en rojo (la skill lo prohíbe).
+> La división por tiempo es **T13 = producción + tests acoplados** (30 min) y **T14 = pruebas nuevas y
+> renombrados** (30 min), dentro del límite de 10 tareas.
+
+```
+cmake --build --preset backend --parallel
+ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios'
+grep -n "palomarPorTipo\|franjasBloqueadasEnFranjasContadas\|causaConflictoDeAula\|DesplazamientosDeGrupo\|nombreAula\|claveAula" src/backend/src/solver/solver.cpp
+```
+
+**Paso 1 (rojo, al inicio).** Se escribe el test de regresión
+`solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente` (M7) y **falla** contra `49d39dc`, que
+devuelve (2). Fixture exacto (M6):
+
+- `dimensiones = {2, 2, 2, 2, 2, 7}`, `franja_horaria = {60, 7}`; turnos `TB = {5,6}` y `TX = {4,5}`;
+  2 días.
+- Materias: `Ciencias` (tipo `Aula base`) y `Laboratorio` (tipo `Laboratorio`); aulas: `R1`
+  (`Aula base`) y `L1` (`Laboratorio`).
+- Planes: `Plan Y = {{0, 2, 4}}` (Ciencias, año 2, 4 bloques) y `Plan X = {{1, 1, 2}}` (Laboratorio,
+  año 1, 2 bloques).
+- Cursos: `2|Y` turno `TB`, referencia `R1` (índice 0); `1|X` turno `TX`, referencia `R1`.
+- **Quién imparte y cuándo:** `Prof Y` (materias `{0}`, años `{2}`) disponible en `(0,{5,6})` y
+  `(1,{5,6})` → 4 celdas para los 4 bloques de `2|Y`; `Prof Lab` (materias `{1}`, años `{1}`)
+  disponible **solo en `(0,4)`** → 1 celda para los 2 bloques de `1|X`.
+- Cifras: `Aula base` demanda 4 = capacidad 1 × 2 días × 2 franjas = 4; `Laboratorio` demanda 2 ≤
+  capacidad 1 × 2 × 2 = 4; (3) 4 ≤ 4 y 2 ≤ 4; (4) `Prof Lab` no alcanza → **`Causa (4)`, sin (2)**.
+  Con `49d39dc` el descuento de bloqueos da (2) (palomar ⌈2/1⌉ = 2, fuera de lo contado 1 → descuento 1
+  → 4 − 1 = 3 < 4): **rojo**.
+
+**Paso 2 (producción).** Inventario de §0.7 aplicado: se eliminan `palomarPorTipo`,
+`franjasBloqueadasEnFranjasContadas`, `DesplazamientosDeGrupo`, `causaConflictoDeAula` (sus dos
+bloques), `nombreAula` y la `claveAula` de `solver.cpp`; `causaSaturacionPorTipo` se reescribe (§4.4)
+con `demandaDelTipo`/`capacidadDelTipo` y **conserva el guard** (excepción de RF-6); `franjasCurso` pasa
+a `franjasSemanales`; `primeraCausaNoFactible` llama a (2) directamente; el fallback de `analizarFallo`
+dice **no atribuible**; el comentario de `causaEntradaInvalida` pasa a «V1–V18» (I3).
+
+**Paso 3 (tests acoplados).** Se adaptan los tests que dependen de la producción para cerrar en verde.
+**El `grep` de arriba no devuelve nada**; ojo: el `claveAula` estático de
+`restricciones_aulas.cpp:26` (usado en `:98` y `:130`) es **otro helper** y **se conserva** (M3).
+
+**Inventario: 13 tests de causas = 12 `solver_causa*` + `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula`**
+(`test_solver_horarios.cpp:983`). **Ninguno se elimina**: todos siguen cubriendo un escenario.
+
+| Test (nombre actual) | Destino | Por qué |
+|---|---|---|
+| `solver_causaDeAulaConSemanaAnchaNoInventaElConflicto` | **se conserva**, comentario nuevo | ya exige `Causa (4)` y no `(2)` |
+| `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos` | **se reescribe** → `solver_causaNoAtribuibleCuandoLaReferenciaCompartidaNoCabe` | INFEASIBLE por la referencia compartida, sin categoría: `no atribuible`, sin entidad |
+| `solver_causaDeAulaConCapacidadSuficienteNoInventaElConflicto` | **se conserva** | control negativo: factible |
+| `solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja` | **se renombra** → `...ConDosCursosDesplazadosEsFactible` | la unión ya no existe; sigue siendo factible |
+| `solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio` | **se reescribe** → `solver_causaNoAtribuibleCuandoLaReferenciaCasiLlenaNoCabe` | 28 ≤ 30 y 4 ≤ 30: el conteo por tipo pasa |
+| `solver_causaDeAulaConLaboratoriosSuficientesNoInventaElConflicto` | **se conserva** | control negativo con 2 laboratorios |
+| `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` | **se reescribe** → `solver_causaNoAtribuibleCuandoElTipoTieneCapacidad` | 7 ≤ 12; **no se toca el fixture** (la referencia de `3|C` sigue en la cancha: los fixtures del motor no pasan por V18, §3.2) y se mantiene la infactibilidad |
+| `solver_causaDeAulaNoSobreestimaConTurnosDistintos` | **se conserva**, comentario nuevo | ya exige `Causa (4)` |
+| `solver_causaDeAulaConTurnosDistintosNoInventaElConflicto` | **se conserva** | control negativo |
+| `solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno` | **se renombra** → `solver_causaDeDocenteEnTurnoDistintoNoSeInformaComoConflictoDeAula` | ya exige `Causa (4)` |
+| `solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible` | **se renombra** → `solver_causaDeDocenteNoElegibleNoSeInformaComoConflictoDeAula` | ya exige `Causa (4)` |
+| `solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto` | **se conserva** | control negativo |
+| `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula` | **se conserva** | ya exige `Causa (4)` |
+| `solver_falloCausaConflictoDeAula` (005) | **se reescribe la aserción** | **el fixture no se toca**: se asevera el **tipo declarado** (`«regular»`) en vez del nombre del aula (8 > 4 sigue siendo (2)) |
+| `solver_falloCausaConflictoDeAulaPorReferenciaSaturada` (T6) | **se renombra** → `...PorCapacidadDeTipo` y **se reescribe la aserción** | 10 > 6 sigue siendo (2); el mensaje ya no nombra el aula |
+| `solver_falloCausaConflictoDeAulaPorSaturacionDeTipo` (T6) | **se conserva**, comentario | 10 > 8 sigue siendo (2) |
+| `solver_falloCausaConflictoDeAulaPorSaturacionDeTipoEnModoMovil` (T6) | **se conserva** | 10 > 8 en modo móvil |
+| `solver_falloTipoSinAulas_esEntradaInvalida` (T6) | **se conserva** | (1) por V17 |
+| `solver_falloCausaConflictoDePersona` (005) | **se conserva** | prueba la **excepción de precedencia** de RF-6 (§0.6): demanda 4 > capacidad 2 y aun así (3) |
+
+### T14. Pruebas nuevas: ventanas, reproducibilidad, aula especializada y renombrados (30 min)
+
+```
+cmake --build --preset backend --parallel
+ctest --test-dir build-backend --output-on-failure -R 'test_solver_horarios'
+```
+
+Esperado: build y verde (el build va en el «Hecho cuando» para que la tarea sea autocontenida, I9).
+
+- **`solver_causaNoAtribuiblePorVentanasDeTurno`** (**fixture completo en §0.3**, verificado): 1 día,
+  `num_slots_dia = 7`, **1 aula** `A1` (`Aula de estudio`), **modo móvil**, tres cursos de 1 bloque:
+  `1|A` y `2|B` con turno `TB={4}` y `Prof A`/`Prof B` disponibles en `(0,4)`, y `3|C` con turno
+  `TC={5,6}` y `Prof C` en `(0,5)` y `(0,6)`. `demanda = 3 = capacidad` (1 × 3) → **(2) no falla**;
+  (3) y (4) tampoco; el modelo es **INFEASIBLE** (`1|A` y `2|B` no caben en la única celda `(0,4)`) →
+  **no atribuible**, sin `Causa (`, sin `A1`, sin `1|A`.
+- **`solver_esReproducible_mismaEntradaMismaSalida`** (RNF-1, M10): resolver **dos veces** el mismo
+  `SolverConfig` (uno factible y el fixture INFEASIBLE de T13) y comparar `exito` y un resumen
+  determinista de la salida —por curso, la lista de `(día, slot, materia, profesor, aula)` y, si no hay
+  solución, `errores`—. Se apoya en que el motor fija `num_search_workers(1)` y `random_seed(0)`
+  (`solver.cpp:424-425`).
+- **`solver_exclusividadEntreClasesDesplazadas`**: se añade una aserción (M11) de que el laboratorio
+  —tipo especializado— aloja clases de **los dos** cursos (`enLaboratorio == 4` sigue), es decir, **no
+  queda reservado** a ninguno; así RF-3 («las aulas especializadas nunca quedan reservadas») tiene
+  comprobación directa, además de seguirse de `solver_referenciaBloqueadaMientrasHayClaseDesplazada`
+  (solo se bloquea la referencia general).
+- Se actualizan los **3 renombrados** y los **2 comentarios** de la tabla de T13 (sin cambiar aserciones
+  más allá de las indicadas) y se comprueba que ningún test usa datos no versionados.
+
+### T15. Documentación, constitución y 005 (25 min; la ejecuta el planner)
+
+```
+grep -n "tipo general" docs/contrato-solver-2.0.md
+grep -n "capacidad del tipo\|no atribuible" docs/contrato-solver-2.0.md
+grep -n "aula de referencia\|preset" docs/contrato-solver-2.0.md
+grep -n "V18" docs/contrato-solver-2.0.md
+grep -n "tipo general" docs/constitution.md
+grep -n "V1–V18" docs/constitution.md
+grep -n "sin atribuirla" docs/constitution.md
+grep -n "no atribuible" specs/005-nucleo-solver/spec.md
+grep -n "excepción de precedencia\|no cabe en su turno" specs/005-nucleo-solver/spec.md
+grep -n "V1–V17" specs/005-nucleo-solver/spec.md docs/contrato-solver-2.0.md
+```
+
+Esperado:
+
+- `docs/contrato-solver-2.0.md` explica el **tipo general por convención de nombre** (`aula de
+  estudio`), la **capacidad del tipo** (fórmula con días×franjas de la unión de turnos), que (2) se
+  decide por ese conteo sin descontar bloqueos, que lo no explicado es **no atribuible** y que **un
+  preset 2.0 anterior con una referencia de tipo especializado pasa a ser entrada inválida por V18**,
+  sin conversión, con la acción «asignar al curso un aula del tipo general» (M12). Se actualiza
+  `:27` («se valida el resto (V1–V17)» → V1–V18) y la fila de `cursos` de la tabla de secciones
+  (`:65`) para incluir **V18**: el `grep -n "V18"` del contrato lo muestra en ambas (esa fila no cae en
+  el `grep` de `V1–V17` porque hoy no lo menciona). Sin sección nueva; el contrato sigue 2.0.
+- Constitución: `tipo general` en §7.1.5/§7.3, **`V1–V18`** en §7.4 y `sin atribuirla` en §7
+  «Comportamiento» (texto de §7 del plan).
+- `specs/005-nucleo-solver/spec.md`: `no atribuible` en la definición de causa y en RF-6, la
+  **excepción de precedencia** de (3) sobre (2), la (2) descrita por capacidad **sin «(invariantes
+  D8/D9/D10)»** (`005:317`, I8) y `V1–V18` en **todas** las apariciones que hoy dicen V1–V17 (`128`,
+  `135`, `317`, `322`, `575`, `578`, `580`, `822` y notas), actualizando «la 010 añade V16 y V17» a
+  «V16, V17 y V18».
+- **El último `grep` no devuelve nada**: no queda ninguna mención a `V1–V17` en la 005 ni en el
+  contrato vivo (M9).
+- **El implementer solo verifica**; no edita estos archivos.
+
+### T16. Regresión global y comprobación del seed (20 min)
+
+```
+cmake --build --preset backend --parallel
+ctest --preset backend
+ctest --test-dir build-backend -N
+git diff --stat src/backend/src/database src/backend/include/backend/database src/seed
+grep -n 'const char\* const kTipoGenerico' src/seed/src/perfil.cpp
+grep -c "kTipoGenerico" src/seed/src/perfil.cpp
+grep -n "Aula de estudio" src/seed/src/perfil.cpp
+```
+
+Esperado: **100 % verde** (sin `test_frontend_conversion` ni `test_generacion_seed`); el benchmark sigue
+**factible** y < 60 s; `git diff --stat` de la base y del seed **vacío** (no hay cambio de esquema ni de
+siembra); el seed sigue declarando `const char* const kTipoGenerico = "Aula de estudio";`
+(`perfil.cpp:43`), **18** líneas mencionan `kTipoGenerico` (declaración, catálogo, las 14 aulas y los dos
+retornos de `tipoFinalDeMateria`) y el curso se asigna por `Aula 01…13` (el aula de referencia no se
+siembra en el seed: se elige en la app). Así la convención se cumple **sin tocar el seed** (I7).
+
 ## 9. Trazabilidad RF → tarea → verificación
 
 | RF | Tarea(s) | Verificación |
 |----|----------|--------------|
-| RF-1 | T1, T2 | `test_constructor_entrada` (2.0, tipos, eventos, `inicio/fin`, ida y vuelta; **aula/materia sin tipo → `ok == false` con mensaje que nombra la entidad**), `test_contrato_solver` (forma y sellado 2.0 en T1), `test_cargador_configuracion` (2.0 válido en T2) |
+| RF-1 | T1, T2 | `test_constructor_entrada` (2.0, tipos, eventos, `inicio/fin`, ida y vuelta; **aula/materia sin tipo → `ok == false` con mensaje que nombra la entidad**), `test_contrato_solver` (forma y sellado 2.0 en T1), `test_cargador_configuracion` (2.0 válido en T2). **Sin cambio el 2026-10-26**: no hay catálogo ni marca en el contrato |
 | RF-2 | T2 | `test_cargador_configuracion` (1.0/sin versión, fixture versionado, archivo, versión, acción, bytes intactos) |
-| RF-3 | T4 | `test_solver_horarios` (referencia, desplazamiento/vuelta, bloqueo, exclusividad, móvil) |
+| RF-3 | T4, **T12**, **T14** | `test_solver_horarios` (referencia, desplazamiento/vuelta, bloqueo, exclusividad, móvil) + **V18**: `test_validador_entrada` (`v18_*`: referencia de otro tipo → `V18:` con curso/aula/tipo; móvil no aplica; sin tipo general llega por `V17:`) + **T14**: aserción de que el laboratorio aloja clases de los dos cursos (los especializados **no** se reservan) |
 | RF-4 | T4, T5 | `test_solver_horarios` (aula real) y `test_validador_salida` (P3 sin cambios y P4 con claves por docente/aula, `06fc70e`) |
-| RF-5 | T3 | `test_validador_entrada` (V1/V2/V16/V17) |
-| RF-6 | T6 | `test_solver_horarios` (saturación → conflicto de aula; tipo sin aulas → entrada inválida) |
-| RF-7 | T7 | `grep` de la 005 (V1 eventos/V1–V17/D10/salida/RF-7/1.0) |
-| RF-8 | T7 | `grep` de la constitución (§5, §7.1.5, §7.3, §7.4, §7.5) |
-| RF-9 | T8 | `grep` del MER (catálogo, tipos, turnos, cursos, eventos) |
-| RF-10 | T9 | `grep` de `docs/contrato-solver-2.0.md` (2.0, eventos, aula de referencia, 1.0, aula real) |
-| RNF-2 | T10 | `test_solver_benchmark` factible y < 60 s |
-| RNF-5 | T10 | `ctest --preset backend` sin tests de frontend |
+| RF-5 | T3, **T12** | `test_validador_entrada` (V1/V2/V16/V17) + **V18** (`v18_*`) en el orden V16 → V17 → V18 |
+| RF-6 | **T11, T13, T14** | `test_capacidad_tipo` (unidades día×franja, demanda y capacidad) + `test_solver_horarios`: (2) solo si `demanda(t) > capacidad(t)`; **excepción de precedencia**: `solver_falloCausaConflictoDePersona` da (3) con demanda 4 > capacidad 2; **contraejemplo del reviewer → `Causa (4)`**; ventanas de turno y referencia compartida → `no atribuible`; `grep` sin `palomarPorTipo`/`franjasBloqueadas...`/`causaConflictoDeAula`/`nombreAula`/`claveAula` |
+| RF-7 | T7, **T15** | `grep` de la 005: V1 eventos, **V1–V18**, D10, salida, RF-7, 1.0, definición de causa (sin D8/D9/D10), **excepción de precedencia** y `no atribuible`; `grep V1–V17` **vacío** |
+| RF-8 | T7, **T15** | `grep` de la constitución: `tipo general` (§7.1.5/§7.3), **`V1–V18`** (§7.4), `sin atribuirla` (§7 Comportamiento); §5 y §7.5 **sin** cambios nuevos |
+| RF-9 | T8 | `grep` del MER (catálogo, tipos, turnos, cursos, eventos). **Sin cambio el 2026-10-26**: no hay columna nueva |
+| RF-10 | T9, **T15** | `grep` de `docs/contrato-solver-2.0.md` (2.0, eventos, aula de referencia, 1.0, aula real) + `tipo general`, `capacidad del tipo`, `no atribuible`, V1–V18 y el aviso del preset 2.0 con referencia especializada |
+| RNF-2 | T10, **T16** | `test_solver_benchmark` factible y < 60 s |
+| RNF-3 | **T13, T14** | Mensaje de (2) con nombre visible del tipo, demanda y capacidad; «no atribuible» sin nombrar entidad; V18 con acción |
+| RNF-4 | T1, T3, T4, T6, **T16** | Suite completa verde; invariantes y objetivo sin cambios |
+| RNF-5 | T10, **T16** | `ctest --preset backend` sin tests de frontend |
 | RNF-6 | Todas | Esta tabla y el `Hecho cuando` de cada tarea |
-| RNF-1/3/4 | T1, T3, T4, T6 | Reproducibilidad del solver, mensajes y no regresión fuera de la regla |
+| RNF-1 | **T14**, T16 | `solver_esReproducible_mismaEntradaMismaSalida`: dos ejecuciones del mismo fixture (factible e INFEASIBLE) dan el mismo `exito` y el mismo resumen/`errores`; el motor fija `num_search_workers(1)` y `random_seed(0)` |
+
+**Cobertura de la spec por parte del plan (no hay RF sin verificación).** RF-1/RF-2/RF-4/RF-9 quedan
+como están (T1–T9, ya verdes); RF-3 y RF-5 suman **V18** (T12); RF-6 se reescribe (T11/T13/T14); RF-7,
+RF-8 y RF-10 suman los textos de T15.
 
 ## 10. Riesgos y condiciones
 
+- **Se pierde atribución, no detección (2026-10-26).** Al retirar el conteo por aula de referencia, los
+  fallos que solo esa ocupación explica se informan como **no atribuible**. Es aceptado por RF-6 y está
+  cubierto por tests que antes exigían (2): si el mensaje «no atribuible» desapareciera o alguien
+  reintrodujera un descuento, T13/T14 fallan. No se pierde el estado INFEASIBLE ni la causa cuando es
+  (1), (3) o (4).
+- **El nombre del tipo general es una convención, no un dato (2026-10-26).** `tipoGeneralAula()` es la
+  única fuente; si la semilla cambiara el nombre, V18 rechazaría todas las referencias. Se verifica en
+  T16 con `grep -n 'const char\* const kTipoGenerico' src/seed/src/perfil.cpp` (debe decir
+  `= "Aula de estudio"`) y `grep -c kTipoGenerico` (18 líneas); el mensaje de V18 nombra la convención.
+- **Presets 2.0 anteriores con referencia especializada (M12).** La regla V18 es de entrada: un preset
+  2.0 guardado con el aula de referencia sobre un laboratorio, taller o cancha pasa a ser **entrada
+  inválida**, **sin conversión automática**. La acción es **asignar al curso un aula del tipo general**
+  (`Aula de estudio`) y regenerar la entrada desde los datos. Afecta a presets escritos antes de este
+  cambio; se documenta en `docs/contrato-solver-2.0.md` (T15). No hay presets en el repo que lo usen.
+- **La causa (2) ya no nombra un aula.** Los mensajes por aula desaparecen con el bloque retirado; los
+  tests que los esperaban se reescriben en T13. Si algún consumidor (GUI, logs) buscaba el nombre del
+  aula en el mensaje, deja de encontrarlo: es coherente con que el conteo es por tipo (RNF-3 se cumple
+  con tipo, demanda y capacidad).
+- **Orden (2) antes que (3) con la excepción aprobada.** La **excepción de precedencia** de RF-6
+  (2026-10-26) manda informar (3) cuando un curso no cabe en su turno, aunque la capacidad del tipo
+  también falle. En producción V14 ya rechaza ese dato antes del solver; la excepción se prueba con
+  `solver_falloCausaConflictoDePersona` (demanda 4 > capacidad 2 → (3)) y la implementa el guard de
+  `causaSaturacionPorTipo`. Si se retirara el guard, habría que enmendar la spec otra vez.
 - **El modelo con `y` para todos los cursos** aumenta las variables (cursos × días × franjas ×
-  aulas); el benchmark de T10 debe seguir <60 s. Si se degrada, la alternativa es podar `y` por los
+  aulas); el benchmark de T10/T16 debe seguir <60 s. Si se degrada, la alternativa es podar `y` por los
   tipos de las materias del curso, no volver a la lógica de aulas fijas.
 - **La referencia bloqueada** es una restricción por par de cursos; con muchos cursos puede crecer
-  como O(cursos² × franjas), pero es lineal en franjas y pequeña frente a `x`.
+  como O(cursos² × franjas), pero es lineal en franjas y pequeña frente a `x`. **Este cambio no la
+  toca**: solo deja de entrar en las cuentas de causa.
 - **La 011** cambiará `duracion_minutos` (30–90) y la procedencia de la configuración; aquí no se
   toca; V2 solo mantiene `>0`.
-- **La constitución y la 005** las edita el planner; el implementer no. **Ya aplicadas** en
-  `f054b2e` (§5, §7.1.5, §7.3, §7.4 y §7.5 más la anotación de la 005), así que T7 no bloquea el
-  cierre.
+- **La constitución y la 005** las edita el planner; el implementer no. Lo de T7 ya está (`f054b2e`);
+  lo de este cambio es **T15**.
 - **El frontend** no compila; `full`/`dev-frontend` siguen rojos; la verificación es el preset
-  `backend`, como en la 009.
-- **Rotura conocida del builder del frontend.** `src/frontend/src/services/entrada_solver_builder.cpp`
-  asigna el retorno de `construirJsonEntrada` a un `QJsonObject`; con `Resultado<QJsonObject>` deja de
-  compilar. Es deuda del equipo del frontend y **no se toca** en esta spec (el preset `backend` no lo
-  compila). El día que el frontend vuelva, basta con `if (!r.ok) …; comp.entrada = r.valor;`.
-- **`Resultado<QJsonObject>` en los consumidores backend.** Además de la definición y la fachada, hay
-  cuatro llamadores en pruebas: `test_constructor_entrada`, `test_validador_entrada`,
-  `test_servicio_generacion` y `test_ipc_aislamiento_bd`. T1 los adapta todos; si se olvida uno, el
-  preset `backend` no compila y la tarea no se marca.
+  `backend`, como en la 009. **Rotura conocida:** `src/frontend/src/services/entrada_solver_builder.cpp`
+  asigna el retorno de `construirJsonEntrada` a un `QJsonObject`; es deuda del equipo del frontend y no
+  se toca.
+- **`Resultado<QJsonObject>` en los consumidores backend:** ya adaptados en T1; este cambio no añade
+  llamadores.
 - **El seed no es generable con la regla dura (documentado, no se intenta).** La demanda de ciencias
-  ronda los **104 bloques** frente a **1 laboratorio × 40 franjas**: no hay horario con la regla de
-  tipo para el centro sembrado. La 009 ya retiró la promesa de generabilidad del seed; la 010 lo deja
-  escrito en la guía de datos de prueba y **no** lo verifica con el solver (`test_generacion_seed`
-  sigue fuera de alcance).
+  ronda los **104 bloques** frente a **1 laboratorio × 40 franjas**. T16 solo verifica que el seed sigue
+  sembrando `Aula de estudio` y que no se toca.
 - **El bloqueo solo recorre `y` existentes.** Ver §4.2: recorrer `c'` a ciegas rompería con turnos
   mixtos (mañana/tarde), que es justo el caso del seed.
+
+## 11. Fuera de alcance de este cambio (2026-10-26)
+
+- **El esquema y su versión:** no hay columna nueva; `TiposAula` sigue con `nombre` y `clave` y
+  `VERSION_ESQUEMA_ACTUAL` no cambia. Una base existente se abre como hoy.
+- **La 009:** no se reabre; no se tocan servicios, DTOs, huella ni seed.
+- **El contrato:** sigue siendo **2.0**, sin sección ni campo nuevos. Un preset 2.0 **sin referencias
+  especializadas** sigue siendo válido; uno con el aula de referencia sobre un tipo especializado pasa a
+  ser **entrada inválida por V18**, sin conversión (ver §10, M12).
+- **El frontend:** no se toca (sigue fuera de la construcción); su deuda con `Resultado<QJsonObject>`
+  es la misma.
+- **El seed:** solo se verifica que siembra `Aula de estudio` (T16); no se modifica ni se intenta
+  generar un horario con él.
+- **El motor:** `x`/`y`, el objetivo (`PESO_HORAS`, `COSTE_SUPLENTE`), la reserva del aula de
+  referencia, el tipo exacto y el resto de restricciones no cambian. `FranjaSemana` se usa **solo**
+  en las cuentas de capacidad.
+- **El resto de RF de la 010:** contrato 2.0, rechazo de versiones, V1/V2/V16/V17, aula de referencia,
+  salida con aula real, MER, documentación general del contrato y benchmark ya están hechos y validados
+  (T1–T10); este cambio no los reabre.
