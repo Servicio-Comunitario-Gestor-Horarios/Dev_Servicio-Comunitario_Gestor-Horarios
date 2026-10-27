@@ -155,27 +155,35 @@ Líneas de `49d39dc` en `src/backend/src/solver/solver.cpp`:
 
 | Elemento | Líneas | Destino |
 |---|---|---|
-| `struct DesplazamientosDeGrupo` | 26-29 | **se elimina** |
-| `aulasDelTipo` | 33-38 | **se mueve** a `contrato_solver` (pura y con test) |
-| `palomarPorTipo` | 40-59 | **se elimina** |
-| `franjasBloqueadasEnFranjasContadas` | 61-90 | **se elimina** |
-| `slotsTurno` | 92-98 | **se añade** la versión pública en `contrato_solver` (T11); la copia local de `solver.cpp` **se retira en T13**, junto con sus últimos usos (`114`, `204`, `249`, `286`, `327`). T11 no toca `solver.cpp` (evita actualizar llamadas que T13 borra) |
+| `struct DesplazamientosDeGrupo` | 26-29 | **se elimina** (T13) |
+| `aulasDelTipo` | 33-38 | **se mueve** a `contrato_solver` **y su copia anónima se borra en T11** (ambigüedad ADL, nota siguiente); las llamadas no cambian |
+| `palomarPorTipo` | 40-59 | **se elimina** (T13) |
+| `franjasBloqueadasEnFranjasContadas` | 61-90 | **se elimina** (T13) |
+| `slotsTurno` | 92-98 | **se mueve** a `contrato_solver` **y su copia anónima se borra en T11** (misma ambigüedad); las llamadas (`114`, `204`, `249`, `286`, `327`) **no cambian** y el cuerpo es idéntico al de la función global |
 | `bloquesMateria`, `bloquesCurso` | 100-110 | se conservan |
-| `franjasCurso` (`num_dias × slots`) | 112-115 | **se sustituye** por `franjasSemanales` (`|franjasDelCurso|`) |
-| `nombreAula` | 126-128 | **se elimina** (solo lo usaban los mensajes por aula) |
-| `claveAula` | 140-144 | **se elimina** (id.) |
+| `franjasCurso` (`num_dias × slots`) | 112-115 | **se sustituye** por `franjasSemanales` (`|franjasDelCurso|`) (T13) |
+| `nombreAula` | 126-128 | **se elimina** (solo lo usaban los mensajes por aula) (T13) |
+| `claveAula` | 140-144 | **se elimina** (id.) (T13) |
 | `causaEntradaInvalida` | 146-184 | se conserva |
-| `causaSaturacionPorTipo` | 186-274 | **se reescribe**: solo `demanda(t) > capacidad(t)`; sin `bloqueosPorReferencia`, sin descuento y sin producto manual; **conserva el guard** de la excepción de precedencia de RF-6 |
-| Bloque por aula de referencia (`cursosPorAula`, `total`, `bloqueadas`, mensajes) | 295-348 | **se elimina** |
-| Rama de aulas móviles | 278-293 | **se elimina**: el caso «modo móvil sin aulas» lo rechaza (1) por **V15** (`solver_config.cpp:714-720`) en el flujo real, y el chequeo de tipo sin aulas (V17) cubre el resto |
-| `causaConflictoDeAula` (resto) | 277-352 | **se elimina**; `primeraCausaNoFactible` llama a (2) directamente |
+| `causaSaturacionPorTipo` | 186-274 | **se reescribe**: solo `demanda(t) > capacidad(t)`; sin `bloqueosPorReferencia`, sin descuento y sin producto manual; **conserva el guard** de la excepción de precedencia de RF-6 (T13) |
+| Bloque por aula de referencia (`cursosPorAula`, `total`, `bloqueadas`, mensajes) | 295-348 | **se elimina** (T13) |
+| Rama de aulas móviles | 278-293 | **se elimina** (T13): el caso «modo móvil sin aulas» lo rechaza (1) por **V15** (`solver_config.cpp:714-720`) en el flujo real, y el chequeo de tipo sin aulas (V17) cubre el resto |
+| `causaConflictoDeAula` (resto) | 277-352 | **se elimina** (T13); `primeraCausaNoFactible` llama a (2) directamente |
 | `causaConflictoDePersona`, `causaConflictoDeAsignacion` | 354-389 | se conservan |
 | `primeraCausaNoFactible` | 391-400 | se conserva el orden (1)(2)(3)(4) |
-| Completo de `causaEntradaInvalida` (comentario) | 147 | **se actualiza** «V1–V17» → «V1–V18» (I3) |
-| Fallback de `analizarFallo` | 537-542 | **se reescribe**: mensaje de **causa no atribuible** |
+| Comentario de `causaEntradaInvalida` | 147 | **se actualiza** «V1–V17» → «V1–V18» (I3) (T13) |
+| Fallback de `analizarFallo` | 537-542 | **se reescribe**: mensaje de **causa no atribuible** (T13) |
 
 Notas del inventario:
 
+- **Borrado de las dos copias anónimas en T11 (corrección del 2026-10-27).** `solver.cpp` declara
+  `aulasDelTipo` y `slotsTurno` en un **namespace anónimo**, que se inyecta en el ámbito global por
+  *using-directive*. Al declarar las mismas firmas en `contrato_solver.hpp` (globales), ambas son
+  candidatas a la vez y el compilador las declara **ambiguas**: **no hay ocultamiento posible** (la
+  afirmación contraria del re-QA del plan era **falsa**). Comprobado el 2026-10-26: con las copias
+  presentes, **8 errores de ambigüedad**; borrando **solo esas dos definiciones** (llamadas intactas,
+  cuerpos idénticos a las funciones globales), compila y la suite queda **50/50**. Por eso el borrado de
+  `solver.cpp:33-38` y `solver.cpp:92-98` es de **T11**, no de T13.
 - **`claveAula`:** se elimina **solo** la de `solver.cpp` (140-144). El `claveAula` estático de
   `restricciones_aulas.cpp:26` (usado en `:98` y `:130`) es **otro helper** y **se conserva**.
 - **Mensaje de (2):** usa el **nombre visible** del tipo tal como lo declara la primera materia que lo
@@ -183,6 +191,8 @@ Notas del inventario:
   `«Aula base»`… (I6).
 - **`slotsDelTurno` de `contrato_solver.cpp:54-60`:** su único consumidor es `slotsDisponibles`; en T11 se
   sustituye por la función pública `slotsTurno` y se elimina la copia privada.
+- **`slots` es macro de Qt** (`QObject`): no se puede usar como nombre de variable local. En
+  `franjasDelCurso` la lista local se llama **`slotsDelCurso`** (ya resuelto en el código de T11).
 
 Otros archivos:
 
@@ -467,11 +477,12 @@ requerida; en un 2.0 se ignora como campo desconocido.
     `slot`) y `qHash` (`qHashMulti`), de modo que sirve en `QSet` y en `QMap` sin ambigüedad de
     unidades: una franja es un par `(día, slot)`, no un `slot` repetido por día.
   - `QVector<int> slotsTurno(const SolverConfig&, const QString& turno)`; se retira el
-    `slotsDelTurno` privado de `contrato_solver.cpp:54-60` y su consumidor pasa a `slotsTurno`. **La
-    copia local de `solver.cpp:92-98` NO se toca en T11**: se retira en T13, con sus usos y sus bloques
-    (M4).
+    `slotsDelTurno` privado de `contrato_solver.cpp:54-60` y su consumidor pasa a `slotsTurno`, y **se
+    borra la copia anónima de `solver.cpp:92-98`** en T11 (ambigüedad ADL, §0.7): sus llamadas **no
+    cambian**.
   - `QSet<FranjaSemana> franjasDelCurso(const SolverConfig&, const CursoSolverConfig&)`:
-    `{ (d, s) : d < num_dias ∧ s ∈ slotsTurno(turno del curso) }`.
+    `{ (d, s) : d < num_dias ∧ s ∈ slotsDelCurso }`, donde `slotsDelCurso` es la lista local con los
+    slots del turno (**`slots` es macro de Qt y no se puede usar como nombre de variable**).
   - `int franjasSemanales(...)`: `|franjasDelCurso|`; **sustituye** el producto manual
     `num_dias × slotsTurno(...).size()` (la sustitución en `solver.cpp` es de T13).
   - `QSet<FranjaSemana> franjasDelTipo(const SolverConfig&, const QString& clave)`: unión de
@@ -995,20 +1006,27 @@ El frontend sigue fuera hasta que su equipo migre.
 ```
 cmake --build --preset backend --parallel
 ctest --test-dir build-backend --output-on-failure -R 'test_capacidad_tipo|test_contrato_solver|test_backend_variables_cp_sat'
+grep -n "int aulasDelTipo\|QVector<int> slotsTurno" src/backend/src/solver/solver.cpp
+ctest --preset backend
 ```
 
-Esperado: build y verde. En `contrato_solver` (target `backend`, sin OR-Tools) y **en ámbito global,
-junto a `claveTipo`** (el `namespace ContratoSolver` solo lleva constantes y no se amplía): `FranjaSemana`
-con `==`, `<` y `qHash`; `slotsTurno`, `franjasDelCurso`, `franjasSemanales`, `demandaDelTipo`,
-`franjasDelTipo`, `aulasDelTipo`, `capacidadDelTipo` y `tipoGeneralAula()`. Se retira **solo** el
-`slotsDelTurno` privado de `contrato_solver.cpp:54-60` (su consumidor pasa a `slotsTurno`); **la copia
-local de `solver.cpp:92-98` se queda** y se retira en T13 con sus usos (M4): T11 **no toca
-`solver.cpp`**. En `test_capacidad_tipo` (nuevo, `add_gtest`, target `backend`): **unidades** —2 días ×
-2 franjas producen 4 `FranjaSemana` distintas, no 2—; unión de turnos `{4,5} ∪ {5,6} = 3`
-franjas/día; `demandaDelTipo` suma los bloques de todos los cursos y no los de un tipo ajeno;
-`capacidadDelTipo = aulas × |franjasDelTipo|`; orden/igualdad/`qHash` coherentes; `tipoGeneralAula()` es
-`"Aula de estudio"` y `claveTipo` de `"  AULA DE ESTUDIO "` coincide. **Rojo primero**: el test no
-compila hasta que existan las firmas.
+Esperado: build y verde; el `grep` **no devuelve nada**; la **suite completa sigue verde** (50/50: los 49 existentes + `test_capacidad_tipo`). En
+`contrato_solver` (target `backend`, sin OR-Tools) y **en ámbito global, junto a `claveTipo`** (el
+`namespace ContratoSolver` solo lleva constantes y no se amplía): `FranjaSemana` con `==`, `<` y
+`qHash`; `slotsTurno`, `franjasDelCurso`, `franjasSemanales`, `demandaDelTipo`, `franjasDelTipo`,
+`aulasDelTipo`, `capacidadDelTipo` y `tipoGeneralAula()`. Se retira el `slotsDelTurno` privado de
+`contrato_solver.cpp:54-60` (su consumidor pasa a `slotsTurno`) **y se borran las dos copias anónimas de
+`solver.cpp` (`aulasDelTipo` 33-38 y `slotsTurno` 92-98)**: con ellas presentes, las firmas globales
+nuevas hacen que el compilador vea **dos candidatas por *using-directive*** y dé **8 errores de
+ambigüedad** (no hay ocultamiento posible, §0.7). **Las llamadas de `solver.cpp` no se tocan** y los
+cuerpos son idénticos a las funciones globales; el resto del inventario de causas sigue en T13. En
+`franjasDelCurso`, la lista local de slots se llama **`slotsDelCurso`** (`slots` es macro de Qt). En
+`test_capacidad_tipo` (nuevo, `add_gtest`, target `backend`): **unidades** —2 días × 2 franjas producen 4
+`FranjaSemana` distintas, no 2—; unión de turnos `{4,5} ∪ {5,6} = 3` franjas/día; `demandaDelTipo` suma
+los bloques de todos los cursos y no los de un tipo ajeno; `capacidadDelTipo = aulas ×
+|franjasDelTipo|`; orden/igualdad/`qHash` coherentes; `tipoGeneralAula()` es `"Aula de estudio"` y
+`claveTipo` de `"  AULA DE ESTUDIO "` coincide. **Rojo primero**: el test no compila hasta que existan
+las firmas.
 
 ### T12. V18 en el validador con la constante del tipo general (25 min)
 

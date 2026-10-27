@@ -156,8 +156,13 @@ Con la referencia limitada al tipo general fijo, la categoría (2) deja de neces
   reproducibilidad). Fuera de los 13, cambian **dos** aserciones: `solver_falloCausaConflictoDeAula`
   (005, asevera el tipo) y `solver_falloCausaConflictoDeAulaPorReferenciaSaturada` (T6, renombrado a
   `...PorCapacidadDeTipo`, asevera el tipo en vez del aula).
-- **Aprobación pendiente del plan.** La spec está aprobada (2026-10-26, con la enmienda); `plan.md` y
-  `tasks.md` de esta segunda entrega esperan la aprobación del usuario antes de implementar.
+- **Corrección de alcance (2026-10-27).** El borrado de las dos copias anónimas de
+  `aulasDelTipo`/`slotsTurno` de `solver.cpp` pasa a **T11** por **ambigüedad ADL** (las firmas
+  globales nuevas y las copias del namespace anónimo son candidatas a la vez: no hay ocultamiento
+  posible); el re-QA del plan afirmó lo contrario y era **incorrecto**. El resto del inventario de
+  causas sigue en T13.
+- **Plan y tareas aprobados por el usuario el 2026-10-26.** La spec está aprobada (2026-10-26, con la
+  enmienda) y `plan.md` y `tasks.md` de esta segunda entrega también; la implementación arranca en T11.
 
 ## Validación 6 · defecto abierto (2026-10-25) — histórico, superado por el cambio de requisitos
 
