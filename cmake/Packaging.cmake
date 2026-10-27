@@ -16,6 +16,10 @@
 #   cmake --build build-rel --target package        # genera el ZIP en build-rel/
 #   cmake --install build-rel --prefix dist         # solo la carpeta, sin ZIP
 #
+# Con `-DGESTOR_PACK_DEMO=ON` el ZIP se llama «Generador de Horarios Demo» y
+# añade los datos de demostración (base sembrada y preset) con un instalador que
+# los copia a %APPDATA% sin pisar los del usuario; ver packaging/LEEME-DATOS-DEMO.txt.
+#
 # Solo se genera en Windows: las dependencias que se copian (windeployqt y el
 # runtime de MSVC) son específicas de esa plataforma. En Linux/Docker el build no
 # se ve afectado.
@@ -125,6 +129,38 @@ endif()
 
 install(FILES "${CMAKE_SOURCE_DIR}/packaging/LEEME.txt" DESTINATION .)
 
+# ── Datos de demostración (opcional) ──
+# El paquete estándar trae solo la aplicación: los datos (docentes, aulas,
+# materias, cursos, planes y turnos) viven en la base de cada usuario
+# (%APPDATA%) y hay que darlos de alta o sembrarlos aparte. Con
+# `GESTOR_PACK_DEMO=ON` la entrega añade la base sembrada del Plan 31059 y su
+# preset, más un .bat que la instala en %APPDATA% sin pisar los datos que ya
+# existan, para que la demo funcione recién descomprimida.
+option(GESTOR_PACK_DEMO
+    "Incluye los datos de demostración (base sembrada y preset) en el paquete"
+    OFF)
+
+if(GESTOR_PACK_DEMO)
+    set(_gestor_datos_prueba "${CMAKE_SOURCE_DIR}/datos-prueba")
+    foreach(_gestor_archivo
+            "centro-31059-holgada.db"
+            "preset-centro-31059-holgada.json")
+        if(NOT EXISTS "${_gestor_datos_prueba}/${_gestor_archivo}")
+            message(FATAL_ERROR
+                "GESTOR_PACK_DEMO=ON, pero falta ${_gestor_archivo} en "
+                "datos-prueba/. Genera los datos de prueba antes de empaquetar.")
+        endif()
+    endforeach()
+    install(FILES
+                "${_gestor_datos_prueba}/centro-31059-holgada.db"
+                "${_gestor_datos_prueba}/preset-centro-31059-holgada.json"
+            DESTINATION datos-demo)
+    install(FILES
+                "${CMAKE_SOURCE_DIR}/packaging/Instalar-datos-demo.bat"
+                "${CMAKE_SOURCE_DIR}/packaging/LEEME-DATOS-DEMO.txt"
+            DESTINATION .)
+endif()
+
 if(GESTOR_WINDEPLOYQT)
     # Se ejecuta al instalar y, por tanto, también al empaquetar con CPack: las
     # dependencias de Qt se copian al lado del ejecutable ya instalado.
@@ -155,6 +191,11 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Gestor de horarios del Liceo Nacional Robert Serra (Qt6 + OR-Tools)")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "GestorHorarios-${PROJECT_VERSION}-win64-portable")
+if(GESTOR_PACK_DEMO)
+    # La entrega de demostración lleva un nombre propio (archivo y carpeta raíz
+    # del ZIP, porque CPACK_INCLUDE_TOPLEVEL_DIRECTORY usa este mismo valor).
+    set(CPACK_PACKAGE_FILE_NAME "Generador de Horarios Demo")
+endif()
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
 set(CPACK_PACKAGE_EXECUTABLES "gestor-horarios" "Gestor de Horarios")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
