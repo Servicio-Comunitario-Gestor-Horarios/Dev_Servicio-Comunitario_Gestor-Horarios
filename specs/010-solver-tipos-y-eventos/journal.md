@@ -2501,3 +2501,58 @@ Sin cambios en `spec.md`, `plan.md` ni en el código.
   la descripción vieja de (2) se mantienen y se sustituyen **en la nota**, para no reescribir el texto de
   la 005 más allá de la anotación de supersesión (el rango V1–V18 y la (2) por capacidad sí se ajustan en
   la frase, como en las anotaciones previas de la 010).
+
+## T16 - Regresión global y seed intacto (2026-10-27)
+
+**Requisito:** RNF-2, RNF-4, RNF-5. **Plan:** §8/T16. **Base:** `49d39dc` · **HEAD:** `da71419`.
+
+### Evidencia
+
+```text
+$ ctest --preset backend
+100% tests passed out of 50
+Total Test time (real) =   5.70 sec
+
+$ ./build-backend/test/test_solver_benchmark
+Total asignaciones: 80
+Totals: 4 passed, 0 failed, 0 skipped, 0 blacklisted, 277ms
+
+$ git diff --stat 49d39dc HEAD -- src/backend/src/database src/backend/include/backend/database src/seed
+(sin salida: vacío)
+
+$ grep -n 'const char\* const kTipoGenerico' src/seed/src/perfil.cpp
+43:const char* const kTipoGenerico = "Aula de estudio";
+$ grep -c "kTipoGenerico" src/seed/src/perfil.cpp
+18
+```
+
+`ctest --test-dir build-backend -N` lista **50 tests** y **no** incluye `test_frontend_conversion` ni
+`test_generacion_seed` (`BUILD_FRONTEND=OFF`). Re-verificado por el implementer el mismo día: suite
+**50/50** en 5,68 s y benchmark **4/4** en 272 ms (≈140 ms de resolución), con las mismas 80
+asignaciones.
+
+### Lectura
+
+- **Suite global 100 % verde (50/50, 5,70 s)**: los 49 tests previos más `test_capacidad_tipo` de T11;
+  sin los tests de interfaz.
+- **Benchmark factible**: 80 asignaciones en 277 ms (≈140 ms de resolución), muy por debajo de los
+  **60 s** de RNF-2, con la estrategia de aulas por tipo de T10 intacta.
+- **Base de datos y seed sin tocar desde `Base: 49d39dc`**: `git diff --stat` vacío en
+  `src/backend/src/database`, `src/backend/include/backend/database` y `src/seed`; el seed sigue
+  declarando `kTipoGenerico = "Aula de estudio"` (`perfil.cpp:43`) con **18** usos (declaración,
+  catálogo, 14 aulas y los dos retornos de `tipoFinalDeMateria`). Los cursos se asignan por
+  `Aula 01…13`, así que la convención del tipo general no exige sembrar nada nuevo.
+- **Alcance de la segunda entrega**: **no** cambia el esquema, la 009, el contrato **2.0**, el
+  frontend ni el seed; solo el motor (diagnóstico de causas y `tipoGeneralAula`) y los textos de
+  validación/documentación que lo citan.
+
+### Cierre de la segunda entrega (T11–T16)
+
+| Tarea | Commit | Qué dejó |
+|---|---|---|
+| T11 | `227eacd` | `FranjaSemana` y funciones puras de demanda y capacidad; borradas las copias anónimas duplicadas |
+| T12 | `736bbcd` | V18: la referencia debe ser del tipo general |
+| T13 | `d3e8de0` | Causa (2) por capacidad del tipo, sin descuento de bloqueos; «no atribuible» |
+| T14 | `b4491ad` | Ventanas de turno (Hall), reproducibilidad y exclusividad del tipo especializado |
+| T15 | `da71419` | Contrato vivo, constitución y 005 alineados con V18 y la causa por capacidad |
+| T16 | este cierre | Regresión global 50/50 y seed intacto |
