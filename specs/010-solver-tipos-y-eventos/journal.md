@@ -2250,3 +2250,101 @@ ser del tipo general «Aula de estudio». Asigne al curso un aula del tipo gener
   para los presets 2.0 anteriores.
 - **El tipo general no se duplica en el motor** (§5.18): `causaEntradaInvalida` no comprueba V18 y
   `solver.cpp` no se toca.
+
+## T13 - Causa (2) por capacidad: producción y tests acoplados (2026-10-27)
+
+**Requisito:** RF-6, RNF-3. **Plan:** §0.7, §3, §4.4, §5.14 y §8/T13. **Base:** `736bbcd`.
+
+### Rojo (test de regresión antes de tocar producción)
+
+Se añadió `solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente` (fixture M6:
+`dimensiones = {2,2,2,2,2,7}`, `TB={5,6}`, `TX={4,5}`, `R1` compartida, `Prof Lab` disponible solo en
+`(0,4)`) y, con la heurística intacta, **falla con (2)**:
+
+```text
+$ ./build-backend/test/test_solver_horarios solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente
+FAIL!  : TestSolverHorarios::solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente()
+  '!texto.contains("Causa (2)")' returned FALSE. (El modelo no tiene solución factible (INFEASIBLE).
+Causa (2) conflicto de aula: el tipo «Aula base» necesita 4 bloques y sus 1 aulas ofrecen 4 franjas
+(1 las bloquean clases desplazadas).
+Entorno: 2 docentes, 2 cursos, 2 materias, 2 aulas.)
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 2ms
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+build exit=0
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'
+1/1 Test #48: test_solver_horarios .............   Passed    0.26 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 41 passed, 0 failed, 0 skipped, 0 blacklisted, 205ms
+
+$ grep -n "palomarPorTipo\|franjasBloqueadasEnFranjasContadas\|causaConflictoDeAula\|DesplazamientosDeGrupo\|nombreAula\|claveAula" src/backend/src/solver/solver.cpp
+(ninguna salida; exit 1)
+
+$ ctest --preset backend
+50/50 Test #50: test_ipc_aislamiento_bd ............   Passed    0.07 sec
+100% tests passed out of 50
+Total Test time (real) =   5.65 sec
+```
+
+El test de regresión ya pasa y devuelve `Causa (4)` sobre `1|X` y «Laboratorio» (sin `(2)`).
+
+### Producción
+
+- **Se eliminan** `DesplazamientosDeGrupo`, `palomarPorTipo`,
+  `franjasBloqueadasEnFranjasContadas`, `franjasCurso`, `nombreAula`, `claveAula` y
+  `causaConflictoDeAula` (rama móvil + bloque de referencia compartida).
+- **`causaSaturacionPorTipo` reescrita**: guard de la excepción de precedencia de RF-6
+  (`bloquesCurso > franjasSemanales` → vacío, para que la causa sea (3)); nombre visible del tipo
+  desde la primera materia que lo requiere; por cada clave en orden determinista de `QMap`:
+  tipo sin aulas → se salta (V17 es (1)), tipo sin franjas → se salta (lo juzga (3)), y
+  `demandaDelTipo(t) > capacidadDelTipo(t)` → `Causa (2)` con nombre visible, demanda y capacidad.
+  **Sin descuento de bloqueos.**
+- `franjasCurso` → `franjasSemanales` (guard de (2) y causa (3)); `primeraCausaNoFactible` llama a
+  (2) directamente; el comentario de `causaEntradaInvalida` pasa a **V1–V18**.
+- `analizarFallo`: el fallback dice **«Causa: no atribuible. Ninguna categoría de (1) a (4) explica
+  el fallo; revise la capacidad de los tipos de aula, las franjas de los turnos y la disponibilidad
+  de los docentes.»**
+
+### Los 13 tests de causas: destino real
+
+| Test | Cambio real en T13 |
+|---|---|
+| `solver_causaDeAulaConSemanaAnchaNoInventaElConflicto` | **sin cambios**; sigue exigiendo (4) |
+| `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos` | **reescrito** a «no atribuible» (fixture intacto; nombre para T14) |
+| `solver_causaDeAulaConCapacidadSuficienteNoInventaElConflicto` | **sin cambios**; factible |
+| `solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja` | **sin cambios**; factible (renombrado en T14) |
+| `solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio` | **reescrito** a «no atribuible» (fixture intacto) |
+| `solver_causaDeAulaConLaboratoriosSuficientesNoInventaElConflicto` | **sin cambios**; factible |
+| `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` | **reescrito** a «no atribuible» (fixture intacto, referencia `Cancha`) |
+| `solver_causaDeAulaNoSobreestimaConTurnosDistintos` | **sin cambios**; sigue exigiendo (4) |
+| `solver_causaDeAulaConTurnosDistintosNoInventaElConflicto` | **sin cambios**; factible |
+| `solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno` | **sin cambios**; sigue exigiendo (4) (renombrado en T14) |
+| `solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible` | **sin cambios**; sigue exigiendo (4) (renombrado en T14) |
+| `solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto` | **sin cambios**; factible |
+| `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula` | **sin cambios**; sigue exigiendo (4) |
+
+Fuera de los 13, se ajustan **dos aserciones** (sin tocar fixtures): `solver_falloCausaConflictoDeAula`
+asevera el **tipo** `«regular»` en vez del nombre del aula (8 > 4 sigue siendo (2)) y
+`solver_falloCausaConflictoDeAulaPorReferenciaSaturada` asevera `«Aula de estudio»` en vez de
+«Aula 1» (10 > 6). `...PorSaturacionDeTipo`, `...EnModoMovil`, `solver_falloTipoSinAulas` y
+`solver_falloCausaConflictoDePersona` no cambian (la (3) sigue siendo la prueba de la excepción).
+
+### Hallazgos
+
+- **El guard de la excepción es imprescindible en el orden nuevo**: `solver_falloCausaConflictoDePersona`
+  tiene demanda 4 > capacidad 2 y, sin el guard, la (2) taparía la (3).
+- **«No atribuible» no nombra entidades**: los tres tests reescritos comprueban además que el texto
+  no contiene `Causa (` ni el nombre del aula/curso, para que el fallback no derive a un mensaje
+  con entidad.
+- **El conteo es necesario pero no suficiente**: los dos fixtures de referencia compartida
+  (`28 ≤ 30` y `5 ≤ 6`) siguen siendo INFEASIBLE y ahora se informan sin categoría, tal y como
+  decide RF-6; no se inventa una (2) que el conteo no prueba.
+- **El motor no valida V18** (§5.18): `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas`
+  mantiene la referencia de `3|C` en la cancha sin cambios y sigue siendo infactible.

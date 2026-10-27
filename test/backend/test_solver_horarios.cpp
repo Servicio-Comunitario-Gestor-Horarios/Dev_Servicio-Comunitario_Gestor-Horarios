@@ -301,7 +301,7 @@ private slots:
         QVERIFY(!resultado.exito);
         const QString texto = resultado.errores.join("\n");
         QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
-        QVERIFY2(texto.contains("Aula compartida"), qPrintable(texto));
+        QVERIFY2(texto.contains("«regular»"), qPrintable(texto));
     }
 
     void solver_falloCausaConflictoDePersona() {
@@ -825,7 +825,7 @@ private slots:
         QVERIFY(!resultado.exito);
         const QString texto = resultado.errores.join("\n");
         QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
-        QVERIFY2(texto.contains("Aula 1"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Aula de estudio»"), qPrintable(texto));
         QVERIFY2(texto.contains("10 bloques"), qPrintable(texto));
         QVERIFY2(texto.contains("6 franjas"), qPrintable(texto));
     }
@@ -925,12 +925,14 @@ private slots:
         Solver solver;
         auto resultado = solver.resolver(config);
 
-        QVERIFY2(!resultado.exito, "las franjas bloqueadas dejan sin sitio a 2|B");
+        QVERIFY2(!resultado.exito, "la referencia compartida no aloja los 5 bloques de Aula común");
         const QString texto = resultado.errores.join("\n");
-        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
-        QVERIFY2(texto.contains("A1"), qPrintable(texto));
-        QVERIFY2(texto.contains("5 bloques en 6 franjas; 4 quedan bloqueadas"), qPrintable(texto));
-        QVERIFY2(!texto.contains("no se pudo identificar"), qPrintable(texto));
+        // El conteo del tipo no falla (5 ≤ 6) y ninguna categoría explica la infactibilidad:
+        // el desenlace es «no atribuible», sin nombrar entidades.
+        QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
+        QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
+        QVERIFY2(!texto.contains("A1"), qPrintable(texto));
+        QVERIFY2(!texto.contains("1|A"), qPrintable(texto));
     }
 
     // Control negativo de la corrección: con capacidad suficiente no se inventa la causa (2).
@@ -1006,12 +1008,12 @@ private slots:
         Solver solver;
         auto resultado = solver.resolver(config);
 
-        QVERIFY2(!resultado.exito, "4 bloques de laboratorio necesitan 4 franjas del único laboratorio");
+        QVERIFY2(!resultado.exito, "la referencia casi llena no aloja los 28 bloques de Aula común");
         const QString texto = resultado.errores.join("\n");
-        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
-        QVERIFY2(texto.contains("A1"), qPrintable(texto));
-        QVERIFY2(texto.contains("28 bloques en 30 franjas; 4 quedan bloqueadas"), qPrintable(texto));
-        QVERIFY2(!texto.contains("no se pudo identificar"), qPrintable(texto));
+        // 28 ≤ 30 y 4 ≤ 30: el conteo por tipo pasa; ninguna categoría lo explica.
+        QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
+        QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
+        QVERIFY2(!texto.contains("A1"), qPrintable(texto));
     }
 
     // Contraprueba del mismo dato: con 2 laboratorios los 4 bloques caben en 2 franjas, A1
@@ -1058,11 +1060,12 @@ private slots:
         Solver solver;
         auto resultado = solver.resolver(config);
 
-        QVERIFY2(!resultado.exito, "el tipo «Aula base» no tiene franjas libres para 3|C");
+        QVERIFY2(!resultado.exito, "A1 y A2 no dan cabida a los 7 bloques del tipo");
         const QString texto = resultado.errores.join("\n");
-        QVERIFY2(texto.contains("Causa (2)"), qPrintable(texto));
-        QVERIFY2(texto.contains("«Aula base»"), qPrintable(texto));
-        QVERIFY2(texto.contains("7 bloques"), qPrintable(texto));
+        // 7 ≤ 12: el conteo del tipo pasa (la referencia de 3|C sigue en la cancha: los fixtures
+        // del motor no pasan por V18) y la infactibilidad se queda sin categoría.
+        QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
+        QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
     }
 
     // ── Corrección 4 (RF-6): la cota es el palomar, no la colocación voraz ──
@@ -1145,6 +1148,42 @@ private slots:
 
         QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
         QVERIFY(resultado.errores.isEmpty());
+    }
+
+    // ── T13/RF-6: el conteo por tipo no descuenta bloqueos; la causa real es de docente ──
+    // Contraejemplo del reviewer: 2 días y R1 compartida. «Aula base» demanda 4 = capacidad
+    // 1 aula × 2 días × 2 franjas y el laboratorio demanda 2 ≤ 4, así que el conteo por tipo no
+    // falla; el docente de laboratorio solo tiene una franja para 2 bloques. La causa es (4), no
+    // una (2) por las franjas que 1|X deja bloqueadas en R1.
+    void solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 2, 2, 2, 2, 7};
+        config.franja_horaria = {60, 7};
+        config.turnos.turnos = {{"TB", {5, 6}}, {"TX", {4, 5}}};
+
+        config.materias = {{"Ciencias", "Aula base"}, {"Laboratorio", "Laboratorio"}};
+        config.aulas = {{"R1", "Aula base", 30}, {"L1", "Laboratorio", 20}};
+        config.planes = {{"Plan Y", {{0, 2, 4}}},    // 2|Y: 4 bloques de Ciencias
+                         {"Plan X", {{1, 1, 2}}}};   // 1|X: 2 bloques de Laboratorio
+        config.cursos = {{2, "Y", "TB", 20, "Plan Y", 0},    // referencia R1
+                         {1, "X", "TX", 20, "Plan X", 0}};   // MISMA referencia R1
+        config.profesores = {
+            // 4 celdas para los 4 bloques de 2|Y: (0,{5,6}) y (1,{5,6}).
+            {"Prof Y", 4, 4, "", "", {2}, {0}, {}, {{0, {5, 6}}, {1, {5, 6}}}},
+            // Una sola celda para los 2 bloques de laboratorio de 1|X.
+            {"Prof Lab", 2, 2, "", "", {1}, {1}, {}, {{0, {4}}}}};
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
+        QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
+        QVERIFY2(texto.contains("1|X"), qPrintable(texto));
+        QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
     }
 };
 
