@@ -1,0 +1,43 @@
+GESTOR DE HORARIOS - DATOS DE DEMOSTRACION
+==========================================
+
+Este paquete (demo) trae, ademas de la aplicacion, los datos del centro que se
+usan en las demostraciones. El paquete normal NO los trae: los datos viven en la
+base de cada usuario y hay que darlos de alta o sembrarlos aparte.
+
+QUE HAY EN ESTA ENTREGA
+  Instalar-datos-demo.bat               Instalador de la base (doble clic).
+  datos-demo\centro-31059-holgada.db    Base de datos sembrada (Plan 31059).
+  datos-demo\preset-centro-31059-holgada.json
+                                        Preset de configuracion del generador.
+
+QUE TRAE LA BASE
+  13 cursos, 65 docentes, 57 materias, 16 aulas, 4 planes de estudio y los 2
+  turnos del centro: Manana 07:00-12:30 y Tarde 12:40-18:10, con 8 franjas de
+  40 minutos y un receso cada uno.
+
+  OJO: los cursos se siembran SIN turno asignado (es un dato que el motor exige).
+  El reparto de turno y plan de cada curso, con las horas y la disponibilidad de
+  los docentes, va en el preset.
+
+COMO CARGAR LA BASE
+  1. Doble clic en "Instalar-datos-demo.bat".
+  2. Copia la base a la carpeta de datos del usuario:
+
+         %APPDATA%\LiceoRobertSerra\GestorHorarios\gestor_horarios.db
+
+  Si ya existe una base de datos ahi, el instalador NO la toca (para no borrar
+  tus datos): antes renombra o mueve ese archivo, y vuelve a ejecutarlo.
+
+COMO CARGAR EL PRESET
+  1. Abre "gestor-horarios.exe".
+  2. Ve al apartado "Generar horarios" y pulsa "Cargar preset...".
+  3. Elige datos-demo\preset-centro-31059-holgada.json.
+
+  El preset rellena el turno, el plan y las materias suplentes de los 13 cursos,
+  ademas de los parametros generales. Usa el mismo formato que recibe el motor,
+  asi que se puede inspeccionar o reutilizar.
+
+PARA QUE SIRVE
+  Con la base instalada y el preset cargado, "Generar horarios" produce un
+  horario completo (unas 520 clases) en un par de segundos.

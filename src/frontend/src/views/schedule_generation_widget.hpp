@@ -21,6 +21,7 @@
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 #include <QWidget>
 
 #include "services/generacion_tipos.hpp"
@@ -78,6 +79,8 @@ private:
     void poblarPlanes();
     void poblarCursos();
     void poblarDocentes();
+    /// Reúne los años de los cursos y las materias existentes (para los selectores).
+    void poblarCatalogos();
 
     GeneracionSolver::OpcionesUI leerOpciones() const;
     void aplicarOpciones(const GeneracionSolver::OpcionesUI& opciones);
@@ -117,6 +120,8 @@ private:
     QStringList m_turnosNombres;
     QStringList m_cursosNombres;
     QStringList m_docentesNombres;
+    QVector<int> m_aniosDisponibles;   ///< Años de los cursos de la base.
+    QStringList m_materiasDisponibles; ///< Materias existentes (para suplencias).
     bool m_defaultsApplied = false; ///< Los valores por defecto se derivan una vez.
     bool m_estadoError = false;     ///< El último estado mostrado es un error.
 };

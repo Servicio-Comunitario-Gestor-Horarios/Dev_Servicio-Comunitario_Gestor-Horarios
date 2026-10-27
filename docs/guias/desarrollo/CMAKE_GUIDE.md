@@ -153,6 +153,30 @@ Cosas a tener en cuenta:
 - Solo se genera en Windows; en Linux/Docker la regla se omite sin afectar al build.
 - Un instalador (Inno Setup, NSIS…) puede envolver ese ZIP más adelante.
 
+### Paquete con datos de demostración
+
+El paquete estándar **no** trae datos: la aplicación crea la base vacía en `%APPDATA%` y hay que darlos
+de alta a mano (o sembrarlos con `gestor-horarios-seed`, que no se distribuye). Para una entrega de
+demostración que funcione recién descomprimida:
+
+```bat
+cmake -S . -B build-rel -DGESTOR_PACK_DEMO=ON
+cmake --build build-rel --target package    :: -> build-rel\Generador de Horarios Demo.zip
+```
+
+Con `GESTOR_PACK_DEMO=ON`:
+
+- el ZIP y su carpeta raíz se llaman **«Generador de Horarios Demo»**;
+- se añade `datos-demo/` con la base sembrada del Plan 31059 (`centro-31059-holgada.db`: 13 cursos,
+  65 docentes, 57 materias, 16 aulas, 4 planes y 2 turnos) y su preset de configuración
+  (`preset-centro-31059-holgada.json`);
+- van a la raíz `Instalar-datos-demo.bat` y `LEEME-DATOS-DEMO.txt`.
+
+El `.bat` copia la base a `%APPDATA%\LiceoRobertSerra\GestorHorarios\gestor_horarios.db` **solo si no
+existe** una: nunca pisa los datos del usuario. El preset no se instala, se carga desde el paquete con
+«Cargar preset…» en la ventana *Generar horarios*. Si falta alguno de los archivos de `datos-prueba/`,
+la configuración falla con un mensaje explícito en vez de generar un ZIP incompleto.
+
 ## Flujo de trabajo diario
 
 ```bash
