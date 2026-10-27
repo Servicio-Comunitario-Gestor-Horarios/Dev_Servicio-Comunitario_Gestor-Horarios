@@ -51,10 +51,11 @@ private:
         return config;
     }
 
-    // Caso del reviewer para la unión de franjas bloqueadas: dos cursos comparten la referencia
-    // A1 y cada uno cursa 2 bloques comunes + 2 de laboratorio. Hay 2 laboratorios y un docente
-    // por curso, así que ambos pueden desplazar sus clases a las MISMAS franjas: A1 solo pierde
-    // 2 franjas y los 4 bloques que se quedan caben en 6 − 2.
+    // Fixture compartido por dos tests: dos cursos comparten la referencia A1 y cada uno cursa
+    // 2 bloques comunes + 2 de laboratorio. Con 2 laboratorios y un docente por curso el horario
+    // existe (control positivo); si el docente de 2|B no opta por el laboratorio, la causa es (4).
+    // El conteo del tipo no falla: «Aula común» demanda 4 frente a 1 aula × 6 franjas y
+    // «Laboratorio» 4 frente a 2 aulas × 6.
     static SolverConfig configDosCursosDesplazadosALaMismaFranja() {
         SolverConfig config;
         config.version = "2.0";
@@ -106,12 +107,13 @@ private:
         return config;
     }
 
-    // Caso del reviewer para el descuento restringido (corrección 5): el tipo «Aula base» se mide
-    // con las franjas de los turnos de los cursos que lo REQUIEREN (2|B y 3|C, turno TB = {0..3}),
-    // pero el bloqueo de A1 lo produce 1|A, que solo cursa laboratorio y va en TL = {4,5}. Sus 2
-    // clases desplazadas caen fuera de las franjas contadas, así que no pueden descontarse: los
-    // 8 bloques de «Aula base» caben en sus 2 aulas × 4 franjas y la causa real es (4), el docente
-    // de laboratorio no dispone de 2 franjas. Si se descuentan (defecto), sale una causa (2) falsa.
+    // Fixture compartido por dos tests: «Aula base» se mide con las franjas de los turnos de los
+    // cursos que lo REQUIEREN (2|B y 3|C, turno TB = {0..3}), mientras que 1|A solo cursa
+    // laboratorio y va en TL = {4,5}. Los 8 bloques de «Aula base» caben en 2 aulas × 4 franjas
+    // (8 = 8) y los 2 de laboratorio en 1 aula × 2 franjas de TL, así que el conteo no falla; la
+    // causa es (4): el docente de laboratorio solo tiene una franja para 2 bloques. (Fixture
+    // heredado de la corrección 5, ya histórica: el bloqueo de la referencia no entra en ninguna
+    // cuenta.)
     static SolverConfig configLaboratorioEnTurnoDistinto() {
         SolverConfig config;
         config.version = "2.0";
@@ -137,11 +139,11 @@ private:
         return config;
     }
 
-    // Caso del reviewer para la cota por palomar: dos cursos comparten la referencia A1 pero sus
-    // turnos son DISTINTOS (1|A usa T1 = {0,1,2,3}; 2|B usa T2 = {2,3}). La colocación voraz
-    // repartía los 4 bloques de laboratorio (2 por curso) en 4 franjas distintas porque 2|B solo
-    // alcanza {2,3} y 1|A ya había tomado 2 franjas de T1; el palomar ⌈4/2⌉ = 2 (dos laboratorios,
-    // una clase por franja y aula) deja 6 franjas libres de A1 para los 6 bloques que se quedan.
+    // Fixture compartido por dos tests: dos cursos comparten la referencia A1 pero sus turnos son
+    // DISTINTOS (1|A usa T1 = {0,1,2,3}; 2|B usa T2 = {2,3}). El conteo del tipo no falla: «Aula
+    // común» demanda 6 frente a 1 aula × 8 franjas de la unión de T1 y T2, y «Laboratorio» demanda
+    // 4 frente a 2 aulas × 8. Con el docente de 2|B cubriendo el laboratorio el horario existe; sin
+    // él, la causa es (4).
     static SolverConfig configDosCursosConTurnosDistintos() {
         SolverConfig config;
         config.version = "2.0";
@@ -324,8 +326,8 @@ private slots:
     }
 
     void solver_falloCausaConflictoDeAula() {
-        // Dos cursos que comparten el aula fija y, juntos, piden más bloques que franjas tiene
-        // el aula (cada uno cabe por separado): la causa es el aula → categoría (2).
+        // Dos cursos que comparten la referencia y, juntos, piden más bloques que la capacidad de
+        // su tipo (8 > 1 aula × 4 franjas; cada uno cabe por separado): categoría (2).
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -862,10 +864,10 @@ private slots:
         QVERIFY2(texto.contains("8 franjas"), qPrintable(texto));
     }
 
-    // ── T6/RF-6: las clases que se quedan en la referencia no caben en ella ──
+    // ── RF-6: el tipo «Aula de estudio» demanda 10 y su capacidad es 6 ──
     void solver_falloCausaConflictoDeAulaPorCapacidadDeTipo() {
-        // Dos cursos comparten la referencia Aula 1; cada uno deja 5 bloques del tipo de la
-        // referencia en ella y desplaza 1: 10 bloques frente a 6 franjas del aula.
+        // Dos cursos comparten la referencia Aula 1; cada uno tiene 5 bloques del tipo general y
+        // desplaza 1: 10 bloques frente a 1 aula × 6 franjas de capacidad del tipo.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -1041,9 +1043,9 @@ private slots:
         QVERIFY(resultado.errores.isEmpty());
     }
 
-    // Mismo dato, pero el docente de 2|B no cubre el laboratorio: la causa real es (4). Con el
-    // descuento por SUMA de bloques desplazados, A1 «perdía» 4 franjas (2 por curso) y la causa
-    // (2) tapaba la (4). Con la unión pierde 2 y se informa la causa correcta.
+    // Mismo dato, pero el docente de 2|B no cubre el laboratorio: la causa real es (4). La (2) no
+    // aplica porque el conteo del tipo no falla y la referencia compartida no resta capacidad, así
+    // que no se informa un conflicto de aula que taparía la causa de asignación.
     void solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula() {
         SolverConfig config = configDosCursosDesplazadosALaMismaFranja();
         // El docente de 2|B solo opta por la materia común (índice 0), no por el laboratorio.
@@ -1165,11 +1167,12 @@ private slots:
         QVERIFY(resultado.errores.isEmpty());
     }
 
-    // ── Corrección 5 (RF-6): el descuento se limita a las franjas contadas en la capacidad ──
-    // Variante alcanzable en producción: V13 solo exige solape entre la disponibilidad del
-    // docente y el turno del curso, no capacidad, así que un titular con una sola franja pasa la
-    // validación y el modelo es INFEASIBLE. La causa es (4), no una (2) por las franjas que
-    // bloquea 1|A en un turno que la capacidad de «Aula base» ni siquiera cuenta.
+    // ── RF-6: la causa es (4) y no (2) cuando el tipo tiene capacidad ──
+    // Variante alcanzable en producción: V13 solo exige solape entre la disponibilidad del docente
+    // y el turno del curso, no capacidad, así que un titular con una sola franja pasa la validación
+    // y el modelo es INFEASIBLE. «Aula base» demanda 8 = 2 aulas × 4 franjas (TB) y «Laboratorio» 2
+    // = 1 aula × 2 franjas (TL), así que el conteo no falla y la causa es (4). (Fixture heredado de
+    // la corrección 5, ya histórica.)
     void solver_causaDeDocenteEnTurnoDistintoNoSeInformaComoConflictoDeAula() {
         SolverConfig config = configLaboratorioEnTurnoDistinto();
 
@@ -1186,7 +1189,7 @@ private slots:
 
     // Misma entrada con el docente SIN materias asignadas: la causa (4) es «no tiene ningún
     // docente elegible». V10/V13 la rechazan en el flujo real, pero el solver directo debe
-    // informarla igual y no convertirla en una causa (2) por el descuento.
+    // informarla igual, sin convertirla en una causa (2) de capacidad del tipo.
     void solver_causaDeDocenteNoElegibleNoSeInformaComoConflictoDeAula() {
         SolverConfig config = configLaboratorioEnTurnoDistinto();
         config.profesores[0].materias_asignadas = {};
@@ -1219,7 +1222,7 @@ private slots:
     // Contraejemplo del reviewer: 2 días y R1 compartida. «Aula base» demanda 4 = capacidad
     // 1 aula × 2 días × 2 franjas y el laboratorio demanda 2 ≤ 4, así que el conteo por tipo no
     // falla; el docente de laboratorio solo tiene una franja para 2 bloques. La causa es (4), no
-    // una (2) por las franjas que 1|X deja bloqueadas en R1.
+    // una (2) por el bloqueo de R1 (el descuento que aplicaba el diagnóstico anterior).
     void solver_causaDeAulaContraejemploDelReviewer_esCausaDeDocente() {
         SolverConfig config;
         config.version = "2.0";
@@ -1249,6 +1252,11 @@ private slots:
         QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
         QVERIFY2(texto.contains("1|X"), qPrintable(texto));
         QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+        // Sub-motivo: el docente de laboratorio existe y es elegible, pero no dispone de franjas
+        // suficientes para los 2 bloques (no es «no tiene ningún docente elegible»).
+        QVERIFY2(texto.contains("ningún docente elegible dispone de tantas franjas"),
+                 qPrintable(texto));
+        QVERIFY2(!texto.contains("no tiene ningún docente elegible"), qPrintable(texto));
     }
 
     // ── T14/RF-6: el conteo global es necesario pero no suficiente (condición de Hall) ──
