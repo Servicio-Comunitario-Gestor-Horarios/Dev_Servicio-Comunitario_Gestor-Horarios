@@ -24,7 +24,7 @@ antes que las secciones**: un 1.0 se rechaza por versión, no por «le falta `ev
 
 | Qué declara el archivo | Resultado | Mensaje (resumen) |
 |---|---|---|
-| `"version": "2.0"` | se acepta y se valida el resto (V1–V17) | — |
+| `"version": "2.0"` | se acepta y se valida el resto (V1–V18) | — |
 | `"version": "1.0"` | **entrada inválida** | «V1: versión de configuración no reconocida ('1.0'); se espera '2.0'.» |
 | Versión ausente (o vacía) | **entrada inválida** | «V1: la configuración no declara versión; se espera '2.0'.» |
 | Cualquier otra (`"9.9"`, `"2"`, …) | **entrada inválida** | el mismo mensaje, nombrando la versión encontrada |
@@ -62,7 +62,7 @@ toleran** (se ignoran), pero una sección obligatoria ausente es «V1: falta la 
 | `turnos` | objeto con `turnos[]` | turnos con sus franjas y ventana | **V2**, V7, V13, V14 |
 | `eventos` | arreglo | eventos del turno (metadata) | **V1**, **V2** |
 | `planes` | arreglo | planes embebidos con materias y horas | **V4**, V10, V11, V13, V14 |
-| `cursos` | arreglo | año, sección, turno, plan, aula de referencia | **V6**, V7, V8, V9, V10, V11, V14, **V17** |
+| `cursos` | arreglo | año, sección, turno, plan, aula de referencia | **V6**, V7, V8, V9, V10, V11, V14, **V17**, **V18** |
 | `profesores` | arreglo | materias, turno/plan/años y disponibilidad | **V4**, **V12**, V13, V2 |
 | `materias` | arreglo | nombre y **tipo de aula requerido** | **V4**, **V16**, **V17** |
 | `aulas` | arreglo | nombre, **tipo** y capacidad | **V6**, **V16**, **V17** |
@@ -182,6 +182,11 @@ menos una materia en él (**V10**).
 - Cada materia de cada curso exige que **exista al menos un aula de su tipo** en el centro
   (**V17**), **en los dos modos** de aula (fija y móvil). Si no existe, la entrada es inválida y el
   mensaje nombra el tipo, la materia y el curso.
+- **El aula de referencia debe ser del tipo general/ordinario** (**V18**): con `aula_fija: true`, el
+  `aula` de cada curso tiene que ser un aula del **tipo general** del centro. Ese tipo es una
+  **convención por nombre**: el de clave normalizada `aula de estudio` (`claveTipo` = `trim` + plegado
+  de caja). Un laboratorio, un taller o una cancha **no** pueden ser referencia. El contrato **no lleva
+  ningún dato adicional** para distinguir tipos generales: no hay campo ni sección nuevos (sigue 2.0).
 - `capacidad` ≤ 0 significa «sin capacidad declarada» (no genera aviso P3).
 
 ---
@@ -249,7 +254,9 @@ cuyo tipo coincide con el que requiere su materia.
 
 Con `aula_fija: true`:
 
-1. **Referencia.** Cada curso declara `aula` (índice a `aulas`); esa es su aula de referencia.
+1. **Referencia.** Cada curso declara `aula` (índice a `aulas`); esa es su aula de referencia y **debe
+   ser del tipo general/ordinario** (convención por nombre: clave normalizada `aula de estudio`;
+   **V18**). Una referencia de laboratorio, taller o cancha es entrada inválida.
 2. **Coincidencia de tipo.** Si la materia de una clase requiere el tipo del aula de referencia, la
    clase se imparte **en el aula de referencia** (no en otra aula del mismo tipo).
 3. **Desplazamiento.** Si la materia requiere **otro** tipo, esa clase se imparte en un **aula del
@@ -262,9 +269,10 @@ Con `aula_fija: true`:
 5. **Exclusividad.** Dos cursos no comparten aula en la misma franja, **incluidas las clases
    desplazadas** (D8 se aplica a todas las aulas reales).
 6. **Degradación prevista.** Si el tipo requerido no tiene aulas suficientes, la entrada sigue siendo
-   válida (**V17** solo exige que exista al menos una) y el resultado puede ser **no factible con
-   causa «conflicto de aula»**. El solver **no** reasigna a un aula de otro tipo ni **libera** la
-   referencia bloqueada para hacer factible el problema.
+   válida (**V17** solo exige que exista al menos una) y el resultado puede ser **no factible**. La causa
+   se diagnostica como se describe en **§5.1**: **conflicto de aula** si falla el conteo de capacidad del
+   tipo, y **no atribuible** si ese conteo no falla. El solver **no** reasigna a un aula de otro tipo ni
+   **libera** la referencia bloqueada para hacer factible el problema.
 
 Con `aula_fija: false` (aulas móviles):
 
@@ -280,6 +288,42 @@ Errores de lectura frecuentes:
 | «Su aula se reserva todo el turno» | Solo en las franjas con una clase **desplazada**; el resto queda libre. |
 | «Otro curso puede usar la referencia mientras está fuera» | **No**: en esa franja está vacía y **bloqueada**. |
 | «Si el laboratorio no alcanza, el solver usa un aula común» | **No**: nunca cambia el tipo; el resultado es no factible (conflicto de aula). |
+| «El aula de referencia puede ser un laboratorio» | **No**: con `aula_fija: true` debe ser del tipo general (`Aula de estudio`); si no, **V18**. |
+| «Todo horario imposible tiene una causa del catálogo» | **No**: si ningún conteo la explica, la causa es **no atribuible**. |
+
+> **Presets 2.0 anteriores con referencia especializada.** Si un preset 2.0 guardado declara como `aula`
+> de un curso un laboratorio, un taller o una cancha, ahora es **entrada inválida por V18**. No se
+> convierte ni se completa: la acción es **asignar al curso un aula del tipo general** (`Aula de
+> estudio`) en los datos y **regenerar** la configuración. El archivo no se modifica.
+
+### 5.1 Cómo se diagnostica un horario no factible
+
+Cuando no hay solución, el solver informa **una** de las cuatro categorías, en este orden: **(1) entrada
+inválida**, **(2) conflicto de aula**, **(3) conflicto de persona**, **(4) conflicto de asignación de
+docente**. Si ninguna aplica, informa **causa no atribuible**.
+
+- **(2) conflicto de aula es un conteo de capacidad del tipo**, no una estimación. Para cada tipo `t`:
+
+  ```
+  demanda(t)   = bloques de las materias que requieren t (en todos los cursos)
+  capacidad(t) = nº de aulas del tipo t × nº de días
+                 × nº de franjas (slots) distintas de la unión de los turnos
+                   de los cursos con al menos una materia que requiere t
+  ```
+
+  Las unidades son **celdas `(aula, día, franja)`**: `capacidad(t)` ya incluye los días. Si
+  `demanda(t) > capacidad(t)`, la causa es conflicto de aula. El conteo **no descuenta** las franjas que
+  un desplazamiento deja bloqueadas en el aula de referencia, y **no** cuenta la ocupación de un aula de
+  referencia concreta.
+- **Causa no atribuible.** El conteo es **necesario, no suficiente**: hay horarios imposibles que no
+  salen de él (dos cursos que comparten un aula de referencia y no caben en ella, ventanas de turno que
+  no se componen, o la disponibilidad de docentes cuando es de otra categoría). En esos casos el mensaje
+  dice «**Causa: no atribuible**» y no nombra una entidad; no se inventa una categoría.
+- **No corrige la entrada.** El solver no cambia el tipo de un aula, no libera la referencia bloqueada ni
+  completa datos para hacer factible el problema.
+- **Excepción de precedencia.** Si un curso necesita más bloques que franjas tiene su turno, la causa es
+  **(3) conflicto de persona**, aunque la capacidad de un tipo también falle: es el motivo concreto y
+  comprobable. Fuera de ese caso, el orden (1)(2)(3)(4) se mantiene.
 
 ---
 
@@ -411,7 +455,8 @@ este rechazo y que sus bytes no cambian.
 
 - Núcleo del solver, restricciones y validaciones V1–V15:
   [`specs/005-nucleo-solver/spec.md`](../specs/005-nucleo-solver/spec.md).
-- Tipos de aula, eventos, contrato 2.0, V16/V17 y salida con aula real:
+- Tipos de aula, eventos, contrato 2.0, V16–V18, capacidad del tipo, causa no atribuible y salida con
+  aula real:
   [`specs/010-solver-tipos-y-eventos/spec.md`](../specs/010-solver-tipos-y-eventos/spec.md) y su
   [`plan.md`](../specs/010-solver-tipos-y-eventos/plan.md) (§2).
 - Persistencia de tipos y eventos (catálogo, `id_tipo_aula`, identidad y orden):

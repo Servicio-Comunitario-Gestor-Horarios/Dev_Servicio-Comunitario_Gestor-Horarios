@@ -125,14 +125,14 @@ construir después.
 
 Esta spec cubre el **solver y todo lo suyo**: su **núcleo**, el **contrato de configuración** (forma
 del JSON y su serialización), el **modelo** (invariantes duras y función objetivo), las
-**validaciones previas** (V1–V17) y la **construcción de la entrada del solver** desde los datos
+**validaciones previas** (V1–V18) y la **construcción de la entrada del solver** desde los datos
 persistidos más el preset (RF-13). La **persistencia** de los datos del curso (año, sección, turno y
 aula) y sus **servicios** son de la **spec 004**, que **precede** a esta spec y le aporta los datos ya
 persistidos; esta spec (005) los **lee y arma** la entrada. La **gestión de los presets** como
 archivos **no** entra aquí.
 
 > **Superado en el rango por la 010 (2026-10-25).** Este alcance decía **V1–V15**; el catálogo vigente
-> de validaciones previas es **V1–V17** (la 010 añade V16 y V17). El resto del alcance no cambia.
+> de validaciones previas es **V1–V18** (la 010 añade V16, V17 y V18). El resto del alcance no cambia.
 
 Una decisión de modelado clave guía esta spec: minimizar el «déficit de horas» es **inerte** (la suma
 de horas asignadas es constante, porque las horas totales de cada materia-curso están fijadas por una
@@ -314,13 +314,24 @@ y no obligan.
 - **Causa de un resultado no factible:** la categoría —y la entidad afectada, cuando sea identificable—
   que explica por qué no existe solución que respete todas las invariantes duras. Categorías, en el
   **orden** en que se comprueban e informan: **(1) entrada inválida** (falla una validación previa
-  V1–V17, incluida la versión/parseo del contrato); **(2) conflicto de aula** (invariantes D8/D9/D10);
-  **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de asignación de
-  docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría aplicable.
-  Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
-  > **Superado en el rango por la 010 (2026-10-25).** Esta definición decía **V1–V15**; el catálogo
-  > vigente es **V1–V17** (la 010 añade V16 y V17). El orden de categorías y el resto de la definición
-  > no cambian.
+  V1–V18, incluida la versión/parseo del contrato); **(2) conflicto de aula** (capacidad de los tipos de
+  aula); **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de
+  asignación de docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría
+  aplicable. Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
+  > **Superada por la 010 (2026-10-25; revisada el 2026-10-26).** Esta definición decía **V1–V15**, la
+  > categoría (2) eran las «invariantes D8/D9/D10» y el orden no tenía excepciones. La 010 fija:
+  > - **V1–V18** (añade V16, V17 y V18; **V18** exige que el aula de referencia sea del **tipo
+  >   general/ordinario**, el de clave normalizada `aula de estudio`, con el modo de aula fija activo).
+  > - **(2) conflicto de aula por conteo de capacidad del tipo:** `demanda(t) > nº de aulas del tipo × nº
+  >   de días × nº de franjas distintas de la unión de los turnos de los cursos que requieren t`, **sin
+  >   descontar bloqueos**. Es un conteo **necesario**: si falla, prueba la infactibilidad; si no falla,
+  >   no permite concluir.
+  > - **Desenlace «no atribuible»:** si ninguna categoría aplica (p. ej., la infactibilidad la explica la
+  >   ocupación de un aula de referencia concreta), la causa se informa como **no atribuible**, sin
+  >   inventar una. Sustituye a «las categorías cubren todas las invariantes duras».
+  > - **Excepción de precedencia:** si un curso necesita más bloques que franjas tiene su turno, la causa
+  >   es **(3) conflicto de persona** aunque la capacidad del tipo también falle; fuera de ese caso, el
+  >   orden (1)(2)(3)(4) no cambia.
 
 ## Catálogo de reglas
 
@@ -485,6 +496,11 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   problema no factible indicando la causa.** La causa se informa con las **categorías de la definición
   «Causa de un resultado no factible», en su orden**: (1) entrada inválida, (2) conflicto de aula,
   (3) conflicto de persona (profesor/curso), (4) conflicto de asignación de docente.
+  > **Superado en el desenlace y en el orden por la 010 (2026-10-26).** «Indicando la causa» pasa a: la
+  > **primera categoría aplicable** y, si ninguna lo es, **causa no atribuible** (sin inventar una). La
+  > **excepción de precedencia** de la 010 hace además que un curso que no cabe en su turno sea (3)
+  > aunque la capacidad del tipo también falle. Las cuatro categorías y su orden se mantienen fuera de
+  > la excepción.
 - **EL SISTEMA no completa ni corrige la entrada:** si la entrada no permite una solución, no la
   «arregla» inventando datos.
 - **EL SISTEMA es reproducible:** bajo el **mismo JSON y el mismo solver**, produce el mismo
@@ -572,15 +588,17 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   sección) como clave**, sin escribir un nombre (ni almacenado ni derivado) por curso (coherente con
   el contrato de salida de la spec 002).
 
-### RF-11. Validación previa (V1–V17)
+### RF-11. Validación previa (V1–V18)
 
 > **Título superado por la 010 (2026-10-25).** Este título decía **V1–V15**; el catálogo vigente es
-> **V1–V17**.
+> **V1–V18**.
 >
-> **Ampliado por la 010 (2026-10-25).** El catálogo de validaciones previas pasa a **V1–V17**: la 010
-> añade **V16** (toda aula y toda materia declara tipo) y **V17** (cada tipo requerido tiene al menos
-> un aula del centro, en los dos modos) y cambia **V1** (sección de eventos y versión 2.0). El detalle
-> normativo de V1, V2, V16 y V17 vive en la spec 010; la constitución solo fija el rango y la remisión.
+> **Ampliado por la 010 (2026-10-25 y 2026-10-26).** El catálogo de validaciones previas pasa a
+> **V1–V18**: la 010 añade **V16** (toda aula y toda materia declara tipo), **V17** (cada tipo requerido
+> tiene al menos un aula del centro, en los dos modos) y **V18** (con aula fija activa, el aula de
+> referencia debe ser del **tipo general/ordinario**, el de clave normalizada `aula de estudio`), y
+> cambia **V1** (sección de eventos y versión 2.0). El detalle normativo de V1, V2, V16, V17 y V18 vive
+> en la spec 010; la constitución solo fija el rango y la remisión.
 
 - **MIENTRAS se prepara una generación, EL SISTEMA ejecutará la validación previa antes de invocar al
   solver; si alguna regla falla, no invocará al solver.** Las comprobaciones se ejecutan y se informan
@@ -819,11 +837,12 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
    > **Superado en la versión por la 010 (2026-10-25).** Este criterio decía `1.0`; la versión vigente
    > del contrato es **`2.0`** y `1.0`, ausente o desconocida se rechaza como entrada inválida. El
    > resto del criterio sigue vigente.
-4. La validación previa incluye V1–V17, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
+4. La validación previa incluye V1–V18, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
    `peso` no negativo y el de `duracion_minutos > 0`) (RF-11).
-   > **Superado en el rango por la 010 (2026-10-25).** Este criterio decía V1–V15; la 010 añade
-   > **V16** (aula y materia declaran tipo) y **V17** (cada tipo requerido tiene aulas, en ambos
-   > modos). V1–V12 siguen enumeradas aquí; el detalle de V1, V2, V16 y V17 vive en la 010.
+   > **Superado en el rango por la 010 (2026-10-25 y 2026-10-26).** Este criterio decía V1–V15; la 010
+   > añade **V16** (aula y materia declaran tipo), **V17** (cada tipo requerido tiene aulas, en ambos
+   > modos) y **V18** (el aula de referencia es del tipo general/ordinario). V1–V12 siguen enumeradas
+   > aquí; el detalle de V1, V2, V16, V17 y V18 vive en la 010.
 5. La entrada del solver se construye desde los datos persistidos más el preset, embebe solo los planes
    referenciados y traduce el aula del curso a su índice; el solver no consulta la base de datos
    (RF-13).

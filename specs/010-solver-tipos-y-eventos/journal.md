@@ -2428,3 +2428,76 @@ Ningún test se elimina (43 casos) y ninguno usa datos no versionados.
   es INFEASIBLE. Es exactamente el caso que justifica el desenlace «no atribuible» de RF-6.
 - **La exclusividad no reserva los tipos especializados**: el laboratorio aloja 2 clases de cada
   curso; lo que se bloquea es solo la referencia general de cada uno.
+
+## T15 - Documentación, constitución y anotación de la 005 (2026-10-27)
+
+**Requisito:** RF-7, RF-8, RF-10. **Plan:** §7 y §8/T15. **Base:** `b4491ad`.
+
+### Qué se actualizó
+
+- `docs/contrato-solver-2.0.md`: el **tipo general por convención de nombre** (`aula de estudio`) y
+  **V18**; la **capacidad del tipo** con su fórmula y sus unidades (aulas × días × franjas de la unión de
+  turnos); que el conteo **no descuenta bloqueos** ni cuenta aulas de referencia concretas; el desenlace
+  **«no atribuible»**; la **excepción de precedencia**; el aviso de que un **preset 2.0 anterior con
+  referencia de tipo especializado pasa a entrada inválida por V18** (sin conversión; acción: asignar al
+  curso un aula del tipo general); `V1–V17 → V1–V18` en `:27` y **V18** en la fila de `cursos` (`:65`);
+  dos filas nuevas en «errores de lectura frecuentes» y la referencia del §9 (V16–V18).
+- `docs/constitution.md`: §7.1.5 (el aula de referencia es **siempre del tipo general/ordinario**; los
+  demás tipos no se reservan), §7.3 (el `aula` del curso **debe ser del tipo general** y la configuración
+  no lleva datos que distingan tipos generales), §7.4 (**V1–V18** y remisión con V18) y §7
+  «Comportamiento» («con la causa cuando una categoría la explica y **sin atribuirla cuando ninguna
+  aplica**»). §5 y §7.5 **sin cambios** (lo de T7).
+- `specs/005-nucleo-solver/spec.md`: definición de «Causa» (**V1–V18**; (2) por capacidad, sin
+  «invariantes D8/D9/D10»; nota con «no atribuible» y la excepción de precedencia), nota de RF-6
+  (desenlace y orden) y **V1–V18 en las ocho apariciones** que decían V1–V17 (alcance `128`, su nota
+  `135`, definición `317`, su nota `322`, título de RF-11 `575`, su nota `578`, nota de ampliación `580`
+  y criterio 4 `822` con su nota).
+
+### Quién aplicó qué
+
+Los dos parches de `docs/` los aplicó el **coordinator**: el planner **no tiene permiso de escritura
+fuera de `specs/`** (el intento de editar `docs/contrato-solver-2.0.md` devolvió `permission.rejected`).
+El planner aplicó la anotación de la 005 y entregó los dos parches ya verificados (`patch -p1
+--dry-run` y aplicación en una copia espejo); el coordinator los aplicó al árbol y verificó.
+
+### Verificación
+
+```text
+$ grep -n "V1–V17" specs/005-nucleo-solver/spec.md docs/contrato-solver-2.0.md
+(vacío)
+
+$ grep -n "V18" docs/contrato-solver-2.0.md
+27:| `"version": "2.0"` | se acepta y se valida el resto (V1–V18) | — |
+65:| `cursos` | arreglo | año, sección, turno, plan, aula de referencia | **V6**, V7, V8, V9, V10, V11, V14, **V17**, **V18** |
+185:- **El aula de referencia debe ser del tipo general/ordinario** (**V18**)…
+259:   **V18**). Una referencia de laboratorio, taller o cancha es entrada inválida.
+291:| «El aula de referencia puede ser un laboratorio» | … **V18**. |
+295:> … ahora es **entrada inválida por V18**…
+458:- Tipos de aula, eventos, contrato 2.0, V16–V18, capacidad del tipo, causa no atribuible y salida con
+
+$ grep -n "tipo general" docs/constitution.md
+64:… El **aula de referencia es siempre del tipo general/ordinario** del centro …
+78:… esa `aula` **debe ser del tipo general/ordinario** (V18). …
+
+$ grep -n "V1–V18" docs/constitution.md
+89:Antes de construir el modelo se ejecutan las validaciones V1–V18; …
+
+$ grep -n "sin atribuirla" docs/constitution.md
+56:- **Comportamiento.** … **con la causa cuando una categoría la explica y sin atribuirla cuando ninguna aplica**. …
+```
+
+### Archivos
+
+- `docs/contrato-solver-2.0.md` y `docs/constitution.md` (parches **aplicados por el coordinator**).
+- `specs/005-nucleo-solver/spec.md` (anotación aplicada por el planner).
+
+Sin cambios en `spec.md`, `plan.md` ni en el código.
+
+### Hallazgos
+
+- **El contrato vivo no necesitó sección nueva:** la convención del tipo general y el diagnóstico caben
+  en §2.7 y en §5/§5.1, y el contrato sigue en **2.0** (no hay campo ni sección nuevos).
+- **La 005 conserva su cuerpo normativo:** la frase «las categorías cubren todas las invariantes duras» y
+  la descripción vieja de (2) se mantienen y se sustituyen **en la nota**, para no reescribir el texto de
+  la 005 más allá de la anotación de supersesión (el rango V1–V18 y la (2) por capacidad sí se ajustan en
+  la frase, como en las anotaciones previas de la 010).
