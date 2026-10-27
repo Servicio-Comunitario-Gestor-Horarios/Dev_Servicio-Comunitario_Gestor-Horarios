@@ -1,12 +1,12 @@
 # Estado 011
 
-Fase: plan
-Aprobaciones: spec 2026-10-23
-Base: 5d6b1da77c9da645441a0bebb38e37753f0f7198 (HEAD). **Condición:** el esquema WIP de la 009 está sin commitear; la base efectiva será el commit que incluya la 009 y la 010. El diff del árbol no se imputa a la implementación.
+Fase: plan aprobado; implementación pendiente (arranca el 2026-10-28)
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27
+Base: 8e0602c (HEAD de `feat/Base-datos`, árbol limpio, suite 50/50). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
 Dudas abiertas: ninguna
-Siguiente paso: el planner escribirá `plan.md` y `tasks.md` de la 009 cuando el usuario confirme la base de commit.
-Veredicto: pendiente
-QA: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); spec aprobada por el usuario el 2026-10-23.
+Siguiente paso: implementar **T1 → T10** en orden, una tarea por vez, con su verificación (`plan.md` §9) y su commit; al terminar, validación RF por RF contra `Base: 8e0602c`. **T4 es aditivo** y el borrado del legado es **T9**: ninguna tarea puede cerrar con el árbol sin compilar. La documentación de **T10 la aplica el coordinator**.
+Veredicto: pendiente (implementación). El QA del plan quedó resuelto: B1 y M1–M10 aplicados el 2026-10-27; la spec estaba aprobada desde el 2026-10-23.
+QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); QA del plan: dos rondas de CAMBIOS NECESARIOS (B1, M1–M10) cerradas el 2026-10-27; plan y tareas aprobados el 2026-10-27.
 
 ## Decisión nueva del usuario (2026-10-23)
 
@@ -67,7 +67,54 @@ QA: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); spec aprobada por el u
 - **Orden de implementación.** Después de la 010: la 010 deja el contrato en 2.0; la 011 solo cambia la
   procedencia y el rango del campo de duración.
 - **Tope de 40.** No se toca; si el usuario quisiera cambiarlo, sería otro requisito.
-- **No hay plan ni tareas todavía.** Esta fase termina con la aprobación de la spec.
+- **Plan y tareas aprobados (2026-10-27).** `plan.md` fija la base `8e0602c` y `tasks.md` la lista
+  T1–T10 con su trazabilidad; lo que queda pendiente es la **implementación**, que arranca el
+  **2026-10-28**.
+
+## QA del plan (2026-10-27)
+
+Dos rondas de re-QA: **CAMBIOS NECESARIOS** (B1 y M1–M10), cerradas el 2026-10-27 con el reparto
+aditivo T4→T9 y la aritmética de la rejilla (clases **11:40/17:20**; `fin` **11:50/17:30** = +10 min
+del evento). **Plan y tareas aprobados el 2026-10-27.** Correcciones aplicadas sin tocar la spec:
+
+- **B1 (bloqueante):** la migración de `calculo_eventos` va en **dos pasos**. T4 **añade** las funciones
+  nuevas y conserva `duracionFranjaEstimada` y las firmas antiguas como envoltorios (nadie queda con el
+  build roto); T5, T6 y T8 migran sus llamadores a las firmas con D; **T9** borra el legado con el
+  `grep` de cierre. La tabla de trazabilidad y el orden de dependencias lo reflejan.
+- **M1:** `docs/interfaz-frontend.md:106` (`VERSION_ESQUEMA_ACTUAL = 3`) → **4**, en §7 y en la
+  verificación de T10.
+- **M2:** las dos menciones de `duracionFranjaEstimada` (`:346` y `:732`) se sustituyen y entran en el
+  `grep` de cierre.
+- **M3:** `docs/guias/datos-prueba-frontend.md:56-57,70-71` (turnos/recesos de 40, pasos y `fin`
+  12:30/18:10) se añaden a §7 y al `grep` de T10.
+- **M4/M5:** `datos-prueba.md:151` («Los 40 minutos…») e `interfaz-frontend.md:658` («40 min…») entran
+  en los `grep` con `40 min|40 minutos`.
+- **M6:** supersesiones de 009/008/005/010 anotadas al cerrar por el **planner** (§7.2 del plan), con
+  textos exactos; no es una tarea del implementer.
+- **M7:** estimación de 20–30 min por tarea en `tasks.md` y §9 del plan (T2, T5, T6, T7 y T8 en el
+  techo de 30; T9 en **25** desde que migra los casos antiguos de `test_calculo_eventos`).
+- **M8:** corregido: el punto único es la conversión **horas académicas → minutos**; multiplicar por D en
+  el encaje o en el ancho de franja no es esa conversión.
+- **M9:** comentarios desfasados asignados a T4 (`calculo_eventos.hpp:34-36`, `.cpp:59-63`), T6
+  (`solver_config.cpp:424-425`) y T8 (`perfil.cpp:282-285`).
+- **M10:** `errorDeRango` y el mensaje de turno sin ventana incluyen la **acción disponible** (RNF-1).
+
+### Correcciones finales (2026-10-27)
+
+- **B1 (aritmética):** la rejilla de clases es **07:00–11:40 / 12:40–17:20** (`8 × 35 = 280`); `Turnos.fin`
+  **11:50/17:30** añade los 10 min del evento (mismo desfase que la 008). Corregido en §6, §7.1 y en el
+  `grep` de T10 (restos viejos `12:20|18:00|12:30|18:10` vacíos; `11:40|17:20` en positivo).
+- **M1:** T9 también migra o retira los casos de `ventanaDePosicion` (2 args) y `eventoDentroDeVentana`
+  (3 args) de `test_calculo_eventos.cpp:111-203`, con build y `ctest -R '^test_calculo_eventos$'`; T9
+  pasa a 25 min (sigue en 10 tareas).
+- **M2:** el criterio 1 de la 008 está en 541 y el 3 en 549-553; cita corregida en §7.2.
+- **M3:** el error de `consultar()` incluye la acción («Compruebe que la base esté disponible e intente
+  de nuevo»).
+- **M4:** `test_backend_nucleo_datos` (T5) y `test_validador_entrada` (T7) se anotan como **regresión**,
+  no como tests nuevos de esas tareas.
+- **M5:** la comprobación de aridad ya no se hace con `grep`: el build es la prueba (sin sobrecargas, una
+  llamada vieja no compila) y el `grep` se revisa a mano; `ctest -R test_calculo_eventos` verifica el
+  resultado.
 
 ## Tamaño previsto
 
