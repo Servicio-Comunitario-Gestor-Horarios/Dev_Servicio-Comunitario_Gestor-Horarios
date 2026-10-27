@@ -2348,3 +2348,83 @@ asevera el **tipo** `«regular»` en vez del nombre del aula (8 > 4 sigue siendo
   decide RF-6; no se inventa una (2) que el conteo no prueba.
 - **El motor no valida V18** (§5.18): `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas`
   mantiene la referencia de `3|C` en la cancha sin cambios y sigue siendo infactible.
+
+## T14 - Pruebas nuevas: ventanas, reproducibilidad y aula especializada (2026-10-27)
+
+**Requisito:** RF-6, RF-3, RNF-1. **Plan:** §0.3, §8/T13 (tabla) y §8/T14. **Base:** `d3e8de0`.
+
+Solo tests y comentarios: **`solver.cpp` no cambia** (`git diff --stat src/backend/src/solver/solver.cpp`
+vacío).
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+build exit=0
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_solver_horarios$'
+1/1 Test #48: test_solver_horarios .............   Passed    0.28 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_solver_horarios
+Totals: 43 passed, 0 failed, 0 skipped, 0 blacklisted, 219ms
+
+$ ctest --preset backend
+100% tests passed out of 50
+Total Test time (real) =   5.67 sec
+```
+
+### Tests nuevos
+
+- **`solver_causaNoAtribuiblePorVentanasDeTurno`** con el fixture completo de §0.3
+  (`configVentanasDeTurnoHall()`: 1 día × 7 franjas, móvil, 1 aula `A1`, `PA/PB/PC` de 1 bloque,
+  `TB={4}` y `TC={5,6}`, docentes con su celda). Comprueba `demanda 3 = capacidad 3` de forma
+  indirecta (la (2) no aparece), INFEASIBLE, «no atribuible», sin `Causa (`, sin `A1` ni `1|A`.
+  El comentario explica la **condición de Hall**: `1|A` y `2|B` solo caben en `(0,4)` y D8 impide
+  compartirla; por eso el conteo global, que es necesario, no basta.
+- **`solver_esReproducible_mismaEntradaMismaSalida`** (RNF-1): dos motores **nuevos** por caso
+  (factible y el INFEASIBLE de Hall) dan el mismo `exito`, el mismo `resumenDeSalida`
+  (`curso|día|slot|materia|profesor|aula`, ordenado) y los mismos `errores` (texto incluido).
+- **`solver_exclusividadEntreClasesDesplazadas`**: además de `enLaboratorio == 4`, se cuenta por
+  curso (`labDeA == 2`, `labDeB == 2`), así queda afirmado que el laboratorio —tipo especializado—
+  aloja clases de **los dos** cursos y **no queda reservado** (RF-3).
+
+### Renombrados y comentarios
+
+Renombrados (los nombres de la tabla de §8/T13 que ya no describían la conducta):
+
+1. `solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos` → `solver_causaNoAtribuibleCuandoLaReferenciaCompartidaNoCabe`
+2. `solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja` → `solver_causaDeAulaConDosCursosDesplazadosEsFactible`
+3. `solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio` → `solver_causaNoAtribuibleCuandoLaReferenciaCasiLlenaNoCabe`
+4. `solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas` → `solver_causaNoAtribuibleCuandoElTipoTieneCapacidad`
+5. `solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno` → `solver_causaDeDocenteEnTurnoDistintoNoSeInformaComoConflictoDeAula`
+6. `solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible` → `solver_causaDeDocenteNoElegibleNoSeInformaComoConflictoDeAula`
+7. `solver_falloCausaConflictoDeAulaPorReferenciaSaturada` → `solver_falloCausaConflictoDeAulaPorCapacidadDeTipo`
+
+La tabla de §8/T13 da **siete** nombres de destino: las **tres** filas marcadas «se renombra» y los
+cuatro nombres que figuraban como destino de las reescrituras de T13. Se aplican los siete para que
+ningún nombre describa ya el mecanismo retirado (palomar, unión de franjas, descuento).
+
+Comentarios actualizados (los **dos** con «comentario nuevo» de la tabla y los de los tests
+reescritos, que aún describían el palomar/unión):
+
+- `solver_causaDeAulaConSemanaAnchaNoInventaElConflicto`: capacidad del tipo, no descuento.
+- `solver_causaDeAulaNoSobreestimaConTurnosDistintos`: conteo del tipo con turnos distintos.
+- `solver_causaNoAtribuibleCuandoLaReferenciaCompartidaNoCabe`,
+  `solver_causaNoAtribuibleCuandoLaReferenciaCasiLlenaNoCabe` y
+  `solver_causaNoAtribuibleCuandoElTipoTieneCapacidad`: describen el fixture y el desenlace
+  «no atribuible» (antes hablaban del bloqueo/palomar).
+- `solver_causaDeAulaConDosCursosDesplazadosEsFactible`: ya no hay unión de franjas en ninguna
+  cuenta.
+
+Ningún test se elimina (43 casos) y ninguno usa datos no versionados.
+
+### Hallazgos
+
+- **`Solver::resolver` no reinicia el modelo**: `model` y `vars` son miembros y `resolver` no los
+  limpia, así que reutilizar la misma instancia acumula restricciones de la entrada anterior. El test
+  de reproducibilidad crea **un `Solver` nuevo por ejecución**; no se toca producción.
+- **La condición de Hall no se puede detectar con el conteo global**: demanda = capacidad y aun así
+  es INFEASIBLE. Es exactamente el caso que justifica el desenlace «no atribuible» de RF-6.
+- **La exclusividad no reserva los tipos especializados**: el laboratorio aloja 2 clases de cada
+  curso; lo que se bloquea es solo la referencia general de cada uno.

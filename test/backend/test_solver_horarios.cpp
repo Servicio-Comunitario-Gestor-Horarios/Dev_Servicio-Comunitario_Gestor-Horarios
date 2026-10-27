@@ -164,6 +164,53 @@ private:
         return config;
     }
 
+    // Fixture de plan.md §0.3: 1 día, 7 franjas, modo móvil, 1 aula `A1` y tres cursos de 1 bloque.
+    // 1|A y 2|B solo pueden ir a la celda (0,4) —D8 impide compartirla— y 3|C tiene (0,5) y (0,6).
+    // Demanda 3 = capacidad 3 (1 aula × 3 franjas de la unión TB∪TC), así que el conteo del tipo
+    // no falla: la infactibilidad es de ventanas entre cursos (condición de Hall), no de capacidad.
+    static SolverConfig configVentanasDeTurnoHall() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = false;
+        config.dimensiones = {3, 1, 1, 3, 1, 7};
+        config.franja_horaria = {60, 7};
+        config.turnos.turnos = {{"TB", {4}}, {"TC", {5, 6}}};
+
+        config.materias = {{"Matemática", "Aula de estudio"}};
+        config.aulas = {{"A1", "Aula de estudio", 30}};
+        config.planes = {{"PA", {{0, 1, 1}}},
+                         {"PB", {{0, 2, 1}}},
+                         {"PC", {{0, 3, 1}}}};
+        config.cursos = {{1, "A", "TB", 20, "PA", -1},
+                         {2, "B", "TB", 20, "PB", -1},
+                         {3, "C", "TC", 20, "PC", -1}};
+        config.profesores = {
+            // Ninguno declara turno ni plan (vacío = cualquiera); uno por curso, con su celda.
+            {"Prof A", 1, 1, "", "", {1}, {0}, {}, {{0, {4}}}},
+            {"Prof B", 1, 1, "", "", {2}, {0}, {}, {{0, {4}}}},
+            {"Prof C", 1, 1, "", "", {3}, {0}, {}, {{0, {5, 6}}}}};
+        return config;
+    }
+
+    /// Resumen determinista de una salida: por curso, sus clases (día, slot, materia, profesor,
+    /// aula), ordenadas. Vacío si el resultado no tiene solución.
+    static QString resumenDeSalida(const Solver::ResultadoSolver& resultado) {
+        QStringList clases;
+        for (auto it = resultado.resultado.horarios.constBegin();
+             it != resultado.resultado.horarios.constEnd(); ++it)
+            for (const DiaOutput& dia : it.value().dias)
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                    clases.append(QStringLiteral("%1|%2|%3|%4|%5|%6")
+                                      .arg(it.key())
+                                      .arg(dia.dia)
+                                      .arg(asignacion.slot)
+                                      .arg(asignacion.materia)
+                                      .arg(asignacion.profesor)
+                                      .arg(asignacion.aula));
+        clases.sort();
+        return clases.join(QLatin1Char('\n'));
+    }
+
 private slots:
 
     void configValida_noTieneErrores() {
@@ -689,6 +736,23 @@ private slots:
                         franjasOcupadas.insert(franja);
                     }
         QCOMPARE(enLaboratorio, 4);   // los 2 bloques de Química de cada curso
+
+        // RF-3: las aulas de un tipo especializado NUNCA quedan reservadas. El laboratorio aloja
+        // clases de los dos cursos mientras ambos están desplazados (solo se bloquea la
+        // referencia general de cada curso).
+        int labDeA = 0;
+        int labDeB = 0;
+        for (auto it = resultado.resultado.horarios.constBegin();
+             it != resultado.resultado.horarios.constEnd(); ++it) {
+            int enLab = 0;
+            for (const DiaOutput& dia : it.value().dias)
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                    if (asignacion.aula == 2) ++enLab;
+            if (it.key() == QStringLiteral("1|A")) labDeA = enLab;
+            if (it.key() == QStringLiteral("2|B")) labDeB = enLab;
+        }
+        QCOMPARE(labDeA, 2);
+        QCOMPARE(labDeB, 2);
     }
 
     // ── T4/RF-3: en modo móvil cada clase elige un aula del tipo requerido ──
@@ -799,7 +863,7 @@ private slots:
     }
 
     // ── T6/RF-6: las clases que se quedan en la referencia no caben en ella ──
-    void solver_falloCausaConflictoDeAulaPorReferenciaSaturada() {
+    void solver_falloCausaConflictoDeAulaPorCapacidadDeTipo() {
         // Dos cursos comparten la referencia Aula 1; cada uno deja 5 bloques del tipo de la
         // referencia en ella y desplaza 1: 10 bloques frente a 6 franjas del aula.
         SolverConfig config;
@@ -830,22 +894,17 @@ private slots:
         QVERIFY2(texto.contains("6 franjas"), qPrintable(texto));
     }
 
-    // ── T6/RF-6: con capacidad de sobra en la referencia, el aula no oculta la causa real ──
-    // Este fixture NO discrimina la regla «las clases desplazadas no se cuentan como ocupantes»
-    // del aula de referencia: los 10 bloques del grupo (6 se quedan + 4 desplazados) caben en
-    // las 12 franjas de la semana aunque se cuenten las desplazadas como ocupantes, así que el
-    // veredicto no cambia. Lo que comprueba es que el descuento por bloqueo no convierte en
-    // conflicto un aula con capacidad de sobra y que la causa real —2|B sin docente elegible—
-    // se informa como (4). Quien discrimina «no se cuentan las desplazadas» es
-    // `solver_falloCausaConflictoDeAulaPorReferenciaSaturada` (exige el mensaje «10 bloques»,
-    // no 12) y `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula` (con el recuento
-    // por suma de bloques desplazados, la causa (2) taparía la (4)).
+    // ── T6/RF-6: con capacidad de sobra en el tipo, el aula no oculta la causa real ──
+    // «Aula de estudio» demanda 6 y «Laboratorio» 4 frente a las 12 franjas de capacidad de cada
+    // tipo (6 días × 2 franjas por aula), así que el conteo de (2) no falla. Lo que comprueba es
+    // que no se inventa un conflicto de aula y que la causa real —2|B sin docente elegible— se
+    // informa como (4). La (2) decide solo por capacidad del tipo, sin descontar el bloqueo de la
+    // referencia (quien aísla ese bloqueo es `solver_falloDocenteNoElegibleNoSeInformaComoConflictoDeAula`).
     void solver_causaDeAulaConSemanaAnchaNoInventaElConflicto() {
         // 1|A (2 bloques en la referencia + 4 de laboratorio) y 2|B (4 en la referencia)
-        // comparten el Aula 1 durante 6 días × 2 franjas = 12 franjas. Solo 2 + 4 = 6 bloques
-        // se quedan en el aula y 1|A bloquea 4 franjas con sus clases desplazadas: quedan 8
-        // franjas para 6 bloques, así que el aula no es la causa. La causa real es de
-        // asignación (4): 2|B no tiene docente elegible.
+        // comparten el Aula 1 durante 6 días × 2 franjas = 12 franjas. Los 6 bloques del tipo
+        // «Aula de estudio» (= 2 + 4) caben de sobra en la capacidad del tipo, así que el aula no
+        // es la causa. La causa real es de asignación (4): 2|B no tiene docente elegible.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -898,9 +957,12 @@ private slots:
         QVERIFY2(!texto.contains("Causa (2)"), qPrintable(texto));
     }
 
-    // ── Corrección de validación (RF-6): el bloqueo de la referencia cuenta como capacidad ──
-    // Escenario exacto del reviewer: entrada 2.0 válida e INFEASIBLE que se quedaba sin causa.
-    void solver_causaDeAulaCuentaLasFranjasBloqueadasPorDesplazamientos() {
+    // ── RF-6: la referencia compartida no cabe y ninguna categoría lo explica ──
+    // 1|A y 2|B comparten «A1» (Aula común): 1|A tiene 2 bloques comunes + 4 de laboratorio y 2|B
+    // necesita 3 bloques comunes. El conteo del tipo no falla (5 ≤ 6) y cada curso cabe en su
+    // turno, pero la contención en la referencia compartida deja la infactibilidad sin categoría:
+    // «no atribuible», sin nombrar entidades.
+    void solver_causaNoAtribuibleCuandoLaReferenciaCompartidaNoCabe() {
         // 1|A y 2|B comparten la referencia «A1» (Aula común). 1|A tiene 2 bloques comunes
         // + 4 de laboratorio: sus 6 clases ocupan las 6 franjas del turno (2 días × 3), así
         // que en las 4 franjas del laboratorio A1 queda vacía y bloqueada. 2|B necesita
@@ -965,11 +1027,11 @@ private slots:
         QVERIFY(resultado.errores.isEmpty());
     }
 
-    // ── Corrección 2 (RF-6): el bloqueo de la referencia es una UNIÓN de franjas, no una suma ──
-    // Dos cursos que comparten A1 y se desplazan a la misma franja (cada uno a un laboratorio
-    // distinto) bloquean una sola franja de la referencia. Caso positivo del reviewer: los 4
-    // bloques que se quedan caben en 6 − 2 franjas, así que el dato es factible.
-    void solver_causaDeAulaNoDescuentaDosVecesLaMismaFranja() {
+    // ── RF-6: dos cursos desplazados que comparten referencia y caben son factibles ──
+    // Comparten A1 y se desplazan a la misma franja (cada uno a un laboratorio distinto); el
+    // conteo del tipo no falla y el bloqueo de la referencia no resta capacidad, así que el dato
+    // es factible. La unión de franjas bloqueadas ya no forma parte de ninguna cuenta.
+    void solver_causaDeAulaConDosCursosDesplazadosEsFactible() {
         SolverConfig config = configDosCursosDesplazadosALaMismaFranja();
 
         Solver solver;
@@ -998,11 +1060,11 @@ private slots:
         QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
     }
 
-    // ── Corrección 3 (RF-6): las franjas bloqueadas no caben si hay menos aulas del tipo ──
-    // La unión pura era optimista: suponía que los 4 bloques de laboratorio de los dos cursos
-    // caben en las mismas 2 franjas. Con un solo laboratorio necesitan 4 franjas distintas
-    // (palomar), A1 pierde 4 y los 28 bloques comunes ya no caben en 26: causa (2) con cifras.
-    void solver_causaDeAulaCuentaLasFranjasQueNoCabenEnUnSoloLaboratorio() {
+    // ── RF-6: 28 ≤ 30 en la referencia casi llena; el conteo por tipo pasa ──
+    // Dos cursos comparten A1 (5 días × 6 franjas) y cada uno cursa 14 bloques comunes + 2 de
+    // laboratorio. El tipo «Aula común» demanda 28 y tiene 30 franjas de capacidad, así que (2) no
+    // falla; la contención en la referencia compartida deja la infactibilidad sin categoría.
+    void solver_causaNoAtribuibleCuandoLaReferenciaCasiLlenaNoCabe() {
         SolverConfig config = configDosCursosCasiLlenosConLaboratorios(1);
 
         Solver solver;
@@ -1028,12 +1090,15 @@ private slots:
         QVERIFY(resultado.errores.isEmpty());
     }
 
-    // La saturación por tipo también descuenta las franjas bloqueadas en las referencias de ese
-    // tipo: aquí el conflicto no se ve referencia a referencia, solo al sumar el tipo.
-    void solver_causaSaturacionPorTipoDescuentaLasFranjasBloqueadas() {
+    // ── RF-6: el tipo tiene capacidad (7 ≤ 12) y la infactibilidad no se atribuye ──
+    // 1|A ocupa todas sus franjas con laboratorio y bloquea A1; 2|B llena A2 y 3|C necesita un
+    // bloque de «Aula base». El conteo del tipo no falla (7 bloques ≤ 2 aulas × 6 franjas), así que
+    // ninguna categoría lo explica. La referencia de 3|C sigue en la cancha: los fixtures del motor
+    // no pasan por V18.
+    void solver_causaNoAtribuibleCuandoElTipoTieneCapacidad() {
         // 1|A ocupa sus 6 franjas con laboratorio y bloquea su referencia A1 (tipo «Aula base»)
-        // en todas ellas; 2|B llena A2 con 6 bloques de «Aula base»; 3|C necesita 1 bloque de
-        // «Aula base» y no le queda ninguna franja de ese tipo (12 menos las 6 bloqueadas).
+        // en todas ellas; 2|B llena A2 con 6 bloques de «Aula base» y 3|C necesita 1 bloque de ese
+        // tipo, pero no le queda ninguna franja utilizable. El conteo del tipo no falla (7 ≤ 12).
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -1068,10 +1133,10 @@ private slots:
         QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
     }
 
-    // ── Corrección 4 (RF-6): la cota es el palomar, no la colocación voraz ──
-    // Con turnos distintos la unión voraz sobreestimaba el bloqueo (4 franjas) y declaraba una
-    // causa (2) falsa que tapaba la real: 2|B no tiene docente de laboratorio, así que la causa
-    // es (4). El palomar ⌈4/2⌉ = 2 deja 6 franjas de A1 para los 6 bloques que se quedan.
+    // ── RF-6: con turnos distintos, el conteo del tipo no inventa un conflicto de aula ──
+    // «Aula común» demanda 6 frente a 1 aula × 8 franjas (unión de T1 y T2 en 2 días) y
+    // «Laboratorio» 4 frente a 2 aulas × 8, así que (2) no falla. La causa real es que 2|B no
+    // tiene docente de laboratorio y se informa (4), no una (2) por la referencia A1.
     void solver_causaDeAulaNoSobreestimaConTurnosDistintos() {
         SolverConfig config = configDosCursosConTurnosDistintos();
         // El docente de 2|B solo opta por la materia común (índice 0), no por el laboratorio.
@@ -1105,7 +1170,7 @@ private slots:
     // docente y el turno del curso, no capacidad, así que un titular con una sola franja pasa la
     // validación y el modelo es INFEASIBLE. La causa es (4), no una (2) por las franjas que
     // bloquea 1|A en un turno que la capacidad de «Aula base» ni siquiera cuenta.
-    void solver_causaSaturacionPorTipoNoDescuentaFranjasDeOtroTurno() {
+    void solver_causaDeDocenteEnTurnoDistintoNoSeInformaComoConflictoDeAula() {
         SolverConfig config = configLaboratorioEnTurnoDistinto();
 
         Solver solver;
@@ -1122,7 +1187,7 @@ private slots:
     // Misma entrada con el docente SIN materias asignadas: la causa (4) es «no tiene ningún
     // docente elegible». V10/V13 la rechazan en el flujo real, pero el solver directo debe
     // informarla igual y no convertirla en una causa (2) por el descuento.
-    void solver_causaSaturacionPorTipoNoDescuentaFranjasConDocenteNoElegible() {
+    void solver_causaDeDocenteNoElegibleNoSeInformaComoConflictoDeAula() {
         SolverConfig config = configLaboratorioEnTurnoDistinto();
         config.profesores[0].materias_asignadas = {};
 
@@ -1184,6 +1249,55 @@ private slots:
         QVERIFY2(texto.contains("Causa (4)"), qPrintable(texto));
         QVERIFY2(texto.contains("1|X"), qPrintable(texto));
         QVERIFY2(texto.contains("«Laboratorio»"), qPrintable(texto));
+    }
+
+    // ── T14/RF-6: el conteo global es necesario pero no suficiente (condición de Hall) ──
+    // 1|A y 2|B solo pueden ir a la celda (0,4) del aula A1 y D8 impide compartirla; 3|C tiene
+    // (0,5) y (0,6). La demanda del tipo (3) es igual a su capacidad (1 aula × 3 franjas de la
+    // unión TB∪TC), así que (2) no falla; (3) y (4) tampoco (cada curso cabe en su turno y cada
+    // docente tiene su celda). La infactibilidad es de ventanas entre cursos y se informa sin
+    // atribuirla, sin nombrar entidades.
+    void solver_causaNoAtribuiblePorVentanasDeTurno() {
+        const SolverConfig config = configVentanasDeTurnoHall();
+
+        Solver solver;
+        auto resultado = solver.resolver(config);
+
+        QVERIFY2(!resultado.exito, "1|A y 2|B no caben en la única celda (0,4)");
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
+        QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
+        QVERIFY2(!texto.contains("A1"), qPrintable(texto));
+        QVERIFY2(!texto.contains("1|A"), qPrintable(texto));
+    }
+
+    // ── T14/RNF-1: la misma entrada da la misma salida, también en el caso INFEASIBLE ──
+    void solver_esReproducible_mismaEntradaMismaSalida() {
+        // El motor fija num_search_workers(1) y random_seed(0): dos motores nuevos sobre el mismo
+        // dato deben coincidir en éxito, en el resumen de cada clase y en los errores (texto
+        // incluido).
+        const auto resolverConMotorNuevo = [](const SolverConfig& config) {
+            Solver solver;
+            return solver.resolver(config);
+        };
+
+        const SolverConfig factible = crearConfigMinima();
+        const auto factible1 = resolverConMotorNuevo(factible);
+        const auto factible2 = resolverConMotorNuevo(factible);
+        QVERIFY2(factible1.exito, qPrintable(factible1.errores.join("\n")));
+        QVERIFY(!resumenDeSalida(factible1).isEmpty());
+        QCOMPARE(factible2.exito, factible1.exito);
+        QCOMPARE(resumenDeSalida(factible2), resumenDeSalida(factible1));
+        QCOMPARE(factible2.errores, factible1.errores);
+
+        const SolverConfig infactible = configVentanasDeTurnoHall();
+        const auto infactible1 = resolverConMotorNuevo(infactible);
+        const auto infactible2 = resolverConMotorNuevo(infactible);
+        QVERIFY2(!infactible1.exito, "el fixture de ventanas debe ser INFEASIBLE");
+        QVERIFY(!infactible1.errores.isEmpty());
+        QCOMPARE(infactible2.exito, infactible1.exito);
+        QCOMPARE(resumenDeSalida(infactible2), resumenDeSalida(infactible1));
+        QCOMPARE(infactible2.errores, infactible1.errores);
     }
 };
 
