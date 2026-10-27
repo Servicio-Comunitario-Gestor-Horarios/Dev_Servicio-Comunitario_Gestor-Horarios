@@ -2071,3 +2071,93 @@ comportamientos; los dos negativos nuevos son los únicos que discriminan.
   deja pasar (solo exige solape), así que era la que podía producir la causa (2) falsa en
   producción; la de `materias_asignadas` vacío se cubre también porque es la que usaban las
   correcciones 2 y 4 para forzar la (4).
+
+## T11 - `FranjaSemana` y funciones puras de capacidad y demanda (2026-10-27)
+
+**Requisito:** RF-6. **Plan:** §3 (M5), §0.7 (nota del 2026-10-27) y §8/T11. **Base:** `295b59e`.
+
+### Rojo (tests primero)
+
+Se creó `test/backend/test_capacidad_tipo.cpp` (7 casos) y su registro
+`add_gtest(test_capacidad_tipo backend/test_capacidad_tipo.cpp backend)` en `test/CMakeLists.txt`
+(junto a `test_contrato_solver`), con la producción todavía sin las firmas nuevas:
+
+```text
+$ cmake --preset backend && cmake --build --preset backend --parallel
+test_capacidad_tipo.cpp:64:11: error: ‘FranjaSemana’ no nombra a un tipo
+test_capacidad_tipo.cpp:69:17: error: ‘lunesCuarta’ no se declaró en este ámbito
+...
+ninja: build stopped: subcommand failed.        # exit 1
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+[69/69] Linking CXX executable test/test_solver_horarios        # exit 0
+
+$ ctest --test-dir build-backend --output-on-failure -R 'test_capacidad_tipo|test_contrato_solver|test_backend_variables_cp_sat'
+1/3 Test #42: test_contrato_solver .............   Passed    0.11 sec
+2/3 Test #43: test_capacidad_tipo ..............   Passed    0.01 sec
+3/3 Test #47: test_backend_variables_cp_sat ....   Passed    0.63 sec
+
+100% tests passed out of 3
+
+$ grep -n "int aulasDelTipo\|QVector<int> slotsTurno" src/backend/src/solver/solver.cpp
+(ninguna salida; exit 1)
+
+$ ctest --preset backend
+50/50 Test #50: test_ipc_aislamiento_bd ............   Passed    0.07 sec
+
+100% tests passed out of 50
+Total Test time (real) =   6.31 sec
+```
+
+`test_capacidad_tipo` (7/7, ejecutando el binario):
+
+```text
+[       OK ] TestCapacidadTipo.franjaSemana_ordenIgualdadYqHash
+[       OK ] TestCapacidadTipo.slotsTurno_devuelveLosSlotsDeclarados
+[       OK ] TestCapacidadTipo.franjasDelCurso_cuentaParesDiaFranjaYnoSlotsSueltos
+[       OK ] TestCapacidadTipo.franjasDelTipo_uneLosTurnosDeLosCursosQueLoTienen
+[       OK ] TestCapacidadTipo.demandaDelTipo_sumaLosBloquesDeTodosLosCursosYNoLosDeOtroTipo
+[       OK ] TestCapacidadTipo.aulasYcapacidadDelTipo_seCuentanPorClave
+[       OK ] TestCapacidadTipo.tipoGeneralAula_esAulaDeEstudioPorClave
+[  PASSED  ] 7 tests.
+```
+
+La suite pasa de **49 a 50** tests por el `test_capacidad_tipo` nuevo; los 49 anteriores siguen verdes
+(`test_solver_horarios`, benchmark factible y resto incluidos).
+
+### Cambios
+
+- `src/backend/include/backend/solver/config/contrato_solver.hpp` (ámbito global, junto a
+  `claveTipo`; el `namespace ContratoSolver` **no** se amplía): `struct FranjaSemana` con `==`, `<`
+  y `qHash` (`qHashMulti`); `slotsTurno`, `franjasDelCurso`, `franjasSemanales`, `franjasDelTipo`,
+  `demandaDelTipo`, `aulasDelTipo`, `capacidadDelTipo` y `tipoGeneralAula()`. Incluye `<QSet>` y
+  `<QHashFunctions>`.
+- `src/backend/src/solver/config/contrato_solver.cpp`: se implementan esas funciones puras y se
+  retira el `slotsDelTurno` privado (`54-60`); `slotsDisponibles` pasa a `slotsTurno`.
+  `tipoGeneralAula()` devuelve `"Aula de estudio"` (una sola constante para V18).
+- `src/backend/src/solver/solver.cpp`: se borran **solo** las dos copias anónimas duplicadas
+  (`aulasDelTipo`, `33-38`, y `slotsTurno`, `92-98`), como manda T11/§0.7. **Ninguna llamada cambia**:
+  los 8 usos resuelven a las funciones públicas (mismas firmas y cuerpos idénticos). El resto del
+  inventario de causas (palomar, `franjasBloqueadasEnFranjasContadas`, `causaConflictoDeAula`,
+  `nombreAula`, bloque por referencia) sigue siendo de T13. Diff: **17 líneas eliminadas, 0 añadidas**.
+- `test/backend/test_capacidad_tipo.cpp` (nuevo) y `test/CMakeLists.txt`.
+- `specs/010-solver-tipos-y-eventos/tasks.md`: T11 marcada como hecha.
+
+### Hallazgos
+
+- **La ambigüedad es por *using-directive* + ADL, no por ocultamiento.** El namespace anónimo se
+  inyecta en el ámbito global y, con argumentos de tipo global (`SolverConfig`, `QString`), la copia
+  anónima y la pública coinciden como candidatas: **8 errores** si se dejan ambas. Borrar solo las
+  definiciones (sin tocar llamadas) es suficiente y no altera el comportamiento.
+- **`slots` es macro de Qt** (`#define slots`): como nombre de variable local no compila
+  (`error: expected unqualified-id before ‘=’`). En `franjasDelCurso` la lista local se llama
+  `slotsDelCurso`, como fija el plan.
+- **La unidad queda fijada por el tipo, no por un comentario.** `franjasDelCurso` produce pares
+  `(día, slot)` distintos (2 días × 2 franjas = 4): el producto manual `num_dias × slots.size()` que
+  T13 sustituye por `franjasSemanales` da ahora el mismo número por construcción.
+- **`aulasDelTipo` y `franjasDelTipo` comparan por clave** (`claveTipo`), no por cadena cruda: el
+  test usa a propósito `"AULA DE ESTUDIO"` en un aula y cuenta 2 aulas del tipo general.

@@ -28,15 +28,6 @@ struct DesplazamientosDeGrupo {
     QMap<QString, QSet<int>> franjasAlcanzables;  ///< tipo requerido → slots donde pueden caer
 };
 
-/// Nº de aulas del CENTRO de un tipo de aula (0 si no hay ninguna: V17 ya lo rechaza como entrada
-/// inválida, así que quien divide lo comprueba antes).
-int aulasDelTipo(const SolverConfig& config, const QString& clave) {
-    int aulas = 0;
-    for (const AulaSolverConfig& a : config.aulas)
-        if (claveTipo(a.tipo) == clave) ++aulas;
-    return aulas;
-}
-
 /// Cota inferior, en franjas distintas, de las que necesitan las clases desplazadas de un grupo
 /// (palomar: una clase por franja y aula):
 ///
@@ -87,14 +78,6 @@ int franjasBloqueadasEnFranjasContadas(const SolverConfig& config,
         total = qMax(total, qMin(qMax(palomar - fuera, 0), dentro));
     }
     return total;
-}
-
-/// Slots declarados por el turno `nombre`, o vacío si no existe.
-QVector<int> slotsTurno(const SolverConfig& config, const QString& nombre) {
-    for (const TurnoConfig& t : config.turnos.turnos)
-        if (t.nombre == nombre)
-            return t.slot;
-    return {};
 }
 
 int bloquesMateria(const SolverConfig& config, const PlanMateriaConfig& mc) {

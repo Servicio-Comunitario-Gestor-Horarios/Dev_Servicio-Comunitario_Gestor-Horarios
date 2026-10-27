@@ -94,6 +94,9 @@ if(TARGET backend)
 	add_gtest(test_servicio_exportacion backend/test_servicio_exportacion.cpp backend)
 
 	add_qtest(test_contrato_solver backend/test_contrato_solver.cpp backend)
+
+	# Funciones puras de demanda y capacidad por tipo (FranjaSemana, T11).
+	add_gtest(test_capacidad_tipo backend/test_capacidad_tipo.cpp backend)
 endif()
 
 # ============================================================
