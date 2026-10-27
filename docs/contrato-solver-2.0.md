@@ -287,7 +287,7 @@ Errores de lectura frecuentes:
 | «Curso fijo = siempre en su aula» | Solo las clases del **tipo de la referencia**; el resto se desplazan y vuelven. |
 | «Su aula se reserva todo el turno» | Solo en las franjas con una clase **desplazada**; el resto queda libre. |
 | «Otro curso puede usar la referencia mientras está fuera» | **No**: en esa franja está vacía y **bloqueada**. |
-| «Si el laboratorio no alcanza, el solver usa un aula común» | **No**: nunca cambia el tipo; el resultado es no factible (conflicto de aula). |
+| «Si el laboratorio no alcanza, el solver usa un aula común» | **No**: nunca cambia el tipo. El resultado es no factible, con causa **(2) conflicto de aula** solo si `demanda(t) > capacidad(t)`, y **no atribuible** si el conteo no falla (§5.1). |
 | «El aula de referencia puede ser un laboratorio» | **No**: con `aula_fija: true` debe ser del tipo general (`Aula de estudio`); si no, **V18**. |
 | «Todo horario imposible tiene una causa del catálogo» | **No**: si ningún conteo la explica, la causa es **no atribuible**. |
 

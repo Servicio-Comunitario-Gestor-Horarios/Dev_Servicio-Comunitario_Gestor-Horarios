@@ -1,20 +1,21 @@
 # Estado 010
 
-Fase: implementacion (plan y tareas de la parte afectada aprobados el 2026-10-26; T11–T16 pendientes)
+Fase: cerrada
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-25 · **spec del cambio de requisitos: 2026-10-26**
   (con la **enmienda de RF-6 del mismo día**: excepción de precedencia de (3) sobre (2)) ·
-  **plan/tareas de la parte afectada: 2026-10-26**
+  **plan/tareas de la parte afectada: 2026-10-26** · **implementación y validación: 2026-10-27**
 Base: **49d39dc** (HEAD al escribir este plan; T1–T10 en `0096b36`, `3a3e724`, `d2fbda1`, `4142939`,
   `0edc6f8`, `06fc70e` (P4), `37cd2e1`, `f054b2e` (T7), `4134209`, `9c5c301`, `35cd5f0`;
   correcciones de validación `aa7ee74`, `232bd19`, `45ac292`, `5fc40e0`, `de61050`; docs `d7728e6`)
 Dudas abiertas: ninguna. La precedencia de (3) sobre (2) quedó **aprobada** el 2026-10-26 como
   excepción de RF-6 (ver «Excepción de precedencia (2026-10-26)»).
-Siguiente paso: implementar **T11 → T16** en orden, **una tarea por vez**, con su **verificación**
-  (`plan.md` §8) y su **commit** al cerrar cada una (evidencia en `journal.md`); al terminar,
-  **validación RF por RF contra `Base: 49d39dc`**.
-Veredicto: **QA de la spec: APROBADA (2026-10-26) con notas menores** (las tres, aplicadas); es el QA
-  **de la spec**, no de la implementación. **La validación de la implementación está pendiente**: no hay
-  `VEREDICTO: APROBADO` de esta segunda entrega y la 010 **no** se marca `implementada`.
+Siguiente paso: **nada pendiente en esta spec: cerrada.** Fuera de ella quedan pendientes que **no son
+  trabajo de la 010**: los de la **005** (T10 y residuales), las specs **011** y **012** sin plan ni
+  tareas, la **divergencia con `release/1.0`** y la actualización de **`MEMORY.md`**, que sigue
+  desfasado.
+Veredicto: **APROBADO (2026-10-27) de la segunda entrega (T11–T16)** por el reviewer. La primera
+  (T1–T10) ya estaba validada salvo **RF-6**, que es lo que se reescribió en esta entrega. Con este
+  veredicto la 010 **queda implementada** (`spec.md`: `implementada (2026-10-27)`).
 QA: APROBADA con las notas del re-QA aplicadas el 2026-10-23; spec aprobada por el usuario el 2026-10-23.
 QA del plan: escrito el 2026-10-24, ajustado el 2026-10-25 (RF-1 con `Resultado<QJsonObject>`) y
   corregido tras el QA del plan (11 hallazgos, sección propia); aprobado por el usuario el 2026-10-25
@@ -24,6 +25,34 @@ Notas: T1–T10 implementadas y commiteadas (T7 = `f054b2e`, desviación autoriz
   `45ac292`, `5fc40e0`, `de61050`): parches sobre una heurística aritmética, justo lo que el usuario
   quiere evitar; de ahí el cambio de requisitos. Detalle en «Cambio de requisitos (2026-10-26)»,
   «Validación 6 · defecto abierto» y «Correcciones 1-5».
+
+## Cierre (2026-10-27)
+
+**Veredicto del reviewer: APROBADO (2026-10-27)** para la **segunda entrega** (T11–T16). La primera
+(T1–T10) ya estaba validada salvo **RF-6**, que es justo lo que se reescribió aquí. Con el veredicto, la
+010 queda **implementada** y esta fase, **cerrada**.
+
+| Tarea | Commit | Qué dejó |
+|---|---|---|
+| T11 | `227eacd` | `FranjaSemana` y las funciones puras de demanda/capacidad en `contrato_solver`; borrado de las dos copias anónimas de `solver.cpp` (ambigüedad ADL) |
+| T12 | `736bbcd` | **V18**: el aula de referencia debe ser del tipo general (`Aula de estudio`), al final de la cadena V16 → V17 → V18 |
+| T13 | `d3e8de0` | Causa (2) **solo** por `demanda(t) > capacidad(t)`, sin bloqueos ni conteo por referencia; fallback «no atribuible»; guard de la excepción |
+| T14 | `b4491ad` | Tests de ventanas de turno (Hall), reproducibilidad y aula especializada no reservada |
+| T15 | `da71419` | Contrato vivo, constitución y 005 alineados con V18, la capacidad del tipo y «no atribuible» |
+| T16 | `a233afc` | Regresión global (**50/50**), benchmark factible y seed intacto |
+| Notas | `072b6ee` | Notas del reviewer **M2 e I3** en los tests: comentarios al día y sub-motivo del contraejemplo |
+
+**Notas del reviewer aplicadas.**
+
+- **M1** — fila de «errores de lectura frecuentes» del contrato (`docs/contrato-solver-2.0.md:290`): la
+  falta de laboratorio **no** es «siempre conflicto de aula»; la causa es (2) **solo si**
+  `demanda(t) > capacidad(t)` y **no atribuible** si el conteo no falla (§5.1). **La aplica el
+  coordinator** (el planner no escribe en `docs/`); el texto literal se entregó en este cierre.
+- **M2 e I3** — comentarios de los tests y sub-motivo del contraejemplo: hechos en `072b6ee`.
+- **I2 e I5** — cita del criterio 2 de la 005 y aclaración del `HEAD` de T16: hechas en este cierre.
+
+**Lo que no se tocó:** el **esquema** (no hay columna ni versión nuevas), la **009**, el **seed**, el
+**frontend** y el **contrato** (sigue en **2.0**, sin sección ni campo nuevos).
 
 ## Cambio de requisitos (2026-10-26): referencia de tipo general y causas por capacidad
 

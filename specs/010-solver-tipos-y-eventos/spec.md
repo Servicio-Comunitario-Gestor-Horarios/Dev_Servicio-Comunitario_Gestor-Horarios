@@ -1,14 +1,14 @@
 # Spec 010 - Solver: tipos de aula y eventos del turno
 
-Estado: aprobada (2026-10-26)
+Estado: implementada (2026-10-27)
 
 > **Cambio de requisitos aprobado (2026-10-26).** El alcance de esta spec se aprobó el 2026-10-23 y se
 > implementó y validó salvo RF-6. Este cambio reescribe **solo** el aula de referencia (del tipo
 > general/ordinario por convención de nombre), la validación que la protege (V18), las causas de un
 > resultado no factible (RF-6) y los textos de documentación, constitución y supersesión que los citan.
 > Incluye la **enmienda de RF-6 del mismo día**: la excepción de precedencia de (3) sobre (2). El resto
-> del texto es el aprobado el 2026-10-23 y no se toca. **La 010 no está implementada**: no se marca como
-> tal hasta que se implemente la parte afectada (T11–T16 del plan) y pase la validación.
+> del texto es el aprobado el 2026-10-23 y no se toca. **Implementada y validada (2026-10-27)**: la parte
+> afectada corresponde a T11–T16 del plan y la segunda entrega tiene `VEREDICTO: APROBADO` del reviewer.
 
 > **Alcance y reparto con la spec 009.** Esta spec cubre la parte del **solver**: el **contrato de
 > configuración 2.0**, la **regla de tipo de aula** en el modelo, las **validaciones nuevas**, la
@@ -357,8 +357,10 @@ Esta spec **supersede** los siguientes puntos de la 005; el resto de la 005 sigu
   con desplazamiento y vuelta (RF-3).
 - **Invariante D10** («un curso con aula fija usa siempre su aula»): sustituida por la regla de tipo
   (RF-3).
-- **Criterio de finalización 2 de la 005** (005:745-748, «el modelo respeta D1–D11 y D13»): se mantiene
-  **salvo D10**, que queda supersedida; el resto de las invariantes sigue vigente.
+- **Criterio de finalización 2 de la 005** (`specs/005-nucleo-solver/spec.md`, §«Criterios de
+  finalización», criterio 2; **005:823-831** en `072b6ee`, eran 805-812 en `b4491ad`): «el modelo
+  respeta D1–D11 y D13». Se mantiene **salvo D10**, que queda supersedida; el resto de las invariantes
+  sigue vigente.
 - **Salida del horario por curso** («con aula fija, su aula fija»): sustituida por el **aula real de
   cada clase** (RF-4).
 - **RF-7 de la 005** (modo de aula fija activo ⇒ cada curso usa su aula): sustituido por RF-3 y RF-4.

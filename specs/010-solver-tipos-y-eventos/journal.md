@@ -2504,7 +2504,11 @@ Sin cambios en `spec.md`, `plan.md` ni en el código.
 
 ## T16 - Regresión global y seed intacto (2026-10-27)
 
-**Requisito:** RNF-2, RNF-4, RNF-5. **Plan:** §8/T16. **Base:** `49d39dc` · **HEAD:** `da71419`.
+**Requisito:** RNF-2, RNF-4, RNF-5. **Plan:** §8/T16. **Base:** `49d39dc`.
+
+> **Nota (cierre del 2026-10-27).** La evidencia de abajo se tomó con **`da71419`** como HEAD (antes
+> del commit de cierre de la tarea); el **commit de cierre es `a233afc`** y el HEAD del veredicto es
+> `072b6ee`. Los números de la evidencia (50/50, benchmark, seed) son los de ese árbol.
 
 ### Evidencia
 
