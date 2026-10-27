@@ -104,9 +104,10 @@ void TeacherListWidget::setupUi() {
     topSectionLayout->addStretch();
     topSectionLayout->addWidget(m_registerButton, 0, Qt::AlignVCenter);
 
-    m_table = new QTableWidget(0, 6, leftWidget);
+    // Tabla principal de 5 columnas (Se removió la columna de materias de texto libre)
+    m_table = new QTableWidget(0, 5, leftWidget);
     m_table->setObjectName("TeacherTable");
-    m_table->setHorizontalHeaderLabels({"Cédula/ID", "Nombre", "Email", "Teléfono", "Materias", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Cédula", "Nombre", "Email", "Teléfono", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
@@ -118,8 +119,7 @@ void TeacherListWidget::setupUi() {
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSectionResizeMode(5, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
     m_table->verticalHeader()->setVisible(false);
     m_table->setShowGrid(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -668,15 +668,10 @@ void TeacherListWidget::cargarDocentes() {
             return item;
         };
 
-        QStringList listaMaterias;
-        for (const auto& mat : profe.materias) listaMaterias << mat.nombre;
-        QString txtMaterias = listaMaterias.isEmpty() ? "-" : listaMaterias.join(", ");
-
-        m_table->setItem(fila, 0, crearItemCentrado(profe.id));
+        m_table->setItem(fila, 0, crearItemCentrado(profe.id)); // Cédula
         m_table->setItem(fila, 1, crearItemCentrado(profe.nombre));
         m_table->setItem(fila, 2, crearItemCentrado(profe.email));
         m_table->setItem(fila, 3, crearItemCentrado(profe.telefono.isEmpty() ? "N/A" : profe.telefono));
-        m_table->setItem(fila, 4, crearItemCentrado(txtMaterias));
 
         QWidget *panelAcciones = new QWidget();
         QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
@@ -698,16 +693,85 @@ void TeacherListWidget::cargarDocentes() {
 
         connect(btnEliminar, &QPushButton::clicked, this, [this, panelAcciones]() {
             for (int i = 0; i < m_table->rowCount(); ++i) {
-                if (m_table->cellWidget(i, 5) == panelAcciones) { eliminarDocente(i); break; }
+                if (m_table->cellWidget(i, 4) == panelAcciones) { eliminarDocente(i); break; }
             }
         });
         connect(btnEditar, &QPushButton::clicked, this, [this, panelAcciones]() {
             for (int i = 0; i < m_table->rowCount(); ++i) {
-                if (m_table->cellWidget(i, 5) == panelAcciones) { abrirFormularioEditar(i); break; }
+                if (m_table->cellWidget(i, 4) == panelAcciones) { abrirFormularioEditar(i); break; }
             }
         });
 
-        m_table->setCellWidget(fila, 5, panelAcciones);
+        m_table->setCellWidget(fila, 4, panelAcciones);
+    }
+}
+
+void TeacherListWidget::abrirFormularioNuevo() {
+    if (!m_nucleo) return;
+
+    QMap<QString, QString> mapaDocentes;
+    auto res = m_nucleo->listarDocentes();
+    if (res.ok) {
+        for (const auto& p : res.valor) {
+            mapaDocentes.insert(p.id, p.nombre);
+        }
+    }
+
+    gestor::frontend::forms::TeacherFormDialog dialog(this);
+    dialog.setDocentesExistentes(mapaDocentes);
+
+    connect(&dialog, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
+            this, [this](const QString& cedula, const QString& nombre, const QString& email, const QString& telefono) {
+                // NOTA DANIEL: Aquí irá la llamada real a NucleoDatos cuando implementes el alta de docentes.
+                QMessageBox::information(this, "Simulación de Registro",
+                                         QString("Docente %1 (Cédula: %2) validado localmente correctamente.\n(Pendiente persistencia en backend por Daniel).").arg(nombre, cedula));
+                cargarDocentes();
+            });
+
+    dialog.exec();
+}
+
+void TeacherListWidget::abrirFormularioEditar(int fila) {
+    if (!m_nucleo || fila < 0 || fila >= m_table->rowCount()) return;
+
+    QString cedulaActual = m_table->item(fila, 0)->text();
+    QString nombreActual = m_table->item(fila, 1)->text();
+    QString emailActual = m_table->item(fila, 2)->text();
+    QString telefonoActual = m_table->item(fila, 3)->text();
+
+    QMap<QString, QString> mapaDocentes;
+    auto res = m_nucleo->listarDocentes();
+    if (res.ok) {
+        for (const auto& p : res.valor) {
+            mapaDocentes.insert(p.id, p.nombre);
+        }
+    }
+
+    gestor::frontend::forms::TeacherFormDialog dialog(this);
+    dialog.setWindowTitle("Editar Docente");
+    dialog.setDocentesExistentes(mapaDocentes, cedulaActual);
+    dialog.cargarDatos(cedulaActual, nombreActual, emailActual, telefonoActual);
+
+    connect(&dialog, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
+            this, [this, cedulaActual](const QString& cedula, const QString& nombre, const QString& email, const QString& telefono) {
+                // NOTA DANIEL: Aquí irá la llamada real a NucleoDatos para actualizar el docente.
+                QMessageBox::information(this, "Simulación de Edición",
+                                         QString("Cambios del docente %1 validados localmente.\n(Pendiente persistencia en backend por Daniel).").arg(nombre));
+                cargarDocentes();
+            });
+
+    dialog.exec();
+}
+
+void TeacherListWidget::eliminarDocente(int fila) {
+    if (!m_nucleo || fila < 0) return;
+    QString cedula = m_table->item(fila, 0)->text();
+    QString nombre = m_table->item(fila, 1)->text();
+
+    if (QMessageBox::question(this, "Eliminar Docente",
+                              QString("¿Desea eliminar al docente %1 (Cédula: %2)?").arg(nombre, cedula)) == QMessageBox::Yes) {
+        m_nucleo->eliminarDocente(cedula);
+        cargarDocentes();
     }
 }
 
@@ -758,10 +822,6 @@ void TeacherListWidget::onDocenteSeleccionado() {
     repintarAsignaturas();
     evaluarCambiosSinGuardar();
 }
-
-void TeacherListWidget::abrirFormularioNuevo() { /* Lógica conservada */ }
-void TeacherListWidget::abrirFormularioEditar(int fila) { /* Lógica conservada */ }
-void TeacherListWidget::eliminarDocente(int fila) { /* Lógica conservada */ }
 
 // ==========================================
 // TEMA VISUAL
