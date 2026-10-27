@@ -262,7 +262,21 @@ private slots:
         // El aula declara el mismo tipo con otra caja y otros espacios: V17 compara por clave.
         QJsonObject aula = o[QStringLiteral("aulas")].toArray()[0].toObject();
         aula[QStringLiteral("tipo")] = QStringLiteral(" LABORATORIO ");
-        o[QStringLiteral("aulas")] = QJsonArray{aula};
+
+        // V18: la referencia del curso es del tipo general, así que el laboratorio no puede serlo.
+        QJsonObject general;
+        general[QStringLiteral("nombre")]    = QStringLiteral("A2");
+        general[QStringLiteral("tipo")]      = QStringLiteral("Aula de estudio");
+        general[QStringLiteral("capacidad")] = 30;
+        o[QStringLiteral("aulas")] = QJsonArray{aula, general};
+
+        QJsonObject dim = o[QStringLiteral("dimensiones")].toObject();
+        dim[QStringLiteral("num_aulas")] = 2;
+        o[QStringLiteral("dimensiones")] = dim;
+
+        QJsonObject curso = o[QStringLiteral("cursos")].toArray()[0].toObject();
+        curso[QStringLiteral("aula")] = 1;
+        o[QStringLiteral("cursos")] = QJsonArray{curso};
 
         const auto config = SolverConfig::fromJson(o);
         QVERIFY2(config.ok, qPrintable(config.mensajeError));

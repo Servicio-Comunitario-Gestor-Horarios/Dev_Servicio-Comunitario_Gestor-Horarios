@@ -242,6 +242,22 @@ private:
         QVERIFY2(resultado.mensajeError.contains(curso), qPrintable(resultado.mensajeError));
     }
 
+    /// Exige que la entrada se rechace por V18 nombrando el aula, el curso y el tipo, y con la
+    /// acción disponible (asignar al curso un aula del tipo general).
+    void exigeRechazoV18(const QJsonObject& j, const QString& aula, const QString& curso,
+                         const QString& tipo) const
+    {
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.startsWith(QStringLiteral("V18:")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(aula), qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(curso), qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(tipo), qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("tipo general")),
+                 qPrintable(resultado.mensajeError));
+    }
+
     void ponerMateriaIdxCurso(QJsonObject& curso, int valor) const
     {
         QJsonArray materias = curso["materias"].toArray();
@@ -766,13 +782,113 @@ private slots:
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }
 
+    // ─── V18: el aula de referencia es del tipo general ────────────────────
+
+    /// Una referencia sobre un laboratorio es entrada inválida aunque haya aula general para las
+    /// materias (RF-3, RF-5).
+    void v18_referenciaSobreLaboratorio_falla()
+    {
+        QJsonObject j = conAulas(
+            jsonValido(),
+            QJsonArray{
+                QJsonObject{{QStringLiteral("nombre"), QStringLiteral("A1")},
+                            {QStringLiteral("tipo"), QStringLiteral("Aula de estudio")},
+                            {QStringLiteral("capacidad"), 30}},
+                QJsonObject{{QStringLiteral("nombre"), QStringLiteral("L1")},
+                            {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                            {QStringLiteral("capacidad"), 20}}});
+        j = conCurso(j, [](QJsonObject& c) { c[QStringLiteral("aula")] = 1; });
+
+        exigeRechazoV18(j, QStringLiteral("L1"), QStringLiteral("1A"),
+                        QStringLiteral("Laboratorio"));
+    }
+
+    /// V17 queda satisfecho (el laboratorio tiene aula) y quien rechaza es V18: solo la referencia
+    /// es especializada.
+    void v18_referenciaSobreTallerConMateriasEspecializadas_falla()
+    {
+        QJsonObject j = conMaterias(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Química")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")}}});
+        j = conAulas(
+            j, QJsonArray{
+                   QJsonObject{{QStringLiteral("nombre"), QStringLiteral("T1")},
+                               {QStringLiteral("tipo"), QStringLiteral("Taller")},
+                               {QStringLiteral("capacidad"), 20}},
+                   QJsonObject{{QStringLiteral("nombre"), QStringLiteral("L1")},
+                               {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                               {QStringLiteral("capacidad"), 20}}});
+        j = conCurso(j, [](QJsonObject& c) { c[QStringLiteral("aula")] = 0; });
+
+        exigeRechazoV18(j, QStringLiteral("T1"), QStringLiteral("1A"), QStringLiteral("Taller"));
+    }
+
+    /// La convención del tipo general se compara por clave: mayúsculas y espacios no cuentan.
+    void v18_referenciaGeneralPorClave_pasa()
+    {
+        const QJsonObject j = conAulas(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("A1")},
+                                   {QStringLiteral("tipo"), QStringLiteral("  AULA DE ESTUDIO ")},
+                                   {QStringLiteral("capacidad"), 30}}});
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    /// Con aulas móviles la referencia se ignora (V8): V18 no aplica.
+    void v18_aulasMoviles_noAplica()
+    {
+        QJsonObject j = conMaterias(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("Química")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")}}});
+        j = conAulas(
+            j, QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("L1")},
+                                      {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                                      {QStringLiteral("capacidad"), 20}}});
+        j[QStringLiteral("aula_fija")] = false;
+        j = conCurso(j, [](QJsonObject& c) { c[QStringLiteral("aula")] = 0; });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    /// Centro sin aulas del tipo general y materias que lo requieren: rechaza V17, no V18.
+    void v18_sinAulaGeneralEnModoFijo_llegaPorV17()
+    {
+        const QJsonObject j = conAulas(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("L1")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                                   {QStringLiteral("capacidad"), 20}}});
+
+        exigeRechazoV17(j, QStringLiteral("Aula de estudio"), QStringLiteral("Matemática"),
+                        QStringLiteral("1A"));
+    }
+
+    /// Lo mismo con aulas móviles: V17 vale en los dos modos y V18 no aplica.
+    void v18_sinAulaGeneralEnModoMovil_llegaPorV17()
+    {
+        QJsonObject j = conAulas(
+            jsonValido(),
+            QJsonArray{QJsonObject{{QStringLiteral("nombre"), QStringLiteral("L1")},
+                                   {QStringLiteral("tipo"), QStringLiteral("Laboratorio")},
+                                   {QStringLiteral("capacidad"), 20}}});
+        j[QStringLiteral("aula_fija")] = false;
+        j = conCurso(j, [](QJsonObject& c) { c[QStringLiteral("aula")] = -1; });
+
+        exigeRechazoV17(j, QStringLiteral("Aula de estudio"), QStringLiteral("Matemática"),
+                        QStringLiteral("1A"));
+    }
+
     void jsonVacio_falla()
     {
         const auto resultado = validarEntradaSolver(QJsonObject{});
         QVERIFY(!resultado.ok);
         QVERIFY(!resultado.mensajeError.isEmpty());
-    }
-};
+    }};
 
 QTEST_MAIN(TestValidadorEntrada)
 #include "test_validador_entrada.moc"

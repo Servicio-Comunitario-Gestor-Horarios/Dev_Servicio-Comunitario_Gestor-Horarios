@@ -773,6 +773,37 @@ QString validarTiposConAulas(const SolverConfig& c)
     return {};
 }
 
+/// V18. El aula de referencia de cada curso es del tipo general/ordinario del centro (RF-3, RF-5).
+///
+/// El tipo general es una convencion fija de nombre (`tipoGeneralAula()`), comparada con
+/// `claveTipo`: no hay columna, seccion del contrato ni consulta a la base. Solo aplica con el modo
+/// de aula fija; con aulas moviles la referencia se ignora (V8). Un indice fuera de rango lo
+/// rechaza antes V6 y una referencia ausente, V8.
+QString validarReferenciaGeneral(const SolverConfig& c)
+{
+    if (!c.aula_fija)
+        return {};   // modo movil: el aula del curso se ignora (V8)
+
+    const QString claveGeneral = claveTipo(tipoGeneralAula());
+    for (const CursoSolverConfig& cu : c.cursos) {
+        if (cu.aula < 0 || cu.aula >= c.aulas.size())
+            continue;   // V6/V8 ya lo rechazan; aqui solo se evita leer fuera de rango
+
+        const AulaSolverConfig& aula = c.aulas[cu.aula];
+        if (claveTipo(aula.tipo) == claveGeneral)
+            continue;
+
+        return QStringLiteral("V18: el aula «%1», referencia del curso %2%3, es del tipo «%4»; el "
+                              "aula de referencia debe ser del tipo general «%5». Asigne al curso "
+                              "un aula del tipo general.")
+            .arg(aula.nombre)
+            .arg(cu.anio)
+            .arg(cu.seccion)
+            .arg(aula.tipo.trimmed(), tipoGeneralAula());
+    }
+    return {};
+}
+
 } // namespace
 
 Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
@@ -803,7 +834,8 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
         validarAulasDeCursos(config),      validarNumeroEstudiantes(config), validarListasNoVacias(config),
         validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCoherenciaHoras(config),
         validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config),
-        validarTiposDeclarados(config),    validarTiposConAulas(config)};
+        validarTiposDeclarados(config),    validarTiposConAulas(config),
+        validarReferenciaGeneral(config)};
     for (const QString& error : errores)
         if (!error.isEmpty())
             return Resultado<SolverConfig>::error(error);

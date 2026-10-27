@@ -2161,3 +2161,92 @@ La suite pasa de **49 a 50** tests por el `test_capacidad_tipo` nuevo; los 49 an
   T13 sustituye por `franjasSemanales` da ahora el mismo número por construcción.
 - **`aulasDelTipo` y `franjasDelTipo` comparan por clave** (`claveTipo`), no por cadena cruda: el
   test usa a propósito `"AULA DE ESTUDIO"` en un aula y cuenta 2 aulas del tipo general.
+
+## T12 - V18: aula de referencia del tipo general (2026-10-27)
+
+**Requisito:** RF-3, RF-5. **Plan:** §3.2, §5.18 y §8/T12. **Base:** `227eacd`.
+
+### Rojo (tests primero)
+
+Se añadieron 6 casos en `test/backend/test_validador_entrada.cpp` y el helper
+`exigeRechazoV18` (aula, curso, tipo y la mención «tipo general»). Con la producción sin V18, los
+dos casos de rechazo fallaban y el resto ya pasaba:
+
+```text
+FAIL!  : TestValidadorEntrada::v18_referenciaSobreLaboratorio_falla() '!resultado.ok' returned FALSE.
+FAIL!  : TestValidadorEntrada::v18_referenciaSobreTallerConMateriasEspecializadas_falla() '!resultado.ok' returned FALSE.
+Totals: 54 passed, 2 failed, 0 skipped, 0 blacklisted, 23ms
+0% tests passed, 1 tests failed out of 1     # test_validador_entrada
+```
+
+### Verde
+
+```text
+$ cmake --build --preset backend --parallel
+build exit=0
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_validador_entrada$'
+1/1 Test #23: test_validador_entrada ...........   Passed    0.03 sec
+100% tests passed out of 1
+
+$ ctest --preset backend
+50/50 Test #50: test_ipc_aislamiento_bd ............   Passed    0.07 sec
+100% tests passed out of 50
+Total Test time (real) =   5.61 sec
+```
+
+Casos V18 (56/56 en el binario):
+
+```text
+PASS   : v18_referenciaSobreLaboratorio_falla
+PASS   : v18_referenciaSobreTallerConMateriasEspecializadas_falla
+PASS   : v18_referenciaGeneralPorClave_pasa
+PASS   : v18_aulasMoviles_noAplica
+PASS   : v18_sinAulaGeneralEnModoFijo_llegaPorV17
+PASS   : v18_sinAulaGeneralEnModoMovil_llegaPorV17
+Totals: 56 passed, 0 failed, 0 skipped, 0 blacklisted, 25ms
+```
+
+### Dónde se encadena V18 y por qué
+
+`validarReferenciaGeneral` se define **después de `validarTiposConAulas`** en
+`solver_config.cpp` y se añade **como última entrada** de la `QStringList errores` de
+`SolverConfig::fromJson` (tras `validarTiposConAulas`). Así el orden es **V16 → V17 → V18**: un
+centro sin aula del tipo general que además tenga materias que lo requieran se informa por **V17**
+(el tipo requerido no tiene aulas) y solo cuando V17 está satisfecho y la referencia es de otro tipo
+se informa **V18**. Con `aula_fija == false` la función devuelve vacío (V8 ya ignora la referencia);
+un índice de aula fuera de rango se salta porque V6/V8 lo rechazan antes.
+
+Mensaje (una sola fuente, `tipoGeneralAula()`, para que el texto no derive de la convención):
+
+```text
+V18: el aula «L1», referencia del curso 1A, es del tipo «Laboratorio»; el aula de referencia debe
+ser del tipo general «Aula de estudio». Asigne al curso un aula del tipo general.
+```
+
+### Cambios
+
+- `src/backend/src/solver/config/solver_config.cpp`: `validarReferenciaGeneral` (compara
+  `claveTipo(aula.tipo)` con `claveTipo(tipoGeneralAula())`) y su registro en la lista de errores.
+  Sin columna, sección de contrato ni consulta a la base.
+- `test/backend/test_validador_entrada.cpp`: helper `exigeRechazoV18` y los 6 casos (laboratorio,
+  taller con materias especializadas, clave con mayúsculas/espacios, móvil, y los dos V17 sin tipo
+  general).
+- `test/backend/test_contrato_solver.cpp`: **fixture acoplado**. `tipoSeConservaTalCualSeDeclaro`
+  convertía el aula de referencia en ` LABORATORIO `, que ahora es entrada inválida por V18
+  (mensaje real del fallo: «V18: el aula «A1», referencia del curso 1A, es del tipo «LABORATORIO»…»).
+  Se conserva la aserción del nombre visible del aula (sigue siendo `aulas[0]`) y se añade un aula
+  general `A2` como referencia del curso (`aula = 1`, `num_aulas = 2`). No se relaja la regla.
+- `specs/010-solver-tipos-y-eventos/tasks.md`: T12 marcada como hecha.
+
+### Hallazgos
+
+- **El orden V16 → V17 → V18 exige encadenar V18 al final.** Si se ejecutara antes de V17, un
+  centro sin aula general pero con materias que la requieren se informaría por V18 cuando la causa
+  concreta (y la acción) es V17.
+- **La regla nueva invalida fixtures que usaban una referencia especializada**, no solo presets: el
+  caso de conservación de nombre de `test_contrato_solver` era uno. Se ajusta el fixture (aula
+  general como referencia) en vez de tocar la validación; es la misma consecuencia que T15 documenta
+  para los presets 2.0 anteriores.
+- **El tipo general no se duplica en el motor** (§5.18): `causaEntradaInvalida` no comprueba V18 y
+  `solver.cpp` no se toca.
