@@ -55,7 +55,6 @@ SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
                                        "    width: 20px;"
                                        "}"
                                        "QComboBox::down-arrow {"
-                                       "    image: url(:/flecha.png);"
                                        "    width: 12px;"
                                        "    height: 12px;"
                                        "}"
