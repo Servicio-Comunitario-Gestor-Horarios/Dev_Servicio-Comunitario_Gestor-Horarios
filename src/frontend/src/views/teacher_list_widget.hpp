@@ -7,11 +7,13 @@
 
 #include <QWidget>
 #include <QTableWidget>
+#include <QListWidget>
 #include <QPushButton>
 #include <QLabel>
 #include <QStackedWidget>
 #include <QSet>
 #include <QPair>
+#include <QStringList>
 
 // Declaración adelantada
 class NucleoDatos;
@@ -50,17 +52,22 @@ private slots:
     void onDisponibilidadCellClicked(int fila, int columna);
     void onPreferenciasCellClicked(int fila, int columna);
 
+    // Interacción en Panel de Asignaturas
+    void onEditarTitularesClicked();
+    void onEditarSuplentesClicked();
+
     // Control de cambios
-    void guardarCambiosRejilla();
-    void descartarCambiosRejilla();
+    void guardarCambios();
+    void descartarCambios();
 
 private:
     void setupUi();
     void setupPanelDerecho(class QVBoxLayout* rightLayout);
 
-    // Funciones auxiliares para la rejilla dinámica
+    // Funciones auxiliares
     void construirRejillasDinamicas();
     void repintarRejillas();
+    void repintarAsignaturas();
     void evaluarCambiosSinGuardar();
 
     // Punteros de interfaz izquierda
@@ -79,7 +86,13 @@ private:
     // Contenido de las pestañas
     QTableWidget* m_gridDisponibilidad = nullptr;
     QTableWidget* m_gridPreferencias = nullptr;
-    QTableWidget* m_tableAsignaturas = nullptr; // O QListWidget
+
+    // Contenido Pestaña Asignaturas (Issue #95)
+    QLabel* m_avisoSinMaterias = nullptr;
+    QListWidget* m_listTitulares = nullptr;
+    QListWidget* m_listSuplentes = nullptr;
+    QPushButton* m_btnEditarTitulares = nullptr;
+    QPushButton* m_btnEditarSuplentes = nullptr;
 
     // Controles de Guardado
     QWidget* m_panelGuardado = nullptr;
@@ -94,12 +107,17 @@ private:
     bool m_isDark = false;
     int m_idDocenteActual = -1;
 
-    // Control de estado para saber qué se ha pintado (Original vs Modificado)
+    // Estado Rejillas
     QSet<CeldaRejilla> m_noDisponibleOriginal;
     QSet<CeldaRejilla> m_noDisponibleModificado;
-
     QSet<CeldaRejilla> m_preferidoOriginal;
     QSet<CeldaRejilla> m_preferidoModificado;
+
+    // Estado Asignaturas
+    QStringList m_titularesOriginal;
+    QStringList m_titularesModificado;
+    QStringList m_suplentesOriginal;
+    QStringList m_suplentesModificado;
 };
 
 // Necesario para que QSet pueda manejar nuestro typedef QPair

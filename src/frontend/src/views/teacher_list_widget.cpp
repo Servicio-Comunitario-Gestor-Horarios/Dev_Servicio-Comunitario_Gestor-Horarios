@@ -5,6 +5,7 @@
 
 #include "teacher_list_widget.hpp"
 #include "../forms/teacher_form_dialog.hpp"
+#include "../widgets/selector_materias.hpp"
 #include "backend/services/NucleoDatos.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -110,7 +111,8 @@ void TeacherListWidget::setupUi() {
         "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
         "border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
-        "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }");
+        "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }"
+        "QTableWidget::item:selected { background-color: #1a237e; color: white; }");
 
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
@@ -207,25 +209,74 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     layPref->addWidget(helpPref);
     layPref->addWidget(m_gridPreferencias);
 
-    // Vista 2: Asignaturas (NUEVO DISEÑO DE TARJETAS)
+    // ==========================================
+    // Vista 2: Asignaturas (Gestión Titulares y Suplencias) - Ocupando todo el recuadro
+    // ==========================================
     QWidget* pageAsig = new QWidget();
     QVBoxLayout* layAsig = new QVBoxLayout(pageAsig);
-    layAsig->setContentsMargins(15, 15, 15, 15);
+    layAsig->setContentsMargins(8, 10, 8, 10);
+    layAsig->setSpacing(12);
 
-    QLabel* helpAsig = new QLabel("📚 Asignaturas impartidas por el docente:");
-    helpAsig->setObjectName("HelpAsig");
-    helpAsig->setStyleSheet("color: #6b7280; font-size: 13px; font-weight: bold; margin-bottom: 10px;");
-    layAsig->addWidget(helpAsig);
+    m_avisoSinMaterias = new QLabel("⚠️ Sin materias asignadas: este docente no podrá usarse en la generación.", pageAsig);
+    m_avisoSinMaterias->setObjectName("AvisoSinMaterias");
+    m_avisoSinMaterias->setStyleSheet("color: #b91c1c; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 6px; padding: 10px; font-weight: bold; font-size: 12px;");
+    m_avisoSinMaterias->setWordWrap(true);
+    layAsig->addWidget(m_avisoSinMaterias);
+    m_avisoSinMaterias->hide();
 
-    m_tableAsignaturas = new QTableWidget(0, 1, this);
-    m_tableAsignaturas->horizontalHeader()->setVisible(false);
-    m_tableAsignaturas->verticalHeader()->setVisible(false);
-    m_tableAsignaturas->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_tableAsignaturas->setShowGrid(false);
-    m_tableAsignaturas->setSelectionMode(QAbstractItemView::NoSelection);
-    m_tableAsignaturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_tableAsignaturas->setFocusPolicy(Qt::NoFocus); // Quita el borde punteado feo
-    layAsig->addWidget(m_tableAsignaturas);
+    // --- Sección Titulares ---
+    QVBoxLayout* cardTitulares = new QVBoxLayout();
+    cardTitulares->setContentsMargins(0, 0, 0, 0);
+    cardTitulares->setSpacing(6);
+
+    QHBoxLayout* headerTitulares = new QHBoxLayout();
+    headerTitulares->setContentsMargins(4, 0, 4, 0);
+    QLabel* lblTitulares = new QLabel("📚 Materias que dicta (Titular):");
+    lblTitulares->setObjectName("LblTitulares");
+    lblTitulares->setStyleSheet("font-size: 13px; font-weight: bold; color: #111827;");
+
+    m_btnEditarTitulares = new QPushButton("Modificar", pageAsig);
+    m_btnEditarTitulares->setCursor(Qt::PointingHandCursor);
+    m_btnEditarTitulares->setStyleSheet("QPushButton { background-color: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 5px 12px; font-weight: bold; } QPushButton:hover { background-color: #c7d2fe; }");
+
+    headerTitulares->addWidget(lblTitulares);
+    headerTitulares->addStretch();
+    headerTitulares->addWidget(m_btnEditarTitulares);
+    cardTitulares->addLayout(headerTitulares);
+
+    m_listTitulares = new QListWidget(pageAsig);
+    m_listTitulares->setFocusPolicy(Qt::NoFocus);
+    m_listTitulares->setSelectionMode(QAbstractItemView::NoSelection);
+    m_listTitulares->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    cardTitulares->addWidget(m_listTitulares);
+    layAsig->addLayout(cardTitulares, 1);
+
+    // --- Sección Suplencias ---
+    QVBoxLayout* cardSuplencias = new QVBoxLayout();
+    cardSuplencias->setContentsMargins(0, 0, 0, 0);
+    cardSuplencias->setSpacing(6);
+
+    QHBoxLayout* headerSuplencias = new QHBoxLayout();
+    headerSuplencias->setContentsMargins(4, 0, 4, 0);
+    QLabel* lblSuplencias = new QLabel("🔄 Puede ser suplente en:");
+    lblSuplencias->setObjectName("LblSuplencias");
+    lblSuplencias->setStyleSheet("font-size: 13px; font-weight: bold; color: #111827;");
+
+    m_btnEditarSuplentes = new QPushButton("Modificar", pageAsig);
+    m_btnEditarSuplentes->setCursor(Qt::PointingHandCursor);
+    m_btnEditarSuplentes->setStyleSheet("QPushButton { background-color: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 5px 12px; font-weight: bold; } QPushButton:hover { background-color: #c7d2fe; }");
+
+    headerSuplencias->addWidget(lblSuplencias);
+    headerSuplencias->addStretch();
+    headerSuplencias->addWidget(m_btnEditarSuplentes);
+    cardSuplencias->addLayout(headerSuplencias);
+
+    m_listSuplentes = new QListWidget(pageAsig);
+    m_listSuplentes->setFocusPolicy(Qt::NoFocus);
+    m_listSuplentes->setSelectionMode(QAbstractItemView::NoSelection);
+    m_listSuplentes->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    cardSuplencias->addWidget(m_listSuplentes);
+    layAsig->addLayout(cardSuplencias, 1);
 
     m_stackedViews->addWidget(pageDisp);
     m_stackedViews->addWidget(pagePref);
@@ -251,14 +302,20 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     rightLayout->addWidget(m_panelGuardado);
     m_panelGuardado->setVisible(false);
 
-    // Conexiones
+    // Conexiones Pestañas y Rejillas
     connect(m_btnTabDisponibilidad, &QPushButton::clicked, this, [this](){ cambiarPestana(0); });
     connect(m_btnTabPreferencias, &QPushButton::clicked, this, [this](){ cambiarPestana(1); });
     connect(m_btnTabAsignaturas, &QPushButton::clicked, this, [this](){ cambiarPestana(2); });
     connect(m_gridDisponibilidad, &QTableWidget::cellClicked, this, &TeacherListWidget::onDisponibilidadCellClicked);
     connect(m_gridPreferencias, &QTableWidget::cellClicked, this, &TeacherListWidget::onPreferenciasCellClicked);
-    connect(m_btnGuardar, &QPushButton::clicked, this, &TeacherListWidget::guardarCambiosRejilla);
-    connect(m_btnDescartar, &QPushButton::clicked, this, &TeacherListWidget::descartarCambiosRejilla);
+
+    // Conexiones Asignaturas Titulares/Suplentes
+    connect(m_btnEditarTitulares, &QPushButton::clicked, this, &TeacherListWidget::onEditarTitularesClicked);
+    connect(m_btnEditarSuplentes, &QPushButton::clicked, this, &TeacherListWidget::onEditarSuplentesClicked);
+
+    // Conexiones Guardado
+    connect(m_btnGuardar, &QPushButton::clicked, this, &TeacherListWidget::guardarCambios);
+    connect(m_btnDescartar, &QPushButton::clicked, this, &TeacherListWidget::descartarCambios);
 
     cambiarPestana(0);
 }
@@ -316,7 +373,6 @@ void TeacherListWidget::repintarRejillas() {
 
     for (int r = 0; r < franjas.size(); ++r) {
         if (franjas[r].esReceso) continue;
-
         for (int c = 0; c < cols; ++c) {
             CeldaRejilla celda(r, c);
 
@@ -352,6 +408,53 @@ void TeacherListWidget::repintarRejillas() {
 }
 
 // ==========================================
+// PINTADO DE ASIGNATURAS CON EXPANSIÓN TOTAL
+// ==========================================
+void TeacherListWidget::repintarAsignaturas() {
+    m_listTitulares->clear();
+    int countTit = m_titularesModificado.size();
+
+    m_listTitulares->setMinimumHeight(80);
+
+    if (m_idDocenteActual == -1) {
+        QListWidgetItem* item = new QListWidgetItem("  (Seleccione un docente)", m_listTitulares);
+        item->setForeground(QColor(156, 163, 175));
+        item->setFlags(item->flags() & ~Qt::ItemIsSelectable & ~Qt::ItemIsEnabled);
+    } else if (countTit == 0) {
+        QListWidgetItem* item = new QListWidgetItem("  (Sin materias titulares asignadas)", m_listTitulares);
+        item->setForeground(QColor(156, 163, 175));
+        item->setFlags(item->flags() & ~Qt::ItemIsSelectable & ~Qt::ItemIsEnabled);
+    } else {
+        for (const QString& mat : m_titularesModificado) {
+            QListWidgetItem* item = new QListWidgetItem("  📚 " + mat, m_listTitulares);
+            item->setSizeHint(QSize(item->sizeHint().width(), 36));
+        }
+    }
+
+    m_listSuplentes->clear();
+    int countSup = m_suplentesModificado.size();
+
+    m_listSuplentes->setMinimumHeight(80);
+
+    if (m_idDocenteActual == -1) {
+        QListWidgetItem* item = new QListWidgetItem("  (Seleccione un docente)", m_listSuplentes);
+        item->setForeground(QColor(156, 163, 175));
+        item->setFlags(item->flags() & ~Qt::ItemIsSelectable & ~Qt::ItemIsEnabled);
+    } else if (countSup == 0) {
+        QListWidgetItem* item = new QListWidgetItem("  (Sin materias suplentes asignadas)", m_listSuplentes);
+        item->setForeground(QColor(156, 163, 175));
+        item->setFlags(item->flags() & ~Qt::ItemIsSelectable & ~Qt::ItemIsEnabled);
+    } else {
+        for (const QString& mat : m_suplentesModificado) {
+            QListWidgetItem* item = new QListWidgetItem("  🔄 " + mat, m_listSuplentes);
+            item->setSizeHint(QSize(item->sizeHint().width(), 36));
+        }
+    }
+
+    m_avisoSinMaterias->setVisible(m_idDocenteActual != -1 && m_titularesModificado.isEmpty());
+}
+
+// ==========================================
 // INTERACCIONES EN REJILLAS Y TABS
 // ==========================================
 void TeacherListWidget::cambiarPestana(int indice) {
@@ -373,10 +476,9 @@ void TeacherListWidget::onDisponibilidadCellClicked(int fila, int columna) {
     if (franjas[fila].esReceso) return;
 
     CeldaRejilla celda(fila, columna);
-
     if (!m_noDisponibleModificado.contains(celda)) {
         if (m_preferidoModificado.contains(celda)) {
-            QMessageBox::information(this, "Aviso", "Esta hora estaba marcada como preferida. Se ha retirado la preferencia al marcarse como no disponible.");
+            QMessageBox::information(this, "Aviso", "Esta hora estaba marcada como preferida. Se retiró la preferencia al marcarse como no disponible.");
             m_preferidoModificado.remove(celda);
         }
         m_noDisponibleModificado.insert(celda);
@@ -394,46 +496,156 @@ void TeacherListWidget::onPreferenciasCellClicked(int fila, int columna) {
     if (franjas[fila].esReceso) return;
 
     CeldaRejilla celda(fila, columna);
-
     if (m_noDisponibleModificado.contains(celda)) {
         QMessageBox::warning(this, "Bloqueado", "No puedes marcar como preferida una hora en la que el docente no está disponible.");
         return;
     }
 
-    if (m_preferidoModificado.contains(celda)) {
-        m_preferidoModificado.remove(celda);
-    } else {
-        m_preferidoModificado.insert(celda);
+    if (m_preferidoModificado.contains(celda)) { m_preferidoModificado.remove(celda); }
+    else { m_preferidoModificado.insert(celda); }
+
+    repintarRejillas();
+    evaluarCambiosSinGuardar();
+}
+
+// ==========================================
+// EDICIÓN DE ASIGNATURAS (ISSUE #95)
+// ==========================================
+void TeacherListWidget::onEditarTitularesClicked() {
+    if (m_idDocenteActual == -1 || !m_nucleo) return;
+
+    auto resMat = m_nucleo->listarMaterias();
+    QStringList todasLasMaterias;
+    if (resMat.ok) {
+        for (const auto& mat : resMat.valor) todasLasMaterias << mat.nombre;
     }
 
-    repintarRejillas();
-    evaluarCambiosSinGuardar();
+    SelectorMateriasDialog dialog(todasLasMaterias, m_titularesModificado, this);
+    dialog.setWindowTitle("Seleccionar Materias Titulares");
+
+    if (m_isDark) {
+        dialog.setStyleSheet(
+            "#selCard { background: #121212; border: 1px solid #27272a; border-radius:14px; }"
+            "#selTitulo { font-size:17px; font-weight:700; color:#f4f4f5; }"
+            "#selAyuda { font-size:12px; color:#a1a1aa; }"
+            "#selContador { font-size:12px; color:#a1a1aa; }"
+            "#selScroll, #selRejilla { background:transparent; border:none; }"
+            "#selMateria { background: #1f1f23; color: #f4f4f5; border: 1px solid #3f3f46; border-radius: 9px; padding:4px 10px; text-align:center; }"
+            "#selMateria:hover { border-color: #52525b; background: #27272a; }"
+            "#selMateria:checked { background: #27272a; color: #ffffff; border: 2px solid #f4f4f6; font-weight:600; }"
+            "#selLimpiar, #selCancelar { min-width:96px; padding:6px 16px; border-radius:9px; border:1px solid #3f3f46; background:#1f1f23; color:#f4f4f5; font-weight:600; }"
+            "#selLimpiar:hover, #selCancelar:hover { background:#27272a; }"
+            "#selAceptar { min-width:110px; padding:6px 18px; border-radius:9px; border:none; background:#f4f4f5; color:#121212; font-weight:700; }"
+            "#selAceptar:hover { background:#ffffff; }"
+            );
+    }
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QStringList nuevaSeleccion = dialog.seleccionadas();
+        bool conflicto = false;
+
+        for (const QString& mat : nuevaSeleccion) {
+            if (m_suplentesModificado.contains(mat)) {
+                m_suplentesModificado.removeAll(mat);
+                conflicto = true;
+            }
+        }
+
+        if (conflicto) {
+            QMessageBox::information(this, "Validación Automática", "Algunas materias se removieron de 'Suplentes' porque un docente no puede ser titular y suplente de la misma materia simultáneamente.");
+        }
+
+        m_titularesModificado = nuevaSeleccion;
+        repintarAsignaturas();
+        evaluarCambiosSinGuardar();
+    }
 }
 
-void TeacherListWidget::evaluarCambiosSinGuardar() {
-    bool hayCambios = (m_noDisponibleOriginal != m_noDisponibleModificado) ||
-                      (m_preferidoOriginal != m_preferidoModificado);
+void TeacherListWidget::onEditarSuplentesClicked() {
+    if (m_idDocenteActual == -1 || !m_nucleo) return;
 
+    auto resMat = m_nucleo->listarMaterias();
+    QStringList todasLasMaterias;
+    if (resMat.ok) {
+        for (const auto& mat : resMat.valor) todasLasMaterias << mat.nombre;
+    }
+
+    SelectorMateriasDialog dialog(todasLasMaterias, m_suplentesModificado, this);
+    dialog.setWindowTitle("Seleccionar Materias Suplentes");
+
+    if (m_isDark) {
+        dialog.setStyleSheet(
+            "#selCard { background: #121212; border: 1px solid #27272a; border-radius:14px; }"
+            "#selTitulo { font-size:17px; font-weight:700; color:#f4f4f5; }"
+            "#selAyuda { font-size:12px; color:#a1a1aa; }"
+            "#selContador { font-size:12px; color:#a1a1aa; }"
+            "#selScroll, #selRejilla { background:transparent; border:none; }"
+            "#selMateria { background: #1f1f23; color: #f4f4f5; border: 1px solid #3f3f46; border-radius: 9px; padding:4px 10px; text-align:center; }"
+            "#selMateria:hover { border-color: #52525b; background: #27272a; }"
+            "#selMateria:checked { background: #27272a; color: #ffffff; border: 2px solid #f4f4f6; font-weight:600; }"
+            "#selLimpiar, #selCancelar { min-width:96px; padding:6px 16px; border-radius:9px; border:1px solid #3f3f46; background:#1f1f23; color:#f4f4f5; font-weight:600; }"
+            "#selLimpiar:hover, #selCancelar:hover { background:#27272a; }"
+            "#selAceptar { min-width:110px; padding:6px 18px; border-radius:9px; border:none; background:#f4f4f5; color:#121212; font-weight:700; }"
+            "#selAceptar:hover { background:#ffffff; }"
+            );
+    }
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QStringList nuevaSeleccion = dialog.seleccionadas();
+        bool conflicto = false;
+
+        for (const QString& mat : nuevaSeleccion) {
+            if (m_titularesModificado.contains(mat)) {
+                m_titularesModificado.removeAll(mat);
+                conflicto = true;
+            }
+        }
+
+        if (conflicto) {
+            QMessageBox::warning(this, "Operación Restringida", "No se agregaron algunas materias a 'Suplentes' porque el docente ya es Titular en ellas.\n\nSi desea que sea suplente, remuévalas primero de la lista de Titulares.");
+        }
+
+        m_suplentesModificado = nuevaSeleccion;
+        repintarAsignaturas();
+        evaluarCambiosSinGuardar();
+    }
+}
+
+// ==========================================
+// CONTROL DE CAMBIOS
+// ==========================================
+void TeacherListWidget::evaluarCambiosSinGuardar() {
+    bool dispCambio = (m_noDisponibleOriginal != m_noDisponibleModificado);
+    bool prefCambio = (m_preferidoOriginal != m_preferidoModificado);
+    bool asigTitCambio = (m_titularesOriginal != m_titularesModificado);
+    bool asigSupCambio = (m_suplentesOriginal != m_suplentesModificado);
+
+    bool hayCambios = dispCambio || prefCambio || asigTitCambio || asigSupCambio;
     m_panelGuardado->setVisible(hayCambios);
 
-    QString tabDispText = (m_noDisponibleOriginal != m_noDisponibleModificado) ? "Disponibilidad *" : "Disponibilidad";
-    QString tabPrefText = (m_preferidoOriginal != m_preferidoModificado) ? "Preferencias *" : "Preferencias";
-
-    m_btnTabDisponibilidad->setText(tabDispText);
-    m_btnTabPreferencias->setText(tabPrefText);
+    m_btnTabDisponibilidad->setText(dispCambio ? "Disponibilidad *" : "Disponibilidad");
+    m_btnTabPreferencias->setText(prefCambio ? "Preferencias *" : "Preferencias");
+    m_btnTabAsignaturas->setText((asigTitCambio || asigSupCambio) ? "Asignaturas *" : "Asignaturas");
 }
 
-void TeacherListWidget::guardarCambiosRejilla() {
+void TeacherListWidget::guardarCambios() {
     m_noDisponibleOriginal = m_noDisponibleModificado;
     m_preferidoOriginal = m_preferidoModificado;
+    m_titularesOriginal = m_titularesModificado;
+    m_suplentesOriginal = m_suplentesModificado;
+
     evaluarCambiosSinGuardar();
-    QMessageBox::information(this, "Éxito", "Disponibilidad y preferencias guardadas correctamente.");
+    QMessageBox::information(this, "Éxito", "Cambios confirmados localmente. (Pendiente persistencia en BD).");
 }
 
-void TeacherListWidget::descartarCambiosRejilla() {
+void TeacherListWidget::descartarCambios() {
     m_noDisponibleModificado = m_noDisponibleOriginal;
     m_preferidoModificado = m_preferidoOriginal;
+    m_titularesModificado = m_titularesOriginal;
+    m_suplentesModificado = m_suplentesOriginal;
+
     repintarRejillas();
+    repintarAsignaturas();
     evaluarCambiosSinGuardar();
 }
 
@@ -523,6 +735,8 @@ void TeacherListWidget::onDocenteSeleccionado() {
 
     m_noDisponibleOriginal.clear();
     m_preferidoOriginal.clear();
+    m_titularesOriginal.clear();
+    m_suplentesOriginal.clear();
 
     for (const auto& disp : profe.disponibilidad) {
         int c = disp.franja.dia - 1;
@@ -531,22 +745,18 @@ void TeacherListWidget::onDocenteSeleccionado() {
             m_noDisponibleOriginal.insert(CeldaRejilla(r, c));
         }
     }
+    for(const auto& mat : profe.materias) {
+        m_titularesOriginal << mat.nombre;
+    }
 
     m_noDisponibleModificado = m_noDisponibleOriginal;
     m_preferidoModificado = m_preferidoOriginal;
+    m_titularesModificado = m_titularesOriginal;
+    m_suplentesModificado = m_suplentesOriginal;
 
     repintarRejillas();
+    repintarAsignaturas();
     evaluarCambiosSinGuardar();
-
-    // Llenar pestaña asignaturas con diseño moderno (Tarjetas)
-    m_tableAsignaturas->clear();
-    m_tableAsignaturas->setRowCount(profe.materias.size());
-    for(int i = 0; i < profe.materias.size(); i++) {
-        // Agrega un espacio para separar del borde azul
-        QTableWidgetItem *item = new QTableWidgetItem("   " + profe.materias[i].nombre);
-        m_tableAsignaturas->setItem(i, 0, item);
-        m_tableAsignaturas->setRowHeight(i, 45); // Altura de tarjeta
-    }
 }
 
 void TeacherListWidget::abrirFormularioNuevo() { /* Lógica conservada */ }
@@ -560,59 +770,60 @@ void TeacherListWidget::actualizarTema(bool modoOscuro) {
     m_isDark = modoOscuro;
     cambiarPestana(m_stackedViews->currentIndex());
 
+    QString listCardsClaro =
+        "QListWidget { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; outline: none; }"
+        "QListWidget::item { background-color: white; border: 1px solid #e2e8f0; border-radius: 6px; margin: 3px 4px; color: #0f172a; font-size: 13px; font-weight: 600; padding-left: 8px; }"
+        "QListWidget::item:hover { background-color: #f1f5f9; border-color: #cbd5e1; color: #0f172a; }";
+
+    QString listCardsOscuro =
+        "QListWidget { background-color: #121212; border: 1px solid #27272a; border-radius: 8px; padding: 4px; outline: none; }"
+        "QListWidget::item { background-color: #1f1f23; border: 1px solid #3f3f46; border-radius: 6px; margin: 3px 4px; color: #f4f4f5; font-size: 13px; font-weight: 600; padding-left: 8px; }"
+        "QListWidget::item:hover { background-color: #27272a; border-color: #52525b; color: #ffffff; }";
+
     if (modoOscuro) {
         if (auto t = findChild<QLabel*>("TeacherTitle")) t->setStyleSheet("font-size: 24px; font-weight: bold; color: #ffffff;");
         if (auto s = findChild<QLabel*>("TeacherSub")) s->setStyleSheet("font-size: 14px; color: #aaaaaa;");
         if (auto dt = findChild<QLabel*>("DetailTitle")) dt->setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;");
-        if (auto ha = findChild<QLabel*>("HelpAsig")) ha->setStyleSheet("color: #aaaaaa; font-size: 13px; font-weight: bold; margin-bottom: 10px;");
 
-        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) {
-            panel->setStyleSheet("QFrame#TeacherRightPanel { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; }");
-        }
-        if (m_table) {
-            m_table->setStyleSheet(
-                "QTableWidget { background-color: #1e1e1e; border-radius: 8px; border: 1px solid #333333; color: #ffffff; }"
-                "QHeaderView::section { background-color: #252525; font-weight: bold; color: #ffffff; "
-                "border: none; border-bottom: 1px solid #333333; padding: 12px; }"
-                "QTableWidget::item { border-bottom: 1px solid #2a2a2a; padding: 5px; color: #ffffff; }");
-        }
+        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) panel->setStyleSheet("QFrame#TeacherRightPanel { background-color: #1e1e1e; border-radius: 12px; border: 1px solid #333333; }");
 
-        QString gridStyle = "QTableWidget { border: 1px solid #333333; gridline-color: #444444; background-color: #1e1e1e; color: white; }"
-                            "QHeaderView::section { background-color: #252525; border: 1px solid #333333; font-size: 11px; color: #aaaaaa; padding: 2px; }";
+        if (m_table) m_table->setStyleSheet("QTableWidget { background-color: #1e1e1e; border-radius: 8px; border: 1px solid #333333; color: #ffffff; } QHeaderView::section { background-color: #252525; font-weight: bold; color: #ffffff; border: none; border-bottom: 1px solid #333333; padding: 12px; } QTableWidget::item { border-bottom: 1px solid #2a2a2a; padding: 5px; color: #ffffff; } QTableWidget::item:selected { background-color: #3730a3; color: white; }");
+
+        QString gridStyle = "QTableWidget { border: 1px solid #333333; gridline-color: #444444; background-color: #1e1e1e; color: white; } QHeaderView::section { background-color: #252525; border: 1px solid #333333; font-size: 11px; color: #aaaaaa; padding: 2px; }";
         m_gridDisponibilidad->setStyleSheet(gridStyle);
         m_gridPreferencias->setStyleSheet(gridStyle);
 
-        // Estilo de tarjetas oscuras
-        m_tableAsignaturas->setStyleSheet(
-            "QTableWidget { border: none; background-color: transparent; outline: none; }"
-            "QTableWidget::item { background-color: #2d3748; border-left: 4px solid #3b82f6; border-bottom: 4px solid #1e1e1e; color: #e2e8f0; font-size: 14px; font-weight: bold; padding-left: 10px; }"
-            );
+        // Asignaturas Oscuro
+        if (auto lT = findChild<QLabel*>("LblTitulares")) lT->setStyleSheet("font-size: 13px; font-weight: bold; color: #e2e8f0;");
+        if (auto lS = findChild<QLabel*>("LblSuplencias")) lS->setStyleSheet("font-size: 13px; font-weight: bold; color: #e2e8f0;");
+        if (auto aS = findChild<QLabel*>("AvisoSinMaterias")) aS->setStyleSheet("color: #fca5a5; background-color: #450a0a; border: 1px solid #991b1b; border-radius: 6px; padding: 10px; font-weight: bold; font-size: 12px;");
+        m_btnEditarTitulares->setStyleSheet("QPushButton { background-color: #27272a; color: #f4f4f5; border-radius: 4px; padding: 5px 12px; font-weight: bold; border: 1px solid #3f3f46; } QPushButton:hover { background-color: #3f3f46; }");
+        m_btnEditarSuplentes->setStyleSheet("QPushButton { background-color: #27272a; color: #f4f4f5; border-radius: 4px; padding: 5px 12px; font-weight: bold; border: 1px solid #3f3f46; } QPushButton:hover { background-color: #3f3f46; }");
+
+        m_listTitulares->setStyleSheet(listCardsOscuro);
+        m_listSuplentes->setStyleSheet(listCardsOscuro);
+
     } else {
         if (auto t = findChild<QLabel*>("TeacherTitle")) t->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827;");
         if (auto s = findChild<QLabel*>("TeacherSub")) s->setStyleSheet("font-size: 14px; color: #6b7280;");
         if (auto dt = findChild<QLabel*>("DetailTitle")) dt->setStyleSheet("font-size: 18px; font-weight: bold; color: #111827;");
-        if (auto ha = findChild<QLabel*>("HelpAsig")) ha->setStyleSheet("color: #6b7280; font-size: 13px; font-weight: bold; margin-bottom: 10px;");
 
-        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) {
-            panel->setStyleSheet("QFrame#TeacherRightPanel { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
-        }
-        if (m_table) {
-            m_table->setStyleSheet(
-                "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
-                "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
-                "border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
-                "QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; }");
-        }
+        if (auto panel = findChild<QFrame*>("TeacherRightPanel")) panel->setStyleSheet("QFrame#TeacherRightPanel { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
 
-        QString gridStyle = "QTableWidget { border: 1px solid #e0e0e0; gridline-color: #f3f4f6; background-color: white; }"
-                            "QHeaderView::section { background-color: #f9fafb; border: 1px solid #e0e0e0; font-size: 11px; color: #374151; padding: 2px; }";
+        if (m_table) m_table->setStyleSheet("QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; } QHeaderView::section { background-color: white; font-weight: bold; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; } QTableWidget::item { border-bottom: 1px solid #f3f4f6; padding: 5px; } QTableWidget::item:selected { background-color: #1a237e; color: white; }");
+
+        QString gridStyle = "QTableWidget { border: 1px solid #e0e0e0; gridline-color: #f3f4f6; background-color: white; } QHeaderView::section { background-color: #f9fafb; border: 1px solid #e0e0e0; font-size: 11px; color: #6b7280; padding: 2px; }";
         m_gridDisponibilidad->setStyleSheet(gridStyle);
         m_gridPreferencias->setStyleSheet(gridStyle);
 
-        // Estilo de tarjetas claras
-        m_tableAsignaturas->setStyleSheet(
-            "QTableWidget { border: none; background-color: transparent; outline: none; }"
-            "QTableWidget::item { background-color: #f8fafc; border-left: 4px solid #1a237e; border-bottom: 4px solid white; color: #1e293b; font-size: 14px; font-weight: bold; padding-left: 10px; }"
-            );
+        // Asignaturas Claro
+        if (auto lT = findChild<QLabel*>("LblTitulares")) lT->setStyleSheet("font-size: 13px; font-weight: bold; color: #111827;");
+        if (auto lS = findChild<QLabel*>("LblSuplencias")) lS->setStyleSheet("font-size: 13px; font-weight: bold; color: #111827;");
+        if (auto aS = findChild<QLabel*>("AvisoSinMaterias")) aS->setStyleSheet("color: #b91c1c; background-color: #fef2f2; border: 1px solid #f87171; border-radius: 6px; padding: 10px; font-weight: bold; font-size: 12px;");
+        m_btnEditarTitulares->setStyleSheet("QPushButton { background-color: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 5px 12px; font-weight: bold; } QPushButton:hover { background-color: #c7d2fe; }");
+        m_btnEditarSuplentes->setStyleSheet("QPushButton { background-color: #e0e7ff; color: #3730a3; border-radius: 4px; padding: 5px 12px; font-weight: bold; } QPushButton:hover { background-color: #c7d2fe; }");
+
+        m_listTitulares->setStyleSheet(listCardsClaro);
+        m_listSuplentes->setStyleSheet(listCardsClaro);
     }
 }
