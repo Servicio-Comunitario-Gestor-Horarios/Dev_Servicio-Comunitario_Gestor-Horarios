@@ -237,6 +237,18 @@ private slots:
         QCOMPARE(segunda.valor.eventos.size(), 2);
         QCOMPARE(segunda.valor.eventos[1].nombre, QStringLiteral("Acto cívico"));
         QCOMPARE(segunda.valor.turnos.turnos[0].inicio, QStringLiteral("07:00"));
+
+        // El `peso` del par suplente sobrevive al ida y vuelta (RF-5 / RNF-4).
+        SolverConfig conSuplente = primera.valor;
+        conSuplente.profesores[0].materias_suplente = {MateriaSuplente{0, 7}};
+        const QJsonObject jsonConPeso = conSuplente.toJson();
+
+        const auto leida = SolverConfig::fromJson(jsonConPeso);
+        QVERIFY2(leida.ok, qPrintable(leida.mensajeError));
+        QCOMPARE(leida.valor.profesores[0].materias_suplente.size(), 1);
+        QCOMPARE(leida.valor.profesores[0].materias_suplente[0].materiaIDx, 0);
+        QCOMPARE(leida.valor.profesores[0].materias_suplente[0].peso, 7);
+        QCOMPARE(leida.valor.toJson(), jsonConPeso);
     }
 
     /// RF-5: la clave de tipo normaliza recorte y plegado Unicode; solo sirve para comparar.

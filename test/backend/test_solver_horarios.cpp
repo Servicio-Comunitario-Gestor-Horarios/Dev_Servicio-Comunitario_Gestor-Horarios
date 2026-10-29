@@ -559,6 +559,67 @@ private slots:
         QCOMPARE(slotsB, 4);
     }
 
+    // ── S1: el exceso sobre horas_aula se permite y se penaliza, no es infactible ──
+    void solver_excesoDeHorasEsPenalizadoYNoInfactible() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 3, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica", "regular"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        // El único docente declara 2 h de aula pero debe cubrir 4 bloques: el exceso se
+        // permite (e[p] con PESO_HORAS) en lugar de hacer el modelo infactible.
+        config.profesores = {
+            {"Prof A", 4, 2, "manana", "Plan General", {}, {0}, {}, dispCompleta()}};
+
+        Solver solver;
+        const auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        int clases = 0;
+        for (const auto& dia : resultado.resultado.horarios[claveCurso(1, "A")].dias)
+            clases += dia.asignaciones.size();
+        QCOMPARE(clases, 4);
+        QVERIFY(ContratoSolver::PESO_HORAS > 0);   // el exceso pesa en el objetivo
+    }
+
+    // ── S2: un titular con capacidad agotada deja la materia al suplente ──
+    void solver_titularAlTope_usaAlSuplente() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 1, 1, 1, 3, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica", "regular"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            // Titular con 2 h de aula para 4 bloques: cubrirlo costaría exceso (PESO_HORAS).
+            {"Prof Titular", 4, 2, "manana", "Plan General", {}, {0}, {}, dispCompleta()},
+            // Suplente elegible con capacidad suficiente: cuesta COSTE_SUPLENTE una vez.
+            {"Prof Suplente", 4, 4, "manana", "Plan General", {}, {}, {{0, 10}},
+             dispCompleta()}};
+
+        Solver solver;
+        const auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        int delTitular = 0, delSuplente = 0;
+        for (const auto& dia : resultado.resultado.horarios[claveCurso(1, "A")].dias)
+            for (const auto& asig : dia.asignaciones) {
+                if (asig.profesor == 0) ++delTitular;
+                if (asig.profesor == 1) ++delSuplente;
+            }
+        QCOMPARE(delTitular, 0);
+        QCOMPARE(delSuplente, 4);
+    }
+
     // ── T4/RF-3: el aula de referencia se usa si su tipo coincide con el de la materia ──
     void solver_aulaFijaUsaLaReferenciaSiElTipoCoincide() {
         SolverConfig config;

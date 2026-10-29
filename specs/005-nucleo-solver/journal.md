@@ -115,3 +115,17 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 - `v13_d13_docenteDeOtroAnioNoEsElegible_falla`: el único docente declara `anios = [2]` y el curso es
   de 1.º → sin candidato elegible (V13; la regla D13 está en `docenteCandidatoElegible`).
 - Los cuatro casos pasan con el código actual: no destaparon incumplimientos. Suite **54/54**.
+
+### C3 - Objetivo y contrato (RNF-4)
+
+- `solver_excesoDeHorasEsPenalizadoYNoInfactible` (S1): un docente con `horas_aula = 2` cubre 4
+  bloques; el modelo es factible y el exceso se penaliza con `ContratoSolver::PESO_HORAS`.
+- `solver_titularAlTope_usaAlSuplente` (S2): el titular (2 h de aula, 4 bloques) no da ninguna clase y
+  el suplente elegible cubre las 4 (coste `COSTE_SUPLENTE`). El caso simétrico «sin suplente → exceso
+  permitido» es el de S1.
+- **Aula de salida como índice:** ya estaba cubierto en los dos modos
+  (`solver_aulaFijaUsaLaReferenciaSiElTipoCoincide` afirma `asig.aula == 0`;
+  `solver_modoMovilEligeAulaDelTipoRequerido` afirma los índices 0/1/2), así que no se duplicó.
+- `test_contrato_solver::idaYVuelta2_0_sinPerdida` amplía: un par suplente con `peso = 7` sobrevive
+  `toJson`/`fromJson` y el JSON vuelve idéntico.
+- Suite **54/54**; `test_solver_horarios` 48 casos y `test_contrato_solver` 13.
