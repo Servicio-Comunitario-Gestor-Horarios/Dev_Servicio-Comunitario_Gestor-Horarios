@@ -18,7 +18,7 @@ T6 → T7; T3,T4 → T8; todo → T9. Ninguna tarea cierra con el árbol sin com
 - [x] **T5. Cascada y baja del docente (~25 min).** RF-4, RNF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_backend_cascada|test_servicio_profesor|test_backend_nucleo_datos|test_servicio_preferencias)$'` está verde; `dependenciasDe("profesor", id)` lista la disponibilidad y las preferencias con una etiqueta legible y `dependenciasDe("profesor").size()` pasa de 2 a **3** en `test_cascada.cpp:140`; `eliminarConCascada("profesor", id)` borra docente, disponibilidad y preferencias sin huérfanas; `NucleoDatos::eliminarDocente` hace lo mismo, con la regresión de `test_servicio_profesor` y `test_backend_nucleo_datos`; si el borrado falla, no queda nada borrado.
 
-- [ ] **T6. Seed: recuento 0 y tabla de dominio (~25 min).** RF-7
+- [x] **T6. Seed: recuento 0 y tabla de dominio (~25 min).** RF-7
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_seed_perfil|test_seed_aplicacion)$'` está verde; `Recuentos.preferencias` existe y vale 0 para las cuatro variantes; `kTablasDominio` incluye `Preferencia_Profesor` y el comentario de `sembrador.cpp:34` pasa a 12 tablas / esquema v5; la base sembrada tiene 0 filas; `resumenTexto` imprime «Preferencias: 0»; una base con solo la configuración sigue siendo sembrable.
 
 - [ ] **T7. Seed: borrado, atomicidad y determinismo (~30 min).** RF-7, RNF-3, RNF-4

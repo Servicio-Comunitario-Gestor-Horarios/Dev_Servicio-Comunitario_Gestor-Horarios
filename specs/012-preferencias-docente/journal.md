@@ -294,3 +294,63 @@ $ ctest --preset backend
   docente, disponibilidad y preferencia sigan existiendo y que, retirado el trigger, la cascada
   funcione. (Con la producción vieja ese test también fallaba, por la FK al intentar borrar el docente.)
 - No se tocaron el esquema, el seed, `ServicioGeneracion` ni `docs/`.
+
+## T6 - Seed: recuento 0 y tabla de dominio (2026-10-29)
+
+**Requisito:** RF-7. **Plan:** §1.6 y §10 (T6). **Base:** `8acce25`.
+
+### Rojo (tests primero)
+
+Los tests usaban `Recuentos::preferencias` antes de existir el campo; con la producción vieja el árbol
+no compila:
+
+```text
+$ cmake --build --preset backend --parallel
+test_seed_aplicacion.cpp:114:38: error: ‘const struct seed::Recuentos’ has no member named ‘preferencias’
+test_seed_aplicacion.cpp:640:38: error: idem
+test_seed_perfil.cpp:395:28: error: idem
+test_seed_perfil.cpp:401:30: error: idem
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_seed_perfil|test_seed_aplicacion)$'
+1/2 Test #49: test_seed_perfil .................   Passed    0.06 sec
+2/2 Test #50: test_seed_aplicacion .............   Passed    0.54 sec
+100% tests passed out of 2
+
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+Comprobación real de la CLI:
+
+```text
+$ gestor-horarios-seed --db …/centro.db
+Hora académica: 35 min (configuraciones: 1)
+Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
+Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
+Preferencias: 0
+$ sqlite3 … "SELECT COUNT(*) FROM Preferencia_Profesor;" → 0
+```
+
+### Cambios
+
+- `seed/perfil.hpp`: `Recuentos.preferencias` (0: el conjunto no las siembra).
+- `seed/src/docentes.cpp`: `recuentosEsperados` deja `r.preferencias = 0` explícito.
+- `seed/src/sembrador.cpp`: `Preferencia_Profesor` en `kTablasDominio` y comentario a **12 tablas /
+  esquema v5**; `leerRecuentos` la cuenta; `recuentosCoinciden` la compara; `resumenTexto` imprime
+  `Preferencias: 0`.
+- Tests: recuento 0 en las cuatro variantes, tabla vacía tras sembrar, comparación de determinismo,
+  lista de «12 tablas» del rollback y línea del resumen.
+
+### Notas
+
+- **Tabla de dominio, conjunto vacío:** `Preferencia_Profesor` cuenta para la política de base vacía,
+  pero como el conjunto la deja a 0, una base recién creada (solo con la configuración) se sigue
+  sembrando sin `--reemplazar`.
+- **T7 pendiente:** el borrado/atomicidad de la preferencia en `--solo-docentes` y `--reemplazar` no se
+  toca aquí; T6 es solo recuento y tabla de dominio.
+- De paso se corrigió el formato de `leerRecuentos` (la declaración de `Recuentos r;` quedaba en la
+  misma línea que la llave).

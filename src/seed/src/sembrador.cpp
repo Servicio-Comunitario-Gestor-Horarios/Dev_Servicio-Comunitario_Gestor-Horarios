@@ -31,13 +31,15 @@ bool varianteValida(VarianteDocentes variante) {
     return false;
 }
 
-/// Las 11 tablas de dominio del esquema v4 (RF-10, detección de datos). `TiposAula` y
-/// `Eventos` son datos de dominio desde la spec 009; `Recesos` ya no existe. La configuración
-/// global (`ConfiguracionHoraria`) **no** es dato de dominio (spec 011, RF-8): no bloquea una
-/// base recién creada.
+/// Las 12 tablas de dominio del esquema v5 (RF-10, detección de datos). `TiposAula`,
+/// `Eventos` y `Preferencia_Profesor` son datos de dominio (splits 009 y 012); `Recesos` ya no
+/// existe. La configuración global (`ConfiguracionHoraria`) **no** es dato de dominio (spec 011,
+/// RF-8): no bloquea una base recién creada. Las preferencias son de dominio aunque el conjunto
+/// las deje vacías (spec 012, RF-7).
 const char* const kTablasDominio[] = {
     "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
     "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+    "Preferencia_Profesor",
 };
 
 /// Número de filas de una tabla; -1 si la consulta falla.
@@ -63,7 +65,8 @@ int contarFilasDeDominio(QSqlDatabase& db) {
 }
 
 /// Recuentos leídos de la base (RF-12): se cuenta tras el commit, no desde el perfil.
-Recuentos leerRecuentos(QSqlDatabase& db) {    Recuentos r;
+Recuentos leerRecuentos(QSqlDatabase& db) {
+    Recuentos r;
     r.turnos           = contarFilas(db, QStringLiteral("Turnos"));
     r.eventos          = contarFilas(db, QStringLiteral("Eventos"));
     r.tiposAula        = contarFilas(db, QStringLiteral("TiposAula"));
@@ -75,6 +78,7 @@ Recuentos leerRecuentos(QSqlDatabase& db) {    Recuentos r;
     r.docentes         = contarFilas(db, QStringLiteral("Profesores"));
     r.asignaciones     = contarFilas(db, QStringLiteral("Profesor_Materia"));
     r.disponibilidades = contarFilas(db, QStringLiteral("Disponibilidad_Profesor"));
+    r.preferencias     = contarFilas(db, QStringLiteral("Preferencia_Profesor"));
     return r;
 }
 
@@ -100,7 +104,8 @@ bool recuentosCoinciden(const Recuentos& actuales, const Recuentos& esperados) {
            actuales.planMaterias == esperados.planMaterias &&
            actuales.cursos == esperados.cursos && actuales.docentes == esperados.docentes &&
            actuales.asignaciones == esperados.asignaciones &&
-           actuales.disponibilidades == esperados.disponibilidades;
+           actuales.disponibilidades == esperados.disponibilidades &&
+           actuales.preferencias == esperados.preferencias;
 }
 
 ResultadoAplicacion fallo(EstadoAplicacion estado, QString detalle) {
@@ -156,6 +161,9 @@ QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recu
                   .arg(r.asignaciones)
                   .arg(r.disponibilidades)
                   .arg(r.tiposAula);
+
+    // Preferencias horarias del docente (RF-7): el conjunto no siembra ninguna.
+    lineas << QStringLiteral("Preferencias: %1").arg(r.preferencias);
 
     // Materias por año de cada plan (RF-12): se calcula del perfil (validado) y contrasta con
     // lo declarado en la spec (GEN 9/9/10/11/12; derivados 9/9/10/12/13).

@@ -86,6 +86,7 @@ struct Recuentos {
     int docentes = 0;          ///< filas de Profesores
     int asignaciones = 0;      ///< filas de Profesor_Materia
     int disponibilidades = 0;  ///< filas de Disponibilidad_Profesor
+    int preferencias = 0;      ///< filas de Preferencia_Profesor (0: el conjunto no las siembra)
 };
 
 /// Identidad: 1 hora académica = 1 bloque (sin conversión ni redondeo). Pura.

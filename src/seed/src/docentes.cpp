@@ -179,6 +179,9 @@ Recuentos recuentosEsperados(const Perfil& perfil, VarianteDocentes variante) {
     }
     r.cursos = perfil.cursos.size();
 
+    // El conjunto no siembra preferencias (spec 012, RF-7): el recuento esperado es 0.
+    r.preferencias = 0;
+
     const QVector<DocenteDef> docentes = docentesDeVariante(perfil, variante);
     r.docentes         = docentes.size();
     r.asignaciones     = 0;

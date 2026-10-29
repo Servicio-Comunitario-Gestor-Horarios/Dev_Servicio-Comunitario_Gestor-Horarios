@@ -392,6 +392,20 @@ private slots:
         const Recuentos esperados = seed::recuentosEsperados(perfil, VarianteDocentes::Holgada);
         QCOMPARE(esperados.eventos, 2);
         QCOMPARE(esperados.tiposAula, 3);
+        QCOMPARE(esperados.preferencias, 0);
+    }
+
+    /// El conjunto no siembra preferencias: el recuento esperado es 0 en las cuatro variantes.
+    void recuentosDePreferenciasSonCeroEnLasCuatroVariantes()
+    {
+        QCOMPARE(Recuentos{}.preferencias, 0);
+
+        for (VarianteDocentes variante : {VarianteDocentes::Holgada, VarianteDocentes::Suplentes,
+                                          VarianteDocentes::SinProfesorado,
+                                          VarianteDocentes::SinDisponibilidad}) {
+            const Recuentos recuentos = seed::recuentosEsperados(perfilPorDefecto(), variante);
+            QCOMPARE(recuentos.preferencias, 0);
+        }
     }
 
     void validarPerfilRechazaTurnosAulasYCursos()

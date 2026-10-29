@@ -110,6 +110,9 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 65);
         QCOMPARE(resultado.recuentos.disponibilidades, 325);
 
+        // El conjunto no siembra preferencias (RF-7): recuento 0 y tabla vacía.
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
         // La configuración global se asegura en 35 con una sola fila (RF-8) y el resultado
         // informa el valor efectivo y su recuento.
         QCOMPARE(resultado.duracionMinutos, 35);
@@ -137,6 +140,7 @@ private slots:
 
         // Configuración global (RF-8): una sola fila `(1, 35)`, idempotente.
         QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
         {
             QSqlQuery config(db);
             QVERIFY(config.exec("SELECT id, duracion_minutos FROM ConfiguracionHoraria"));
@@ -298,6 +302,8 @@ private slots:
         } kComparaciones[] = {
             {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
             {"ConfiguracionHoraria", "SELECT id, duracion_minutos FROM ConfiguracionHoraria"},
+            {"Preferencia_Profesor",
+             "SELECT id_Profesor, dia, hora_inicio, hora_fin, sentido FROM Preferencia_Profesor"},
             {"TiposAula", "SELECT nombre, clave FROM TiposAula"},
             {"Eventos",
              "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin FROM Eventos"},
@@ -344,12 +350,14 @@ private slots:
         QVERIFY(!resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
 
-        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 11 tablas.
+        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 12 tablas de
+        // dominio del esquema v5.
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
         const char* const kTablas[] = {
             "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
             "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+            "Preferencia_Profesor",
         };
         for (const char* tabla : kTablas) {
             QCOMPARE(contar(db, QString::fromLatin1(tabla)), 0);
@@ -629,6 +637,7 @@ private slots:
         QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
         QCOMPARE(resultado.duracionMinutos, 35);
         QCOMPARE(resultado.configuraciones, 1);
+        QCOMPARE(resultado.recuentos.preferencias, 0);
         QCOMPARE(resultado.recuentos.turnos, 2);
     }
 
@@ -639,6 +648,7 @@ private slots:
 
         QVERIFY2(resumen.contains(QStringLiteral("35 min")), qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("configuraciones: 1")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Preferencias: 0")), qPrintable(resumen));
     }
 
     void atomicidadAnteFalloEnReemplazo()
