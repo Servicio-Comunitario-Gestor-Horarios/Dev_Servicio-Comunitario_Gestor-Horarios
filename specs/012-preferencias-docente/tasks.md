@@ -21,7 +21,7 @@ T6 → T7; T3,T4 → T8; todo → T9. Ninguna tarea cierra con el árbol sin com
 - [x] **T6. Seed: recuento 0 y tabla de dominio (~25 min).** RF-7
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_seed_perfil|test_seed_aplicacion)$'` está verde; `Recuentos.preferencias` existe y vale 0 para las cuatro variantes; `kTablasDominio` incluye `Preferencia_Profesor` y el comentario de `sembrador.cpp:34` pasa a 12 tablas / esquema v5; la base sembrada tiene 0 filas; `resumenTexto` imprime «Preferencias: 0»; una base con solo la configuración sigue siendo sembrable.
 
-- [ ] **T7. Seed: borrado, atomicidad y determinismo (~30 min).** RF-7, RNF-3, RNF-4
+- [x] **T7. Seed: borrado, atomicidad y determinismo (~30 min).** RF-7, RNF-3, RNF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'` está verde; con una preferencia preinsertada, `--solo-docentes` y `--reemplazar` terminan sin fallar por claves foráneas y dejan 0 preferencias; con una preferencia preinsertada y `simularFalloTrasDocentes`, la preferencia y la variante anterior siguen completas (rollback); dos siembras del mismo perfil coinciden también en `Preferencia_Profesor`; el comentario (`:347`) y la lista (`:350`) de «las 11 tablas» de
   `test_seed_aplicacion.cpp` pasan a 12 tablas con `Preferencia_Profesor`.
 

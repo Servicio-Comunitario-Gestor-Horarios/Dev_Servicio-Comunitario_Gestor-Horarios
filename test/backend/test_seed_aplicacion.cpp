@@ -82,6 +82,28 @@ class TestSeedAplicacion : public QObject {
 private:
     int m_contador = 0;
 
+    /// Inserta un docente y una preferencia directamente (la siembra no las crea) para
+    /// comprobar que los borrados del seed respetan la FK y que el rollback las conserva.
+    void preinsertarPreferencia(const QString& ruta)
+    {
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+
+        QSqlQuery docente(db);
+        QVERIFY2(docente.exec("INSERT INTO Profesores (id, nombre, email) "
+                              "VALUES ('P-PREF', 'Docente Pref', 'pref@centro.edu')"),
+                 qPrintable(docente.lastError().text()));
+
+        QSqlQuery preferencia(db);
+        QVERIFY2(preferencia.exec(
+                     "INSERT INTO Preferencia_Profesor "
+                     "(id_Profesor, dia, hora_inicio, hora_fin, sentido) "
+                     "VALUES ('P-PREF', '1', '08:00', '10:00', 'preferida')"),
+                 qPrintable(preferencia.lastError().text()));
+
+        cerrarInspeccion(db);
+    }
+
 private slots:
     void creaBaseNuevaYPuebla()
     {
@@ -649,6 +671,98 @@ private slots:
         QVERIFY2(resumen.contains(QStringLiteral("35 min")), qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("configuraciones: 1")), qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("Preferencias: 0")), qPrintable(resumen));
+    }
+
+    void soloDocentes_conPreferenciaPreinsertada_borraSinFallarPorFK()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        // Sin borrar la preferencia antes que el docente, SQLite rechaza el DELETE por FK.
+        OpcionesAplicacion conmutacion;
+        conmutacion.rutaDb = ruta;
+        conmutacion.soloDocentes = true;
+        conmutacion.confirmado = true;
+        conmutacion.variante = VarianteDocentes::Suplentes;
+        conmutacion.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(conmutacion);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 43);   // variante suplentes
+        cerrarInspeccion(db);
+    }
+
+    void reemplazoTotal_conPreferenciaPreinsertada_borraSinFallarPorFK()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 65);   // variante holgada
+        cerrarInspeccion(db);
+    }
+
+    /// Un fallo tras los docentes revierte también la preferencia preinsertada: la variante
+    /// anterior queda completa (RNF-4).
+    void falloSimulado_conPreferenciaPreinsertada_conservaLaVarianteYLaPreferencia()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        OpcionesAplicacion conmutacion;
+        conmutacion.rutaDb = ruta;
+        conmutacion.soloDocentes = true;
+        conmutacion.confirmado = true;
+        conmutacion.variante = VarianteDocentes::Suplentes;
+        conmutacion.simularFalloTrasDocentes = true;
+        conmutacion.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(conmutacion);
+        QCOMPARE(resultado.estado, EstadoAplicacion::FalloEscritura);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        // La variante anterior (holgada + el docente preinsertado) sigue completa.
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 66);
+        QCOMPARE(contar(db, QStringLiteral("Profesor_Materia")), 65);
+        QCOMPARE(contar(db, QStringLiteral("Disponibilidad_Profesor")), 325);
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 1);
+        cerrarInspeccion(db);
     }
 
     void atomicidadAnteFalloEnReemplazo()

@@ -354,3 +354,58 @@ $ sqlite3 … "SELECT COUNT(*) FROM Preferencia_Profesor;" → 0
   toca aquí; T6 es solo recuento y tabla de dominio.
 - De paso se corrigió el formato de `leerRecuentos` (la declaración de `Recuentos r;` quedaba en la
   misma línea que la llave).
+
+## T7 - Seed: borrado, atomicidad y determinismo (2026-10-29)
+
+**Requisito:** RF-7, RNF-3, RNF-4. **Plan:** §1.6 y §10 (T7). **Base:** `3b8ba90`.
+
+### Rojo (tests primero)
+
+Con una preferencia preinsertada y la producción anterior:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'
+FAIL!  : …soloDocentes_conPreferenciaPreinsertada_borraSinFallarPorFK()
+         'resultado.ok()' returned FALSE. (No se pudieron borrar los docentes para la conmutación de variante.)
+FAIL!  : …reemplazoTotal_conPreferenciaPreinsertada_borraSinFallarPorFK()
+         'resultado.ok()' returned FALSE. (No se pudieron borrar los datos previos para el reemplazo total.)
+Totals: 18 passed, 2 failed
+```
+
+Eran claves foráneas: el docente se borraba antes que su preferencia.
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'
+1/1 Test #50: test_seed_aplicacion .............   Passed    0.62 sec
+100% tests passed out of 1
+$ ./build-backend/test/test_seed_aplicacion
+Totals: 20 passed, 0 failed
+
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+### Cambios
+
+- `seed/src/sembrador.cpp`:
+  - **`--solo-docentes`:** borra `Preferencia_Profesor` → `Disponibilidad_Profesor` →
+    `Profesor_Materia` → `Profesores` (preferencias y disponibilidad referencian al docente; el
+    orden cambia solo para añadir la nueva tabla al principio).
+  - **Reemplazo total:** `Eventos` → `Preferencia_Profesor` → `Disponibilidad_Profesor` →
+    `Profesor_Materia` → `Cursos` → … → `Profesores` (la nueva tabla entra antes de sus padres).
+- `test/backend/test_seed_aplicacion.cpp`: helper `preinsertarPreferencia` y tres casos nuevos; el
+  comentario y la lista de «12 tablas» ya venían de T6 y siguen con `Preferencia_Profesor` incluida.
+
+### Notas
+
+- **Rollback real:** `falloSimulado_conPreferenciaPreinsertada_conservaLaVarianteYLaPreferencia`
+  siembra la variante holgada, inserta un docente + preferencia, conmuta a suplentes con
+  `simularFalloTrasDocentes` y exige que el resultado sea `FalloEscritura` y que la base siga con
+  66 docentes (65 holgada + el preinsertado), 65 asignaciones, 325 disponibilidades y **1**
+  preferencia. Sin el borrado ordenado, el fallo llegaría antes (FK) y sin rollback la preferencia
+  habría desaparecido.
+- **Determinismo:** la comparación de dos siembras ya incluye `Preferencia_Profesor` (T6); ambas
+  quedan con 0 filas.
+- No se tocaron el esquema, los servicios, el DTO, la cascada, `ServicioGeneracion` ni `docs/`.

@@ -405,7 +405,10 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
 
     // ── Conmutación de docentes (RF-9): solo docentes + materias asignadas + disponibilidad ──
     if (opciones.soloDocentes) {
-        if (!borrarTabla(QStringLiteral("Disponibilidad_Profesor")) ||
+        // Orden FK-seguro: las preferencias (012) y la disponibilidad referencian al docente,
+        // así que se borran antes que él; después, sus materias.
+        if (!borrarTabla(QStringLiteral("Preferencia_Profesor")) ||
+            !borrarTabla(QStringLiteral("Disponibilidad_Profesor")) ||
             !borrarTabla(QStringLiteral("Profesor_Materia")) ||
             !borrarTabla(QStringLiteral("Profesores"))) {
             return abortar(
@@ -423,12 +426,13 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         // ── Alta completa (base nueva o reemplazo total) ──────────────────────────────
         if (opciones.reemplazarTodo) {
             // Orden FK-seguro (plan §4.5): Eventos antes que Turnos; Cursos antes que Turnos
-            // y Aulas; PlanEstudio_Materia/Profesor_Materia/Disponibilidad_Profesor antes de
-            // sus padres; Aulas y Materias antes que TiposAula; Profesores al final.
+            // y Aulas; Preferencia_Profesor/PlanEstudio_Materia/Profesor_Materia/
+            // Disponibilidad_Profesor antes de sus padres; Aulas y Materias antes que TiposAula;
+            // Profesores al final.
             for (const char* tabla :
-                 {"Eventos", "Disponibilidad_Profesor", "Profesor_Materia", "Cursos",
-                  "PlanEstudio_Materia", "PlanEstudio", "Materias", "Turnos", "Aulas",
-                  "TiposAula", "Profesores"}) {
+                 {"Eventos", "Preferencia_Profesor", "Disponibilidad_Profesor",
+                  "Profesor_Materia", "Cursos", "PlanEstudio_Materia", "PlanEstudio",
+                  "Materias", "Turnos", "Aulas", "TiposAula", "Profesores"}) {
                 if (!borrarTabla(QString::fromLatin1(tabla))) {
                     return abortar(QStringLiteral(
                         "No se pudieron borrar los datos previos para el reemplazo total."));
