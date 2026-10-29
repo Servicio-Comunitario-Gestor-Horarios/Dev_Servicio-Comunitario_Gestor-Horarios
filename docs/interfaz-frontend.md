@@ -822,6 +822,9 @@ sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo po
 
 ## 6. Deuda del frontend y alcance (spec 011)
 
+> **Guía de migración paso a paso:** `docs/guias/migracion-frontend.md` (qué rompe la compilación,
+> qué cambió en las specs 009–012 y cómo verificarlo).
+
 La 011 cambia `src/backend` y `src/seed`; `src/frontend` **no se toca** y **no compila** contra las
 firmas nuevas. El equipo de interfaz debe migrar:
 
