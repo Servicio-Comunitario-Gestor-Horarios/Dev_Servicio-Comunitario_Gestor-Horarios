@@ -15,7 +15,7 @@ T6 → T7; T3,T4 → T8; todo → T9. Ninguna tarea cierra con el árbol sin com
 - [x] **T4. `ProfesorDTO` con preferencias y fachada `NucleoDatos` (~30 min).** RF-3
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_profesor|test_backend_nucleo_datos|test_servicio_preferencias)$'` está verde; `ProfesorDTO` devuelve `disponibilidad` y `preferencias` como listas distintas y ordenadas en `obtenerProfesor` y `listarProfesores`; `ProfesorDTO::toProfesor()` no copia preferencias; `NucleoDatos::agregarPreferencia`, `listarPreferencias`, `actualizarPreferencia`, `eliminarPreferencia` y `limpiarPreferencias` funcionan; una escritura fallida queda registrada como pendiente y se puede reintentar.
 
-- [ ] **T5. Cascada y baja del docente (~25 min).** RF-4, RNF-4
+- [x] **T5. Cascada y baja del docente (~25 min).** RF-4, RNF-4
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_backend_cascada|test_servicio_profesor|test_backend_nucleo_datos|test_servicio_preferencias)$'` está verde; `dependenciasDe("profesor", id)` lista la disponibilidad y las preferencias con una etiqueta legible y `dependenciasDe("profesor").size()` pasa de 2 a **3** en `test_cascada.cpp:140`; `eliminarConCascada("profesor", id)` borra docente, disponibilidad y preferencias sin huérfanas; `NucleoDatos::eliminarDocente` hace lo mismo, con la regresión de `test_servicio_profesor` y `test_backend_nucleo_datos`; si el borrado falla, no queda nada borrado.
 
 - [ ] **T6. Seed: recuento 0 y tabla de dominio (~25 min).** RF-7

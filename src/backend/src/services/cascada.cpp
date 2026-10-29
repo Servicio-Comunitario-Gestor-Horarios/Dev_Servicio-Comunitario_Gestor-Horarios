@@ -62,6 +62,13 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("disponibilidad"), QStringLiteral("Disponibilidad_Profesor"),
             QStringLiteral("id_Profesor"), QStringLiteral("id"),
             QStringLiteral("dia"), QStringLiteral("Franja de disponibilidad"), false));
+
+        // Preferencias horarias (012, RF-4): etiqueta legible con sentido, día y rango.
+        relaciones.append(relacion(
+            QStringLiteral("preferencia"), QStringLiteral("Preferencia_Profesor"),
+            QStringLiteral("id_Profesor"), QStringLiteral("id"),
+            QStringLiteral("sentido || ' ' || dia || ' ' || hora_inicio || '-' || hora_fin"),
+            QStringLiteral("Preferencia horaria"), false));
     }
     else if (dominio == QStringLiteral("aula"))
     {

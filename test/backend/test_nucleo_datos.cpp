@@ -59,6 +59,15 @@ private:
         return f;
     }
 
+    /// Número de filas de una tabla (para comprobar hijas borradas en la baja).
+    int contarTabla(const QString& tabla) const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(tabla)) || !query.next())
+            return -1;
+        return query.value(0).toInt();
+    }
+
 private slots:
 
     void init()
@@ -127,8 +136,14 @@ private slots:
         QVERIFY(actualizado.ok);
         QCOMPARE(m_nucleo->listarDocentes().valor.first().nombre, QStringLiteral("Ana Gómez"));
 
+        // La baja del docente arrastra sus preferencias (mismo camino que `eliminarConCascada`).
+        QVERIFY(m_nucleo->agregarPreferencia("P1", franja(1, 8, 0, 10, 0),
+                                             SentidoPreferencia::Preferida).ok);
+        QCOMPARE(contarTabla(QStringLiteral("Preferencia_Profesor")), 1);
+
         QVERIFY(m_nucleo->eliminarDocente("P1"));
         QVERIFY(m_nucleo->listarDocentes().valor.isEmpty());
+        QCOMPARE(contarTabla(QStringLiteral("Preferencia_Profesor")), 0);
     }
 
     // ─── Aulas ──────────────────────────────────────────────────────────────

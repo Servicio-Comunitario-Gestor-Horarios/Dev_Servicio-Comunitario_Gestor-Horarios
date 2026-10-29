@@ -137,7 +137,7 @@ private slots:
         QCOMPARE(dependenciasDe(QStringLiteral("curso")).size(), 0); // ya no arrastra nada
         QCOMPARE(dependenciasDe(QStringLiteral("turno")).size(), 2);
         QCOMPARE(dependenciasDe(QStringLiteral("plan")).size(), 1);  // sin plan -> cursos
-        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 2);
+        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 3);
 
         QVERIFY(dependenciasDe(QStringLiteral("inexistente")).isEmpty());
         QVERIFY(!dominioValido(QStringLiteral("inexistente")));
@@ -222,11 +222,30 @@ private slots:
         franja.fin = QTime(10, 0);
         QVERIFY(m_profesor->agregarDisponibilidad("P1", franja).ok);
 
+        FranjaHoraria preferida;
+        preferida.dia = 2;
+        preferida.inicio = QTime(14, 0);
+        preferida.fin = QTime(16, 0);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", preferida,
+                                             SentidoPreferencia::Evitada).ok);
+
         const auto dependencias =
             m_nucleo->dependientesDe(QStringLiteral("profesor"), QStringLiteral("P1"));
 
         QCOMPARE(contarDominio(dependencias, QStringLiteral("profesor_materia")), 1);
         QCOMPARE(contarDominio(dependencias, QStringLiteral("disponibilidad")), 1);
+        QCOMPARE(contarDominio(dependencias, QStringLiteral("preferencia")), 1);
+
+        // La preferencia se lista con etiqueta legible (sentido, día y rango).
+        bool etiquetaLegible = false;
+        for (const Dependencia& d : dependencias) {
+            if (d.dominio != QStringLiteral("preferencia"))
+                continue;
+            etiquetaLegible = d.descripcion.contains(QStringLiteral("Preferencia horaria")) &&
+                              d.descripcion.contains(QStringLiteral("evitada")) &&
+                              d.descripcion.contains(QStringLiteral("14:00-16:00"));
+        }
+        QVERIFY(etiquetaLegible);
     }
 
     void dependientesDe_turno_listaEventos()
@@ -365,6 +384,67 @@ private slots:
         const auto cursos = m_nucleo->listarCursos().valor;
         QCOMPARE(cursos.size(), 1);
         QVERIFY(cursos.first().turno.isEmpty());
+    }
+
+    void eliminarConCascada_profesor_borraDisponibilidadYPreferencias()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+
+        FranjaHoraria disponibilidad;
+        disponibilidad.dia = 1;
+        disponibilidad.inicio = QTime(8, 0);
+        disponibilidad.fin = QTime(10, 0);
+        QVERIFY(m_profesor->agregarDisponibilidad("P1", disponibilidad).ok);
+
+        FranjaHoraria preferida;
+        preferida.dia = 2;
+        preferida.inicio = QTime(14, 0);
+        preferida.fin = QTime(16, 0);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", preferida,
+                                             SentidoPreferencia::Preferida).ok);
+
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 1);
+
+        QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                             QStringLiteral("P1")));
+
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 0);
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 0);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 0);
+    }
+
+    /// Un fallo al borrar el docente revierte también sus hijas (RNF-4).
+    void eliminarConCascada_profesor_atomico_falloDejaTodoIntacto()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+
+        FranjaHoraria franja;
+        franja.dia = 1;
+        franja.inicio = QTime(8, 0);
+        franja.fin = QTime(10, 0);
+        QVERIFY(m_profesor->agregarDisponibilidad("P1", franja).ok);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", franja,
+                                             SentidoPreferencia::Preferida).ok);
+
+        // El trigger aborta al borrar el docente, después de borrar sus hijas.
+        QVERIFY(ejecutar(QStringLiteral(
+            "CREATE TRIGGER fallo_cascada BEFORE DELETE ON Profesores "
+            "BEGIN SELECT RAISE(ABORT, 'fallo simulado en cascada'); END;")));
+
+        QVERIFY(!m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                              QStringLiteral("P1")));
+
+        // Nada aplicado: docente, disponibilidad y preferencia siguen ahí.
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 1);
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 1);
+
+        // Retirado el trigger, la cascada vuelve a funcionar.
+        QVERIFY(ejecutar(QStringLiteral("DROP TRIGGER fallo_cascada")));
+        QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                             QStringLiteral("P1")));
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 0);
     }
 
     void eliminarConCascada_turno_borraSusEventos()

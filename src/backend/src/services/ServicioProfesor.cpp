@@ -306,7 +306,8 @@ bool ServicioProfesor::eliminarProfesor(const QString& id) {
         return true;
     };
 
-    if (!borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
+    if (!borrarHijas("DELETE FROM Preferencia_Profesor    WHERE id_Profesor = :id") ||
+        !borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
         !borrarHijas("DELETE FROM Profesor_Materia       WHERE id_Profesor = :id")) {
         m_db.rollback();
         return false;

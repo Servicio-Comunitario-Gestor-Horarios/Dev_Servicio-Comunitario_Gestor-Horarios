@@ -268,6 +268,10 @@ private slots:
         QVERIFY(m_servicio->agregarDisponibilidad(
             "P-900", franja(1, 8, 0, 10, 0)).ok);
 
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-900", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
         auto materia = m_servicioMaterias->crearMateria("Materia Cascada", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-900", materia.valor.id));
@@ -283,6 +287,11 @@ private slots:
         QCOMPARE(q.value(0).toInt(), 0);
 
         q.prepare("SELECT COUNT(*) FROM Profesor_Materia WHERE id_Profesor = :id");
+        q.bindValue(":id", "P-900");
+        QVERIFY(q.exec() && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+
+        q.prepare("SELECT COUNT(*) FROM Preferencia_Profesor WHERE id_Profesor = :id");
         q.bindValue(":id", "P-900");
         QVERIFY(q.exec() && q.next());
         QCOMPARE(q.value(0).toInt(), 0);

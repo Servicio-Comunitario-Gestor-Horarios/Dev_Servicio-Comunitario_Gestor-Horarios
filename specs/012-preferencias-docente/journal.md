@@ -241,3 +241,56 @@ $ ctest --preset backend
 - **Listas distintas:** una preferencia que coincide con la disponibilidad coexiste y no se mezcla
   (`disponibilidad` sigue con 1 y `preferencias` con 2 en el test).
 - No se tocaron el esquema, la cascada, el seed, `ServicioGeneracion` ni `docs/`.
+
+## T5 - Cascada y baja del docente (2026-10-29)
+
+**Requisito:** RF-4, RNF-4. **Plan:** §1.5 y §10 (T5). **Base:** `d2f2147`.
+
+### Rojo (tests primero, con la producción vieja)
+
+Se añadieron los casos y, antes de la producción, el build con el código anterior dejó:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_backend_cascada|test_servicio_profesor|test_backend_nucleo_datos)$'
+FAIL!  : TestNucleoDatos::docentes_altaModificacionBaja() 'eliminarDocente("P1")' returned FALSE
+FAIL!  : TestCascada::dependenciasDe_describeRelacionesPorDominio() Compared values are not the same
+FAIL!  : TestCascada::dependientesDe_profesor_listaRelaciones() Compared values are not the same
+FAIL!  : TestCascada::eliminarConCascada_profesor_borraDisponibilidadYPreferencias() 'eliminarConCascada(…)'
+FAIL!  : TestCascada::eliminarConCascada_profesor_atomico_falloDejaTodoIntacto() 'eliminarConCascada(…)'
+FAIL!  : TestServicioProfesor::eliminarProfesor_borraRelaciones() 'eliminarProfesor("P-900")' returned FALSE
+0% tests passed, 3 tests failed out of 3
+```
+
+Las bajas fallaban por **clave foránea**: las preferencias no se borraban (los dos caminos).
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_backend_cascada|test_servicio_profesor|test_backend_nucleo_datos|test_servicio_preferencias)$'
+100% tests passed out of 4
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+### Cambios
+
+- `cascada.cpp`: nueva relación del dominio `profesor` → tabla `Preferencia_Profesor`, columna
+  `id_Profesor`, id `id`, etiqueta
+  `sentido || ' ' || dia || ' ' || hora_inicio || '-' || hora_fin`, descripción «Preferencia horaria».
+  `dependenciasDe("profesor").size()` pasa de 2 a **3**.
+- `ServicioProfesor.cpp`: `eliminarProfesor` borra `Preferencia_Profesor` dentro de su transacción
+  (antes de la disponibilidad y de las materias y del docente).
+- Tests: `test_cascada` (tamaño 3, dependencia con etiqueta legible, borrado por `eliminarConCascada`
+  y rollback con trigger), `test_servicio_profesor` (la baja borra también preferencias) y
+  `test_nucleo_datos` (`eliminarDocente` arrastra preferencias).
+
+### Notas
+
+- **Dos caminos cubiertos:** `ServicioProfesor::eliminarProfesor` (lo usa `NucleoDatos::eliminarDocente`)
+  y `NucleoDatos::eliminarConCascada`; ambos dejan 0 disponibilidades y 0 preferencias.
+- **Etiqueta:** el listado de dependientes muestra «Preferencia horaria: evitada 2 14:00-16:00»
+  (sentido, día y rango), así que el usuario ve qué confirma.
+- **Rollback:** un trigger `BEFORE DELETE ON Profesores` aborta tras borrar las hijas; el test exige que
+  docente, disponibilidad y preferencia sigan existiendo y que, retirado el trigger, la cascada
+  funcione. (Con la producción vieja ese test también fallaba, por la FK al intentar borrar el docente.)
+- No se tocaron el esquema, el seed, `ServicioGeneracion` ni `docs/`.
