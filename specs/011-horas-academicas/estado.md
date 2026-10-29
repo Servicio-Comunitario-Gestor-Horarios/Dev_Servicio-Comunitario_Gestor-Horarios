@@ -1,11 +1,11 @@
 # Estado 011
 
-Fase: implementación completa; pendiente de validación RF por RF
-Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27 · implementación 2026-10-29
-Base: 8e0602c (base de la implementación; HEAD de `feat/Base-datos`: `c62653c`, suite 52/52). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
+Fase: cerrada
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27 · implementación 2026-10-29 · validación 2026-10-29
+Base: 8e0602c (base de la implementación; HEAD de `feat/Base-datos`: `19ceccb`, suite 52/52). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
 Dudas abiertas: ninguna
-Siguiente paso: validación RF por RF contra `Base: 8e0602c` por el reviewer; tras `VEREDICTO: APROBADO`, marcar la spec `implementada` y cerrar.
-Veredicto: pendiente (validación de la implementación).
+Siguiente paso: nada pendiente en esta spec. Fuera de ella: la **012** sigue sin plan ni tareas; quedan pendientes los de la **005-T10**; sigue la divergencia con `release/1.0`; y falta actualizar `MEMORY.md` con el cierre de la 011.
+Veredicto: APROBADO (2026-10-29) por el reviewer contra `Base: 8e0602c`; I1, I2 y M5 corregidos en `19ceccb` y los hallazgos documentales en este cierre.
 QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); QA del plan: dos rondas de CAMBIOS NECESARIOS (B1, M1–M10) cerradas el 2026-10-27; plan y tareas aprobados el 2026-10-27.
 
 ## Decisión nueva del usuario (2026-10-23)
@@ -134,7 +134,8 @@ tarea cierra con el árbol sin compilar» exigió ejecutarla antes.
 | T6 | `fbb1f68` | Contrato: V2 30–90 con el punto único y encaje de todos los turnos; V1 rechaza no enteros. |
 | T7 | `15db0d2` | `construirJsonEntrada(datos, preset, D, ahora)` (sobrescritura incondicional y rejilla con D) y `huellaDatos(datos, D)`. |
 | T9 | `c62653c` | Retirada del legado: `duracionFranjaEstimada` y las firmas de 2/3 argumentos; casos de `test_calculo_eventos` migrados/retirados. |
-| T10 | este cierre | Docs de §7 (más el ejemplo de `consola-datos.md`), anotaciones de supersesión en 009/008/005/010 y verificación de cierre. |
+| T10 | `059815b` | Docs de §7 (más el ejemplo de `consola-datos.md`), anotaciones de supersesión en 009/008/005/010 y verificación de cierre. |
+| Correcciones de la validación | `19ceccb` | I1: el servicio de turnos propaga el fallo de lectura de la configuración y solo usa 35 cuando no hay fila. I2: el déficit de `errorDeEncaje` sale de `deficitDeEncaje`. M5: vuelve el caso del evento sin horas. |
 
 - **Suite:** `ctest --preset backend` → **52/52** (100 %), sin `test_frontend_conversion` ni
   `test_generacion_seed`.
@@ -143,6 +144,22 @@ tarea cierra con el árbol sin compilar» exigió ejecutarla antes.
 - **Documentación:** los `12:30/18:10` que quedan en `docs/solver/Motor-Solver-Plan-Completo.md` son
   históricos y la constitución los declara no vinculantes; el otro resto es un `archivo:línea` de un
   log de auditoría. No se tocan.
+
+## Cierre (2026-10-29)
+
+- **Veredicto:** **APROBADO (2026-10-29)** por el reviewer contra `Base: 8e0602c`; RF validados uno a
+  uno y hallazgos **I1, I2 y M5** corregidos en `19ceccb`.
+- **Suite:** `ctest --preset backend` → **52/52**.
+- **Secuencia real:** T1 `fc86368` → T2 `11077f8` → T3 `4262b49` → T4 `36c28b2` → **T8 `c913d87`**
+  (adelantada) → T5 `bc7122b` → T6 `fbb1f68` → T7 `15db0d2` → T9 `c62653c` → T10 `059815b` →
+  correcciones de la validación `19ceccb`.
+- **No se tocó:** el modelo del solver, el tope de 40 horas académicas ni la interfaz.
+- **Deudas documentadas (frontend):** builder con la firma nueva de `construirJsonEntrada`; selector de
+  duración del editor y de la vista; `horasAula` y la aritmética en minutos de la vista; «datos
+  anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` con 40. Ver
+  `docs/interfaz-frontend.md` §6.
+- **M6 (aceptado sin cambio):** el `CHECK` del esquema (30–90) es defensa en profundidad; la validación
+  de negocio sigue en `duracion_horaria::errorDeRango`.
 
 ## Tamaño previsto
 

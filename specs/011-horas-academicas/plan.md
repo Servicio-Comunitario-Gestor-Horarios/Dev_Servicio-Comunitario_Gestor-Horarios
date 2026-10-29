@@ -362,7 +362,7 @@ Y en `NucleoDatos`: `configuracionHoraria()` / `guardarConfiguracionHoraria(int)
 
 1. **§2.2, línea 106:** `constexpr int VERSION_ESQUEMA_ACTUAL = 3;` pasa a **`= 4`** y el comentario a
    «v4: configuración global de la hora académica (una fila)». La vecina de línea 124 no cambia.
-2. **§2.4.2, línea 346:** sustituir el apartado «Duración de la franja» por: la franja dura **D**
+2. **§2.4.2, línea 343:** sustituir el apartado «Duración de la franja» por: la franja dura **D**
    (global, 35 por defecto), la rejilla no reparte la ventana, el encaje es
    `numSlots × D + Σ eventos ≤ ventana` y el rechazo nombra turno, D y déficit (`errorDeEncaje`);
    `duracionFranjaEstimada` ya no existe.
@@ -371,12 +371,12 @@ Y en `NucleoDatos`: `configuracionHoraria()` / `guardarConfiguracionHoraria(int)
    no cambia el anterior), la fachada `NucleoDatos::configuracionHoraria`/
    `guardarConfiguracionHoraria`, `duracion_horaria::minutosDeHorasAcademicas` como único punto horas →
    minutos, y que el tope de 40 horas académicas no cambia.
-4. **§3.6, línea 658:** el campo `duracion_minutos` del preset es **derivado**; `construirJsonEntrada`
+4. **§3.6, línea 682:** el campo `duracion_minutos` del preset es **derivado**; `construirJsonEntrada`
    lo sobrescribe siempre y un cambio de configuración desde que se guardó el preset no es error ni
    aviso. Donde dice «40 min en los datos de prueba del centro», pasa a **35 min** y se marca como deuda
    (la vista no se toca).
 5. **§4:** filas para `ConfiguracionHoraria`, `errorDeEncaje` y la firma nueva del constructor.
-6. **§5, punto 4, línea 732:** la deuda de la 009 decía «usar la suma de `duracion` (o directamente
+6. **§5, punto 4, línea 758:** la deuda de la 009 decía «usar la suma de `duracion` (o directamente
    `duracionFranjaEstimada(turno)`)»; pasa a las funciones nuevas con D (`errorDeEncaje`, ventana de
    posición con D) y a `NucleoDatos::configuracionHoraria()` para la D efectiva.
 7. Nueva **§6** «Deuda del frontend y alcance (spec 011)»:
@@ -400,9 +400,9 @@ Y en `NucleoDatos`: `configuracionHoraria()` / `guardarConfiguracionHoraria(int)
 
 **`docs/guias/datos-prueba-frontend.md`**
 
-- **Líneas 56-57**, tabla de entidades: turnos a `Mañana 07:00–11:50 · Tarde 12:40–17:30, 8 franjas de
+- **Líneas 58-59**, tabla de entidades: turnos a `Mañana 07:00–11:50 · Tarde 12:40–17:30, 8 franjas de
   35 min` y eventos a `08:10–08:20 (Mañana) y 13:50–14:00 (Tarde)`.
-- **Líneas 70-71**, «Turnos (rejilla aritmética)»: pasos de **35 min**; la **rejilla de clases** va de
+- **Líneas 72-74**, «Turnos (rejilla aritmética)»: pasos de **35 min**; la **rejilla de clases** va de
   07:00 a **11:40** y de 12:40 a **17:20** (`8 × 35 = 280`); `Turnos.fin` = **11:50/17:30**, que añade
   los **10 min del evento «Receso»**: el desfase sigue existiendo y es el tiempo del evento, el mismo
   que documenta la 008. **No** se escribe que el `fin` coincida con la rejilla ni se repiten las horas
@@ -412,10 +412,16 @@ Y en `NucleoDatos`: `configuracionHoraria()` / `guardarConfiguracionHoraria(int)
 - **Línea 34**: `duracion_minutos` ya **no** es solo del preset: es la configuración global persistida
   (`ConfiguracionHoraria`, una fila, 35 por defecto, rango 30–90); el campo del preset es derivado y se
   sobrescribe.
-- **Línea 197**, checklist: «(y 26 h 40 min solo como dato de tiempo real)» pasa a «23 h 20 min».
-- **Línea 200**, checklist: «(35 min por bloque, o el valor efectivo de la configuración)» en lugar de
+- **Línea 200**, checklist: «(y 26 h 40 min solo como dato de tiempo real)» pasa a «23 h 20 min».
+- **Línea 203**, checklist: «(35 min por bloque, o el valor efectivo de la configuración)» en lugar de
   «40 min»; matizar «No descuentes su duración de las franjas útiles»: el solver ignora los eventos,
   pero el **encaje** del turno es `slots × D + Σ eventos ≤ ventana`.
+
+**`docs/guias/consola-datos.md`**
+
+- **Líneas 159-160:** el ejemplo crea el turno `manana` con **07:00–11:50** y añade el receso en
+  **08:10–08:20** (antes 12:30 y 08:20–08:30, que dejaban el ejemplo inválido con D = 35 porque la
+  ventana de la posición 2 es 08:10–08:20).
 
 **`docs/contrato-solver-2.0.md`**
 
@@ -430,39 +436,41 @@ Y en `NucleoDatos`: `configuracionHoraria()` / `guardarConfiguracionHoraria(int)
 - El ejemplo completo de §7 (45 min, 6 franjas, ventana 07:00–12:00, evento 30 min) ya cumple
   `6 × 45 + 30 = 300`; se deja como está.
 
-### 7.2 Anotación de supersesiones en los specs históricos (la hace el planner, no el implementer)
+### 7.2 Anotación de supersesiones en los specs históricos (las aplicó el planner, no el implementer)
 
-Solo el planner edita `spec.md`; por eso esto **no** es una tarea de `tasks.md` ni la aplica el
-implementer. Se hace al cerrar la fase (antes de marcar la 011 como implementada), como hizo la 010 con
-la 005, y **no** basta con el preámbulo de la 011: el precedente de la 010 dejó notas inline en los
-textos históricos. Inserciones exactas, todas con fecha **2026-10-27**:
+Solo el planner edita `spec.md`; por eso esto **no** es una tarea de `tasks.md` ni las aplica el
+implementer. Se hizo al cerrar la fase, como la 010 con la 005, y **no** basta con el preámbulo de la
+011: el precedente de la 010 dejó notas inline en los textos históricos. **Autoría:** las aplicó el
+planner; viajaron en el commit de T10 (`059815b`) porque el coordinator aplicó los parches de `docs/`
+en el mismo cierre. Inserciones exactas, todas con fecha **2026-10-29**:
 
 - **`specs/009-tipos-de-aula-y-eventos/spec.md`**:
-  - Definición «Duración estimada de la franja de clase» (líneas 138-142) y **RF-3** (líneas 227-231):
-    > **Superada por la 011 (2026-10-27).** La franja de clase dura la hora académica (D, 35 por
+  - Definición «Duración estimada de la franja de clase» (nota en **143**) y **RF-3** (nota en **233**):
+    > **Superada por la 011 (2026-10-29).** La franja de clase dura la hora académica (D, 35 por
     > defecto, rango 30–90); la ventana del turno no se reparte y el sobrante no se usa.
-  - **RF-11** (líneas 369-371):
-    > **Superada en la fórmula por la 011 (2026-10-27).** La guía documenta D y el encaje
+  - **RF-11** (nota en **375**):
+    > **Superada en la fórmula por la 011 (2026-10-29).** La guía documenta D y el encaje
     > `slots × D + Σ eventos ≤ ventana`, no el reparto de la ventana.
 - **`specs/008-datos-de-prueba/spec.md`**:
-  - **RF-4** (líneas 238-268), **criterio 1** (línea 541) y **criterio 3** (líneas 549-553):
-    > **Superado por la 011 (2026-10-27).** El inventario de 8 franjas de 40 min y la rejilla
+  - **RF-4** (nota en **272**), **criterio 1** (nota en **550**) y **criterio 3** (nota en **564**):
+    > **Superado por la 011 (2026-10-29).** El inventario de 8 franjas de 40 min y la rejilla
     > `8 × 40 + 10` se sustituyen por 8 franjas de D = 35: Mañana 07:00–11:50 y Tarde 12:40–17:30,
     > recesos 08:10–08:20 y 13:50–14:00 (`8 × 35 + 10 = 290`). La rejilla de clases termina en 11:40 y
     > 17:20; el `fin` añade el evento de 10 min (mismo desfase que la 008).
 - **`specs/005-nucleo-solver/spec.md`**:
-  - Nota existente de **V2** (líneas 615-619): quitar «pendiente de la 011 futura» y dejarla así:
-    > **Estrechada por la 011 (2026-10-27).** V2 exige `duracion_minutos` entero entre 30 y 90; la
+  - Nota existente de **V2** (**616-618**): se quitó «pendiente de la 011 futura» y quedó así:
+    > **Estrechada por la 011 (2026-10-29).** V2 exige `duracion_minutos` entero entre 30 y 90; la
     > procedencia es la configuración global y V2 valida además el encaje
     > `slots × D + Σ eventos ≤ ventana`.
-  - Definición de `duracion_minutos` (líneas 184-185) y caso límite (líneas 725-726):
-    > **Superada en el rango por la 011 (2026-10-27).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
+  - Definición de `duracion_minutos` (nota en **188**) y caso límite (nota en **728**):
+    > **Superada en el rango por la 011 (2026-10-29).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
 - **`specs/010-solver-tipos-y-eventos/spec.md`**:
-  - **V2** (línea 292):
-    > **Ampliada por la 011 (2026-10-27).** El rango de `duracion_minutos` es 30–90 y V2 valida el
+  - **V2** (nota en **298**):
+    > **Ampliada por la 011 (2026-10-29).** El rango de `duracion_minutos` es 30–90 y V2 valida el
     > encaje del turno; el resto de V2 no cambia.
-- **Verificación de cierre (planner):** `grep -n "011 (2026-10-27)" specs/009-*/spec.md
-  specs/008-*/spec.md specs/005-*/spec.md specs/010-*/spec.md` devuelve al menos las notas listadas.
+- **Verificación de cierre (planner):** `grep -n "011 (2026-10-29)" specs/009-*/spec.md
+  specs/008-*/spec.md specs/005-*/spec.md specs/010-*/spec.md` devuelve 10 notas (009: 3; 008: 3;
+  005: 3; 010: 1).
 
 ## 8. Decisiones (con la alternativa descartada)
 

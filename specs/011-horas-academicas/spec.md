@@ -1,6 +1,6 @@
 # Spec 011 - Duración de la hora académica
 
-Estado: aprobada (2026-10-23)
+Estado: implementada (2026-10-29)
 
 > **Alcance y reparto.** Esta spec cubre la **persistencia y el backend** de la duración de la hora
 > académica: la configuración global, su validación centralizada, los servicios, la franja de clase, el
