@@ -3,7 +3,7 @@
 #include <backend/services/ValidadorSalidaSolver.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 
-/// Tests de las validaciones posteriores de la salida del solver (P1–P4, RF-3).
+/// Tests de las validaciones posteriores de la salida del solver (P2 y P4, RF-3).
 ///
 /// Desde la 010 el solver informa el **aula real** de cada clase, también en el modo de aula
 /// fija: un curso puede tener clases en aulas distintas (su aula de referencia y las aulas a
@@ -128,7 +128,7 @@ private:
         return h;
     }
 
-    /// Conflictos (P4) en un solo texto. Los avisos (P1–P3) no cuentan como conflicto.
+    /// Conflictos (P4) en un solo texto. Los avisos (P2) no cuentan como conflicto.
     static QString conflictos(const AnalisisSalida& a)
     {
         return a.conflictos.join(QLatin1Char('\n'));
@@ -206,15 +206,15 @@ private slots:
         QVERIFY2(!conflictos(a).contains(QStringLiteral("docente")), qPrintable(texto(a)));
     }
 
-    void horasNoCubiertas_generaAviso()
+    void horasNoCubiertas_noGeneraAviso()
     {
-        // El curso debería tener 2 horas; solo se asigna 1.
+        // P1 se retiró en la 005 (I2): un curso con menos horas de las esperadas ya no avisa.
         HorarioSalida h = horarioValido();
         h.horarios[claveCurso(1, QStringLiteral("A"))].dias[0].asignaciones = {AsignacionOutput{0, 0, 0, 0}};
 
         const AnalisisSalida a = analizarSalidaSolver(h, configBase());
         QVERIFY(a.presentable());
-        QVERIFY(!a.avisos.isEmpty());
+        QVERIFY2(a.avisos.isEmpty(), qPrintable(texto(a)));
     }
 
     void excesoDeHorasDeProfesor_generaAviso()
@@ -227,20 +227,20 @@ private slots:
         QVERIFY(!a.avisos.isEmpty());
     }
 
-    void excesoDeCapacidadDeAula_generaAviso()
+    void excesoDeCapacidadDeAula_noGeneraAviso()
     {
+        // P3 se retiró en la 005 (I2): la capacidad del aula ya no genera aviso.
         SolverConfig config = configBase();
         config.aulas[0].capacidad = 10;  // el curso tiene 20 estudiantes
 
         const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
         QVERIFY(a.presentable());
-        QVERIFY(!a.avisos.isEmpty());
+        QVERIFY2(a.avisos.isEmpty(), qPrintable(texto(a)));
     }
 
-    /// RF-4: un curso en modo de aula fija con clases en aulas distintas no se marca como si
-    /// todas estuvieran en su aula de referencia; la capacidad se comprueba contra el aula
-    /// real de cada clase.
-    void aulaFijaConClasesEnAulasDistintas_usaElAulaRealDeCadaClase()
+    /// RF-4: un curso en modo de aula fija con clases en aulas distintas no genera conflictos
+    /// (P4 usa el aula real de cada clase) ni avisos (la capacidad se retiró con P3, 005 I2).
+    void aulaFijaConClasesEnAulasDistintas_esPresentableSinAvisos()
     {
         const SolverConfig config = configConMateriaDesplazada();
         QVERIFY(config.aula_fija);
@@ -251,14 +251,7 @@ private slots:
         // El horario es coherente: una clase por franja, horas cubiertas y sin solapes.
         QVERIFY2(a.presentable(), qPrintable(texto(a)));
         QVERIFY(a.conflictos.isEmpty());
-        // El único aviso es la capacidad del **laboratorio** (10 < 20 estudiantes). Si el
-        // validador usara el aula de referencia del curso (A1, 30) para todas sus clases, no
-        // habría ningún aviso.
-        QCOMPARE(a.avisos.size(), 1);
-        QVERIFY2(a.avisos.first().contains(QStringLiteral("Laboratorio")),
-                 qPrintable(a.avisos.first()));
-        QVERIFY2(!a.avisos.first().contains(QStringLiteral("A1")),
-                 qPrintable(a.avisos.first()));
+        QVERIFY2(a.avisos.isEmpty(), qPrintable(texto(a)));
     }
 
     /// RF-3/RF-4: la exclusividad de aula cubre las clases desplazadas; dos clases en el
@@ -314,9 +307,9 @@ private slots:
     }
 
     /// Una salida incoherente sigue rechazándose: dos clases que informan el mismo aula
-    /// inexistente en la misma franja colisionan entre sí. P3 no indexa fuera de rango y P4
-    /// nombra el aula como desconocida. Un aula inexistente **sola** no es un conflicto
-    /// (P4 solo detecta colisiones, no valida el catálogo).
+    /// inexistente en la misma franja colisionan entre sí. P4 nombra el aula como desconocida.
+    /// Un aula inexistente **sola** no es un conflicto (P4 solo detecta colisiones, no valida
+    /// el catálogo).
     void aulaInexistenteRepetidaEnLaFranja_noPresentable()
     {
         const SolverConfig config = configConMateriaDesplazada();

@@ -54,3 +54,21 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 - En `ConstructorEntradaSolver.cpp` (`src/backend/src/services/`, **fuera** del directorio `src/backend/src/solver/`) sigue existiendo `duracionMinutos * 60` en `slotsDeFranja`, pero es la traducción de una franja de **reloj** a índices de slot (rejilla horaria/disponibilidad), no la conversión de horas académicas a bloques; queda fuera del alcance de T11 y es correcta según la definición de `duracion_minutos` («duración real de la franja»).
 - La identidad del tope S1 (`bloquesAula = horas_aula`) no es observable de forma aislada de D3 (comparten la misma fórmula de conversión), por lo que se cubre explícitamente en `test_contrato_solver.cpp` (`bloquesAula_esIdentidad`) y de forma end-to-end en el test D3 del solver.
 - El «Cierre» de la tarea (actualizar `MEMORY.md` y el campo Estado de `spec.md` a **implementada**) **no** se ejecuta en esta pasada por instrucción explícita del coordinador (no modificar `spec.md`/`plan.md`/`estado.md`); queda pendiente para una pasada posterior.
+
+## Residuales de la validación: avisos P1/P3, metadata y estado del solver (2026-10-29)
+
+**Base:** `57725b6`. Deudas de `estado.md` («Residuales») y de la decisión I2 de la 005.
+
+### F1 - Retirada de los avisos P1 y P3
+
+- `ValidadorSalidaSolver.cpp`: se elimina la generación del aviso de horas no cubiertas (P1) y la de
+  capacidad de aula (P3), con sus conteos y los ayudantes que solo ellas usaban
+  (`indiceCurso`, `horasEsperadas`). Se conserva **P2** (exceso de horas de profesor) y **P4**
+  (solapamientos, no presentable).
+- Cabecera: solo P2 genera avisos; P4 no es presentable; se anota que I2 retiró P1/P3.
+- Tests: `horasNoCubiertas_noGeneraAviso`, `excesoDeCapacidadDeAula_noGeneraAviso` y
+  `aulaFijaConClasesEnAulasDistintas_esPresentableSinAvisos` (antes contaban avisos; el `grep`
+  previsto no los detectó porque los nombres no contenían las cadenas literales). P2 y P4 siguen
+  cubiertos y en verde. Suite **54/54**.
+- **Docs pendientes (no editadas):** `docs/interfaz-frontend.md:607` («avisos P1–P3 y conflictos
+  P4») y `:667-669` (descripción de P1/P2/P3 en la tabla de `ValidadorSalidaSolver`).

@@ -6,14 +6,14 @@
  *
  * Aplica las validaciones del contrato sobre el horario devuelto por el proceso
  * de cálculo:
- *  - P1: todas las horas semanales de cada curso están cubiertas.
- *  - P2: ningún profesor excede sus horas requeridas.
- *  - P3: ninguna aula se usa por encima de su capacidad.
+ *  - P2: ningún profesor excede sus horas requeridas (aviso).
  *  - P4: sin conflictos de solapamiento (profesor, aula o curso).
  *
- * P1–P3 generan avisos; P4 hace que el resultado no sea presentable. Es una
- * función pura (sin E/S) que el frontend consume para pintar el horario y sus
- * avisos.
+ * P2 genera avisos; P4 hace que el resultado no sea presentable. Es una función pura
+ * (sin E/S) que el frontend consume para pintar el horario y sus avisos.
+ *
+ * La 005 (decisión I2) retiró los avisos de horas no cubiertas (P1) y de capacidad
+ * de aula (P3): no se generan.
  */
 
 #include <QStringList>
@@ -25,7 +25,7 @@
 struct AnalisisSalida
 {
     QStringList conflictos;  ///< P4: solapamientos encontrados (no vacío ⇒ no presentable).
-    QStringList avisos;      ///< P1–P3: horas no cubiertas, exceso de horas/capacidad.
+    QStringList avisos;      ///< P2: exceso de horas requeridas por el docente.
 
     /// Un resultado con conflictos de solapamiento nunca es presentable.
     bool presentable() const { return conflictos.isEmpty(); }
