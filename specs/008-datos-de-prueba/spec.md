@@ -148,6 +148,8 @@ persistido, no la configuración de cálculo.
   del conjunto.
 - **Reemplazo de docentes:** borrado **solo** de los docentes, sus materias asignadas y su
   disponibilidad, y carga de otra variante; el resto de los datos no se toca.
+  > **Superado en lo que toca a las preferencias por la 012 (2026-10-29).** La conmutación borra
+  > también `Preferencia_Profesor` antes que los docentes; el resto de la definición sigue vigente.
 - **Base vacía:** base con el esquema esperado y **ningún** registro de dominio.
 - **Datos ficticios:** nombres, correos y contactos inventados; ninguna persona real (constitución §5).
 
@@ -401,6 +403,9 @@ persistido, no la configuración de cálculo.
   completa**, sin estados intermedios.
 - **CUANDO se aplique dos veces la misma variante, EL SISTEMA dejará el mismo estado final**, sin
   duplicar docentes, materias asignadas ni disponibilidades.
+
+> **Superado en lo que toca a las preferencias por la 012 (2026-10-29).** La conmutación de variante
+> borra también `Preferencia_Profesor` antes que los docentes; la 008 conserva el resto de su RF-9.
 
 ### RF-10. Aplicación inicial, reemplazo y protección de la base
 

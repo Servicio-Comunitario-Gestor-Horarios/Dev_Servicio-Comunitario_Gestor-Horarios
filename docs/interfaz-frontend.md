@@ -103,7 +103,7 @@ nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. 
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 4;   // v4: configuración global de la hora académica
+constexpr int VERSION_ESQUEMA_ACTUAL = 5;   // v5: preferencias horarias del docente
 enum class EstadoApertura { Crear, Abrir, FalloEsquema };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
@@ -115,10 +115,11 @@ bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // catálogo 
 
 `decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `crearEsquema`
 aplica el catálogo completo (`Migracion::aplicarPaso`) y fija `user_version` en una sola transacción;
-si algo falla, revierte. La versión **4** añade la configuración global de la hora académica
-(`ConfiguracionHoraria`, una fila con `duracion_minutos` entre 30 y 90) al catálogo `TiposAula` (con
-su `clave` normalizada) y `Eventos` (identidad y orden) de la v3; el catálogo esperado incluye las
-tablas y sus columnas. Una base con la versión anterior (3) **no se migra**: se rechaza al abrir.
+si algo falla, revierte. La versión **5** añade las preferencias (`Preferencia_Profesor`) al catálogo
+de la **v4**. La **v4** añadió la configuración global de la hora académica (`ConfiguracionHoraria`, una
+fila con `duracion_minutos` entre 30 y 90) al catálogo `TiposAula` (con su `clave` normalizada) y
+`Eventos` (identidad y orden) de la **v3**; el catálogo esperado incluye las tablas y sus columnas. Una
+base con la versión anterior (**4**) **no se migra**: se rechaza al abrir.
 
 > **Guardia anti-regresión.** `test/backend/test_version_esquema.cpp` congela la **huella SHA-256**
 > del catálogo real (`HUELLAS_CONOCIDAS`, por versión). Si se cambia el DDL hay que **subir
@@ -168,8 +169,9 @@ Para «Crear base de datos nueva» (RF-4, RF-6), llamar a `descartarBaseYCrearNu
 ### 2.4 `NucleoDatos` — fachada de dominios (implementado)
 
 `src/backend/include/backend/services/NucleoDatos.hpp`. Fachada única sobre la conexión y los
-servicios de dominio; el frontend la consume **en proceso** (ya no por IPC) para docentes, aulas,
-materias, tipos de aula, cursos, planes de estudio y turnos con sus eventos. El `NucleoDatos` **no es
+servicios de dominio; el frontend la consume **en proceso** (ya no por IPC) para docentes,
+preferencias horarias, aulas, materias, tipos de aula, cursos, planes de estudio y turnos con sus
+eventos. El `NucleoDatos` **no es
 dueño** de la conexión ni se instancia en la interfaz: lo construye el `ContextoBaseDatos` del módulo
 `datos` (ver 2.7), que también se lo inyecta a la ventana principal. El frontend recibe un
 `NucleoDatos*` ya construido y operativo.
@@ -186,6 +188,16 @@ public:
     Resultado<ProfesorDTO> actualizarDocente(const QString& id, const QString& nombre,
                                              const QString& email, const QString& telefono = QString());
     bool                   eliminarDocente(const QString& id);
+
+    // Preferencias horarias (dato distinto de la disponibilidad)
+    Resultado<PreferenciaDTO> agregarPreferencia(const QString& idProfesor,
+                                                 const FranjaHoraria& franja,
+                                                 SentidoPreferencia sentido);
+    Resultado<QVector<PreferenciaDTO>> listarPreferencias(const QString& idProfesor) const;
+    Resultado<PreferenciaDTO> actualizarPreferencia(int id, const FranjaHoraria& franja,
+                                                    SentidoPreferencia sentido);
+    Resultado<bool> eliminarPreferencia(int id);
+    Resultado<int>  limpiarPreferencias(const QString& idProfesor);
 
     // Aulas (el tipo es obligatorio y debe existir en el catálogo)
     Resultado<QVector<AulaDTO>> listarAulas() const;
@@ -267,7 +279,7 @@ public:
 
 | DTO | Campos |
 |---|---|
-| `ProfesorDTO` | `id`, `nombre`, `email`, `telefono`, `QVector<DisponibilidadDTO> disponibilidad`, `QVector<MateriaAsignadaDTO> materias` |
+| `ProfesorDTO` | `id`, `nombre`, `email`, `telefono`, `QVector<DisponibilidadDTO> disponibilidad`, `QVector<PreferenciaDTO> preferencias`, `QVector<MateriaAsignadaDTO> materias` |
 | `AulaDTO` | `id`, `nombre`, `capacidad`, `edificio`, `piso`, `idTipoAula`, `tipoAula` (nombre del tipo, solo lectura) |
 | `MateriaDTO` | `id`, `nombre`, `requisitos`, `idTipoAula`, `tipoAula` (solo lectura) |
 | `TipoAulaDTO` | `id`, `nombre` |
@@ -276,6 +288,7 @@ public:
 | `CursoDTO` | `id`, `anio`, `seccion`, `turno`, `aula` (`-1` si no tiene) |
 | `TurnoDTO` | `nombre`, `inicio`, `fin`, `numSlots`, `QVector<EventoDTO> eventos` (ordenados por posición, orden e id) |
 | `EventoDTO` | `id` (`-1` al crear), `nombre`, `despuesDeSlot`, `orden`, `duracion` (minutos), `inicio`, `fin` (inválidas = ausentes) |
+| `PreferenciaDTO` | `id`, `idProfesor`, `franja` (día 0–6, `inicio`, `fin`), `sentido` (`preferida`/`evitada`) |
 
 **Contrato de las operaciones:**
 - Los `listar*` devuelven `Resultado<QVector<Dto>>`: distinguen **error de lectura** (`!ok`, con
@@ -304,7 +317,7 @@ depende de qué. `NucleoDatos::dependientesDe`/`eliminarConCascada` usan **estas
 |---|---|---|
 | `plan` | `PlanEstudio` (`codigo`) | materias del plan |
 | `materia` | `Materias` (`id`) | vínculos plan-materia y profesor-materia |
-| `profesor` | `Profesores` (`id`) | profesor-materia y disponibilidad |
+| `profesor` | `Profesores` (`id`) | profesor-materia, disponibilidad y **preferencias** |
 | `aula` | `Aulas` (`id`) | **anula** la referencia de los cursos con esa aula (no los borra) |
 | `curso` | `Cursos` (`id`) | (ninguno) |
 | `turno` | `Turnos` (`nombre`) | **borra** los eventos del turno y **anula** la referencia de los cursos del turno |
@@ -396,6 +409,38 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
   `porDefecto`/origen; editar con `guardarConfiguracionHoraria()` y, ante `!ok`, mostrar
   `mensajeError` sin dar el cambio por hecho. La aritmética en minutos de las vistas es deuda de su
   equipo (ver §6).
+
+#### 2.4.5 Preferencias horarias (`ServicioPreferencias`)
+
+`src/backend/include/backend/services/ServicioPreferencias.hpp`. Registra cuándo **prefiere** o
+**evita** dar clase un docente. Es un dato **distinto** de la disponibilidad (que es factibilidad) y
+**no** interviene todavía en la generación.
+
+- **Modelo.** `PreferenciaDTO{int id; QString idProfesor; FranjaHoraria franja; SentidoPreferencia
+  sentido;}`: docente, día, hora de inicio, hora de fin y sentido (`preferida`/`evitada`), con
+  **identidad propia** (`id`). El docente no cambia al actualizar: para mover una preferencia de
+  docente se borra y se crea.
+- **Día.** Entero **0–6** (0 = domingo … 6 = sábado), el mismo rango que la disponibilidad. Sábado y
+  domingo se guardan y se exponen, pero **no intervienen en la generación actual** (lunes–viernes).
+- **Validación.** Docente existente; día 0–6; horas válidas con inicio anterior al fin; sentido válido;
+  **sin solapes de sentidos opuestos** en el mismo docente y día; **sin duplicado exacto** (docente,
+  día, rango y sentido). Los solapes y rangos contiguos del **mismo sentido** se aceptan y no se
+  fusionan. Cambiar el sentido o el día se revalida contra los opuestos; si contradice, se rechaza y se
+  conserva el valor anterior.
+- **Orden.** `listar()` devuelve por día, hora de inicio, hora de fin e `id`.
+- **Operaciones.** `agregar`, `listar`, `actualizar`, `eliminar` y `limpiar`; todas devuelven
+  `Resultado<T>` (`eliminar`, `Resultado<bool>`; `limpiar`, `Resultado<int>`), con mensajes en español
+  que identifican campo, valor, causa y **acción**. `limpiar` no toca la disponibilidad.
+- **Baja y cascada.** `eliminarDocente` y `eliminarConCascada` borran preferencias y disponibilidad en
+  una transacción; `dependientesDe("profesor", id)` las muestra antes de confirmar.
+- **Sin efecto en la generación.** La huella de datos **no** las incluye mientras el solver no las
+  consuma; `ProfesorDTO::toProfesor()` las ignora. Cambiar preferencias no marca «datos anteriores».
+  **Condición futura:** cuando una spec del solver las use, deberán entrar en `DatosDominio` y en
+  `huellaDatos`.
+- **Cómo lo trata el frontend:** cargar `ProfesorDTO.preferencias` desde `listarDocentes`, usar las
+  cinco operaciones de `NucleoDatos`, separar preferencias de disponibilidad y mostrar el día con su
+  nombre. Los cambios de firma son **aditivos**: el DTO gana el campo y `NucleoDatos` gana
+  métodos; no rompen la compilación.
 
 ### 2.5 Estado por registro y cambios pendientes (implementado)
 
@@ -717,6 +762,7 @@ Release de OR-Tools).
 | `ContextoBaseDatos` (`src/datos`) | El arranque lo crea y entrega `NucleoDatos*` a la ventana (`setNucleoDatos`) | RF-1, RF-2 |
 | `NucleoDatos::dependientesDe` / `eliminarConCascada` | Confirmación de cascada | RF-2 |
 | `EventoDTO` / CRUD de eventos | Alta, edición y baja por identidad; eventos por posición y orden | RF-1, RF-2 |
+| `PreferenciaDTO` / CRUD de preferencias | Alta, consulta, edición y baja por identidad; día 0–6 y sentido; separadas de la disponibilidad; la cascada del docente las lista | RF-1, RF-2 (012) |
 | `TipoAulaDTO` / CRUD del catálogo | Desplegable obligatorio en aulas y materias; gestión del catálogo | RF-5 |
 | `ConfiguracionHoraria` / `ServicioConfiguracionHoraria` | Valor efectivo y origen; editar 30–90 (inválida no cambia el valor) | RF-1, RF-2 |
 | `duracion_horaria::errorDeRango` / `errorDeEncaje` | Mensajes del rango y del encaje del turno (turno, D, déficit) | RF-1, RF-4 |

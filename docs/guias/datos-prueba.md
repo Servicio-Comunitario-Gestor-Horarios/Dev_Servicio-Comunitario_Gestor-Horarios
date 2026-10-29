@@ -21,6 +21,7 @@
 | Planes de estudio (General + 3 áreas de desarrollo) | 4 |
 | Cargas plan-materia | 210 |
 | Cursos (3 secciones en 1.º–3.º, 2 en 4.º–5.º; **sin turno**) | 13 |
+| Preferencias (no se siembran) | 0 |
 
 - **Escala de carga:** cada año de cada plan suma **40 horas académicas** (la hora del 31059 es una
   **hora académica = un bloque**; la escala 44/44/46/46/46 del plan oficial se reduce al techo semanal
@@ -81,8 +82,10 @@ gestor-horarios-seed --db <ruta> [--variante <v>] [--reemplazar | --solo-docente
 ```
 Base: /tmp/centro.db
 Variante: holgada
+Hora académica: 35 min (configuraciones: 1)
 Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
 Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
+Preferencias: 0
 Materias por año: GEN 9/9/10/11/12 · EXA 9/9/10/12/13 · NAT 9/9/10/12/13 · SOC 9/9/10/12/13
 GEN  General            40/40/40/40/40 h académicas
 EXA  Ciencias Exactas   40/40/40/40/40 h académicas

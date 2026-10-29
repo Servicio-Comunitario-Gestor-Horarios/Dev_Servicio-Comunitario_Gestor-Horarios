@@ -395,8 +395,8 @@ Resultado<int>  limpiarPreferencias(const QString& idProfesor);
 
 - Tabla §1: fila `Preferencias (no se siembran) | 0`.
 - **Ejemplo de salida (`:82-93`):** añadir `Hora académica: 35 min (configuraciones: 1)` tras
-  `Variante:` (deuda de la 011 que el ejemplo arrastraba) y `Preferencias: 0` en la línea de
-  `Cursos…`; el resto del ejemplo no cambia.
+  `Variante:` (deuda de la 011 que el ejemplo arrastraba) y `Preferencias: 0` en **línea propia**,
+  después de la línea de `Cursos…` (así lo imprime `resumenTexto`); el resto del ejemplo no cambia.
 
 ### 8.2 Supersesión de la 008 (la anota el planner al cerrar)
 
