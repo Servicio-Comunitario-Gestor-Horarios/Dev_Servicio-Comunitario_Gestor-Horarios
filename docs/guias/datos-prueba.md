@@ -13,8 +13,8 @@
 
 | Entidad | Cantidad |
 |---|---|
-| Turnos (Mañana 07:00–12:30 · Tarde 12:40–18:10, 8 franjas de 40 min) | 2 |
-| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:20–08:30 y 14:00–14:10) | 2 |
+| Turnos (Mañana 07:00–11:50 · Tarde 12:40–17:30, 8 franjas de 35 min) | 2 |
+| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:10–08:20 y 13:50–14:00) | 2 |
 | Tipos de aula (`Aula de estudio`, `Laboratorio`, `Taller`) | 3 |
 | Aulas (13 para cursos + reserva + laboratorio + taller) | 16 |
 | Materias-año del catálogo (51 del 31059 + 6 nuevas de los derivados) | 57 |
@@ -148,9 +148,11 @@ variante inexistente sale con código **6** y **no toca ningún dato**.
   del preset `backend`. La generabilidad se recuperará con los **datos reales del liceo** (decisión del
   usuario), no con este conjunto ficticio.
 - **La duración de la franja no cambia la carga:** 1 hora académica = 1 bloque, y cada año suma 40
-  horas académicas (= 40 bloques). Los **40 minutos** son la duración **real** de la franja (rejilla
-  horaria, eventos y disponibilidad), no un factor de conversión. El evento «Receso» de 10 minutos
-  tras la 2.ª franja se descuenta en la fórmula `(ventana − Σ eventos) / franjas`.
+  horas académicas (= 40 bloques). Los **35 minutos** son la duración **real** de la franja (rejilla
+  horaria, eventos y disponibilidad), no un factor de conversión; 40 h × 35 = **1400 min** (23 h 20).
+  El evento «Receso» de 10 minutos tras la 2.ª franja encaja por la invariante
+  `8 × 35 + 10 = 290` min = ventana del turno. La siembra asegura la configuración global en 35 (una
+  fila, no es dato de dominio).
 - **Semana de referencia:** 5 días (lunes a viernes); es una propiedad de la configuración que acompaña
   al conjunto y **no se persiste**.
 - **Determinismo:** aplicar el mismo perfil dos veces sobre bases vacías deja los mismos datos

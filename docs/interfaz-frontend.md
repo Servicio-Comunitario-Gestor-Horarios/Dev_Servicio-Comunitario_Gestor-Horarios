@@ -103,7 +103,7 @@ nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. 
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 3;   // esquema único (sin migración por versión)
+constexpr int VERSION_ESQUEMA_ACTUAL = 4;   // v4: configuración global de la hora académica
 enum class EstadoApertura { Crear, Abrir, FalloEsquema };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
@@ -115,9 +115,10 @@ bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // catálogo 
 
 `decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `crearEsquema`
 aplica el catálogo completo (`Migracion::aplicarPaso`) y fija `user_version` en una sola transacción;
-si algo falla, revierte. La versión **3** incorpora el catálogo `TiposAula` (con su `clave`
-normalizada) y `Eventos` (identidad y orden); el catálogo esperado incluye ambas tablas y sus
-columnas. Una base con la versión anterior (2) **no se migra**: se rechaza al abrir.
+si algo falla, revierte. La versión **4** añade la configuración global de la hora académica
+(`ConfiguracionHoraria`, una fila con `duracion_minutos` entre 30 y 90) al catálogo `TiposAula` (con
+su `clave` normalizada) y `Eventos` (identidad y orden) de la v3; el catálogo esperado incluye las
+tablas y sus columnas. Una base con la versión anterior (3) **no se migra**: se rechaza al abrir.
 
 > **Guardia anti-regresión.** `test/backend/test_version_esquema.cpp` congela la **huella SHA-256**
 > del catálogo real (`HUELLAS_CONOCIDAS`, por versión). Si se cambia el DDL hay que **subir
@@ -339,12 +340,13 @@ ocurre dentro de un turno (un descanso, un acto, una pausa…): tiene `id` propi
 - **Horas.** `inicio`/`fin` son un par opcional: ambas o ninguna, `fin > inicio` y la diferencia en
   minutos debe coincidir con `duracion`. Si el evento tiene horas, su intervalo debe caber en la
   **ventana de su posición**; además no puede solaparse con otro evento del turno.
-- **Duración de la franja.** La rejilla se estima con la **suma de los eventos**:
-  `duracionFranja = (minutos de la ventana del turno − Σ duracion de los eventos) / numSlots`.
-  La ventana de la posición *k* va del fin de la franja *k* al inicio de la *k+1*; la última llega al
-  fin del turno. Si `numSlots <= 0`, la ventana no es positiva o el reparto no llega a un minuto,
-  `duracionFranjaEstimada` devuelve `0` y el servicio **rechaza** el encaje del evento
-  (`calculo_eventos.hpp`, funciones puras).
+- **Duración de la franja y encaje.** La franja de clase dura **D**, la hora académica de la
+  configuración global (35 por defecto; rango 30–90, §2.4.4); la rejilla **no reparte** la ventana del
+  turno. La ventana de la posición *k* va del fin de la franja *k* al inicio de la *k+1*, con ancho D,
+  y la última llega al fin del turno. Un turno encaja si
+  `numSlots × D + Σ duracion de los eventos ≤ ventana`; si no, el servicio rechaza el alta o la
+  actualización con el turno, D y el déficit, y el mensaje es el de `errorDeEncaje(turno, D)`
+  (`calculo_eventos.hpp`, funciones puras; el sobrante de la ventana queda sin usar al final).
 - **Reducción de franjas.** Si `actualizarTurno` reduce `numSlots` y hay eventos que quedarían fuera
   de rango, sin `eliminarEventosFueraDeRango` devuelve el error con los afectados
   (`eventosFueraDeRango(turno, numSlots)` permite listarlos antes); con `true` los borra en la misma
@@ -372,6 +374,28 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
 - **Cómo lo trata el frontend:** cargar el catálogo con `listarTiposAula()` en los formularios de
   aula y materia (desplegable obligatorio), ofrecer «gestionar tipos» con el CRUD y, antes de
   eliminar, mostrar `mensajeError` con los dependientes (no se confirma).
+
+#### 2.4.4 Duración de la hora académica (`ServicioConfiguracionHoraria`)
+
+`src/backend/include/backend/services/ServicioConfiguracionHoraria.hpp`. Configuración **global y
+única** por base: una sola fila (`id = 1`); no hay valores por turno, curso, docente ni generación.
+
+- **DTO.** `ConfiguracionHoraria{int duracionMinutos; bool porDefecto;}`: el valor efectivo y si
+  proviene del defecto (35) porque no hay fila.
+- **Consulta.** `consultar()` devuelve el valor efectivo; sin fila devuelve `{35, porDefecto = true}`
+  y **no** es error. Solo falla si la lectura de la base falla.
+- **Edición.** `guardar(int)` valida el rango 30–90 con `duracion_horaria::errorDeRango` (punto único,
+  el mismo que V2 del contrato) y hace *upsert* de la fila. Una duración inválida devuelve el mensaje
+  (campo, valor, rango y acción) y **no cambia** el valor anterior.
+- **Fachada.** `NucleoDatos::configuracionHoraria()` y `guardarConfiguracionHoraria(int)` son la vía
+  del frontend.
+- **Punto único horas → minutos.** `duracion_horaria::minutosDeHorasAcademicas(horas, D)` es la única
+  conversión de horas académicas a minutos (40 h × 35 = 1400 min). El tope de **40 horas académicas**
+  semanales por año no cambia.
+- **Cómo lo trata el frontend:** pedir el valor con `configuracionHoraria()` y mostrar
+  `porDefecto`/origen; editar con `guardarConfiguracionHoraria()` y, ante `!ok`, mostrar
+  `mensajeError` sin dar el cambio por hecho. La aritmética en minutos de las vistas es deuda de su
+  equipo (ver §6).
 
 ### 2.5 Estado por registro y cambios pendientes (implementado)
 
@@ -655,8 +679,11 @@ informativo.
 
 Al cargar la base por primera vez, la vista **deriva de los turnos** el nº de slots por día (suma de
 los slots de todos los turnos) y la **duración del bloque** (franja del turno menos la **suma de las
-duraciones de sus eventos**, sobre sus slots; 40 min en los datos de prueba del centro), ambos
-editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). La columna **Turno** de cada curso
+duraciones de sus eventos**, sobre sus slots; 35 min en los datos de prueba del centro), ambos
+editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). El campo `duracion_minutos` del
+preset es **derivado**: `construirJsonEntrada` lo sobrescribe siempre con el de la configuración
+global y su valor nunca se usa; un cambio de configuración desde que se guardó el preset no es error
+ni aviso. La columna **Turno** de cada curso
 es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún sin asignar
 (los del centro se siembran sin turno; el solver exige uno, V7).
 
@@ -691,6 +718,9 @@ Release de OR-Tools).
 | `NucleoDatos::dependientesDe` / `eliminarConCascada` | Confirmación de cascada | RF-2 |
 | `EventoDTO` / CRUD de eventos | Alta, edición y baja por identidad; eventos por posición y orden | RF-1, RF-2 |
 | `TipoAulaDTO` / CRUD del catálogo | Desplegable obligatorio en aulas y materias; gestión del catálogo | RF-5 |
+| `ConfiguracionHoraria` / `ServicioConfiguracionHoraria` | Valor efectivo y origen; editar 30–90 (inválida no cambia el valor) | RF-1, RF-2 |
+| `duracion_horaria::errorDeRango` / `errorDeEncaje` | Mensajes del rango y del encaje del turno (turno, D, déficit) | RF-1, RF-4 |
+| `construirJsonEntrada(datos, preset, D, ahora)` | Pasar la D efectiva; el preset nunca manda la duración | RF-5 |
 | `estadoPendienteDe` / `GestorPendientes` | Marca por fila + «Reintentar»; aviso al cerrar | RF-3, RF-6, RNF-3/4 |
 | `InstanciaUnica` | Enfocar la instancia existente; salir si no hay acuse | RF-5 |
 | `ServicioGeneracion` | Vista de generación (estados, «Generar», «datos anteriores») | RF-1, RF-3 |
@@ -728,9 +758,10 @@ volver a compilar con `BUILD_FRONTEND=ON`:
 4. **`schedule_generation_widget.cpp`: aritmética en minutos reales y DTO/método antiguos.** La vista
    calculaba la duración del bloque en minutos reales (`inicio.secsTo(fin)/60`) restando la suma de
    los descansos y recorría los campos del DTO retirado; debe incluir
-   `backend/services/ServicioTurnosEventos.hpp`, recorrer `turno.eventos` y usar la suma de `duracion`
-   (o directamente `duracionFranjaEstimada(turno)`). La spec 011 cambiará esta fórmula; el frontend
-   debe consumir la función, no replicarla.
+   `backend/services/ServicioTurnosEventos.hpp`, recorrer `turno.eventos` y usar la suma de `duracion`.
+   La 011 retiró el reparto de la ventana: la D efectiva sale de `NucleoDatos::configuracionHoraria()`
+   y el encaje se comprueba con `errorDeEncaje(turno, D)`; el frontend debe consumir esas funciones,
+   no replicar la fórmula.
 5. **Tests de frontend.** `test_frontend_conversion` y `test_generacion_seed` no se configuran con
    `BUILD_FRONTEND=OFF`; siguen siendo deuda del equipo de frontend y el segundo fija además el
    valor 40 de la spec 008, que la 011 revisará.
@@ -739,3 +770,26 @@ volver a compilar con `BUILD_FRONTEND=ON`:
 tipos, y la verificación de la entrega es la suite del preset `backend`
 (`ctest --preset backend`), sin los tests de frontend. El contrato 1.0 del solver sigue derivando su
 sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo por el contrato 2.0.
+
+---
+
+## 6. Deuda del frontend y alcance (spec 011)
+
+La 011 cambia `src/backend` y `src/seed`; `src/frontend` **no se toca** y **no compila** contra las
+firmas nuevas. El equipo de interfaz debe migrar:
+
+1. **`construirJsonEntrada` exige D.** La firma es `construirJsonEntrada(datos, preset,
+   duracionMinutos, ahora)` (y la fachada `ConstructorEntradaSolver::construir`). El builder debe leer
+   la D efectiva con `NucleoDatos::configuracionHoraria()` y pasarla; el campo `duracion_minutos` del
+   preset es derivado y la construcción lo sobrescribe siempre.
+2. **`huellaDatos(datos, duracionMinutos)` incluye D.** El callback `huellaActual` de
+   `ServicioGeneracion` debe construir la huella con la D efectiva. **Hoy la vista pasa `{}`**
+   (`schedule_generation_widget.cpp`), así que «datos anteriores» no se marca aunque D cambie: sin ese
+   cableado, el mecanismo del backend no se ve en la interfaz.
+3. **Selector de duración.** El selector de duración del editor de presets y de la vista de generación
+   **deja de ofrecerse**: la duración es global y se edita con `guardarConfiguracionHoraria()`.
+4. **Aritmética en minutos.** `schedule_generation_widget.cpp` sigue derivando la duración del turno y
+   `horasAula` sigue en minutos: deuda del equipo de frontend; la conversión de presentación es
+   `duracion_horaria::minutosDeHorasAcademicas`.
+5. **Tests de frontend.** `test/frontend/test_generacion_seed.cpp` fija `duracion_minutos == 40` y
+   queda fuera del preset `backend`; se reescribe al migrar el builder con D.

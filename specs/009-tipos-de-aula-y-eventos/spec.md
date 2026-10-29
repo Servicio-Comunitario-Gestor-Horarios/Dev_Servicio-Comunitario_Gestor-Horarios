@@ -140,6 +140,8 @@ datos de prueba por los reales.
   franjas de clase en la línea de tiempo que usan las ventanas de posición. Como no se admiten
   solapes, la suma coincide con la unión de los intervalos. Es una estimación de presentación y **no**
   altera la rejilla aritmética que usa el solver (spec 005).
+  > **Superada por la 011 (2026-10-29).** La franja de clase dura la hora académica (D, 35 por
+  > defecto, rango 30–90); la ventana del turno no se reparte y el sobrante no se usa.
 - **Receso:** evento cuya finalidad es la pausa entre clases; un caso particular de evento. El solver
   lo ignora (spec 010).
 - **Tipo de evento:** **no existe como dato**. El sistema no clasifica los eventos en un enumerado ni
@@ -228,6 +230,8 @@ datos de prueba por los reales.
   las duraciones de todos sus eventos y dividiendo entre el número de franjas**, sin admitir solapes
   internos: la suma coincide con la unión de intervalos y es la cifra que documenta RF-11. La
   estimación es de presentación y no altera la rejilla aritmética del solver (spec 005).
+  > **Superada por la 011 (2026-10-29).** La franja de clase dura la hora académica (D, 35 por
+  > defecto, rango 30–90); la ventana del turno no se reparte y el sobrante no se usa.
 
 ### RF-4. Actualización de turnos con eventos dependientes
 
@@ -368,6 +372,8 @@ datos de prueba por los reales.
 - **La documentación indicará la fórmula de estimación de la duración del bloque** a partir de la
   ventana del turno y de la **suma de las duraciones** de todos sus eventos, tal como la fija RF-3;
   con solo recesos sembrados, el resultado coincide con el actual.
+  > **Superada en la fórmula por la 011 (2026-10-29).** La guía documenta D y el encaje
+  > `slots × D + Σ eventos ≤ ventana`, no el reparto de la ventana.
 - **La documentación enumerará los cambios de firma que rompen la compilación del frontend**, para que
   su equipo los adapte, y advertirá de que la interfaz de usuario está fuera del alcance de esta
   entrega.

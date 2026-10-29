@@ -82,21 +82,25 @@ Los cuatro primeros deben **coincidir con el tamaño** de las listas correspondi
 ### 2.2 `franja_horaria`
 
 ```json
-"franja_horaria": { "duracion_minutos": 40, "slots_por_turno": 8 }
+"franja_horaria": { "duracion_minutos": 35, "slots_por_turno": 8 }
 ```
 
-`duracion_minutos` debe ser **> 0** (**V2**). Con la hora académica actual, un bloque es una hora
-académica: `duracion_minutos` describe la **duración real** de la franja (rejilla, evento y
-disponibilidad) y **no** convierte horas a bloques. `slots_por_turno` no interviene en la validación
-ni en el modelo: la rejilla efectiva de cada turno es su lista `slot`.
+`duracion_minutos` debe ser un entero **entre 30 y 90** (**V2**, mismo punto único que la
+configuración global: `duracion_horaria::errorDeRango`). Un bloque es una hora académica:
+`duracion_minutos` describe la **duración real** de la franja (rejilla, evento y disponibilidad) y
+**no** convierte horas a bloques. En la construcción de la entrada, el valor **lo manda la
+configuración global**: `construirJsonEntrada` sobrescribe siempre el del preset (campo derivado) y
+un preset con 0, 5 o 45 no bloquea. Un contrato que llega sin pasar por la construcción se valida
+igual: 30–90. `slots_por_turno` no interviene en la validación ni en el modelo: la rejilla efectiva
+de cada turno es su lista `slot`. Ver la spec 011.
 
 ### 2.3 `turnos`
 
 ```json
 "turnos": {
   "turnos": [
-    { "nombre": "Mañana", "slot": [0,1,2,3,4,5,6,7], "inicio": "07:00", "fin": "12:30" },
-    { "nombre": "Tarde",  "slot": [8,9,10,11,12,13,14,15], "inicio": "12:40", "fin": "18:10" }
+    { "nombre": "Mañana", "slot": [0,1,2,3,4,5,6,7], "inicio": "07:00", "fin": "11:50" },
+    { "nombre": "Tarde",  "slot": [8,9,10,11,12,13,14,15], "inicio": "12:40", "fin": "17:30" }
   ]
 }
 ```
@@ -108,6 +112,11 @@ ni en el modelo: la rejilla efectiva de cada turno es su lista `slot`.
   y acota la posición de un evento (**V2**) y las franjas útiles de **V14**.
 - `inicio`/`fin` (`HH:mm`) son la **ventana real del turno**. Solo hacen falta para validar eventos
   con horario (**V2**): sin ventana válida, cualquier evento con `inicio`/`fin` se rechaza.
+- **Encaje con la hora académica.** Un turno debe cumplir
+  `nº franjas × D + Σ duracion de sus eventos ≤ ventana`; si no, **V2** lo rechaza con el turno, D y
+  el déficit. El sobrante de la ventana no se reparte: queda sin usar al final. Con D = 35 y 8
+  franjas, la rejilla de clases es de 280 min y el `fin` de 11:50/17:30 añade los 10 min del evento
+  «Receso».
 
 ### 2.4 `planes`
 
@@ -220,7 +229,7 @@ replanifica. Sustituyen a la antigua sección `recesos` del contrato 1.0.
 ```json
 "eventos": [
   { "nombre": "Receso", "turno": "Mañana", "despues_de_slot": 2,
-    "orden": 1, "duracion": 30, "inicio": "08:30", "fin": "09:00" }
+    "orden": 1, "duracion": 10, "inicio": "08:10", "fin": "08:20" }
 ]
 ```
 

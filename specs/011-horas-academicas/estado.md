@@ -1,11 +1,11 @@
 # Estado 011
 
-Fase: plan aprobado; implementación pendiente (arranca el 2026-10-28)
-Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27
-Base: 8e0602c (HEAD de `feat/Base-datos`, árbol limpio, suite 50/50). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
+Fase: implementación completa; pendiente de validación RF por RF
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27 · implementación 2026-10-29
+Base: 8e0602c (base de la implementación; HEAD de `feat/Base-datos`: `c62653c`, suite 52/52). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
 Dudas abiertas: ninguna
-Siguiente paso: implementar **T1 → T10** en orden, una tarea por vez, con su verificación (`plan.md` §9) y su commit; al terminar, validación RF por RF contra `Base: 8e0602c`. **T4 es aditivo** y el borrado del legado es **T9**: ninguna tarea puede cerrar con el árbol sin compilar. La documentación de **T10 la aplica el coordinator**.
-Veredicto: pendiente (implementación). El QA del plan quedó resuelto: B1 y M1–M10 aplicados el 2026-10-27; la spec estaba aprobada desde el 2026-10-23.
+Siguiente paso: validación RF por RF contra `Base: 8e0602c` por el reviewer; tras `VEREDICTO: APROBADO`, marcar la spec `implementada` y cerrar.
+Veredicto: pendiente (validación de la implementación).
 QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); QA del plan: dos rondas de CAMBIOS NECESARIOS (B1, M1–M10) cerradas el 2026-10-27; plan y tareas aprobados el 2026-10-27.
 
 ## Decisión nueva del usuario (2026-10-23)
@@ -115,6 +115,34 @@ del evento). **Plan y tareas aprobados el 2026-10-27.** Correcciones aplicadas s
 - **M5:** la comprobación de aridad ya no se hace con `grep`: el build es la prueba (sin sobrecargas, una
   llamada vieja no compila) y el `grep` se revisa a mano; `ctest -R test_calculo_eventos` verifica el
   resultado.
+
+## Implementación (2026-10-29)
+
+Ejecutada sobre `Base: 8e0602c`. El orden real de commits fue T1→T4, **T8**, T5→T7, T9, T10; T8 se
+adelantó porque T5 dejaba `test_seed_aplicacion` en rojo hasta que el perfil pasara a 35 (el servicio
+empezaba a validar el encaje con D = 35 sobre turnos aún dimensionados para 40). La regla «ninguna
+tarea cierra con el árbol sin compilar» exigió ejecutarla antes.
+
+| Tarea | Commit | Qué dejó |
+|---|---|---|
+| T1 | `fc86368` | Punto único `duracion_horaria`: rango 30–90 (con acción), horas académicas → minutos, franjas utilizables y déficit. |
+| T2 | `11077f8` | Esquema **v4**: `ConfiguracionHoraria` (una fila, 35 por defecto), catálogo esperado y huella v4. |
+| T3 | `4262b49` | `ServicioConfiguracionHoraria` (consulta/edición con *upsert*) y fachada `NucleoDatos`. |
+| T4 | `36c28b2` | Franja = D y encaje: `franjasUtilizables`, `deficitDeEncaje`, `errorDeEncaje` y sobrecargas con D; legado temporal. |
+| **T8** | `c913d87` | **Adelantada.** Seed con D = 35: turnos 07:00–11:50 / 12:40–17:30, recesos 08:10–08:20 / 13:50–14:00, configuración asegurada en 35 y fuera de `kTablasDominio`. |
+| T5 | `bc7122b` | `ServicioTurnosEventos` con la D efectiva: encaje en alta/actualización de turnos y en eventos; seis llamadas migradas. |
+| T6 | `fbb1f68` | Contrato: V2 30–90 con el punto único y encaje de todos los turnos; V1 rechaza no enteros. |
+| T7 | `15db0d2` | `construirJsonEntrada(datos, preset, D, ahora)` (sobrescritura incondicional y rejilla con D) y `huellaDatos(datos, D)`. |
+| T9 | `c62653c` | Retirada del legado: `duracionFranjaEstimada` y las firmas de 2/3 argumentos; casos de `test_calculo_eventos` migrados/retirados. |
+| T10 | este cierre | Docs de §7 (más el ejemplo de `consola-datos.md`), anotaciones de supersesión en 009/008/005/010 y verificación de cierre. |
+
+- **Suite:** `ctest --preset backend` → **52/52** (100 %), sin `test_frontend_conversion` ni
+  `test_generacion_seed`.
+- **Sin cambios** en el modelo del solver, el tope de 40 horas académicas ni la interfaz (deuda
+  documentada en `docs/interfaz-frontend.md` §6).
+- **Documentación:** los `12:30/18:10` que quedan en `docs/solver/Motor-Solver-Plan-Completo.md` son
+  históricos y la constitución los declara no vinculantes; el otro resto es un `archivo:línea` de un
+  log de auditoría. No se tocan.
 
 ## Tamaño previsto
 

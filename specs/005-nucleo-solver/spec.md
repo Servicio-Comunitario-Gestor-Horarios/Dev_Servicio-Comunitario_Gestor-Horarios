@@ -185,6 +185,7 @@ y no obligan.
 - **`duracion_minutos`:** duración **real** en minutos de cada franja; dato de la configuración, **mayor
   que 0**. Define la **rejilla horaria** (inicio y fin de cada franja, recesos y traducción de la
   disponibilidad) y **no** interviene en la conversión de horas a bloques.
+  > **Superada en el rango por la 011 (2026-10-29).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
 - **Hora académica:** unidad pedagógica de carga de una materia. **Una hora académica equivale a un
   bloque**; no es una hora de reloj.
 - **Bloque:** unidad mínima de clase, igual a una franja. La conversión de horas académicas a bloques es
@@ -612,11 +613,11 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   - **V2. Tipos y rangos de campo:** cada sección y campo tiene el tipo esperado; además,
     **NUEVA: el `peso` de cada par (docente, materia-suplente) debe ser un entero no negativo** (un
     `peso` negativo se rechaza), y **NUEVA: `duracion_minutos` debe ser mayor que 0**.
-    > **Ampliada por la 010 (2026-10-25) y pendiente de la 011 futura.** La 010 añade a V2 la **forma y
-    > temporalidad de los eventos** (`nombre`, turno existente, posición, orden, duración y par
-    > `inicio`/`fin` dentro de la ventana del turno y de su posición, sin solapes). El rango de
-    > `duracion_minutos` sigue siendo `> 0` en la 010; la **011** lo estrechará a **30–90** y cambiará la
-    > procedencia del dato.
+    > **Ampliada por la 010 (2026-10-25) y estrechada por la 011 (2026-10-29).** La 010 añade a V2 la
+    > **forma y temporalidad de los eventos** (`nombre`, turno existente, posición, orden, duración y
+    > par `inicio`/`fin` dentro de la ventana del turno y de su posición, sin solapes). La **011**
+    > estrecha `duracion_minutos` a **30–90** (mismo punto único que la configuración global, de la que
+    > procede el valor) y añade a V2 el **encaje** `nº franjas × D + Σ eventos ≤ ventana`.
   - **V3. Dimensiones:** las dimensiones declaradas coinciden con los tamaños de las listas.
   - **V4. Índices de materias en rango.**
   - **V5. Índices de profesores en rango.**
@@ -724,6 +725,7 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   cualquiera es válido; el desempate está **diferido** (RNF-1) (RF-5).
 - **`peso` de un par negativo:** rechazo previo (RF-11, V2).
 - **`duracion_minutos` menor o igual que 0:** rechazo previo (RF-11, V2).
+  > **Superada en el rango por la 011 (2026-10-29).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
 - **Rango de disponibilidad no alineado con los bloques:** se cubren solo los bloques enteros
   contenidos en el rango; los solapes parciales no cuentan (definición de regla de traducción).
 - **Receso dentro de un turno:** no reduce las franjas útiles del curso ni interviene en la traducción

@@ -156,8 +156,8 @@ No interactivo (script/smoke):
   --cmd "materias listar" \
   --cmd 'aulas crear "A1" 30 1 "Planta Baja"' \
   --cmd 'planes crear CIEN "Ciencias"' \
-  --cmd 'turnos crear manana 07:00 12:30 8' \
-  --cmd 'turnos evento-agregar "manana" "Receso" 2 10 08:20 08:30' \
+  --cmd 'turnos crear manana 07:00 11:50 8' \
+  --cmd 'turnos evento-agregar "manana" "Receso" 2 10 08:10 08:20' \
   --cmd "turnos eventos manana" \
   --cmd 'cursos crear 1 A manana 1' \
   --cmd "dependientes materia 1" \

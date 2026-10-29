@@ -295,6 +295,8 @@ tipo de aula, ni una reforma del frontend, ni una decisión sobre compartir la c
   el fin es posterior al inicio, la diferencia coincide con la duración, el intervalo cabe en la
   ventana del turno y en la de su posición, el orden es cronológico y no hay solapes dentro de la
   posición ni entre posiciones.
+  > **Ampliada por la 011 (2026-10-29).** El rango de `duracion_minutos` es 30–90 y V2 valida el
+  > encaje del turno; el resto de V2 no cambia.
 - **V16 → SI alguna aula o alguna materia de la configuración no declara un tipo no vacío, ENTONCES EL
   SISTEMA rechazará la entrada como entrada inválida**, indicando la entidad.
 - **V17 → SI alguna materia de un curso requiere un tipo para el que no hay ninguna aula en el
