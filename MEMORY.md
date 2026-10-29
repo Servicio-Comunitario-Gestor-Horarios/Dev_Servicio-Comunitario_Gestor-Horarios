@@ -114,19 +114,22 @@
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
-2. **Pendientes de la 005-T10** (ver abajo): RF-13, RNF-4, avisos retirados (I2) y residuales del validador de salida.
+2. **Pendientes de la 005-T10** (ver abajo): **RF-13**, **RNF-4** y la validación de materias duplicadas o de 0 horas. Los residuales del validador (I2, `metadata`) y el estado del `Solver` se resolvieron el 2026-10-29.
 3. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
 4. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
-5. **Riesgo latente:** `Solver::resolver` **no reinicia `model`/`vars`** (son miembros); no afecta al camino real (una instancia por ejecución), pero conviene arreglarlo cuando se toque.
-6. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-7. **MEMORY actualizado** (2026-10-29) con el cierre de la 012.
+5. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
+6. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y los residuales de la 005 resueltos.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
+- **Resueltos el 2026-10-29** (T10 sigue abierta por lo de abajo):
+  - **Decisión I2 — avisos retirados** (`36cd7b2`; docs en `ebeb3bf`): `ValidadorSalidaSolver` ya no emite **P1** (horas no cubiertas) ni **P3** (capacidad de aula); **P2** (exceso de horas del docente) es el único aviso y **P4** sigue como conflicto no presentable. `test_validador_salida` alineado.
+  - **`metadata` de la salida** (`d356780`): `total_asignaciones` cuenta **clases** (no variables), `profesores_asignados` cuenta docentes distintos con al menos una clase y `tiempo_ejecucion_ms` sale del cronómetro.
+  - **`Solver` acumulaba estado** (`57f5be8`): `resolver` reinicia `model`/`vars`; reutilizar la instancia no contamina.
+  - **Notas retiradas por desfasadas:** `.clangd` **ya está** en `.gitignore`; y «P1/P2 comparan horas vs bloques» **dejó de ser un problema** con la 011 (1 hora académica = 1 bloque).
 - **RF-13 — planes de los docentes:** `ConstructorEntradaSolver` embebe los planes de los **cursos** pero no los que usan los **docentes**. Sin impacto funcional hoy (el plan del docente se compara como cadena), pero es una cláusula explícita del RF.
-- **RNF-4 — cobertura de tests por regla:** faltan casos rojo→verde de V2 (`peso` negativo; el rango de `duracion_minutos` lo cubre la 011), V7 (turno ausente), V8 (modo inactivo), V14, V15, D13 (`anios`), S1/S2 (exceso y titular a tope), reproducibilidad (RNF-1), aula de salida como índice (fija/móvil) y `peso` en el ida y vuelta. Por esto los «Hecho cuando» de T3/T5/T7/T8 no quedan cerrados y **T10 sigue abierta**. La reproducibilidad del solver ya tiene un caso en la 010 (`solver_esReproducible_mismaEntradaMismaSalida`), pero no cubre el ida y vuelta ni el resto.
-- **Decisión I2 — avisos retirados:** `ValidadorSalidaSolver` sigue emitiendo los avisos de **capacidad de aula** y **horas no cubiertas**, y `test_validador_salida` los exige; la spec 005 los **retira hasta nuevo aviso**. Hay que alinear código/tests (tocando la spec si se cambia la decisión).
-- **Residuales varios:** P1/P2 de `ValidadorSalidaSolver` comparan horas vs bloques; `metadata.total_asignaciones` cuenta variables (no asignaciones); `profesores_asignados`/`tiempo_ejecucion_ms` sin rellenar; `Solver` acumula estado si se reutiliza la instancia; `.clangd` sin ignorar; no se validan materias duplicadas ni de 0 horas en un plan.
+- **RNF-4 — cobertura de tests por regla:** faltan casos rojo→verde de V7 (turno ausente), V8 (modo inactivo), V14, V15, D13 (`anios`), S1/S2 (exceso y titular a tope), aula de salida como índice (fija/móvil) y `peso` en el ida y vuelta. Por esto los «Hecho cuando» de T3/T5/T7/T8 no quedan cerrados y **T10 sigue abierta**. V2 ya cubre `peso` negativo y el rango de `duracion_minutos` lo cubre la 011; la reproducibilidad tiene un caso en la 010 (`solver_esReproducible_mismaEntradaMismaSalida`), pero no cubre el ida y vuelta ni el resto.
+- **Validación de materias:** no se validan materias duplicadas ni de 0 horas en un plan.
 
 ## Progreso de implementación
 
@@ -154,7 +157,7 @@
 - 012: **implementada y cerrada (2026-10-29)** ✅ (APROBADO 2026-10-29 contra `3007c54`; suite **54/54**).
   - T1 `4993be0` · T2 `3871488` · T3 `7405351` · T4 `d2f2147` · T5 `8acce25` · T6 `3b8ba90` · T7 `43c222c` · T8 `94647ef` · T9 `98c9dbc` · notas de la validación (M1–M6) `e12641b`.
   - **Alcance:** persistencia, validación, servicios, cascada, seed y documentación. **No se tocó** el solver, el contrato ni la interfaz; las preferencias **no alteran la generación** y quedan **fuera de la huella** hasta que el solver las consuma.
-- Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno al solver. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
+- Tests ajenos que fallan: **ninguno**. El antiguo **flaky `test_middleware_transport`** estaba **mal atribuido**: no era ajeno al solver, sino una **colisión del nombre fijo del socket IPC** entre los tests que levantan `InternalServer` (`health_check`, `transport`, `ipc_aislamiento_bd`) al correr en paralelo; **corregido el 2026-10-29** con `RESOURCE_LOCK` de CTest (`fd7ac33`). La suite es estable hoy en serie y en paralelo (`-j4`/`-j8`). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`, dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004 cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distinguía una base vieja de una nueva. Medidas:
   - `VersionEsquema::esquemaEsperado(db, QString* motivo)` explica exactamente lo que no cuadra (tablas/columnas faltantes y tablas retiradas presentes).
   - `AperturaBaseDatos` distingue versión ≠ esperada de catálogo ≠ esperado (nombra el motivo) en `detalle`; sigue sin migrar ni tocar datos (RF-6).
