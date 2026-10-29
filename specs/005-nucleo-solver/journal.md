@@ -82,3 +82,12 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 - Test `solver_metadataCuadraConLaSalida`: con el fixture mínimo, la metadata cuadra con lo emitido
   (8 clases y los docentes de la salida). Antes `total_asignaciones` valía 48 (variables del modelo).
   Suite **54/54**.
+
+### F3 - `Solver::resolver` sin estado arrastrado
+
+- `resolver` reinicia `model` (`CpModelBuilder`) y `vars` (`VariablesSolver`) al inicio; dos llamadas
+  a la **misma** instancia equivalen a dos nuevas.
+- Tests: `solver_reutilizarLaMismaInstancia_daElMismoResultado` (mismo horario y mismos errores) y
+  `solver_reutilizarLaInstancia_noContaminaConOtraEntrada` (factible → infactible → factible sin
+  heredar nada). Antes, la segunda resolución daba otro horario y la tercera era INFEASIBLE.
+  Suite **54/54**.

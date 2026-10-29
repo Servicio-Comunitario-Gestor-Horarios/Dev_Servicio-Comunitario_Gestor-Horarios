@@ -1336,6 +1336,38 @@ private slots:
         QCOMPARE(resumenDeSalida(infactible2), resumenDeSalida(infactible1));
         QCOMPARE(infactible2.errores, infactible1.errores);
     }
+
+    // ── F3: reutilizar la instancia no arrastra modelo ni variables ──────────────
+    void solver_reutilizarLaMismaInstancia_daElMismoResultado() {
+        Solver solver;
+        const SolverConfig config = crearConfigMinima();
+        const auto primera = solver.resolver(config);
+        const auto segunda = solver.resolver(config);
+
+        QVERIFY2(primera.exito, qPrintable(primera.errores.join("\n")));
+        QVERIFY2(segunda.exito, qPrintable(segunda.errores.join("\n")));
+        QCOMPARE(segunda.exito, primera.exito);
+        QCOMPARE(resumenDeSalida(segunda), resumenDeSalida(primera));
+        QCOMPARE(segunda.errores, primera.errores);
+    }
+
+    void solver_reutilizarLaInstancia_noContaminaConOtraEntrada() {
+        Solver solver;
+        const SolverConfig factible = crearConfigMinima();
+        const auto primera = solver.resolver(factible);
+        QVERIFY2(primera.exito, qPrintable(primera.errores.join("\n")));
+
+        // La misma instancia con una entrada no factible no hereda la solución anterior.
+        const auto infactible = solver.resolver(configVentanasDeTurnoHall());
+        QVERIFY(!infactible.exito);
+        QVERIFY(!infactible.errores.isEmpty());
+        QVERIFY(infactible.resultado.horarios.isEmpty());
+
+        // Y volver al dato factible da lo mismo que la primera vez.
+        const auto tercera = solver.resolver(factible);
+        QVERIFY2(tercera.exito, qPrintable(tercera.errores.join("\n")));
+        QCOMPARE(resumenDeSalida(tercera), resumenDeSalida(primera));
+    }
 };
 
 QTEST_MAIN(TestSolverHorarios)

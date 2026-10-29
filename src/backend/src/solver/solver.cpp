@@ -191,6 +191,12 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     QElapsedTimer timer;
     timer.start();
 
+    // No arrastrar estado entre resoluciones: `model` y `vars` son miembros y una segunda
+    // llamada acumularía variables y restricciones. Se reinician al inicio (F3), de modo que
+    // dos llamadas a la misma instancia equivalen a dos instancias nuevas.
+    model = CpModelBuilder();
+    vars = VariablesSolver();
+
     ResultadoSolver resultado;
     resultado.exito = false;
     
