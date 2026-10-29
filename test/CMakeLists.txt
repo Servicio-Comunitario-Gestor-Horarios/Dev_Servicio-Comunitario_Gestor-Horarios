@@ -100,6 +100,12 @@ if(TARGET backend)
 
 	# Punto único de duración de la hora académica (rango, minutos y encaje, 011 T1).
 	add_gtest(test_duracion_horaria backend/test_duracion_horaria.cpp backend)
+
+	# Configuración global de la hora académica: valor efectivo y edición (011 T3).
+	add_qtest(test_servicio_configuracion_horaria
+				backend/test_servicio_configuracion_horaria.cpp
+				backend Qt6::Sql
+	)
 endif()
 
 # ============================================================

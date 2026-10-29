@@ -316,6 +316,31 @@ private slots:
         QVERIFY(m_nucleo->listarTurnos().valor.isEmpty());
     }
 
+    // ─── Configuración global de la hora académica (011 T3) ──────────────────
+
+    void configuracionHoraria_fachadaLeeYGuardaElValorEfectivo()
+    {
+        // El esquema deja la fila por defecto: 35 con origen guardado, no por defecto.
+        const auto inicial = m_nucleo->configuracionHoraria();
+        QVERIFY2(inicial.ok, qPrintable(inicial.mensajeError));
+        QCOMPARE(inicial.valor.duracionMinutos, 35);
+        QVERIFY(!inicial.valor.porDefecto);
+
+        const auto guardado = m_nucleo->guardarConfiguracionHoraria(40);
+        QVERIFY2(guardado.ok, qPrintable(guardado.mensajeError));
+        QCOMPARE(guardado.valor.duracionMinutos, 40);
+
+        const auto leido = m_nucleo->configuracionHoraria();
+        QVERIFY(leido.ok);
+        QCOMPARE(leido.valor.duracionMinutos, 40);
+        QVERIFY(!leido.valor.porDefecto);
+
+        // Una edición inválida no cambia el valor anterior.
+        const auto rechazado = m_nucleo->guardarConfiguracionHoraria(29);
+        QVERIFY(!rechazado.ok);
+        QCOMPARE(m_nucleo->configuracionHoraria().valor.duracionMinutos, 40);
+    }
+
     // ─── Catálogo de tipos de aula ──────────────────────────────────────────
 
     void tiposAula_altaListadoRenombradoBaja()

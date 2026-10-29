@@ -20,6 +20,7 @@
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCargaHoraria.hpp"
 #include "backend/services/ServicioComposicionPlan.hpp"
+#include "backend/services/ServicioConfiguracionHoraria.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
@@ -136,6 +137,13 @@ public:
     Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno,
                                                       int numSlots) const;
 
+    // ─── Configuración global de la hora académica (RF-1, RF-2) ───────────
+
+    /// Valor efectivo de la duración y si proviene del defecto (35 sin fila).
+    Resultado<ConfiguracionHoraria> configuracionHoraria() const;
+    /// Valida 30–90 y guarda la configuración; inválida no cambia el anterior.
+    Resultado<ConfiguracionHoraria> guardarConfiguracionHoraria(int duracionMinutos);
+
     // ─── Eliminación en cascada (RF-2) ────────────────────────────────────
 
     /**
@@ -189,6 +197,7 @@ private:
     ServicioComposicionPlan m_composicion;
     ServicioCursos m_cursos;
     ServicioTurnosEventos m_turnos;
+    ServicioConfiguracionHoraria m_configuracion;
 
     /// Estado en memoria de las escrituras fallidas pendientes de reintento.
     GestorPendientes m_pendientes;

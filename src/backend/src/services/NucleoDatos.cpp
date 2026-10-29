@@ -65,7 +65,8 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_carga(db),
       m_composicion(db),
       m_cursos(db),
-      m_turnos(db) {}
+      m_turnos(db),
+      m_configuracion(db) {}
 
 // ─── Docentes ──────────────────────────────────────────────────────────────
 
@@ -385,6 +386,19 @@ bool NucleoDatos::eliminarEvento(int id) {
 Resultado<QVector<EventoDTO>> NucleoDatos::eventosFueraDeRango(const QString& turno,
                                                                int numSlots) const {
     return m_turnos.eventosFueraDeRango(turno, numSlots);
+}
+
+// ─── Configuración global de la hora académica (RF-1, RF-2) ────────────────
+
+Resultado<ConfiguracionHoraria> NucleoDatos::configuracionHoraria() const {
+    return m_configuracion.consultar();
+}
+
+Resultado<ConfiguracionHoraria> NucleoDatos::guardarConfiguracionHoraria(
+    int duracionMinutos) {
+    // La configuración es global, no un registro de dominio: no pasa por
+    // `GestorPendientes` (plan §1.2).
+    return m_configuracion.guardar(duracionMinutos);
 }
 
 // ─── Cambios pendientes y reintento (RF-3) ────────────────────────────────
