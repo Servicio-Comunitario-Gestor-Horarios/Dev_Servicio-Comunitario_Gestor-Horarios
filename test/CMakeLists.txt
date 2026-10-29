@@ -160,3 +160,17 @@ if(TARGET frontend AND TARGET backend)
 						${CMAKE_SOURCE_DIR}/src/frontend/src)
 	endif()
 endif()
+
+# ============================================================
+# Serialización de los tests del socket IPC
+# ============================================================
+# Los tests que levantan `InternalServer` comparten el nombre fijo del socket IPC
+# (middleware/messages.h): no pueden correr a la vez o uno borra el socket del otro
+# (`QLocalServer::removeServer` antes de `listen`). Se serializan con un RESOURCE_LOCK
+# de CTest; `test_instancia_unica` no entra porque usa un nombre único (nombreUnico()).
+set_tests_properties(
+	test_middleware_health_check
+	test_middleware_transport
+	test_ipc_aislamiento_bd
+	PROPERTIES RESOURCE_LOCK servidor_ipc_middleware
+)
