@@ -282,11 +282,11 @@ private slots:
     // ─── Turnos y eventos ───────────────────────────────────────────────────
 
     /// Fixture corregida a la rejilla de T4: con 13:00–18:00 y 5 franjas, un
-    /// evento de 15 min deja franja = (300 − 15)/5 = 57, así que su ventana en
-    /// la posición 2 es 14:54–15:09 (no 15:00–15:15). El turno se actualiza
-    /// antes de crear el evento (14:00–19:00 con 6 franjas deja franja = 47 y
-    /// ventana 15:34–15:49) y el evento se declara dentro de su ventana real,
-    /// sin relajar la validación.
+    /// evento de 15 min en la posición 2 con la franja de la hora académica
+    /// (35 min): su ventana es 15:10–15:25 (no 15:34–15:49 del reparto antiguo).
+    /// El turno se actualiza antes de crear el evento (14:00–19:00 con 6
+    /// franjas) y el evento se declara dentro de su ventana real, sin relajar la
+    /// validación.
     void turnosEventos_altaModificacionBaja()
     {
         auto turno = m_nucleo->crearTurno("Tarde", QTime(13, 0), QTime(18, 0), 5);
@@ -299,7 +299,7 @@ private slots:
         QCOMPARE(actualizado.valor.numSlots, 6);
 
         auto evento = m_nucleo->agregarEvento("Tarde", "Receso", 2, 15,
-                                              QTime(15, 34), QTime(15, 49));
+                                              QTime(15, 10), QTime(15, 25));
         QVERIFY2(evento.ok, qPrintable(evento.mensajeError));
         QCOMPARE(evento.valor.despuesDeSlot, 2);
         QCOMPARE(evento.valor.duracion, 15);

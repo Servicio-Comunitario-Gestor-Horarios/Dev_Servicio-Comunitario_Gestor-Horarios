@@ -93,6 +93,10 @@ public:
 private:
     QSqlDatabase& m_db;
 
+    /// Duración efectiva de la hora académica: la de la configuración global o
+    /// 35 si no hay fila (RF-1). No se guarda en el servicio: manda la base.
+    int duracionEfectiva() const;
+
     bool validarTurno(const QString& nombre, const QTime& inicio, const QTime& fin,
                       int numSlots, QString& error) const;
 
@@ -100,11 +104,11 @@ private:
     bool validarEvento(const TurnoDTO& dto, const QString& nombre, int despuesDeSlot,
                        int duracion, int orden, bool ordenObligatorio, QString& error) const;
 
-    /// Valida el par de horas, la diferencia con la duración, el encaje en la
-    /// rejilla, la ventana de su posición y los solapes. `turno` debe incluir el
-    /// candidato en `turno.eventos`.
+    /// Valida el par de horas, la diferencia con la duración, el encaje del turno
+    /// con `duracionMinutos`, la ventana de su posición y los solapes. `turno` debe
+    /// incluir el candidato en `turno.eventos`.
     bool validarCoherenciaTemporal(const TurnoDTO& turno, const EventoDTO& candidato,
-                                   QString& error) const;
+                                   int duracionMinutos, QString& error) const;
 
     /// Carga `dto.eventos` ordenados por posición, orden e id.
     bool cargarEventos(TurnoDTO& dto) const;

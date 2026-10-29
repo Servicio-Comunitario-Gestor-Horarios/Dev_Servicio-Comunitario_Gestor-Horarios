@@ -288,3 +288,66 @@ ventana; `eventoDentroDeVentana` con D y sin horas; y las dos pruebas de delegac
 - No se tocaron `ServicioTurnosEventos.cpp`, `solver_config.cpp`, `perfil.cpp`, el constructor, el seed,
   `duracion_horaria`, el esquema ni `docs/`: son T5/T6/T7/T8/T10. El `grep` de `duracionFranjaEstimada`
   sigue con resultados a propósito (T9).
+
+## T5 - Servicio de turnos: encaje con la D efectiva en turnos y eventos (2026-10-29)
+
+**Requisito:** RF-4 (y RNF-1/RNF-4). **Plan:** §1.4, §2.2, §8 decisión 4 y §9 (T5). **Base:** `36c28b2`.
+
+### Rojo (tests primero)
+
+Se adaptaron los casos temporales de `test_servicio_turnos_eventos` a D = 35 (ventana de la posición
+1: 07:35–07:45; posición 2: 08:10–08:20) y se añadieron los de encaje con la configuración. Contra el
+servicio que aún usa la franja estimada:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_turnos_eventos|test_backend_nucleo_datos|test_backend_cascada)$'
+FAIL!  : TestServicioTurnosEventos::agregarEvento_enLaVentanaDeSuPosicion_aceptado()
+         'r.ok' returned FALSE. (El intervalo 07:35–07:45 del evento «Receso» no cabe en la
+         ventana de la posición 1 (07:58–08:08).)
+FAIL!  : TestServicioTurnosEventos::crearTurno_conDuracion45YVentana290_rechazaConDeficit70()
+FAIL!  : TestNucleoDatos::turnosEventos_altaModificacionBaja() (ventana 15:34–15:49 del reparto)
+[...]
+Totals: 31 passed, 11 failed          # test_servicio_turnos_eventos
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_turnos_eventos|test_backend_nucleo_datos|test_backend_cascada)$'
+1/3 Test #15: test_backend_nucleo_datos ........   Passed    0.07 sec
+2/3 Test #16: test_backend_cascada .............   Passed    0.07 sec
+3/3 Test #26: test_servicio_turnos_eventos .....   Passed    0.12 sec
+100% tests passed out of 3
+```
+
+### Cambios
+
+- `ServicioTurnosEventos.hpp` / `.cpp`:
+  - `duracionEfectiva()` privada: consulta `ServicioConfiguracionHoraria(m_db).consultar()` en cada
+    operación que valida (sin caché ni global); si falla, 35 y un `qWarning`.
+  - `crearTurno` y `actualizarTurno` comprueban `errorDeEncaje(turno, D)` **antes de escribir**; en la
+    actualización sustituye la antigua comprobación de «reparto en positivo».
+  - `validarCoherenciaTemporal(..., D, ...)` valida el encaje del turno con el candidato dentro y usa
+    `ventanaDePosicion`/`eventoDentroDeVentana` con D.
+  - Las seis llamadas antiguas (`:114, :122, :124, :315, :330, :334`) quedan migradas; el servicio ya
+    no llama a `duracionFranjaEstimada`.
+- `test/backend/test_servicio_turnos_eventos.cpp`: casos temporales a D = 35 y seis casos nuevos de
+  encaje (8 franjas/290 con 35, 5 franjas/5 h, D = 45 → déficit 70, evento con D = 45 → déficit 80,
+  actualización de turno y de evento rechazadas sin escribir, y comparación literal con
+  `errorDeEncaje` para probar que el mensaje es único).
+- `test/backend/test_nucleo_datos.cpp`: el evento de la fachada pasa a la rejilla de 35
+  (15:10–15:25) y el comentario deja de hablar del reparto.
+
+### Notas y hallazgo
+
+- **D se inyecta por consulta, no por constructor** (decisión 4 del plan): cada operación de escritura
+  lee la D efectiva una vez y la pasa a los validadores; no hay estado que se desincronice entre la
+  fachada, la consola y los tests.
+- **No se valida al eliminar un evento:** borrar no puede romper la invariante, `eliminarEvento`
+  devuelve `bool` sin mensaje y bloquearlo impediría corregir datos tras subir D. `tasks.md` y el plan
+  solo piden alta/edición; se sigue esa lectura.
+- **`test_seed_aplicacion` queda en rojo (9 casos) hasta T8.** El perfil del seed aún declara el
+  inventario de 40 min (turno 07:00–12:30, receso 08:20–08:30); con D = 35 la ventana de la posición 2
+  es 08:10–08:20 y el alta se rechaza. Es exactamente lo que T8 migra (07:00–11:50, receso
+  08:10–08:20). El `-R` de T5 no lo incluye y `perfil.cpp` está fuera de su alcance; el árbol compila
+  y las tres suites de la tarea están en verde. `ctest --preset backend` da **51/52** por ese motivo.

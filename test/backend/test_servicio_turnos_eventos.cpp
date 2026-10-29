@@ -8,7 +8,9 @@
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
+#include <backend/services/ServicioConfiguracionHoraria.hpp>
 #include <backend/services/ServicioTurnosEventos.hpp>
+#include <backend/services/calculo_eventos.hpp>
 
 /// Tests del servicio de turnos y eventos (RF-1, RF-2): los eventos son la
 /// única representación del turno (sin capa de compatibilidad de recesos).
@@ -38,6 +40,14 @@ private slots:
         m_dbManager->close();
         m_dbManager.reset();
         m_dir.reset();
+    }
+
+    /// Fija la configuración global de la hora académica de la base de prueba.
+    void fijarDuracion(int duracionMinutos)
+    {
+        ServicioConfiguracionHoraria configuracion(m_dbManager->database());
+        const auto resultado = configuracion.guardar(duracionMinutos);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }
 
     // ─── Validaciones del alta ──────────────────────────────────────────────
@@ -315,11 +325,12 @@ private slots:
         QCOMPARE(q.value(0).toInt(), 0);
     }
 
-    // ─── Coherencia temporal del evento (RF-3) ─────────────────────────────
+    // ─── Coherencia temporal del evento (RF-3, RF-4) ────────────────────────
     //
-    // Turno de partida «Mañana»: 07:00–12:00, 5 franjas (300 min). Con un
-    // evento de 10 min la franja estimada es 58 min y la ventana de la
-    // posición 1 (tras la primera franja) es 07:58–08:08.
+    // Turno de partida «Mañana»: 07:00–12:00, 5 franjas. La franja dura la hora
+    // académica configurada (35 min por defecto): la ventana de la posición 1 va
+    // de 07:35 a 07:45 con un evento de 10 min y la de la posición 2, de 08:10 a
+    // 08:20. El sobrante de la ventana no se reparte.
 
     void agregarEvento_parDeHorasIncompleto_rechazado()
     {
@@ -354,7 +365,7 @@ private slots:
     void agregarEvento_duracionNoCoincideConLasHoras_rechazada()
     {
         auto r = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                           QTime(7, 58), QTime(8, 13));
+                                           QTime(7, 35), QTime(7, 50));
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("no coincide"));
@@ -363,23 +374,24 @@ private slots:
 
     void agregarEvento_enLaVentanaDeSuPosicion_aceptado()
     {
+        // Posición 1 de 07:00–12:00 con D = 35: la franja acaba a las 07:35.
         auto r = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                           QTime(7, 58), QTime(8, 8));
+                                           QTime(7, 35), QTime(7, 45));
 
         QVERIFY2(r.ok, qPrintable(r.mensajeError));
-        QCOMPARE(r.valor.inicio, QTime(7, 58));
-        QCOMPARE(r.valor.fin, QTime(8, 8));
+        QCOMPARE(r.valor.inicio, QTime(7, 35));
+        QCOMPARE(r.valor.fin, QTime(7, 45));
     }
 
     void agregarEvento_fueraDeLaVentanaDeSuPosicion_rechazado()
     {
         auto antes = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                               QTime(7, 50), QTime(8, 0));
+                                               QTime(7, 30), QTime(7, 40));
         QVERIFY(!antes.ok);
         QVERIFY(antes.mensajeError.contains("ventana"));
 
         auto despues = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                                 QTime(8, 8), QTime(8, 18));
+                                                 QTime(7, 45), QTime(7, 55));
         QVERIFY(!despues.ok);
         QVERIFY(despues.mensajeError.contains("ventana"));
 
@@ -388,13 +400,13 @@ private slots:
 
     void agregarEvento_solapeEnLaMismaPosicion_rechazado()
     {
-        // Con dos eventos de 10 min la franja baja a 56 y la ventana de la
-        // posición 1 pasa a 07:56–08:16: el segundo cabe pero pisa al primero.
+        // Con dos eventos de 10 min la ventana de la posición 1 pasa a
+        // 07:35–07:55: el segundo cabe pero pisa al primero.
         QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                          QTime(7, 58), QTime(8, 8)).ok);
+                                          QTime(7, 35), QTime(7, 45)).ok);
 
         auto solapado = m_servicio->agregarEvento("Mañana", "Aviso", 1, 10,
-                                                  QTime(8, 6), QTime(8, 16));
+                                                  QTime(7, 40), QTime(7, 50));
 
         QVERIFY(!solapado.ok);
         QVERIFY(solapado.mensajeError.contains("solapan"));
@@ -406,7 +418,7 @@ private slots:
         // Un evento que empieza antes que el de una posición anterior queda
         // fuera de su propia ventana: las ventanas son disjuntas y ordenadas.
         QVERIFY(m_servicio->agregarEvento("Mañana", "Primero", 2, 10,
-                                          QTime(8, 56), QTime(9, 6)).ok);
+                                          QTime(8, 10), QTime(8, 20)).ok);
 
         auto invertido = m_servicio->agregarEvento("Mañana", "Segundo", 3, 10,
                                                    QTime(8, 0), QTime(8, 10));
@@ -418,13 +430,15 @@ private slots:
 
     void agregarEvento_eventosNoCabenEnElTurno_rechazado()
     {
+        // 5 × 35 + 300 = 475 > 300 (déficit 175) y 5 × 35 + 299 = 474 > 300.
         auto ocupaTodo = m_servicio->agregarEvento("Mañana", "Acto", 1, 300);
         QVERIFY(!ocupaTodo.ok);
-        QVERIFY(ocupaTodo.mensajeError.contains("caben"));
+        QVERIFY2(ocupaTodo.mensajeError.contains("déficit"), qPrintable(ocupaTodo.mensajeError));
 
         auto dejaSinReparto = m_servicio->agregarEvento("Mañana", "Acto", 1, 299);
         QVERIFY(!dejaSinReparto.ok);
-        QVERIFY(dejaSinReparto.mensajeError.contains("caben"));
+        QVERIFY2(dejaSinReparto.mensajeError.contains("déficit"),
+                 qPrintable(dejaSinReparto.mensajeError));
 
         QVERIFY(m_servicio->obtenerTurno("Mañana").valor.eventos.isEmpty());
     }
@@ -432,14 +446,14 @@ private slots:
     void actualizarEvento_solapeConOtroEvento_rechazado()
     {
         auto receso = m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                                QTime(7, 58), QTime(8, 8));
+                                                QTime(7, 35), QTime(7, 45));
         auto aviso = m_servicio->agregarEvento("Mañana", "Aviso", 2, 10);
         QVERIFY(receso.ok);
         QVERIFY(aviso.ok);
 
         // El aviso se mueve a la posición 1 con horas que pisan el receso.
         auto r = m_servicio->actualizarEvento(aviso.valor.id, "Aviso", 1, 10,
-                                              QTime(8, 6), QTime(8, 16), 2);
+                                              QTime(7, 40), QTime(7, 50), 2);
 
         QVERIFY(!r.ok);
         QVERIFY(r.mensajeError.contains("solapan"));
@@ -513,10 +527,10 @@ private slots:
     void actualizarTurno_ventanaQueDejaFueraUnEvento_rechazada()
     {
         QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 1, 10,
-                                          QTime(7, 58), QTime(8, 8)).ok);
+                                          QTime(7, 35), QTime(7, 45)).ok);
 
         // Con la campana 08:00–12:00 la ventana de la posición 1 pasa a
-        // 08:46–08:56: el receso de 07:58–08:08 ya no cabe.
+        // 08:35–08:45: el receso de 07:35–07:45 ya no cabe.
         auto r = m_servicio->actualizarTurno("Mañana", QTime(8, 0), QTime(12, 0), 5);
 
         QVERIFY(!r.ok);
@@ -525,19 +539,20 @@ private slots:
         auto turno = m_servicio->obtenerTurno("Mañana").valor;
         QCOMPARE(turno.inicio, QTime(7, 0));
         QCOMPARE(turno.eventos.size(), 1);
-        QCOMPARE(turno.eventos.first().inicio, QTime(7, 58));
+        QCOMPARE(turno.eventos.first().inicio, QTime(7, 35));
     }
 
-    void actualizarTurno_ventanaSinRepartoParaLosEventos_rechazada()
+    void actualizarTurno_ventanaQueNoDaEncaje_rechazada()
     {
         QVERIFY(m_servicio->agregarEvento("Mañana", "Receso", 2, 10).ok);
         QVERIFY(m_servicio->agregarEvento("Mañana", "Aviso", 4, 10).ok);
 
-        // 20 min de ventana para 20 min de eventos: no queda franja.
+        // 5 × 35 + 20 = 195 min > 20 de ventana: el mensaje es el de `errorDeEncaje`.
         auto r = m_servicio->actualizarTurno("Mañana", QTime(7, 0), QTime(7, 20), 5);
 
         QVERIFY(!r.ok);
-        QVERIFY(r.mensajeError.contains("caben"));
+        QVERIFY2(r.mensajeError.contains("Mañana"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("déficit"), qPrintable(r.mensajeError));
 
         auto turno = m_servicio->obtenerTurno("Mañana").valor;
         QCOMPARE(turno.fin, QTime(12, 0));
@@ -554,6 +569,119 @@ private slots:
         QCOMPARE(r.valor.numSlots, 6);
         QCOMPARE(r.valor.fin, QTime(13, 0));
         QCOMPARE(r.valor.eventos.size(), 1);
+    }
+
+    // ─── Encaje con la hora académica configurada (RF-4, T5) ────────────────
+    //
+    // La D efectiva sale de `ConfiguracionHoraria` (35 por defecto). La
+    // invariante es `franjas × D + eventos ≤ ventana`; si falla, no se escribe.
+
+    void crearTurno_ochoFranjasYVentana290_aceptaConDuracion35()
+    {
+        // 8 × 35 = 280 ≤ 290: cabe sin eventos.
+        auto r = m_servicio->crearTurno("Largo", QTime(7, 0), QTime(11, 50), 8);
+
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.numSlots, 8);
+        QCOMPARE(r.valor.inicio, QTime(7, 0));
+        QCOMPARE(r.valor.fin, QTime(11, 50));
+    }
+
+    void crearTurno_cincoFranjasEnCincoHoras_sigueAceptandose()
+    {
+        // 5 × 35 = 175 ≤ 300: el turno de 5 franjas en 5 h se sigue creando.
+        auto r = m_servicio->crearTurno("Corto", QTime(7, 0), QTime(12, 0), 5);
+
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.numSlots, 5);
+    }
+
+    void crearTurno_conDuracion45YVentana290_rechazaConDeficit70()
+    {
+        fijarDuracion(45);
+
+        // 8 × 45 = 360 > 290: faltan 70.
+        auto r = m_servicio->crearTurno("Ajustado", QTime(7, 0), QTime(11, 50), 8);
+
+        QVERIFY(!r.ok);
+        QVERIFY2(r.mensajeError.contains("Ajustado"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("45"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("déficit 70"), qPrintable(r.mensajeError));
+
+        // No se escribió nada.
+        QVERIFY(!m_servicio->obtenerTurno("Ajustado").ok);
+
+        // El mensaje es el de `errorDeEncaje`: una sola definición.
+        TurnoDTO esperado;
+        esperado.nombre   = QStringLiteral("Ajustado");
+        esperado.inicio   = QTime(7, 0);
+        esperado.fin      = QTime(11, 50);
+        esperado.numSlots = 8;
+        QCOMPARE(r.mensajeError, errorDeEncaje(esperado, 45));
+    }
+
+    void agregarEvento_trasSubirLaDuracionA45_rechazaConTurnoDuracionYDeficit()
+    {
+        QVERIFY(m_servicio->crearTurno("Largo", QTime(7, 0), QTime(11, 50), 8).ok);
+        fijarDuracion(45);
+
+        // 8 × 45 + 10 = 370 > 290: el evento rompe la invariante y no se escribe.
+        auto r = m_servicio->agregarEvento("Largo", "Receso", 2, 10);
+
+        QVERIFY(!r.ok);
+        QVERIFY2(r.mensajeError.contains("Largo"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("45"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("déficit 80"), qPrintable(r.mensajeError));
+        QVERIFY(m_servicio->obtenerTurno("Largo").valor.eventos.isEmpty());
+
+        // Mismo mensaje que `errorDeEncaje` con el candidato dentro.
+        TurnoDTO esperado = m_servicio->obtenerTurno("Largo").valor;
+        EventoDTO candidato;
+        candidato.nombre        = QStringLiteral("Receso");
+        candidato.despuesDeSlot = 2;
+        candidato.orden         = 1;
+        candidato.duracion      = 10;
+        esperado.eventos.append(candidato);
+        QCOMPARE(r.mensajeError, errorDeEncaje(esperado, 45));
+    }
+
+    void actualizarTurno_conDuracion45_rechazaSinEscribir()
+    {
+        QVERIFY(m_servicio->crearTurno("Largo", QTime(7, 0), QTime(11, 50), 8).ok);
+        fijarDuracion(45);
+
+        // Aunque la ventana no cambie, 8 franjas ya no encajan con 45 min.
+        auto r = m_servicio->actualizarTurno("Largo", QTime(7, 0), QTime(11, 50), 8);
+
+        QVERIFY(!r.ok);
+        QVERIFY2(r.mensajeError.contains("déficit 70"), qPrintable(r.mensajeError));
+
+        auto turno = m_servicio->obtenerTurno("Largo").valor;
+        QCOMPARE(turno.numSlots, 8);
+        QCOMPARE(turno.inicio, QTime(7, 0));
+        QCOMPARE(turno.fin, QTime(11, 50));
+    }
+
+    void actualizarEvento_trasSubirLaDuracion_rechazaSinEscribir()
+    {
+        QVERIFY(m_servicio->crearTurno("Largo", QTime(7, 0), QTime(11, 50), 8).ok);
+        // Con D = 35: 8 × 35 + 10 = 290, cabe justo.
+        auto creado = m_servicio->agregarEvento("Largo", "Receso", 2, 10);
+        QVERIFY2(creado.ok, qPrintable(creado.mensajeError));
+
+        fijarDuracion(45);
+
+        // Con D = 45: 8 × 45 + 12 = 372 > 290; la edición se rechaza.
+        auto r = m_servicio->actualizarEvento(creado.valor.id, "Receso", 2, 12,
+                                              QTime(), QTime(), 1);
+
+        QVERIFY(!r.ok);
+        QVERIFY2(r.mensajeError.contains("Largo"), qPrintable(r.mensajeError));
+        QVERIFY2(r.mensajeError.contains("déficit 82"), qPrintable(r.mensajeError));
+
+        auto turno = m_servicio->obtenerTurno("Largo").valor;
+        QCOMPARE(turno.eventos.size(), 1);
+        QCOMPARE(turno.eventos.first().duracion, 10); // no se escribió el 12
     }
 
     // ─── Compatibilidad retirada (T9) ─────────────────────────────────────

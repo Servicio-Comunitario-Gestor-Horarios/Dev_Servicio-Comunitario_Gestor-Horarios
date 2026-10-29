@@ -7,6 +7,8 @@
 #include <QVariant>
 
 #include "backend/services/calculo_eventos.hpp"
+#include "backend/services/ServicioConfiguracionHoraria.hpp"
+#include "backend/services/duracion_horaria.hpp"
 
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
 
@@ -24,6 +26,18 @@ namespace
 } // namespace
 
 ServicioTurnosEventos::ServicioTurnosEventos(QSqlDatabase& db) : m_db(db) {}
+
+int ServicioTurnosEventos::duracionEfectiva() const {
+    // La configuración global manda (plan §1.4): se consulta con su servicio en
+    // cada operación que valida, sin guardarla en el servicio ni en un global.
+    const auto configuracion = ServicioConfiguracionHoraria(m_db).consultar();
+    if (!configuracion.ok) {
+        qWarning() << "No se pudo leer la duración de la hora académica; se usa el defecto:"
+                   << configuracion.mensajeError;
+        return duracion_horaria::POR_DEFECTO;
+    }
+    return configuracion.valor.duracionMinutos;
+}
 
 bool ServicioTurnosEventos::validarTurno(const QString& nombre, const QTime& inicio,
                                          const QTime& fin, int numSlots,
@@ -83,6 +97,7 @@ bool ServicioTurnosEventos::validarEvento(const TurnoDTO& dto, const QString& no
 
 bool ServicioTurnosEventos::validarCoherenciaTemporal(const TurnoDTO& turno,
                                                       const EventoDTO& candidato,
+                                                      int duracionMinutos,
                                                       QString& error) const {
     const bool hayHoras = candidato.inicio.isValid() || candidato.fin.isValid();
     if (candidato.inicio.isValid() != candidato.fin.isValid()) {
@@ -109,19 +124,18 @@ bool ServicioTurnosEventos::validarCoherenciaTemporal(const TurnoDTO& turno,
         }
     }
 
-    // El reparto de la rejilla debe quedar en positivo: si los eventos ocupan
-    // toda la ventana o no dejan un minuto por franja, no encajan (RF-3, RF-4).
-    if (duracionFranjaEstimada(turno) <= 0) {
-        error = QStringLiteral("Los eventos del turno «%1» no caben en su ventana de %2 a %3.")
-                    .arg(turno.nombre,
-                         formatearHora(turno.inicio),
-                         formatearHora(turno.fin));
+    // El turno con el candidato debe encajar con la hora académica vigente: el
+    // mensaje es el único de `calculo_eventos::errorDeEncaje` (RF-4, RNF-4).
+    if (const QString errorEncaje = errorDeEncaje(turno, duracionMinutos);
+        !errorEncaje.isEmpty()) {
+        error = errorEncaje;
         return false;
     }
 
-    if (hayHoras && !eventoDentroDeVentana(candidato, turno, candidato.despuesDeSlot)) {
+    if (hayHoras && !eventoDentroDeVentana(candidato, turno, candidato.despuesDeSlot,
+                                           duracionMinutos)) {
         const QPair<QTime, QTime> ventana =
-            ventanaDePosicion(turno, candidato.despuesDeSlot);
+            ventanaDePosicion(turno, candidato.despuesDeSlot, duracionMinutos);
         error = QStringLiteral("El intervalo %1 del evento «%2» no cabe en la ventana de la"
                                " posición %3 (%4).")
                     .arg(formatearIntervalo(candidato.inicio, candidato.fin),
@@ -190,6 +204,17 @@ Resultado<TurnoDTO> ServicioTurnosEventos::crearTurno(const QString& nombre,
     QString error;
     if (!validarTurno(nombre, inicio, fin, numSlots, error)) {
         return Resultado<TurnoDTO>::error(error);
+    }
+
+    // Encaje con la hora académica configurada: sin eventos, `franjas × D ≤ ventana`.
+    TurnoDTO nuevo;
+    nuevo.nombre   = nombre.trimmed();
+    nuevo.inicio   = inicio;
+    nuevo.fin      = fin;
+    nuevo.numSlots = numSlots;
+    const QString errorEncaje = errorDeEncaje(nuevo, duracionEfectiva());
+    if (!errorEncaje.isEmpty()) {
+        return Resultado<TurnoDTO>::error(errorEncaje);
     }
 
     QSqlQuery query(m_db);
@@ -312,14 +337,13 @@ Resultado<TurnoDTO> ServicioTurnosEventos::actualizarTurno(const QString& nombre
             nuevo.eventos.append(evento);
     }
 
-    if (!nuevo.eventos.isEmpty() && duracionFranjaEstimada(nuevo) <= 0) {
-        return Resultado<TurnoDTO>::error(
-            QStringLiteral("Los eventos del turno «%1» no caben en la nueva ventana de %2 a"
-                           " %3 con %4 franjas.")
-                .arg(nuevo.nombre,
-                     formatearHora(inicio),
-                     formatearHora(fin),
-                     QString::number(numSlots)));
+    const int duracion = duracionEfectiva();
+
+    // El turno con la ventana nueva y los eventos que quedan debe encajar (RF-4).
+    // El mensaje es el único de `errorDeEncaje` (turno, D y déficit).
+    const QString errorEncaje = errorDeEncaje(nuevo, duracion);
+    if (!errorEncaje.isEmpty()) {
+        return Resultado<TurnoDTO>::error(errorEncaje);
     }
 
     // La ventana nueva no puede dejar fuera el intervalo de un evento (RF-4).
@@ -327,11 +351,11 @@ Resultado<TurnoDTO> ServicioTurnosEventos::actualizarTurno(const QString& nombre
         if (!evento.inicio.isValid() || !evento.fin.isValid())
             continue;
 
-        if (eventoDentroDeVentana(evento, nuevo, evento.despuesDeSlot))
+        if (eventoDentroDeVentana(evento, nuevo, evento.despuesDeSlot, duracion))
             continue;
 
         const QPair<QTime, QTime> ventana =
-            ventanaDePosicion(nuevo, evento.despuesDeSlot);
+            ventanaDePosicion(nuevo, evento.despuesDeSlot, duracion);
         return Resultado<TurnoDTO>::error(
             QStringLiteral("Cambiar la ventana del turno «%1» dejaría fuera el evento «%2»"
                            " (#%3, pos. %4): su intervalo %5 no cabe en la ventana %6.")
@@ -479,10 +503,10 @@ Resultado<EventoDTO> ServicioTurnosEventos::agregarEvento(const QString& turno,
     candidato.inicio        = inicio;
     candidato.fin           = fin;
 
-    // Se valida el turno con el candidato dentro: ventana, rejilla y solapes.
+    // Se valida el turno con el candidato dentro: encaje con D, ventana y solapes.
     TurnoDTO conCandidato = dto;
     conCandidato.eventos.append(candidato);
-    if (!validarCoherenciaTemporal(conCandidato, candidato, error)) {
+    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectiva(), error)) {
         return Resultado<EventoDTO>::error(error);
     }
 
@@ -592,7 +616,7 @@ Resultado<EventoDTO> ServicioTurnosEventos::actualizarEvento(int id, const QStri
             conCandidato.eventos.append(existente);
     }
     conCandidato.eventos.append(candidato);
-    if (!validarCoherenciaTemporal(conCandidato, candidato, error)) {
+    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectiva(), error)) {
         return Resultado<EventoDTO>::error(error);
     }
 
