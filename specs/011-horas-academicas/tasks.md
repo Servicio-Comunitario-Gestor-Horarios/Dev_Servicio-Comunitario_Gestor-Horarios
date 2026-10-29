@@ -9,7 +9,7 @@ añaden tareas.
 - [x] **T1. Punto único de duración: rango 30–90 y horas académicas → minutos (~25 min).** RF-1, RF-3, RNF-4
     - Hecho cuando: `cmake --preset backend`, `cmake --build --preset backend --parallel` y `ctest --test-dir build-backend --output-on-failure -R '^test_duracion_horaria$'` están en verde; `duracion_horaria::errorDeRango(29)`, `(91)` y `(5)` devuelven el mensaje con el rango, el valor **y la acción** («Ajuste la duración a un valor del rango»), y `(30)`, `(35)`, `(90)` devuelven vacío; `minutosDeHorasAcademicas(40, 35) == 1400` y `(40, 30) == 1200`; `franjasUtilizables(290, 10, 45) == 6`, `(290, 10, 35) == 8` y `(150, 10, 35) == 4`; `deficitDeEncaje(8, 290, 10, 45) == 80` y `(5, 150, 10, 35) == 35`; el módulo es puro (sin `QSql*`, sin reloj) y está en `src/backend/CMakeLists.txt`.
 
-- [ ] **T2. Esquema v4: `ConfiguracionHoraria`, catálogo y huella (~30 min).** RF-1, RF-2, RF-7
+- [x] **T2. Esquema v4: `ConfiguracionHoraria`, catálogo y huella (~30 min).** RF-1, RF-2, RF-7
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_backend_version_esquema|test_backend_apertura_base_datos|test_esquema_cursos)$'` está verde; `VERSION_ESQUEMA_ACTUAL == 4`; `crearEsquema` deja **una** fila `(1, 35)` en `ConfiguracionHoraria`; un `INSERT` con `id = 2` falla por `CHECK(id = 1)` y un valor 29/91 falla por el `CHECK` del rango; el catálogo esperado incluye la tabla y sus columnas; `HUELLAS_CONOCIDAS` tiene la entrada de la versión 4 con la huella real que imprime el test al fallar (copiada, no inventada); una base con `user_version = 3` sigue fallando al abrir.
 
 - [ ] **T3. Servicio de configuración y fachada en `NucleoDatos` (~25 min).** RF-1, RF-2

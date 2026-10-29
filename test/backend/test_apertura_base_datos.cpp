@@ -157,6 +157,24 @@ private slots:
         QVERIFY(!resultado.ok());
     }
 
+    void abrir_baseV3_fallaEsquemaSinMigrarNiBorrar()
+    {
+        // La spec 011 sube el esquema a v4 (configuración global de la hora
+        // académica). La política de la 009 sigue: una base con la marca 3 se
+        // rechaza al abrir, sin migrar, sin borrar datos y sin tocar la marca.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("v3.db");
+        crearBaseConEsquema(ruta, 3);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.detalle.contains(QStringLiteral("3")));
+        QCOMPARE(leerVersion(ruta), 3); // la marca del archivo no se reescribe
+    }
+
     void abrir_versionPosterior_fallaEsquema()
     {
         QTemporaryDir dir;

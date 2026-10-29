@@ -12,6 +12,7 @@ namespace
 {
     /// Tablas que debe tener el esquema único.
     const QStringList TABLAS_ESPERADAS = {
+        QStringLiteral("ConfiguracionHoraria"),
         QStringLiteral("Aulas"),        QStringLiteral("Profesores"),
         QStringLiteral("Materias"),     QStringLiteral("Profesor_Materia"),
         QStringLiteral("Disponibilidad_Profesor"), QStringLiteral("PlanEstudio"),
@@ -56,6 +57,11 @@ namespace
         QStringLiteral("id"), QStringLiteral("nombre"), QStringLiteral("clave")
     };
 
+    /// Columnas que debe tener la tabla `ConfiguracionHoraria` (una sola fila).
+    const QStringList COLUMNAS_CONFIGURACION = {
+        QStringLiteral("id"), QStringLiteral("duracion_minutos")
+    };
+
     /// Tablas del catálogo con sus columnas obligatorias.
     struct TablaConColumnas
     {
@@ -64,6 +70,7 @@ namespace
     };
 
     const TablaConColumnas TABLAS_CON_COLUMNAS[] = {
+        { "ConfiguracionHoraria", &COLUMNAS_CONFIGURACION },
         { "Cursos", &COLUMNAS_CURSOS },
         { "Aulas", &COLUMNAS_AULAS },
         { "Materias", &COLUMNAS_MATERIAS },

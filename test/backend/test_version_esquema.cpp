@@ -139,9 +139,9 @@ private:
 
 private slots:
 
-    void versionActual_esTres()
+    void versionActual_esCuatro()
     {
-        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 3);
+        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 4);
     }
 
     // ─── decidirApertura ────────────────────────────────────────────────────
@@ -167,8 +167,8 @@ private slots:
 
     void decidirApertura_versionAnterior_debeFallarEsquema()
     {
-        // Una base v2 (la anterior a los eventos con identidad y al catálogo) no se migra.
-        QCOMPARE(VersionEsquema::decidirApertura(true, 2, VersionEsquema::VERSION_ESQUEMA_ACTUAL),
+        // La 011 sube la marca a 4: una base v3 (sin `ConfiguracionHoraria`) no se migra.
+        QCOMPARE(VersionEsquema::decidirApertura(true, 3, VersionEsquema::VERSION_ESQUEMA_ACTUAL),
                  EstadoApertura::FalloEsquema);
     }
 
@@ -195,12 +195,68 @@ private slots:
         QVERIFY(tablaExiste(db, QStringLiteral("Cursos")));
         QVERIFY(tablaExiste(db, QStringLiteral("TiposAula")));
         QVERIFY(tablaExiste(db, QStringLiteral("Eventos")));
+        QVERIFY(tablaExiste(db, QStringLiteral("ConfiguracionHoraria")));
         QVERIFY(!tablaExiste(db, QStringLiteral("Curso_Materia")));
         QVERIFY(!tablaExiste(db, QStringLiteral("Recesos")));
 
         // Idempotente: repetir no falla ni cambia la versión.
         QVERIFY(VersionEsquema::crearEsquema(db));
         QCOMPARE(VersionEsquema::leerVersionEsquema(db), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+        cerrarBase(db);
+    }
+
+    void crearEsquema_dejaConfiguracionHorariaCon35YUnaSolaFila()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery query(db);
+        QVERIFY2(query.exec(QStringLiteral(
+                     "SELECT id, duracion_minutos FROM ConfiguracionHoraria")),
+                 qPrintable(query.lastError().text()));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 1);
+        QCOMPARE(query.value(1).toInt(), 35); // valor por defecto (RF-2)
+        QVERIFY(!query.next());               // una sola configuración global (RF-1)
+
+        // Idempotente: volver a crear el esquema no duplica la fila ni cambia el valor.
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral(
+            "SELECT COUNT(*), MAX(duracion_minutos) FROM ConfiguracionHoraria")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 1);
+        QCOMPARE(cuenta.value(1).toInt(), 35);
+
+        cerrarBase(db);
+    }
+
+    void configuracionHoraria_check_rechazaSegundaFilaYValoresFueraDeRango()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Una sola configuración por base: `CHECK(id = 1)`.
+        QSqlQuery segunda(db);
+        QVERIFY(!segunda.exec(QStringLiteral(
+            "INSERT INTO ConfiguracionHoraria (id, duracion_minutos) VALUES (2, 35)")));
+
+        // El rango 30–90 es la última barrera para escrituras directas (RF-1).
+        QSqlQuery baja(db);
+        QVERIFY(!baja.exec(QStringLiteral(
+            "UPDATE ConfiguracionHoraria SET duracion_minutos = 29 WHERE id = 1")));
+
+        QSqlQuery alta(db);
+        QVERIFY(!alta.exec(QStringLiteral(
+            "UPDATE ConfiguracionHoraria SET duracion_minutos = 91 WHERE id = 1")));
+
+        // Los rechazos no tocan el valor guardado.
+        QSqlQuery lectura(db);
+        QVERIFY(lectura.exec(QStringLiteral(
+            "SELECT duracion_minutos FROM ConfiguracionHoraria WHERE id = 1")));
+        QVERIFY(lectura.next());
+        QCOMPARE(lectura.value(0).toInt(), 35);
 
         cerrarBase(db);
     }
@@ -212,6 +268,33 @@ private slots:
         QSqlDatabase db = abrirBaseEnMemoria();
         QVERIFY(VersionEsquema::crearEsquema(db));
         QVERIFY(VersionEsquema::esquemaEsperado(db));
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_exigeLaConfiguracionHorariaYSusColumnas()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // El catálogo incluye la tabla y sus columnas.
+        QVERIFY(columnaExiste(db, QStringLiteral("ConfiguracionHoraria"), QStringLiteral("id")));
+        QVERIFY(columnaExiste(db, QStringLiteral("ConfiguracionHoraria"),
+                              QStringLiteral("duracion_minutos")));
+        QVERIFY(VersionEsquema::esquemaEsperado(db));
+
+        // Sin la tabla, el motivo la nombra como faltante.
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE ConfiguracionHoraria")));
+        QString motivo;
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("ConfiguracionHoraria")));
+
+        // Con la tabla pero sin la columna del valor, el motivo nombra la columna.
+        QVERIFY(q.exec(QStringLiteral(
+            "CREATE TABLE ConfiguracionHoraria (id INTEGER PRIMARY KEY CHECK(id = 1))")));
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("duracion_minutos")));
+
         cerrarBase(db);
     }
 
@@ -466,6 +549,7 @@ private slots:
         static const struct { int version; const char* huella; } HUELLAS_CONOCIDAS[] = {
             { 2, "b7684333c36458b0529308f9130e2a3b105c4cd4086b5f0e470a26ca917eb882" },
             { 3, "ba386397216ac9fb8d427ab4603c09ce3d8342cc5605dda16eecc78a02f1701b" },
+            { 4, "f630cc2547e21454b8273fa255124142138e254bfa8b2a580c52bf8b051f7101" },
         };
 
         QSqlDatabase db = abrirBaseEnMemoria();

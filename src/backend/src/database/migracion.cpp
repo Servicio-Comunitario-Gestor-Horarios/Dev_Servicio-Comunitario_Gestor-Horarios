@@ -158,6 +158,24 @@ namespace
             ")"
         )) return false;
 
+        // ── ConfiguracionHoraria (configuración global de la hora académica) ──
+        // Una sola fila (`CHECK(id = 1)`) con la duración en minutos; el rango
+        // 30–90 es la última barrera para escrituras directas (la validación de
+        // negocio es la de `duracion_horaria`). La creación deja el valor por
+        // defecto de 35 minutos (spec 011, RF-1 y RF-2).
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS ConfiguracionHoraria ("
+            "id INTEGER PRIMARY KEY CHECK(id = 1),"
+            "duracion_minutos INTEGER NOT NULL CHECK(duracion_minutos BETWEEN 30 AND 90),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        if (!ejecutar(query,
+            "INSERT OR IGNORE INTO ConfiguracionHoraria (id, duracion_minutos) VALUES (1, 35)"
+        )) return false;
+
         // ── Cursos ──
         // Identidad (anio, seccion) unica en todo el sistema; `aula` es una
         // referencia opcional a Aulas(id). No existe `Curso_Materia`: las materias

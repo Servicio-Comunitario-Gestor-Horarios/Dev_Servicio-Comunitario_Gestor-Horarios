@@ -70,3 +70,77 @@ D ≤ 0 → 0); `deficitDeEncaje(8, 290, 10, 45) == 80`, `(5, 150, 10, 35) == 35
   `deficitDeEncaje` devuelve el exceso positivo; con ventana ≤ 0 ambas devuelven 0.
 - `minutosDeHorasAcademicas` valida D con `errorDeRango`: con D fuera de 30–90 devuelve 0.
 - No se tocó `calculo_eventos.*`, `solver_config.cpp`, el constructor, el seed, el esquema ni `docs/`.
+
+## T2 - Esquema v4: `ConfiguracionHoraria`, catálogo y huella (2026-10-29)
+
+**Requisito:** RF-1, RF-2, RF-7 (y RNF-2 en el rechazo sin migración). **Plan:** §1.3, §2.2 (implícito),
+§3 y §9 (T2). **Base:** `fc86368`.
+
+### Rojo (tests primero)
+
+`test_version_esquema` y `test_apertura_base_datos` se escribieron antes del DDL:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_backend_version_esquema|test_backend_apertura_base_datos)$'
+[...]
+Totals: 21 passed, 6 failed, 0 skipped, 0 blacklisted   # version_esquema
+FAIL!  : TestAperturaBaseDatos::abrir_baseV3_fallaEsquemaSinMigrarNiBorrar()
+   Actual   (resultado.estado)    : 1      # OkAbierta con VERSION_ESQUEMA_ACTUAL = 3
+   Expected (Estado::FalloEsquema): 2
+```
+
+Casos: versión 4; tabla/columnas en el catálogo; fila `(1, 35)` única e idempotente; `INSERT id = 2`
+rechazado por `CHECK(id = 1)`; `UPDATE` a 29 y 91 rechazados por el `CHECK` del rango; una base con
+`user_version = 3` se rechaza al abrir y conserva su marca.
+
+### Verde
+
+Primera pasada con la huella como marcador: el test imprimió la huella real.
+
+```text
+FAIL!  : TestVersionEsquema::huellaEsquema_noCambiaSinSubirLaMarcaDeVersion()
+   Actual   (QString::fromLatin1(huella))    : "f630cc2547e21454b8273fa255124142138e254bfa8b2a580c52bf8b051f7101"
+   Expected (QString::fromLatin1(registrada)): "pendiente-de-copiar"
+```
+
+Copiada a `HUELLAS_CONOCIDAS`:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_backend_version_esquema|test_backend_apertura_base_datos|test_esquema_cursos)$'
+1/3 Test #11: test_backend_version_esquema .......   Passed    0.05 sec
+2/3 Test #12: test_esquema_cursos ................   Passed    0.02 sec
+3/3 Test #14: test_backend_apertura_base_datos ...   Passed    0.04 sec
+100% tests passed out of 3
+
+$ ctest --preset backend
+51/51 Test #51: test_ipc_aislamiento_bd ............   Passed    0.08 sec
+100% tests passed out of 51
+```
+
+La suite sigue en **51/51**: T2 añade casos a binarios existentes, no un binario nuevo (eso es T3).
+
+### Cambios
+
+- `src/backend/src/database/migracion.cpp`: DDL de `ConfiguracionHoraria` (antes de `Cursos`) con
+  `CHECK(id = 1)` y `CHECK(duracion_minutos BETWEEN 30 AND 90)`, más
+  `INSERT OR IGNORE ... VALUES (1, 35)`.
+- `src/backend/include/backend/database/version_esquema.hpp`: `VERSION_ESQUEMA_ACTUAL = 4` y comentario
+  de la v4.
+- `src/backend/src/database/version_esquema.cpp`: `ConfiguracionHoraria` en `TABLAS_ESPERADAS` y
+  `COLUMNAS_CONFIGURACION = {id, duracion_minutos}` en `TABLAS_CON_COLUMNAS`.
+- `test/backend/test_version_esquema.cpp`: versión 4, catálogo, fila por defecto, `CHECK`s y huella v4
+  copiada del fallo real (no inventada).
+- `test/backend/test_apertura_base_datos.cpp`: caso explícito de base con marca 3 → `FalloEsquema` sin
+  migrar ni reescribir la marca.
+
+### Notas
+
+- **Huella v4:** `f630cc2547e21454b8273fa255124142138e254bfa8b2a580c52bf8b051f7101`, copiada del
+  `Actual` que imprimió el test con el DDL ya aplicado.
+- **`INSERT OR IGNORE` y no `INSERT`:** `crearEsquema` es idempotente y se vuelve a llamar en tests y en
+  el flujo de catálogo (`esquemaEsperado_explicaElMotivo`), así que la fila por defecto no debe duplicar
+  ni fallar.
+- **Sin migración:** una base con `user_version = 3` se rechaza al abrir (`FalloEsquema`) y conserva su
+  marca; es el comportamiento esperado de la 009 y queda documentado en el test.
+- No se tocaron servicios, `NucleoDatos`, `calculo_eventos`, el constructor, el seed, el contrato,
+  `duracion_horaria` ni `docs/`.
