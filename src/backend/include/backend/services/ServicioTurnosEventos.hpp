@@ -93,9 +93,10 @@ public:
 private:
     QSqlDatabase& m_db;
 
-    /// Duración efectiva de la hora académica: la de la configuración global o
-    /// 35 si no hay fila (RF-1). No se guarda en el servicio: manda la base.
-    int duracionEfectiva() const;
+    /// Duración efectiva de la hora académica: la de la configuración global o 35 si no
+    /// hay fila (RF-1, RF-2). Un fallo de lectura se propaga: no se sustituye por el
+    /// defecto. No se guarda en el servicio: manda la base.
+    Resultado<int> duracionEfectiva() const;
 
     bool validarTurno(const QString& nombre, const QTime& inicio, const QTime& fin,
                       int numSlots, QString& error) const;

@@ -116,6 +116,9 @@ private slots:
         QVERIFY2(error.contains(QStringLiteral("45")), qPrintable(error));
         QVERIFY2(error.contains(QStringLiteral("déficit 80")), qPrintable(error));
         QVERIFY2(error.contains(QStringLiteral("Ajuste el número de franjas")), qPrintable(error));
+        // El déficit del mensaje es el del punto único `deficitDeEncaje`.
+        QVERIFY2(error.contains(QStringLiteral("déficit %1").arg(deficitDeEncaje(manana, 45))),
+                 qPrintable(error));
     }
 
     void errorDeEncaje_siCabe_esVacio()
@@ -285,6 +288,21 @@ private slots:
         t.eventos.append(receso);
 
         QVERIFY(!eventoDentroDeVentana(receso, t, 2, 35));
+    }
+
+    /// Regresión: un evento sin horas no tiene intervalo que comprobar y siempre entra,
+    /// incluso con una posición que no tendría ventana.
+    void eventoDentroDeVentana_sinHoras_verdadero()
+    {
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        const EventoDTO sinHoras = evento("SinHoras", 2, 1, 10);
+        t.eventos.append(sinHoras);
+
+        QVERIFY(eventoDentroDeVentana(sinHoras, t, 2, 35));
+
+        // La guarda precede al cálculo de la ventana: una posición fuera de rango tampoco
+        // convierte en falso un evento sin horas.
+        QVERIFY(eventoDentroDeVentana(sinHoras, t, 99, 35));
     }
 
     // ─── haySolapeCronologico ───────────────────────────────────────────────

@@ -94,6 +94,9 @@ QString errorDeEncaje(const TurnoDTO& turno, int duracionMinutos)
     const int eventos = tiempoDeEventos(turno);
     const int total = turno.numSlots * duracionMinutos + eventos;
 
+    // El déficit sale del punto único `deficitDeEncaje` (una sola aritmética).
+    const int deficit = deficitDeEncaje(turno, duracionMinutos);
+
     return QStringLiteral(
                "El turno «%1» no encaja con una hora académica de %2 min: %3 franjas × %2 min + "
                "%4 min de eventos = %5 min y su ventana es de %6 min (déficit %7 min). Ajuste el "
@@ -104,7 +107,7 @@ QString errorDeEncaje(const TurnoDTO& turno, int duracionMinutos)
         .arg(eventos)
         .arg(total)
         .arg(ventana)
-        .arg(total - ventana);
+        .arg(deficit);
 }
 
 QPair<QTime, QTime> ventanaDePosicion(const TurnoDTO& turno, int posicion,

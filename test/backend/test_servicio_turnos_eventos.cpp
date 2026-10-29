@@ -684,6 +684,57 @@ private slots:
         QCOMPARE(turno.eventos.first().duracion, 10); // no se escribió el 12
     }
 
+    // ─── Lectura de la configuración: «sin fila» frente a fallo (RF-1, RF-2) ──
+
+    /// Caso legítimo: la tabla existe y no hay fila → valor efectivo 35 y la operación sigue.
+    void configuracionSinFila_valorEfectivo35_permiteCrearTurnoYEvento()
+    {
+        {
+            QSqlQuery borrar(m_dbManager->database());
+            QVERIFY2(borrar.exec(QStringLiteral("DELETE FROM ConfiguracionHoraria")),
+                     qPrintable(borrar.lastError().text()));
+        }
+
+        // 8 × 35 = 280 ≤ 290: el turno se crea con el valor efectivo por defecto.
+        auto turno = m_servicio->crearTurno("SinConfig", QTime(7, 0), QTime(11, 50), 8);
+        QVERIFY2(turno.ok, qPrintable(turno.mensajeError));
+        QCOMPARE(turno.valor.numSlots, 8);
+
+        // 8 × 35 + 10 = 290: el evento también encaja con el defecto.
+        auto evento = m_servicio->agregarEvento("SinConfig", "Receso", 2, 10);
+        QVERIFY2(evento.ok, qPrintable(evento.mensajeError));
+        QCOMPARE(m_servicio->obtenerTurno("SinConfig").valor.eventos.size(), 1);
+    }
+
+    /// Caso de fallo: la lectura de la configuración falla → error del servicio y nada escrito.
+    /// No es «sin fila»: aquí la tabla no se puede consultar.
+    void configuracionIlegible_fallaSinEscribir()
+    {
+        // Turno previo con la configuración todavía legible.
+        QVERIFY(m_servicio->crearTurno("Base", QTime(7, 0), QTime(11, 50), 8).ok);
+
+        // La tabla desaparece: `consultar()` devuelve error, no «sin fila».
+        {
+            QSqlQuery borrar(m_dbManager->database());
+            QVERIFY2(borrar.exec(QStringLiteral("DROP TABLE ConfiguracionHoraria")),
+                     qPrintable(borrar.lastError().text()));
+        }
+
+        auto creado = m_servicio->crearTurno("Nuevo", QTime(7, 0), QTime(11, 50), 8);
+        QVERIFY(!creado.ok);
+        QVERIFY2(creado.mensajeError.contains(
+                     QStringLiteral("No se pudo consultar la duración de la hora académica")),
+                 qPrintable(creado.mensajeError));
+        QVERIFY(!m_servicio->obtenerTurno("Nuevo").ok); // no se escribió el turno
+
+        auto evento = m_servicio->agregarEvento("Base", "Receso", 2, 10);
+        QVERIFY(!evento.ok);
+        QVERIFY2(evento.mensajeError.contains(
+                     QStringLiteral("No se pudo consultar la duración de la hora académica")),
+                 qPrintable(evento.mensajeError));
+        QVERIFY(m_servicio->obtenerTurno("Base").valor.eventos.isEmpty());
+    }
+
     // ─── Compatibilidad retirada (T9) ─────────────────────────────────────
     //
     // La vista de recesos y los métodos antiguos ya no existen: los eventos son

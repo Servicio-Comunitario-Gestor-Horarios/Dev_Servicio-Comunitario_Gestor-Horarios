@@ -8,7 +8,6 @@
 
 #include "backend/services/calculo_eventos.hpp"
 #include "backend/services/ServicioConfiguracionHoraria.hpp"
-#include "backend/services/duracion_horaria.hpp"
 
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
 
@@ -27,16 +26,15 @@ namespace
 
 ServicioTurnosEventos::ServicioTurnosEventos(QSqlDatabase& db) : m_db(db) {}
 
-int ServicioTurnosEventos::duracionEfectiva() const {
-    // La configuración global manda (plan §1.4): se consulta con su servicio en
-    // cada operación que valida, sin guardarla en el servicio ni en un global.
+Resultado<int> ServicioTurnosEventos::duracionEfectiva() const {
+    // La configuración global manda (plan §1.4): se consulta con su servicio en cada
+    // operación que valida, sin guardarla en el servicio ni en un global. El servicio ya
+    // distingue «sin fila» (35) de un fallo de lectura (error): aquí solo se propaga.
     const auto configuracion = ServicioConfiguracionHoraria(m_db).consultar();
     if (!configuracion.ok) {
-        qWarning() << "No se pudo leer la duración de la hora académica; se usa el defecto:"
-                   << configuracion.mensajeError;
-        return duracion_horaria::POR_DEFECTO;
+        return Resultado<int>::error(configuracion.mensajeError, configuracion.codigoError);
     }
-    return configuracion.valor.duracionMinutos;
+    return Resultado<int>::exito(configuracion.valor.duracionMinutos);
 }
 
 bool ServicioTurnosEventos::validarTurno(const QString& nombre, const QTime& inicio,
@@ -212,7 +210,14 @@ Resultado<TurnoDTO> ServicioTurnosEventos::crearTurno(const QString& nombre,
     nuevo.inicio   = inicio;
     nuevo.fin      = fin;
     nuevo.numSlots = numSlots;
-    const QString errorEncaje = errorDeEncaje(nuevo, duracionEfectiva());
+
+    // Un fallo de lectura de la configuración impide validar: se propaga sin escribir.
+    const auto duracion = duracionEfectiva();
+    if (!duracion.ok) {
+        return Resultado<TurnoDTO>::error(duracion.mensajeError, duracion.codigoError);
+    }
+
+    const QString errorEncaje = errorDeEncaje(nuevo, duracion.valor);
     if (!errorEncaje.isEmpty()) {
         return Resultado<TurnoDTO>::error(errorEncaje);
     }
@@ -337,11 +342,15 @@ Resultado<TurnoDTO> ServicioTurnosEventos::actualizarTurno(const QString& nombre
             nuevo.eventos.append(evento);
     }
 
-    const int duracion = duracionEfectiva();
+    // Un fallo de lectura de la configuración impide validar: se propaga sin escribir.
+    const auto duracion = duracionEfectiva();
+    if (!duracion.ok) {
+        return Resultado<TurnoDTO>::error(duracion.mensajeError, duracion.codigoError);
+    }
 
     // El turno con la ventana nueva y los eventos que quedan debe encajar (RF-4).
     // El mensaje es el único de `errorDeEncaje` (turno, D y déficit).
-    const QString errorEncaje = errorDeEncaje(nuevo, duracion);
+    const QString errorEncaje = errorDeEncaje(nuevo, duracion.valor);
     if (!errorEncaje.isEmpty()) {
         return Resultado<TurnoDTO>::error(errorEncaje);
     }
@@ -351,11 +360,11 @@ Resultado<TurnoDTO> ServicioTurnosEventos::actualizarTurno(const QString& nombre
         if (!evento.inicio.isValid() || !evento.fin.isValid())
             continue;
 
-        if (eventoDentroDeVentana(evento, nuevo, evento.despuesDeSlot, duracion))
+        if (eventoDentroDeVentana(evento, nuevo, evento.despuesDeSlot, duracion.valor))
             continue;
 
         const QPair<QTime, QTime> ventana =
-            ventanaDePosicion(nuevo, evento.despuesDeSlot, duracion);
+            ventanaDePosicion(nuevo, evento.despuesDeSlot, duracion.valor);
         return Resultado<TurnoDTO>::error(
             QStringLiteral("Cambiar la ventana del turno «%1» dejaría fuera el evento «%2»"
                            " (#%3, pos. %4): su intervalo %5 no cabe en la ventana %6.")
@@ -506,7 +515,14 @@ Resultado<EventoDTO> ServicioTurnosEventos::agregarEvento(const QString& turno,
     // Se valida el turno con el candidato dentro: encaje con D, ventana y solapes.
     TurnoDTO conCandidato = dto;
     conCandidato.eventos.append(candidato);
-    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectiva(), error)) {
+    // Un fallo de lectura de la configuración impide validar: se propaga sin escribir.
+    const auto duracionEfectivaActual = duracionEfectiva();
+    if (!duracionEfectivaActual.ok) {
+        return Resultado<EventoDTO>::error(duracionEfectivaActual.mensajeError,
+                                           duracionEfectivaActual.codigoError);
+    }
+    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectivaActual.valor,
+                                   error)) {
         return Resultado<EventoDTO>::error(error);
     }
 
@@ -616,7 +632,14 @@ Resultado<EventoDTO> ServicioTurnosEventos::actualizarEvento(int id, const QStri
             conCandidato.eventos.append(existente);
     }
     conCandidato.eventos.append(candidato);
-    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectiva(), error)) {
+    // Un fallo de lectura de la configuración impide validar: se propaga sin escribir.
+    const auto duracionEfectivaActual = duracionEfectiva();
+    if (!duracionEfectivaActual.ok) {
+        return Resultado<EventoDTO>::error(duracionEfectivaActual.mensajeError,
+                                           duracionEfectivaActual.codigoError);
+    }
+    if (!validarCoherenciaTemporal(conCandidato, candidato, duracionEfectivaActual.valor,
+                                   error)) {
         return Resultado<EventoDTO>::error(error);
     }
 

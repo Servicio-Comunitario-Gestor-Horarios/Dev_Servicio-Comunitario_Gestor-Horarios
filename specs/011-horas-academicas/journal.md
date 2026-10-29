@@ -616,3 +616,34 @@ Migrados a la firma con D (aportaban algo que T4 no cubre):
 - No quedan comentarios que anuncien el legado (`grep` de «legado» vacío en los archivos tocados).
 - No se tocaron `solver_config.cpp`, el constructor, el seed, el esquema, `duracion_horaria` ni
   `docs/`.
+
+## Correcciones de la validación (2026-10-29)
+
+**Hallazgos:** I1 (configuración ilegible), I2 (déficit por el punto único) y M5 (cobertura de evento
+sin horas). **Base:** `059815b`.
+
+### Cambios
+
+- **I1:** `ServicioTurnosEventos::duracionEfectiva()` devuelve `Resultado<int>` y **propaga** el error
+  de `ServicioConfiguracionHoraria::consultar()` (sin `qWarning` ni 35 de reserva). Los cuatro caminos
+  (`crearTurno`, `actualizarTurno`, `agregarEvento`, `actualizarEvento`) devuelven ese error tal cual y
+  no escriben. «Sin fila» sigue siendo 35 y no es error (RF-2).
+- **I2:** `errorDeEncaje` obtiene el déficit de `deficitDeEncaje(turno, D)`; `total` se conserva solo
+  para el texto. Una sola aritmética del déficit.
+- **M5:** vuelve `eventoDentroDeVentana_sinHoras_verdadero` (evento sin horas → `true`, también con
+  posición fuera de rango, porque la guarda precede al cálculo de la ventana).
+
+### Tests
+
+- `test_servicio_turnos_eventos`: `configuracionSinFila_valorEfectivo35_permiteCrearTurnoYEvento`
+  (fila borrada, tabla existente) y `configuracionIlegible_fallaSinEscribir` (tabla dropeada: error del
+  servicio y nada escrito en `Turnos`/`Eventos`). **44 casos** en verde.
+- `test_calculo_eventos`: `eventoDentroDeVentana_sinHoras_verdadero` y el cruce del «déficit 80» con
+  `deficitDeEncaje`. **31 casos** en verde.
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_turnos_eventos|test_calculo_eventos|test_backend_nucleo_datos|test_backend_cascada)$'
+100% tests passed out of 4
+$ ctest --preset backend
+52/52 … 100% tests passed out of 52
+```
