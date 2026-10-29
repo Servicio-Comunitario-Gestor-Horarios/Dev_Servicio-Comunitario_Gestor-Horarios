@@ -106,6 +106,9 @@ if(TARGET backend)
 				backend/test_servicio_configuracion_horaria.cpp
 				backend Qt6::Sql
 	)
+
+	# Modelo puro de preferencias y validación compartida de franjas (012 T1).
+	add_gtest(test_preferencias backend/test_preferencias.cpp backend)
 endif()
 
 # ============================================================

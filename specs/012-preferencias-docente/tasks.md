@@ -3,7 +3,7 @@
 Todas las tareas: **20–30 min**. Orden y dependencias: T1 → T3; T2 → T3; T3 → T4; T3,T4 → T5; T2 → T6;
 T6 → T7; T3,T4 → T8; todo → T9. Ninguna tarea cierra con el árbol sin compilar.
 
-- [ ] **T1. Modelo puro y validación compartida de día/rango (~25 min).** RF-1, RF-2, RNF-1
+- [x] **T1. Modelo puro y validación compartida de día/rango (~25 min).** RF-1, RF-2, RNF-1
     - Hecho cuando: `cmake --preset backend`, `cmake --build --preset backend --parallel` y `ctest --test-dir build-backend --output-on-failure -R '^(test_preferencias|test_servicio_profesor)$'` están en verde; `franja_horaria::errorDeFranja` rechaza `-1`, `7`, horas inválidas e inicio ≥ fin con mensaje que incluye el valor y la acción, y acepta 0/6; `haySolape(08–10, 09–11)` es verdadero y `(08–10, 10–12)` falso; `textoDeSentido`/`sentidoDesdeTexto` hacen ida y vuelta; `sentidoValido` rechaza un valor casteado; `ServicioProfesor.cpp` usa la validación compartida y su suite sigue verde.
 
 - [ ] **T2. Esquema v5: `Preferencia_Profesor`, catálogo y huella (~30 min).** RF-1, RF-6

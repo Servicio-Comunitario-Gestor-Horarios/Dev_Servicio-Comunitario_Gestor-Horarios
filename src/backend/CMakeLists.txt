@@ -48,6 +48,8 @@ target_sources(backend PRIVATE
 				src/services/ServicioTurnosEventos.cpp
 				src/services/calculo_eventos.cpp
 				src/services/duracion_horaria.cpp
+				src/services/franja_horaria_validacion.cpp
+				src/services/preferencias.cpp
 				src/services/ServicioConfiguracionHoraria.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
