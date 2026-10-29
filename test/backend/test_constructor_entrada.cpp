@@ -40,9 +40,9 @@ private:
         EventoDTO evento;
         evento.id = 1; evento.nombre = QStringLiteral("Receso");
         evento.despuesDeSlot = 1; evento.orden = 1; evento.duracion = 10;
-        // Ventana de la posición 1: turno 07:00–12:00 (300 min) − 10 min del evento = 290;
-        // 290 / 6 = 48 min de franja → 07:48–07:58, donde cabe el evento.
-        evento.inicio = QTime(7, 48); evento.fin = QTime(7, 58);
+        // Ventana de la posición 1 con la franja de 45 min: 07:00 + 45 = 07:45, y la
+        // duración de 10 min la cierra a las 07:55, donde cabe el evento.
+        evento.inicio = QTime(7, 45); evento.fin = QTime(7, 55);
         TurnoDTO turno;
         turno.nombre = QStringLiteral("manana");
         turno.inicio = QTime(7, 0); turno.fin = QTime(12, 0);
@@ -173,8 +173,8 @@ private slots:
         QCOMPARE(evento["despues_de_slot"].toInt(), 1);
         QCOMPARE(evento["orden"].toInt(), 1);
         QCOMPARE(evento["duracion"].toInt(), 10);
-        QCOMPARE(evento["inicio"].toString(), QStringLiteral("07:48"));
-        QCOMPARE(evento["fin"].toString(), QStringLiteral("07:58"));
+        QCOMPARE(evento["inicio"].toString(), QStringLiteral("07:45"));
+        QCOMPARE(evento["fin"].toString(), QStringLiteral("07:55"));
     }
 
     /// RF-1: se emite una entrada por evento, aunque compartan posición.

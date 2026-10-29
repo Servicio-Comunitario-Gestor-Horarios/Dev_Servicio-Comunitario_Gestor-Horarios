@@ -432,3 +432,63 @@ Tarde|13:50|14:00
   de 20 min (`8 × 35 + 10 + 20 = 310 > 290`, «déficit 20»).
 - No se tocaron `calculo_eventos` (legado vivo), `solver_config.cpp`, el constructor, el esquema,
   `duracion_horaria` ni `docs/`.
+
+## T6 - Contrato 2.0: rango 30–90, no entero y encaje (2026-10-29)
+
+**Requisito:** RF-5 (y RF-1). **Plan:** §1.5, §2.2, §5, §9 (T6) y decisión 11. **Base:** `c913d87`.
+
+### Rojo (tests primero)
+
+Nuevos casos de V2 (rango 1/5/29/91, válidos 30/35/45/90), V1 (`35.5`), encaje del turno sin eventos,
+y recálculo de las horas de evento a la rejilla de 45 min. Contra la regla `> 0` y la franja estimada:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_validador_entrada|test_cargador_configuracion|test_contrato_solver)$'
+FAIL!  : …v2_eventoConHorarioValido_pasa() … (V2: el intervalo 08:30–08:40 … (08:36–08:46).)
+FAIL!  : …v2_duracionMinutosFueraDeRango_falla() '!resultado.ok' returned FALSE. (1)
+FAIL!  : …v1_duracionMinutosNoEntera_falla() … (V2: duracion_minutos debe ser mayor que 0.)
+FAIL!  : …v2_turnoQueNoEncaja_falla() '!resultado.ok' returned FALSE. ()
+Totals: 52 passed, 6 failed
+```
+
+El caso de `35.5` mostró el problema real: el parseo la convierte en **0** y V2 decía «mayor que 0».
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_validador_entrada|test_cargador_configuracion|test_contrato_solver)$'
+100% tests passed out of 3
+$ ctest --preset backend
+52/52 Test #52: test_ipc_aislamiento_bd ...............   Passed    0.07 sec
+100% tests passed out of 52
+```
+
+### Cambios
+
+- `solver_config.cpp`:
+  - **V1:** si `franja_horaria.duracion_minutos` existe y no es un número entero, se rechaza citando el
+    valor (`V1: duracion_minutos debe ser un entero; se recibió «35.5».`).
+  - **V2:** el rango sale de `duracion_horaria::errorDeRango` (punto único) y se prefija `V2: `.
+  - **V2 (turnos):** todos los turnos con ventana se validan con `errorDeEncaje(turno, D)` del propio
+    contrato, aunque no tengan eventos; se elimina la comprobación con `duracionFranjaEstimada` y las
+    llamadas de ventana de posición pasan a las firmas con D. Comentario de la función actualizado.
+- `test/backend/test_validador_entrada.cpp`: casos nuevos y recálculo de fixtures a D = 45.
+- `test/backend/test_contrato_solver.cpp`: solo el comentario de la ventana (47 → 45 min); los datos
+  ya encajaban (`6 × 45 + 15 = 285 ≤ 300`).
+- `test/backend/test_constructor_entrada.cpp`: el evento del dominio pasa de 07:48–07:58 a
+  **07:45–07:55** (rejilla de 45 min), porque V2 ya rechaza el reparto antiguo. T7 lo llevará a la
+  rejilla de 35 (07:35–07:45) al cambiar la firma del constructor.
+
+### Notas
+
+- **Fixtures ajustados con aritmética:**
+  - `conFranjasUtiles40`: 8 franjas × 45 = 360 → la ventana del turno pasa a 07:00–13:00 (antes 300).
+  - Eventos del turno 07:00–12:00 con D = 45: la posición 2 pasa de 08:36–08:46 a **08:30–08:40**;
+    solapes y cronología se recalculan sobre 08:30 (6+6 y 4+5).
+  - Duración 90: 6 × 90 = 540 → ventana 07:00–16:00 para el caso «pasa».
+- `configValida()` del cargador (45, 6 franjas, evento de 30 min en 08:30–09:00) sigue válida:
+  `6 × 45 + 30 = 300` = ventana.
+- No se relajó ninguna aserción: el antiguo `v2_duracionMinutosUno_pasa` se sustituye por el rechazo
+  de 1, que es justo la regla nueva.
+- No se tocaron `calculo_eventos` (legado vivo), el constructor, el seed, el esquema, `duracion_horaria`
+  ni `docs/`.

@@ -1,6 +1,7 @@
 #include "backend/solver/config/solver_config.hpp"
 
 #include "backend/services/calculo_eventos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
 #include <QJsonArray>
@@ -8,6 +9,8 @@
 #include <QPair>
 #include <QStringList>
 #include <QTime>
+
+#include <cmath>
 
 namespace {
 
@@ -404,14 +407,26 @@ QString validarEstructura(const QJsonObject& obj)
     for (const QString& clave : requeridas)
         if (!obj.contains(clave))
             return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
+
+    // La duración, si está, debe ser un número entero de minutos: `35.5` se rechaza aquí,
+    // citando el valor recibido, antes de que el parseo la convierta en 0 (RF-5, RNF-1).
+    const QJsonObject franja = obj.value(QLatin1String("franja_horaria")).toObject();
+    if (franja.contains(QLatin1String("duracion_minutos"))) {
+        const QJsonValue duracion = franja.value(QLatin1String("duracion_minutos"));
+        if (!duracion.isDouble() || duracion.toDouble() != std::floor(duracion.toDouble()))
+            return QStringLiteral("V1: duracion_minutos debe ser un entero; se recibió «%1».")
+                .arg(duracion.toVariant().toString());
+    }
     return {};
 }
 
-/// V2. Tipos/rangos + peso >= 0 + duracion_minutos > 0.
+/// V2. Tipos/rangos + peso >= 0 + duracion_minutos en 30–90 (punto único de la 011).
 QString validarTiposYRangos(const SolverConfig& c)
 {
-    if (c.franja_horaria.duracion_minutos <= 0)
-        return QStringLiteral("V2: duracion_minutos debe ser mayor que 0.");
+    const QString errorDuracion =
+        duracion_horaria::errorDeRango(c.franja_horaria.duracion_minutos);
+    if (!errorDuracion.isEmpty())
+        return QStringLiteral("V2: ") + errorDuracion;
     for (const ProfesorSolverConfig& p : c.profesores)
         for (const MateriaSuplente& s : p.materias_suplente)
             if (s.peso < 0)
@@ -419,13 +434,13 @@ QString validarTiposYRangos(const SolverConfig& c)
     return {};
 }
 
-/// V2 (eventos). Forma y temporalidad de los eventos del turno (RF-5 de la 010).
+/// V2 (eventos). Forma y temporalidad de los eventos del turno (RF-5 de la 010) y encaje de
+/// todos los turnos con la hora académica del contrato (RF-4, RF-5 de la 011).
 ///
-/// Reutiliza las funciones puras de `calculo_eventos` de la 009 —`duracionFranjaEstimada`,
-/// `ventanaDePosicion`, `eventoDentroDeVentana` y `haySolapeCronologico`— convirtiendo
-/// `EventoConfig`/`TurnoConfig` a `EventoDTO`/`TurnoDTO`, de modo que la semántica es la misma que
-/// la del servicio de turnos. Puro: no lee el reloj. La 011 es la que estrecha `duracion` a 30–90;
-/// aquí solo se exige mayor que 0.
+/// Reutiliza las funciones puras de `calculo_eventos` —`errorDeEncaje`, `ventanaDePosicion`,
+/// `eventoDentroDeVentana` y `haySolapeCronologico`— convirtiendo
+/// `EventoConfig`/`TurnoConfig` a `EventoDTO`/`TurnoDTO`, de modo que la semántica es la misma
+/// que la del servicio de turnos. Puro: no lee el reloj.
 QString validarEventos(const SolverConfig& c)
 {
     // 1. Forma de cada evento y referencia a su turno.
@@ -504,26 +519,34 @@ QString validarEventos(const SolverConfig& c)
             hayHoras = hayHoras || evento.inicio.isValid();
             dto.eventos.append(evento);
         }
-        if (dto.eventos.isEmpty())
-            continue;
-
         // Un evento con horario exige la ventana del turno: sin ella no hay rejilla que comprobar.
         if (hayHoras && (!dto.inicio.isValid() || !dto.fin.isValid()))
             return QStringLiteral("V2: el turno «%1» no declara una ventana inicio/fin válida (inicio "
                                   "«%2», fin «%3») y tiene eventos con horario.")
                 .arg(t.nombre, t.inicio, t.fin);
 
-        if (dto.inicio.isValid() && dto.fin.isValid() && duracionFranjaEstimada(dto) <= 0)
-            return QStringLiteral("V2: los eventos del turno «%1» no caben en su ventana de %2 a %3.")
-                .arg(t.nombre, formatearHora(dto.inicio), formatearHora(dto.fin));
+        // Encaje con la hora académica del contrato, aunque el turno no tenga eventos (RF-4,
+        // RF-5): `franjas × D + eventos ≤ ventana`, con turno, D y déficit en el mensaje.
+        if (dto.inicio.isValid() && dto.fin.isValid()) {
+            const QString errorEncaje =
+                errorDeEncaje(dto, c.franja_horaria.duracion_minutos);
+            if (!errorEncaje.isEmpty())
+                return QStringLiteral("V2: ") + errorEncaje;
+        }
+
+        if (dto.eventos.isEmpty())
+            continue;
 
         for (const EventoDTO& evento : dto.eventos) {
             if (!evento.inicio.isValid() || !evento.fin.isValid())
                 continue;
-            if (eventoDentroDeVentana(evento, dto, evento.despuesDeSlot))
+            if (eventoDentroDeVentana(evento, dto, evento.despuesDeSlot,
+                                      c.franja_horaria.duracion_minutos))
                 continue;
 
-            const QPair<QTime, QTime> ventana = ventanaDePosicion(dto, evento.despuesDeSlot);
+            const QPair<QTime, QTime> ventana =
+                ventanaDePosicion(dto, evento.despuesDeSlot,
+                                  c.franja_horaria.duracion_minutos);
             return QStringLiteral("V2: el intervalo %1 del evento «%2» no cabe en la ventana de la "
                                   "posición %3 (%4).")
                 .arg(formatearIntervalo(evento.inicio, evento.fin), evento.nombre)

@@ -49,8 +49,8 @@ private:
         receso["despues_de_slot"]  = 2;
         receso["orden"]            = 1;
         receso["duracion"]         = 10;
-        // Ventana de la posición 2: turno 07:00–12:00 (300 min) − 15 min de eventos = 285;
-        // 285 / 6 = 47 min de franja → la posición 2 abarca 08:34–08:49.
+        // Ventana de la posición 2 con la franja de 45 min: 07:00 + 2 × 45 = 08:30, y la
+        // suma de duraciones (15 min) la cierra a las 08:45; el receso va de 08:34 a 08:44.
         receso["inicio"]           = QStringLiteral("08:34");
         receso["fin"]              = QStringLiteral("08:44");
         QJsonObject acto;
