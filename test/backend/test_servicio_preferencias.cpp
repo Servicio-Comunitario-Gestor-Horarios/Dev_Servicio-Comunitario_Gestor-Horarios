@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
+#include <backend/services/ServicioGeneracion.hpp>
 #include <backend/services/ServicioPreferencias.hpp>
 
 /// Tests del servicio de preferencias horarias del docente (RF-1, RF-2, RF-3,
@@ -458,6 +459,49 @@ private slots:
         QVERIFY(m_servicio->listar(QStringLiteral("P1")).valor.isEmpty());
         QCOMPARE(m_servicio->listar(QStringLiteral("P2")).valor.size(), 1);
         QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
+    }
+
+    // ─── Sin efecto en la generación ni en la huella (RF-5) ─────────────────
+
+    /// Las preferencias no viajan al solver ni entran en la huella: cambiarlas no marca
+    /// «datos anteriores» mientras el solver no las consuma.
+    void huellaDatos_noCambiaConLasPreferenciasYtoProfesorLasIgnora()
+    {
+        DatosDominio sinPreferencias;
+        ProfesorDTO docente;
+        docente.id = QStringLiteral("P1");
+        docente.nombre = QStringLiteral("Ana");
+        DisponibilidadDTO disponibilidad;
+        disponibilidad.franja = franja(1, 8, 0, 10, 0);
+        docente.disponibilidad = {disponibilidad};
+        sinPreferencias.docentes = {docente};
+
+        const QString huellaBase = huellaDatos(sinPreferencias, 35);
+        QVERIFY(!huellaBase.isEmpty());
+
+        PreferenciaDTO preferencia;
+        preferencia.id = 7;
+        preferencia.idProfesor = QStringLiteral("P1");
+        preferencia.franja = franja(2, 14, 0, 16, 0);
+        preferencia.sentido = SentidoPreferencia::Preferida;
+
+        DatosDominio conPreferencias = sinPreferencias;
+        conPreferencias.docentes[0].preferencias = {preferencia};
+        QCOMPARE(conPreferencias.docentes[0].preferencias.size(), 1);
+
+        // La huella es la misma con y sin la preferencia (RF-5).
+        QCOMPARE(huellaDatos(conPreferencias, 35), huellaBase);
+
+        // Tampoco influye su contenido: otro sentido deja la misma huella.
+        DatosDominio conOtra = conPreferencias;
+        conOtra.docentes[0].preferencias[0].sentido = SentidoPreferencia::Evitada;
+        QCOMPARE(huellaDatos(conOtra, 35), huellaBase);
+
+        // `toProfesor()` no copia las preferencias: el modelo del solver no cambia.
+        const Profesor antes = sinPreferencias.docentes[0].toProfesor();
+        const Profesor despues = conPreferencias.docentes[0].toProfesor();
+        QCOMPARE(despues.toJson(), antes.toJson());
+        QCOMPARE(despues.disponibilidad.size(), 1);
     }
 
     void limpiar_sinPreferencias_devuelveCero()

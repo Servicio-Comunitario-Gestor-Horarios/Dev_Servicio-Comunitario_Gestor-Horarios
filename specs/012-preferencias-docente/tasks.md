@@ -25,7 +25,7 @@ T6 → T7; T3,T4 → T8; todo → T9. Ninguna tarea cierra con el árbol sin com
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^test_seed_aplicacion$'` está verde; con una preferencia preinsertada, `--solo-docentes` y `--reemplazar` terminan sin fallar por claves foráneas y dejan 0 preferencias; con una preferencia preinsertada y `simularFalloTrasDocentes`, la preferencia y la variante anterior siguen completas (rollback); dos siembras del mismo perfil coinciden también en `Preferencia_Profesor`; el comentario (`:347`) y la lista (`:350`) de «las 11 tablas» de
   `test_seed_aplicacion.cpp` pasan a 12 tablas con `Preferencia_Profesor`.
 
-- [ ] **T8. Huella intacta y sin efecto en la generación (~20 min).** RF-5
+- [x] **T8. Huella intacta y sin efecto en la generación (~20 min).** RF-5
     - Hecho cuando: `cmake --build --preset backend --parallel` compila y `ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_generacion|test_servicio_preferencias)$'` está verde; `grep -rn "preferencia" src/backend/src/services/ServicioGeneracion.cpp src/backend/include/backend/services/ServicioGeneracion.hpp` está vacío; en `test_servicio_preferencias`, una instantánea con una `PreferenciaDTO` añadida a `ProfesorDTO::preferencias` da el **mismo** `huellaDatos` que sin ella; `ProfesorDTO::toProfesor()` no incluye preferencias; la condición futura queda anotada en el plan y en la guía (§8.1), no en el código.
 
 - [ ] **T9. Documentación (la aplica el coordinator) y regresión global (~30 min).** RF-8, RNF-5, RNF-6

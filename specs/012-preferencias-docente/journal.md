@@ -409,3 +409,47 @@ $ ctest --preset backend
 - **Determinismo:** la comparación de dos siembras ya incluye `Preferencia_Profesor` (T6); ambas
   quedan con 0 filas.
 - No se tocaron el esquema, los servicios, el DTO, la cascada, `ServicioGeneracion` ni `docs/`.
+
+## T8 - Huella intacta y sin efecto en la generación (2026-10-29)
+
+**Requisito:** RF-5. **Plan:** §1.7, §8.1 (punto 6) y §10 (T8). **Base:** `43c222c`.
+
+### Verde (prueba de guardia, sin cambio de producción)
+
+T8 **no cambia comportamiento**: demuestra que la huella y el modelo del solver siguen intactos. El
+test nuevo pasa con el código actual y fallará si alguien introduce las preferencias en la huella.
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_generacion|test_servicio_preferencias)$'
+1/2 Test #25: test_servicio_generacion .........   Passed    0.09 sec
+2/2 Test #47: test_servicio_preferencias .......   Passed    0.08 sec
+100% tests passed out of 2
+
+$ ./build-backend/test/test_servicio_preferencias → Totals: 31 passed, 0 failed
+
+$ grep -in "preferencia" src/backend/src/services/ServicioGeneracion.cpp \
+      src/backend/include/backend/services/ServicioGeneracion.hpp
+(vacío; exit 1)
+
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+### Cambios
+
+- `test/backend/test_servicio_preferencias.cpp`: nuevo caso
+  `huellaDatos_noCambiaConLasPreferenciasYtoProfesorLasIgnora`.
+
+### Notas
+
+- **Qué prueba:** construye un `DatosDominio` con un docente (con disponibilidad), calcula
+  `huellaDatos(sin, 35)` y añade una `PreferenciaDTO` a `ProfesorDTO::preferencias`. La huella es
+  **idéntica**; cambiar el `sentido` de la preferencia tampoco la mueve. `toProfesor()` de ambos DTO
+  devuelve el mismo `toJson()` (la disponibilidad sí viaja, la preferencia no).
+- **Sin base:** el test vive en `test_servicio_preferencias` (tiene base por otros casos), pero la
+  comprobación de huella es pura; `test_servicio_generacion` no se tocó y sigue igual.
+- **Condición futura:** ya está anotada en el plan §1.7 («cuando una spec del solver las consuma,
+  deberán añadirse al DTO de dominio y a la huella en el mismo cambio») y en §8.1 punto 6, que el
+  coordinator llevará a la guía en T9. No se añadió ningún comentario en `ServicioGeneracion` (el
+  `grep` sigue vacío).
+- No se tocaron el esquema, los servicios de escritura, el seed ni `docs/`.
