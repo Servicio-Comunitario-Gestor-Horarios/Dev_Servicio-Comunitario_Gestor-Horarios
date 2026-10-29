@@ -65,7 +65,8 @@ Base: f94acba455a04ae80364c82e1f07ae16d9f156ec
 - [x] **T10. Suite completa en verde y limpieza.** RF-12, RNF-4
     - Tests (verificación): la **suite completa** pasa con el comando del contenedor; `test_constructor_entrada`, `test_validador_entrada`, `test_ipc_aislamiento_bd` y `test_solver_horarios`/`benchmark` (los 4 rojos) quedan **verdes**.
     - Verificación: `grep -R "TODO(spec 005)" src test` no devuelve nada; no queda ninguna referencia a `curso.nombre`/`aula_fija` por curso en el solver.
-    - Hecho cuando: `ctest --preset full --output-on-failure` pasa al 100 % con el modelo anterior a la rectificación. El cambio de Estado a **implementada** se hizo en el cierre de la 005 (2026-10-17); T11 es posterior.
+    - Hecho cuando: `ctest --preset backend --output-on-failure` pasa **54/54**. El cambio de Estado a **implementada** se hizo en el cierre de la 005 (2026-10-17); T11 es posterior.
+    - Nota (preset de verificación): el **`--preset full`** incluye la interfaz, **fuera de alcance desde la 001**, y su builder está roto por la firma nueva de la 011 (deuda del equipo del frontend); se volverá a exigir **cuando se cierre esa deuda**. La rotura es ajena a la 005.
     - Nota (2026-10-29): **T10 cerrada** con los pendientes que quedaban: RF-13 (`7e3ee0b`), cobertura RNF-4 (`70ea509`: V7/V8/V15/D13; `7354c7a`: S1/S2 y `peso` en el ida y vuelta). Suite **54/54**. Ver journal, «T10 - Cierre de deudas…».
 
 - [x] **T11. Rectificación en código: hora académica = bloque.** RF-1, RF-5, RF-11

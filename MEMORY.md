@@ -6,7 +6,7 @@
 
 - **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. Suite **54/54** en verde (`ctest --preset backend`, 54 tests registrados).
 - **Fecha:** 2026-10-29
-- **Rama:** `feat/Base-datos` (HEAD `e12641b`; **71 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
+- **Rama:** `feat/Base-datos` (HEAD `0946600`; **83 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
 - **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**, y la 005 cerró su **T10** el 2026-10-29. El resto, implementadas (ver tabla).
 - **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (deudas del frontend, `release/1.0` y PR a `develop`).
 
@@ -116,7 +116,7 @@
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
 2. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
 3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
-4. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
+4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
 5. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y de la T10 de la 005.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)

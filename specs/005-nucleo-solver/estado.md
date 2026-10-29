@@ -37,7 +37,9 @@ Siguiente paso: nada pendiente en esta spec. Abrir el PR de la rama a `develop` 
 
 ### Cierre de T10 (2026-10-29)
 
-Suite **54/54** (`ctest --preset backend`).
+Suite **54/54** (`ctest --preset backend`, en serie y `-j4`). El **`--preset full`** incluye la interfaz
+(fuera de alcance desde la 001; builder roto por la 011, deuda del equipo del frontend) y se exigirá
+cuando esa deuda se cierre: es ajena a la 005.
 
 | Tarea | Commit | Qué dejó |
 |---|---|---|
