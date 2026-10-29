@@ -105,3 +105,13 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 - Tests: `planSoloDeDocentes_seEmbebeAlFinal` (plan sin curso que lo use viaja como segundo plan, con
   su materia resuelta), `planDeDocenteQueCoincideConElDelCurso_noSeDuplica`,
   `planDeDocenteInexistenteOVacio_seIgnora`. Rojo previo en el primero (planes 1 ≠ 2). Suite **54/54**.
+
+### C2 - Cobertura RNF-4 del validador (V7, V8, V15, D13)
+
+- `v7_turnoAusente_falla`: curso sin `turno` → V7 («no declara turno»).
+- `v8_modoMovilSinAulaDeCurso_pasa`: `aula_fija = false` y curso sin `aula` → la entrada pasa (el
+  aula se ignora).
+- `v15_movilSinAulasEnElCentro_falla`: móvil con `aulas` vacío y curso sin aula → V15.
+- `v13_d13_docenteDeOtroAnioNoEsElegible_falla`: el único docente declara `anios = [2]` y el curso es
+  de 1.º → sin candidato elegible (V13; la regla D13 está en `docenteCandidatoElegible`).
+- Los cuatro casos pasan con el código actual: no destaparon incumplimientos. Suite **54/54**.

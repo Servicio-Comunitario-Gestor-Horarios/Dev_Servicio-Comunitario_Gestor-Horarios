@@ -395,6 +395,48 @@ private slots:
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
+    void v7_turnoAusente_falla()
+    {
+        // Un curso sin turno no puede ubicarse en la rejilla (V7).
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) {
+            c[QStringLiteral("turno")] = QString();
+        });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("V7")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("no declara turno")),
+                 qPrintable(resultado.mensajeError));
+    }
+
+    void v8_modoMovilSinAulaDeCurso_pasa()
+    {
+        // Con aula fija inactiva el aula del curso se ignora: puede estar ausente.
+        QJsonObject j = jsonValido();
+        j[QStringLiteral("aula_fija")] = false;
+        j = conCurso(j, [](QJsonObject& c) { c.remove(QStringLiteral("aula")); });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+    }
+
+    void v15_movilSinAulasEnElCentro_falla()
+    {
+        // Modo móvil exige al menos un aula en el centro (el aula del curso no aplica: V8).
+        QJsonObject j = jsonValido();
+        j[QStringLiteral("aula_fija")] = false;
+        j = conCurso(j, [](QJsonObject& c) { c.remove(QStringLiteral("aula")); });
+        j = conAulas(j, QJsonArray{});
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("V15")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("sin aulas")),
+                 qPrintable(resultado.mensajeError));
+    }
+
     void v9_numeroEstudiantesNegativo_falla()
     {
         // num_estudiantes presente debe ser positivo. -1 es el centinela de AUSENTE,
@@ -489,6 +531,22 @@ private slots:
 
     /// V13 debe cruzar la disponibilidad del docente con las franjas del turno del curso:
     /// un candidato cuyo rango no se solapa con el turno del curso no es elegible.
+    void v13_d13_docenteDeOtroAnioNoEsElegible_falla()
+    {
+        // D13: `anios` restringe la elegibilidad al año del curso. El único docente del
+        // fixture pasa a dar solo 2.º, así que la materia de 1.º se queda sin candidato (V13).
+        QJsonObject j = conProfesor(jsonValido(), [](QJsonObject& p) {
+            p[QStringLiteral("anios")] = QJsonArray{2};
+        });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("V13")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("candidato elegible")),
+                 qPrintable(resultado.mensajeError));
+    }
+
     void v13_sinDisponibilidadEnElTurno_falla()
     {
         QJsonObject j = jsonValido();
