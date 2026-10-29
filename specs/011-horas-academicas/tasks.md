@@ -6,7 +6,7 @@ T3,T5 → T8; T5,T6,T7,T8 → T9; todo → T10. Ninguna tarea cierra con el árb
 más ajustado**: si no cabe, se para y se propone dividir la spec (011a T1–T4 / 011b T5–T10); no se
 añaden tareas.
 
-- [ ] **T1. Punto único de duración: rango 30–90 y horas académicas → minutos (~25 min).** RF-1, RF-3, RNF-4
+- [x] **T1. Punto único de duración: rango 30–90 y horas académicas → minutos (~25 min).** RF-1, RF-3, RNF-4
     - Hecho cuando: `cmake --preset backend`, `cmake --build --preset backend --parallel` y `ctest --test-dir build-backend --output-on-failure -R '^test_duracion_horaria$'` están en verde; `duracion_horaria::errorDeRango(29)`, `(91)` y `(5)` devuelven el mensaje con el rango, el valor **y la acción** («Ajuste la duración a un valor del rango»), y `(30)`, `(35)`, `(90)` devuelven vacío; `minutosDeHorasAcademicas(40, 35) == 1400` y `(40, 30) == 1200`; `franjasUtilizables(290, 10, 45) == 6`, `(290, 10, 35) == 8` y `(150, 10, 35) == 4`; `deficitDeEncaje(8, 290, 10, 45) == 80` y `(5, 150, 10, 35) == 35`; el módulo es puro (sin `QSql*`, sin reloj) y está en `src/backend/CMakeLists.txt`.
 
 - [ ] **T2. Esquema v4: `ConfiguracionHoraria`, catálogo y huella (~30 min).** RF-1, RF-2, RF-7

@@ -97,6 +97,9 @@ if(TARGET backend)
 
 	# Funciones puras de demanda y capacidad por tipo (FranjaSemana, T11).
 	add_gtest(test_capacidad_tipo backend/test_capacidad_tipo.cpp backend)
+
+	# Punto único de duración de la hora académica (rango, minutos y encaje, 011 T1).
+	add_gtest(test_duracion_horaria backend/test_duracion_horaria.cpp backend)
 endif()
 
 # ============================================================

@@ -47,6 +47,7 @@ target_sources(backend PRIVATE
 				src/services/ServicioCursos.cpp
 				src/services/ServicioTurnosEventos.cpp
 				src/services/calculo_eventos.cpp
+				src/services/duracion_horaria.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
 				src/services/cascada.cpp
