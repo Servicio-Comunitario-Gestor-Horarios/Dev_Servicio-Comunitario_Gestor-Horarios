@@ -5,7 +5,7 @@ Aprobaciones: spec 2026-10-17 (rectificada) · plan/tareas 2026-10-17 · impleme
 Base: f94acba455a04ae80364c82e1f07ae16d9f156ec
 Dudas abiertas: ninguna
 Veredicto: APROBADO (2026-10-17)
-Siguiente paso: nada pendiente en esta spec. Los pendientes menores (ver abajo) se abordan en una spec futura o en la 005-T10; el usuario decide si se abre PR.
+Siguiente paso: nada pendiente en esta spec. Los pendientes menores (ver abajo) se abordan en una spec futura o en la 005-T10 (cerrada el 2026-10-29); el usuario decide si se abre PR.
 
 ## Implementado
 
@@ -26,8 +26,7 @@ Siguiente paso: nada pendiente en esta spec. Los pendientes menores (ver abajo) 
 
 ## Pendientes menores
 
-- **`.clangd` sin ignorar** en `.gitignore`.
 - **Convención de `despues_de_slot`:** se documenta como **asunción 1-based** (valor 2 = receso tras la
   franja 2, 08:20/14:00). El esquema admite 0 y no la fija; si se confirma 0-based, usar 1.
-- **005-T10** sigue abierta con sus pendientes conocidos (cobertura de tests por regla, RF-13 y
-  residuales del solver).
+- **005-T10 (cerrada el 2026-10-29):** resueltos allí la cobertura de tests por regla, RF-13 y los
+  residuales del solver.

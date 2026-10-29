@@ -1,11 +1,11 @@
 # Estado 005
 
 Fase: cerrada
-Aprobaciones: spec 2026-10-17 (rectificada) · plan/tareas 2026-10-17 · implementación 2026-10-17
+Aprobaciones: spec 2026-10-17 (rectificada) · plan/tareas 2026-10-17 · implementación 2026-10-17 · **T10 2026-10-29**
 Base: f94acba455a04ae80364c82e1f07ae16d9f156ec
 Dudas abiertas: ninguna
-Veredicto: APROBADO (2026-10-17)
-Siguiente paso: los pendientes de **T10** pasan a una spec futura (006/007 o una nueva); abrir PR de la rama a `develop` cuando el usuario lo pida. No hay más trabajo en esta spec.
+Veredicto: APROBADO (2026-10-17); **T10 cerrada el 2026-10-29**
+Siguiente paso: nada pendiente en esta spec. Abrir el PR de la rama a `develop` cuando el usuario lo pida.
 
 ## Implementado
 
@@ -15,7 +15,7 @@ Siguiente paso: los pendientes de **T10** pasan a una spec futura (006/007 o una
   contrato, validador y solver actualizados; `docs/constitution.md` §7 enmendada.
 - Suite **46/46** en verde en el contenedor (`ctest --preset full`), incluidos los 2 tests del seed.
 
-## Pendientes (T10, abierta y documentada)
+## Pendientes (T10, cerrada el 2026-10-29)
 
 ### Resueltos (2026-10-29)
 
@@ -35,10 +35,19 @@ Siguiente paso: los pendientes de **T10** pasan a una spec futura (006/007 o una
   con un `RESOURCE_LOCK` de CTest (`fd7ac33`): antes 5/5 en rojo con `-j4`, ahora 5/5 en verde con
   `-j4` y `-j8`.
 
-### Sigue abierto
+### Cierre de T10 (2026-10-29)
 
-- **RF-13:** `ConstructorEntradaSolver` no embebe los planes de los **docentes** (solo los de los cursos).
-- **RNF-4:** faltan casos rojo→verde de V7, V8, V14, V15, D13, S1/S2, aula de salida como índice y
-  `peso` en el ida y vuelta. (V2 ya cubre `peso` negativo y el rango de `duracion_minutos` lo cubre la
-  011; la reproducibilidad tiene un caso en la 010, pero no cubre el ida y vuelta ni el resto.)
-- **Validación de materias:** no se validan materias duplicadas ni de 0 horas en un plan.
+Suite **54/54** (`ctest --preset backend`).
+
+| Tarea | Commit | Qué dejó |
+|---|---|---|
+| **RF-13** — planes de los docentes | `7e3ee0b` | `ConstructorEntradaSolver` embebe también los planes que usan los **docentes** (además de los de los cursos), sin duplicar y en orden determinista (cursos primero, docentes después); vacío o inexistente se ignora. Tests: plan solo de docentes, coincidente sin duplicar, vacío/inexistente ignorado. |
+| **RNF-4** — reglas V7/V8/V15/D13 | `70ea509` | Casos nuevos `v7_turnoAusente_falla`, `v8_modoMovilSinAulaDeCurso_pasa`, `v15_movilSinAulasEnElCentro_falla` y `v13_d13_docenteDeOtroAnioNoEsElegible_falla`. **Ninguno destapó un fallo de producción**: V7, V8, V15 y D13 ya cumplían. |
+| **RNF-4** — S1/S2 y contrato | `7354c7a` | `solver_excesoDeHorasEsPenalizadoYNoInfactible` (S1), `solver_titularAlTope_usaAlSuplente` (S2) y `peso = 7` en el ida y vuelta (`test_contrato_solver`). |
+
+- **Cobertura de RNF-4:** cubiertos V7, V8, V15, D13, S1, S2 y `peso` en el ida y vuelta. V2 (`peso`
+  negativo) y el rango de `duracion_minutos` ya estaban cubiertos (este último por la 011), y el aula de
+  salida como índice ya se aseveraba en ambos modos, así que no se duplicó.
+- **T10:** ya no tiene pendientes.
+- **Fuera de la spec:** la validación de **materias duplicadas o de 0 horas** en un plan no está en la
+  005 —no la menciona ningún RF—; si se quiere, es un requisito nuevo y se abre en otra spec.

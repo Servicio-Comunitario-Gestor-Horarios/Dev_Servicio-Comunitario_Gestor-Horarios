@@ -4,7 +4,7 @@ Fase: cerrada
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-27 · implementación 2026-10-29 · validación 2026-10-29
 Base: 8e0602c (base de la implementación; HEAD de `feat/Base-datos`: `19ceccb`, suite 52/52). Las dependencias **009** y **010** están **cerradas e implementadas**: el esquema v3, el contrato 2.0 y sus pruebas ya están en la base.
 Dudas abiertas: ninguna
-Siguiente paso: nada pendiente en esta spec. Fuera de ella: la **012** sigue sin plan ni tareas; quedan pendientes los de la **005-T10**; sigue la divergencia con `release/1.0`; y falta actualizar `MEMORY.md` con el cierre de la 011.
+Siguiente paso: nada pendiente en esta spec. Fuera de ella: las **deudas del frontend** de la 011 (`docs/interfaz-frontend.md` §6), la divergencia con `release/1.0` y el PR de `feat/Base-datos` a `develop`.
 Veredicto: APROBADO (2026-10-29) por el reviewer contra `Base: 8e0602c`; I1, I2 y M5 corregidos en `19ceccb` y los hallazgos documentales en este cierre.
 QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H8); QA del plan: dos rondas de CAMBIOS NECESARIOS (B1, M1–M10) cerradas el 2026-10-27; plan y tareas aprobados el 2026-10-27.
 

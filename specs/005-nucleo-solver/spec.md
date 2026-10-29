@@ -3,8 +3,8 @@
 Estado: implementada (2026-10-17)
 
 > **Cierre.** Implementada y aprobada por el reviewer (`VEREDICTO: APROBADO`, 2026-10-17): la
-> rectificación se hizo en **T11**. La **T10** sigue **abierta** por los pendientes conocidos del
-> solver (cobertura de tests por regla, RF-13 y residuales), documentados en `estado.md` y `MEMORY.md`.
+> rectificación se hizo en **T11**. La **T10 se cerró el 2026-10-29** con **RF-13** y la **cobertura de
+> RNF-4** (`7e3ee0b`, `70ea509`, `7354c7a`; suite 54/54), documentados en `estado.md` y `MEMORY.md`.
 
 > **Cambio de requisitos (2026-10-17): la hora académica es un bloque.** En Venezuela la **hora
 > académica** es una unidad **pedagógica**, no una hora de reloj: 45 minutos tradicionalmente, 35 desde

@@ -4,7 +4,7 @@ Fase: cerrada
 Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-29 · implementación 2026-10-29 · validación 2026-10-29
 Base: 3007c54 (base de la implementación; último commit de código: `94647ef`; notas de la validación en `e12641b`; suite 54/54; el cierre de la implementación son estos documentos). Las dependencias **009**, **010** y **011** están **cerradas e implementadas**; el esquema vigente es **v5**.
 Dudas abiertas: ninguna
-Siguiente paso: nada pendiente en esta spec. Fuera de ella: los pendientes de la **005-T10**, las **deudas del frontend** de la 011 y de la 012 (`docs/interfaz-frontend.md` §6), la divergencia con `release/1.0` y el PR de `feat/Base-datos` a `develop`.
+Siguiente paso: nada pendiente en esta spec. Fuera de ella: las **deudas del frontend** de la 011 y de la 012 (`docs/interfaz-frontend.md` §6), la divergencia con `release/1.0` y el PR de `feat/Base-datos` a `develop`.
 Veredicto: APROBADO (2026-10-29) contra `Base: 3007c54`; las seis notas menores (M1–M6) están corregidas en `e12641b`.
 QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H5); spec aprobada el 2026-10-23 · QA del plan: CAMBIOS NECESARIOS (B1, I1, I2, M1–M9) y re-QA APROBADO el 2026-10-29.
 

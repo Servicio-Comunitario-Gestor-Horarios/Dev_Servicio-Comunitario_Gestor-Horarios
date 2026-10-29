@@ -7,8 +7,8 @@
 - **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. Suite **54/54** en verde (`ctest --preset backend`, 54 tests registrados).
 - **Fecha:** 2026-10-29
 - **Rama:** `feat/Base-datos` (HEAD `e12641b`; **71 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
-- **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**; `specs/005-nucleo-solver` sigue **implementada con T10 abierta** por pendientes conocidos. El resto, implementadas (ver tabla).
-- **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (005-T10, deudas del frontend, `release/1.0` y PR a `develop`).
+- **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**, y la 005 cerró su **T10** el 2026-10-29. El resto, implementadas (ver tabla).
+- **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (deudas del frontend, `release/1.0` y PR a `develop`).
 
 ## Specs activas
 
@@ -18,7 +18,7 @@
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
 | 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9) |
-| 005-nucleo-solver | aprobada | **implementada** (T1–T9 + T11; **T10 abierta** por pendientes conocidos) |
+| 005-nucleo-solver | aprobada | **implementada (2026-10-29)** (T1–T9 + T11; **T10 cerrada el 2026-10-29**) |
 | 008-datos-de-prueba | aprobada | **implementada** (T1–T9; 57 materias, 4 planes, 13 cursos, 4 variantes) |
 | 009-tipos-de-aula-y-eventos | aprobada (2026-10-23) | **implementada** (T1–T9; APROBADO 2026-10-24) |
 | 010-solver-tipos-y-eventos | aprobada (2026-10-23; cambio de requisitos 2026-10-26) | **implementada (2026-10-27)** (T1–T10 + T11–T16; APROBADO de la 2.ª entrega 2026-10-27) |
@@ -114,22 +114,16 @@
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
-2. **Pendientes de la 005-T10** (ver abajo): **RF-13**, **RNF-4** y la validación de materias duplicadas o de 0 horas. Los residuales del validador (I2, `metadata`) y el estado del `Solver` se resolvieron el 2026-10-29.
-3. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
-4. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
-5. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-6. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y los residuales de la 005 resueltos.
+2. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
+3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
+4. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
+5. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y de la T10 de la 005.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
-- **Resueltos el 2026-10-29** (T10 sigue abierta por lo de abajo):
-  - **Decisión I2 — avisos retirados** (`36cd7b2`; docs en `ebeb3bf`): `ValidadorSalidaSolver` ya no emite **P1** (horas no cubiertas) ni **P3** (capacidad de aula); **P2** (exceso de horas del docente) es el único aviso y **P4** sigue como conflicto no presentable. `test_validador_salida` alineado.
-  - **`metadata` de la salida** (`d356780`): `total_asignaciones` cuenta **clases** (no variables), `profesores_asignados` cuenta docentes distintos con al menos una clase y `tiempo_ejecucion_ms` sale del cronómetro.
-  - **`Solver` acumulaba estado** (`57f5be8`): `resolver` reinicia `model`/`vars`; reutilizar la instancia no contamina.
-  - **Notas retiradas por desfasadas:** `.clangd` **ya está** en `.gitignore`; y «P1/P2 comparan horas vs bloques» **dejó de ser un problema** con la 011 (1 hora académica = 1 bloque).
-- **RF-13 — planes de los docentes:** `ConstructorEntradaSolver` embebe los planes de los **cursos** pero no los que usan los **docentes**. Sin impacto funcional hoy (el plan del docente se compara como cadena), pero es una cláusula explícita del RF.
-- **RNF-4 — cobertura de tests por regla:** faltan casos rojo→verde de V7 (turno ausente), V8 (modo inactivo), V14, V15, D13 (`anios`), S1/S2 (exceso y titular a tope), aula de salida como índice (fija/móvil) y `peso` en el ida y vuelta. Por esto los «Hecho cuando» de T3/T5/T7/T8 no quedan cerrados y **T10 sigue abierta**. V2 ya cubre `peso` negativo y el rango de `duracion_minutos` lo cubre la 011; la reproducibilidad tiene un caso en la 010 (`solver_esReproducible_mismaEntradaMismaSalida`), pero no cubre el ida y vuelta ni el resto.
-- **Validación de materias:** no se validan materias duplicadas ni de 0 horas en un plan.
+**Sin pendientes:** T10 cerrada el 2026-10-29 — RF-13 (planes de docentes, `7e3ee0b`), RNF-4 (V7, V8, V15, D13, S1/S2, `peso` en el ida y vuelta, `70ea509`/`7354c7a`). Antes de cerrarla, el mismo día, se resolvieron la decisión I2 (`36cd7b2`; docs `ebeb3bf`), `metadata` de la salida (`d356780`), el estado de `Solver` (`57f5be8`) y el flaky del middleware (`fd7ac33`).
+
+> La validación de **materias duplicadas o de 0 horas** en un plan **no está en la spec 005**: sería un **requisito nuevo** y se abriría en otra spec.
 
 ## Progreso de implementación
 
@@ -142,9 +136,10 @@
     contrato fija `Resultado<T>`, `AperturaBaseDatos::Resultado::ok()/detalle/rutaRespaldo` y
     `estadoPendienteDe` (verde).
 - 002: **T1–T9 completas** ✅ (`CargadorConfiguracionSolver` + `SolverConfig::toJson`; `solver_config` movido al target `backend` sin OR-Tools; `ConstructorEntradaSolver`/`construirJsonEntrada` + `DatosDominio`; `ValidadorEntradaSolver` con V1–V13; `ValidadorSalidaSolver` P1–P4; `ServicioGeneracion` + `PuertoSolver`; `messages.h` y transporte; `servicio_solver`/`resolverEntradaSolver`; contrato de `ServicioHorarioSalida`; `docs/interfaz-frontend.md` §3 + `test_contrato_generacion`). **Spec 002 implementada.**
-- 005: **T1–T9 completas** ✅ (T10 abierta por pendientes conocidos). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Sellaba `version="1.0"` al producir/guardar (**superado por la 010: 2.0**).
+- 005: **T1–T9 completas** ✅ (T10 cerrada el 2026-10-29). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Sellaba `version="1.0"` al producir/guardar (**superado por la 010: 2.0**).
   - **Validación del reviewer (ronda 2): APROBADA.** Bloqueantes corregidos y commiteados: `37666a2` (D1/D3 siempre publicadas + V13 cruza disponibilidad×turno), `454a53b` (RF-10 versión no reconocida), `7a7ff1b` (RF-11 centinela `-1`, coherencia de horas, V9 estricto), `4171a4d` (RF-6 categorías de causa), `f063f39` (sello `version="1.0"`).
-  - **T11 (rectificación 2026-10-17):** hora académica = bloque; `bloques`/`bloquesAula` identidad; `duracion_minutos` solo describe la franja; constitución §7 enmendada. Suite **46/46** entonces. **T10 sigue abierta.**
+  - **T11 (rectificación 2026-10-17):** hora académica = bloque; `bloques`/`bloquesAula` identidad; `duracion_minutos` solo describe la franja; constitución §7 enmendada. Suite **46/46** entonces.
+  - **T10 (cierre 2026-10-29):** RF-13 (`7e3ee0b`, planes de los docentes embebidos sin duplicar), cobertura RNF-4 (`70ea509`: V7/V8/V15/D13; `7354c7a`: S1/S2 y `peso` en el ida y vuelta). Suite **54/54**; sin pendientes.
 - 008: **T1–T9 completas** ✅ (APROBADO por el reviewer; 57 materias, 4 planes, 13 cursos sin turno, 16 aulas, 4 variantes de docentes; suite 46/46).
 - 009: **T1–T9 completas** ✅ (**APROBADO 2026-10-24**). Esquema **v3** con `TiposAula` (clave normalizada + índice único), `id_tipo_aula` obligatorio y `Eventos` con identidad/orden (`059168f`, `357102d`); servicios de eventos con coherencia temporal y ventanas por posición (`08067ce`, `693fa18`), catálogo de tipos y huella (`83d7e7f`), fachada/cascada/puente de eventos en la entrada (`e79d227`); seed con tipos y eventos y reemplazo seguro (`f438079`, `af1ac8a`); preset `backend` sin interfaz (`8cfa211`); API, guías y deuda del frontend (`221e563`); mensajes de rechazo con el valor recibido (`1835399`); cierre (`e72c930`).
 - 010: **implementada (2026-10-27)** ✅. Dos entregas validadas:

@@ -10,9 +10,8 @@ Base: **49d39dc** (HEAD al escribir este plan; T1–T10 en `0096b36`, `3a3e724`,
 Dudas abiertas: ninguna. La precedencia de (3) sobre (2) quedó **aprobada** el 2026-10-26 como
   excepción de RF-6 (ver «Excepción de precedencia (2026-10-26)»).
 Siguiente paso: **nada pendiente en esta spec: cerrada.** Fuera de ella quedan pendientes que **no son
-  trabajo de la 010**: los de la **005** (T10 y residuales), las specs **011** y **012** sin plan ni
-  tareas, la **divergencia con `release/1.0`** y la actualización de **`MEMORY.md`**, que sigue
-  desfasado.
+  trabajo de la 010**: las **deudas del frontend** de la 011 y de la 012
+  (`docs/interfaz-frontend.md` §6), la **divergencia con `release/1.0`** y el **PR a `develop`**.
 Veredicto: **APROBADO (2026-10-27) de la segunda entrega (T11–T16)** por el reviewer. La primera
   (T1–T10) ya estaba validada salvo **RF-6**, que es lo que se reescribió en esta entrega. Con este
   veredicto la 010 **queda implementada** (`spec.md`: `implementada (2026-10-27)`).
