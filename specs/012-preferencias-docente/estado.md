@@ -1,11 +1,11 @@
 # Estado 012
 
-Fase: implementación completa; pendiente de validación RF por RF
-Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-29 · implementación 2026-10-29
-Base: 3007c54 (base de la implementación; último commit de código: `94647ef`; suite 54/54; el cierre de la implementación son estos documentos). Las dependencias **009**, **010** y **011** están **cerradas e implementadas**; el esquema vigente es **v5**.
+Fase: cerrada
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-29 · implementación 2026-10-29 · validación 2026-10-29
+Base: 3007c54 (base de la implementación; último commit de código: `94647ef`; notas de la validación en `e12641b`; suite 54/54; el cierre de la implementación son estos documentos). Las dependencias **009**, **010** y **011** están **cerradas e implementadas**; el esquema vigente es **v5**.
 Dudas abiertas: ninguna
-Siguiente paso: validación RF por RF contra `Base: 3007c54` por el reviewer; tras `VEREDICTO: APROBADO`, marcar la spec `implementada` y cerrar.
-Veredicto: pendiente (validación de la implementación).
+Siguiente paso: nada pendiente en esta spec. Fuera de ella: los pendientes de la **005-T10**, las **deudas del frontend** de la 011 y de la 012 (`docs/interfaz-frontend.md` §6), la divergencia con `release/1.0` y el PR de `feat/Base-datos` a `develop`.
+Veredicto: APROBADO (2026-10-29) contra `Base: 3007c54`; las seis notas menores (M1–M6) están corregidas en `e12641b`.
 QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H5); spec aprobada el 2026-10-23 · QA del plan: CAMBIOS NECESARIOS (B1, I1, I2, M1–M9) y re-QA APROBADO el 2026-10-29.
 
 ## Decisiones cerradas (2026-10-23)
@@ -65,7 +65,34 @@ se tocó el solver, el contrato ni la interfaz: solo persistencia, validación, 
 | T6. Recuento del seed | `3b8ba90` | `Recuentos.preferencias = 0`, `Preferencia_Profesor` en `kTablasDominio` (12 tablas) y `Preferencias: 0` en el resumen |
 | T7. Borrado ordenado y atomicidad | `43c222c` | `--solo-docentes` y reemplazo total borran preferencias antes que docentes y disponibilidad; rollback y determinismo cubiertos |
 | T8. Huella intacta | `94647ef` | `ServicioGeneracion` sin «preferencia»: cambiar preferencias no marca «datos anteriores» |
-| T9. Documentación y regresión | este cierre | `docs/interfaz-frontend.md` (§2.2 a v5, dominios, `NucleoDatos`, DTO, fila `profesor` con preferencias, §2.4.5, tabla §4), `docs/guias/datos-prueba.md` (fila 0 y ejemplo con `Hora académica` y `Preferencias: 0`) y notas de supersesión en la 008; `ctest --preset backend` **54/54** |
+| T9. Documentación y regresión | `98c9dbc` | `docs/interfaz-frontend.md` (§2.2 a v5, dominios, `NucleoDatos`, DTO, fila `profesor` con preferencias, §2.4.5, tabla §4), `docs/guias/datos-prueba.md` (fila 0 y ejemplo con `Hora académica` y `Preferencias: 0`) y notas de supersesión en la 008; `ctest --preset backend` **54/54** |
+
+## Cierre (2026-10-29)
+
+**VEREDICTO: APROBADO (2026-10-29)** contra `Base: 3007c54`, con las seis notas menores (M1–M6)
+aplicadas y verificadas en `e12641b`. Suite **54/54** (`ctest --preset backend`).
+
+| Tarea | Commit |
+|---|---|
+| T1. Modelo puro y validación compartida | `4993be0` |
+| T2. Esquema v5 | `3871488` |
+| T3. Servicio de preferencias | `7405351` |
+| T4. DTO y fachada | `d2f2147` |
+| T5. Cascada y baja del docente | `8acce25` |
+| T6. Recuento del seed | `3b8ba90` |
+| T7. Borrado ordenado y atomicidad | `43c222c` |
+| T8. Huella intacta | `94647ef` |
+| T9. Documentación y regresión | `98c9dbc` |
+| Notas de la validación (M1–M6) | `e12641b` |
+
+- **No se tocó** el solver, el contrato de configuración, la generación ni la interfaz: la spec
+  entrega persistencia, validación, servicios, cascada, seed y documentación.
+- **Deudas declaradas:**
+  - Las preferencias **no tienen efecto en la generación**; cuando una spec del solver las consuma,
+    deberán entrar en `DatosDominio` y en `huellaDatos`.
+  - El `CHECK` de horas asume el formato `HH:mm`; es la misma dependencia que ya tenían
+    disponibilidad y turnos.
+  - La interfaz de usuario sigue fuera de alcance (`docs/interfaz-frontend.md` §2.4.5 y §6).
 
 ## Notas
 
@@ -76,9 +103,9 @@ se tocó el solver, el contrato ni la interfaz: solo persistencia, validación, 
 - **Plan y tareas (2026-10-29).** `plan.md` fija la base `3007c54` y `tasks.md` la lista T1–T9 con su
   trazabilidad; ambos aprobados tras el QA. Corregida en §8.1 la redacción del ejemplo de salida del
   seed: `Preferencias: 0` va en **línea propia**, después de `Cursos…` (así lo imprime `resumenTexto`).
-- **Cierre documental.** Tras el veredicto, el **planner** actualiza este `estado.md` y deja el
-  contenido completo de `MEMORY.md` (hoy dice «esquema v4»); el **coordinator** lo aplica en la raíz
-  porque el planner no escribe fuera de `specs/`.
+- **Cierre documental (2026-10-29).** Veredicto APROBADO; `spec.md` pasa a `implementada (2026-10-29)` y
+  este `estado.md` queda cerrado. El contenido completo de `MEMORY.md` lo entrega el **planner** y lo
+  aplica el **coordinator** en la raíz, porque el planner no escribe fuera de `specs/`.
 
 ## Tamaño previsto
 

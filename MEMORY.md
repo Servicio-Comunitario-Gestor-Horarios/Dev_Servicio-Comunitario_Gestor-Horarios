@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** **009 (tipos de aula y eventos)**, **010 (solver: tipos, referencia general y eventos)** y **011 (duración de la hora académica)** **cerradas e implementadas**. Suite **52/52** en verde (`ctest --preset backend`, 52 tests registrados).
+- **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. Suite **54/54** en verde (`ctest --preset backend`, 54 tests registrados).
 - **Fecha:** 2026-10-29
-- **Rama:** `feat/Base-datos` (HEAD `0703052`; **59 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
-- **Specs en curso:** `specs/012-preferencias-docente` (aprobada el 2026-10-23, **sin plan ni tareas**); `specs/005-nucleo-solver` (implementada, **T10 abierta** por pendientes conocidos). El resto, implementadas (ver tabla).
-- **Siguiente paso:** plan y tareas de la **012** (preferencias del docente). Ver «Siguiente paso».
+- **Rama:** `feat/Base-datos` (HEAD `e12641b`; **71 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
+- **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**; `specs/005-nucleo-solver` sigue **implementada con T10 abierta** por pendientes conocidos. El resto, implementadas (ver tabla).
+- **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (005-T10, deudas del frontend, `release/1.0` y PR a `develop`).
 
 ## Specs activas
 
@@ -23,9 +23,9 @@
 | 009-tipos-de-aula-y-eventos | aprobada (2026-10-23) | **implementada** (T1–T9; APROBADO 2026-10-24) |
 | 010-solver-tipos-y-eventos | aprobada (2026-10-23; cambio de requisitos 2026-10-26) | **implementada (2026-10-27)** (T1–T10 + T11–T16; APROBADO de la 2.ª entrega 2026-10-27) |
 | 011-horas-academicas | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T10; **T8 adelantada**; APROBADO 2026-10-29) |
-| 012-preferencias-docente | aprobada (2026-10-23) | **sin plan ni tareas** |
+| 012-preferencias-docente | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T9; APROBADO 2026-10-29) |
 
-> Épico **solver** (numeración real del trabajo): **004 (persistencia de campos) → 005 (núcleo) → 008 (datos de prueba) → 009 (tipos de aula y eventos) → 010 (tipos en el solver) → 011 (horas académicas, **cerrada el 2026-10-29**) → 012 (preferencias del docente)**. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado** y no existen en `specs/`; si se retoman, se numerarán al abrirlas.
+> Épico **solver** (numeración real del trabajo): **004 (persistencia de campos) → 005 (núcleo) → 008 (datos de prueba) → 009 (tipos de aula y eventos) → 010 (tipos en el solver) → 011 (horas académicas, **cerrada el 2026-10-29**) → 012 (preferencias del docente, **cerrada el 2026-10-29**)**. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado** y no existen en `specs/`; si se retoman, se numerarán al abrirlas.
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
 > (superaba las 10 tareas) y se renumeró desde 001.
@@ -101,15 +101,25 @@
   - **Si falla la lectura de la configuración** (error de SQL, no «sin fila»), **la operación de turnos/eventos falla**; el 35 solo se usa cuando hay esquema y no hay fila (decisión del usuario, `19ceccb`).
   - **Supersesiones**: 009 (franja estimada y su cálculo), 008 (8×40+10), 005/010 (V2 solo `> 0`), anotadas en sus specs con fecha `011 (2026-10-29)`.
 
+- **Preferencias horarias del docente (spec 012, cerrada el 2026-10-29):**
+  - **Modelo que replica la disponibilidad y añade sentido.** Tabla `Preferencia_Profesor` con docente, día, inicio, fin y **sentido** (`preferida`/`evitada`), con identidad propia. **No se mezcla** con la disponibilidad: una cosa es poder y otra querer.
+  - **Día 0–6** (0 = domingo … 6 = sábado), el mismo rango que la disponibilidad; sábado y domingo se guardan y se exponen pero **no intervienen** en la generación actual.
+  - **Validación:** docente existente, día 0–6, `inicio < fin`, sentido válido, **sin solapes de sentidos opuestos**, **sin duplicado exacto**; los solapes y rangos contiguos del **mismo sentido** se admiten; **cambiar el sentido o el día se revalida** y, si contradice, se rechaza **conservando el anterior**.
+  - **Servicios y DTO:** `ServicioPreferencias` (`agregar`/`listar`/`actualizar`/`eliminar`/`limpiar`) con `Resultado<T>` y mensajes con valor y acción; `ProfesorDTO` gana `preferencias` **separadas** de `disponibilidad` (cambios aditivos) y **`toProfesor()` las ignora**.
+  - **Cascada en los dos caminos:** `eliminarProfesor` y `eliminarConCascada` borran preferencias y disponibilidad de forma atómica; las dependencias se listan antes de confirmar.
+  - **Huella intacta:** no entran en `DatosDominio`/`huellaDatos` y cambiarlas no marca «datos anteriores». **Condición futura:** cuando el solver las consuma, deberán entrar en ambos.
+  - **Esquema v5** con catálogo y `HUELLAS_CONOCIDAS` en el mismo cambio; **sin migración** (una base v4 se rechaza al abrir). `CHECK(hora_inicio < hora_fin)` **depende del formato `HH:mm`** (barrera lexicográfica, no un parser), y el `UNIQUE` frena el duplicado exacto.
+  - **Seed con 0 preferencias** (`Preferencias: 0`, 12 tablas de dominio); `--solo-docentes` y el reemplazo total **borran preferencias antes que docentes** y disponibilidad, en una transacción; **supersede RF-9 y la definición de reemplazo de docentes de la 008**.
+
 ## Siguiente paso
 
-1. **Plan y tareas de la 012 (preferencias del docente)**: es la única spec que queda sin plan ni tareas. La 011 quedó cerrada el 2026-10-29.
+1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
 2. **Pendientes de la 005-T10** (ver abajo): RF-13, RNF-4, avisos retirados (I2) y residuales del validador de salida.
-3. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40.
+3. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
 4. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
 5. **Riesgo latente:** `Solver::resolver` **no reinicia `model`/`vars`** (son miembros); no afecta al camino real (una instancia por ejecución), pero conviene arreglarlo cuando se toque.
-6. **59 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-7. **MEMORY actualizado** (2026-10-29) con el cierre de la 011.
+6. **71 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
+7. **MEMORY actualizado** (2026-10-29) con el cierre de la 012.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
@@ -141,6 +151,9 @@
   - T1 `fc86368` · T2 `11077f8` · T3 `4262b49` · T4 `36c28b2` · **T8 `c913d87` (adelantada)** · T5 `bc7122b` · T6 `fbb1f68` · T7 `15db0d2` · T9 `c62653c` · T10 `059815b` · correcciones `19ceccb` · cierre `0703052`.
   - **T8 se adelantó a T5** porque T5 dejaba `test_seed_aplicacion` en rojo hasta que el perfil pasara a 35; la regla «ninguna tarea cierra con el árbol sin compilar» lo exigió.
   - **No se tocó** el modelo del solver, el tope de 40 h ni la interfaz; las deudas del frontend quedan en `docs/interfaz-frontend.md` §6.
+- 012: **implementada y cerrada (2026-10-29)** ✅ (APROBADO 2026-10-29 contra `3007c54`; suite **54/54**).
+  - T1 `4993be0` · T2 `3871488` · T3 `7405351` · T4 `d2f2147` · T5 `8acce25` · T6 `3b8ba90` · T7 `43c222c` · T8 `94647ef` · T9 `98c9dbc` · notas de la validación (M1–M6) `e12641b`.
+  - **Alcance:** persistencia, validación, servicios, cascada, seed y documentación. **No se tocó** el solver, el contrato ni la interfaz; las preferencias **no alteran la generación** y quedan **fuera de la huella** hasta que el solver las consuma.
 - Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno al solver. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`, dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004 cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distinguía una base vieja de una nueva. Medidas:
   - `VersionEsquema::esquemaEsperado(db, QString* motivo)` explica exactamente lo que no cuadra (tablas/columnas faltantes y tablas retiradas presentes).
@@ -149,7 +162,7 @@
   - **Guardia anti-regresión:** `test_backend_version_esquema` congela la huella SHA-256 del catálogo por versión (`HUELLAS_CONOCIDAS`); cambiar el DDL obliga a subir la versión y registrar la huella nueva. `test_backend_apertura_base_datos` reproduce el incidente.
   - Base del usuario recreada tras respaldo (`gestor_horarios.db.respaldo-20261017-090000`).
   - Verificación de entonces en host (MSVC + Ninja + OR-Tools): 36/41, con los rojos conocidos de la 005 y los de solver/IPC por las DLL de OR-Tools.
-- Entorno: la verificación es el preset **`backend`** en el host (`cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend`), con OR-Tools en `~/.local/ortools`; **52/52**. El contenedor `gestor-dev` (`--preset full`) queda como vía alternativa.
+- Entorno: la verificación es el preset **`backend`** en el host (`cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend`), con OR-Tools en `~/.local/ortools`; **54/54**. El contenedor `gestor-dev` (`--preset full`) queda como vía alternativa.
 - **Vista de generación en el frontend (2026-10-17, cierre parcial de 005):** implementada la vista «Generación de horario» (`ScheduleGenerationWidget`, índice 4 de `MainWindow`) y su capa de servicios en `src/frontend/src/services/` (`generacion_tipos.hpp`, `entrada_solver_builder`, `puerto_solver_ipc`). Arma la entrada reutilizando `construirJsonEntrada` con el contrato nuevo (planes embebidos, curso por `anio`+`seccion`, `aula_fija` global, `anios`), la envía por IPC (`OP_RESOLVER_HORARIO`) y traduce el `HorarioSalida` al formato de visualización. `MainWindow` guarda el `InternalClient`, inyecta el `NucleoDatos` y, al emitirse `horarioGenerado`, guarda el JSON y lo carga en `ScheduleVisualizationWidget`. Doc: `docs/interfaz-frontend.md` §3.6. Test `test_frontend_conversion`. **Rotura conocida:** el builder del frontend no compila con `construirJsonEntrada` devolviendo `Resultado<QJsonObject>` (deuda del equipo del frontend; el preset `backend` no lo compila).
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se probó el flujo completo de la vista «Generación de horario» con la base sembrada (`datos-prueba/centro-31059-holgada.db`, variante `holgada`), copiada sobre la base de la app con respaldo previo. Cambios:
   - **Turno por curso en el preset.** `ParametrosCurso` gana `turno`; la columna **Turno** pasa a desplegable con los turnos de la base + «Sin turno»; `construirEntrada` lo inyecta y `ConstructorEntradaSolver` **prefiere el `turno` del preset** y cae al de la base si viene vacío. `validarConfiguracion` exige turno.

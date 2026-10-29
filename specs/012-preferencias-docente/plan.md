@@ -135,7 +135,9 @@ Base: 3007c54
   `ServicioPreferencias.cpp`; `test/CMakeLists.txt`: los dos binarios nuevos.
 - **Nuevas:** `test/backend/test_preferencias.cpp` (puro) y
   `test/backend/test_servicio_preferencias.cpp` (con base de datos), registradas en
-  `test/CMakeLists.txt` (`add_qtest(... backend)` y `add_qtest(... backend Qt6::Sql)`).
+  `test/CMakeLists.txt` (`add_gtest(... backend)` y `add_qtest(... backend Qt6::Sql)`).
+  > **Corrección (2026-10-29).** El plan decía `add_qtest` para `test_preferencias`; se registró con
+  > **`add_gtest`** porque es fuente Google Test y lógica pura (lo recoge el `journal.md`).
 - **Ampliadas:**
   - `test/backend/test_servicio_profesor.cpp`: DTO con preferencias y baja.
   - `test/backend/test_cascada.cpp`: dependencias (`dependenciasDe("profesor").size()` 2 → 3) y

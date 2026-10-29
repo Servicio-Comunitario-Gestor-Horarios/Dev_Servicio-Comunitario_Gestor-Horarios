@@ -1,6 +1,6 @@
 # Spec 012 - Preferencias horarias del docente
 
-Estado: aprobada (2026-10-23)
+Estado: implementada (2026-10-29)
 
 > **Alcance.** Esta spec cubre **persistencia, servicios y exposición** de las preferencias horarias de
 > los docentes. **No** toca el solver, ni el contrato de configuración, ni la generación: las
