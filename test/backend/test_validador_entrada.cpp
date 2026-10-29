@@ -395,6 +395,22 @@ private slots:
         QVERIFY(!validarEntradaSolver(j).ok);
     }
 
+    void v8_aulaFijaActivaSinAula_falla()
+    {
+        // Rama activa de V8: con aula fija, el curso sin `aula` (ausente = -1) se rechaza.
+        // El caso de índice fuera de rango de arriba lo juzga V6, no V8.
+        QJsonObject j = conCurso(jsonValido(), [](QJsonObject& c) {
+            c.remove(QStringLiteral("aula"));
+        });
+
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY(!resultado.ok);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("V8")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("no declara aula")),
+                 qPrintable(resultado.mensajeError));
+    }
+
     void v7_turnoAusente_falla()
     {
         // Un curso sin turno no puede ubicarse en la rejilla (V7).

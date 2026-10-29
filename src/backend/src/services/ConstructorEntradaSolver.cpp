@@ -288,8 +288,8 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
     // Planes EMBEBIDOS (RF-13): los referenciados por los cursos de la generación **más los
     // que usan los docentes**. Criterio determinista: primero los de los cursos en su orden y
     // después los de los docentes en el suyo; sin duplicados. Un docente sin plan (vacío =
-    // cualquiera, D11) no añade nada, y un código que no existe en el centro se ignora (V10/V11
-    // lo juzgan), igual que hoy con el plan de un curso.
+    // cualquiera, D11) no añade nada; un plan inexistente no se embebe y el filtro D7 del
+    // docente lo juzga en V13.
     const auto embeberPlan = [&datos, &salida](const QString& codigo) {
         if (codigo.isEmpty())
             return;

@@ -100,8 +100,8 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 
 - `ConstructorEntradaSolver`: `embeberPlan(codigo)` evita duplicados, resuelve el plan del centro y
   lo añade; primero se recorren los **cursos** y después los **docentes**, en el orden de sus listas
-  (orden determinista). Un `plan` vacío no añade nada (D11) y un código inexistente se ignora (V10/V11
-  lo juzgan).
+  (orden determinista). Un `plan` vacío no añade nada (D11) y un plan inexistente no se embebe: el
+  filtro D7 del docente lo juzga en V13.
 - Tests: `planSoloDeDocentes_seEmbebeAlFinal` (plan sin curso que lo use viaja como segundo plan, con
   su materia resuelta), `planDeDocenteQueCoincideConElDelCurso_noSeDuplica`,
   `planDeDocenteInexistenteOVacio_seIgnora`. Rojo previo en el primero (planes 1 ≠ 2). Suite **54/54**.
@@ -118,8 +118,9 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
 
 ### C3 - Objetivo y contrato (RNF-4)
 
-- `solver_excesoDeHorasEsPenalizadoYNoInfactible` (S1): un docente con `horas_aula = 2` cubre 4
-  bloques; el modelo es factible y el exceso se penaliza con `ContratoSolver::PESO_HORAS`.
+- `solver_excesoDeHorasEsLaValvulaSinCapacidad` (S1, comparativo): con 4 h el docente cubre los 4
+  bloques sin exceso; con 2 h el exceso se permite y el horario sigue siendo factible (la
+  penalización con `PESO_HORAS` la demuestra S2).
 - `solver_titularAlTope_usaAlSuplente` (S2): el titular (2 h de aula, 4 bloques) no da ninguna clase y
   el suplente elegible cubre las 4 (coste `COSTE_SUPLENTE`). El caso simétrico «sin suplente → exceso
   permitido» es el de S1.

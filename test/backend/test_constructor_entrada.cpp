@@ -7,6 +7,7 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ConstructorEntradaSolver.hpp>
+#include <backend/services/ValidadorEntradaSolver.hpp>
 #include <backend/solver/config/solver_config.hpp>
 
 /// Tests del constructor del JSON de entrada del solver (RF-1, contrato 2.0).
@@ -336,6 +337,53 @@ private slots:
             construirJsonEntrada(dominioCompleto(), inexistente, 35, ahoraFijo());
         QVERIFY2(conInexistente.ok, qPrintable(conInexistente.mensajeError));
         QCOMPARE(conInexistente.valor[QStringLiteral("planes")].toArray().size(), 1);
+    }
+
+    /// El plan extra de un docente no invalida la entrada: con otro docente elegible para la
+    /// materia del curso, V13 pasa y ambos planes viajan (RF-13).
+    void planSoloDeDocentesConDocenteElegible_validaLaEntrada()
+    {
+        DatosDominio datos = dominioCompleto();
+        datos.planes.append(planSoloDeDocentes());
+
+        // Segundo docente elegible para la materia del curso (plan Ciencias): el único docente
+        // original queda ligado al plan extra y, por D7, no sería candidato del curso.
+        ProfesorDTO beto;
+        beto.id = QStringLiteral("P2");
+        beto.nombre = QStringLiteral("Beto");
+        beto.materias = {MateriaAsignadaDTO{1, QStringLiteral("Matemática")}};
+        FranjaHoraria franja;
+        franja.dia = 1;
+        franja.inicio = QTime(7, 0);
+        franja.fin = QTime(9, 0);
+        DisponibilidadDTO disponibilidad;
+        disponibilidad.franja = franja;
+        beto.disponibilidad = {disponibilidad};
+        datos.docentes.append(beto);
+
+        SolverConfig p = parametros();
+        p.profesores[0].plan = QStringLiteral("Docentes");
+        ProfesorSolverConfig profBeto;
+        profBeto.nombre = QStringLiteral("Beto");
+        profBeto.horas_requeridas = 10;
+        profBeto.horas_aula = 8;
+        profBeto.plan = QStringLiteral("Ciencias");
+        p.profesores.append(profBeto);
+
+        const auto resultado = construirJsonEntrada(datos, p, 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+        // Ambos planes viajan: el del curso y el que solo usa un docente.
+        const QJsonArray planes = resultado.valor[QStringLiteral("planes")].toArray();
+        QCOMPARE(planes.size(), 2);
+        QCOMPARE(planes[0].toObject()[QStringLiteral("codigo")].toString(),
+                 QStringLiteral("Ciencias"));
+        QCOMPARE(planes[1].toObject()[QStringLiteral("codigo")].toString(),
+                 QStringLiteral("Docentes"));
+
+        // El plan extra no rompe V4/V10/V11 y el segundo docente cubre V13.
+        const auto validada = validarEntradaSolver(resultado.valor);
+        QVERIFY2(validada.ok, qPrintable(validada.mensajeError));
     }
 
     void cursosYprofesoresReferencianElPoolDeMaterias()
