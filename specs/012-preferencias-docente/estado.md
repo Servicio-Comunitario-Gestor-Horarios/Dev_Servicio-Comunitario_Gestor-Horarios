@@ -1,12 +1,12 @@
 # Estado 012
 
-Fase: plan
-Aprobaciones: spec 2026-10-23
-Base: 5d6b1da77c9da645441a0bebb38e37753f0f7198 (HEAD). **Condición:** el esquema WIP de la 009 está sin commitear; la base efectiva será el commit que incluya la 009 (y, según el orden propuesto, la 011). El diff del árbol no se imputa a la implementación.
+Fase: implementacion (plan y tareas aprobados el 2026-10-29; T1–T9 pendientes)
+Aprobaciones: spec 2026-10-23 · plan/tareas 2026-10-29
+Base: 3007c54 (HEAD de `feat/Base-datos`, árbol limpio, suite 52/52). Las dependencias **009**, **010** y **011** están **cerradas e implementadas**; el esquema vigente es **v4** y esta spec lo lleva a **v5**.
 Dudas abiertas: ninguna
-Siguiente paso: el planner escribirá `plan.md` y `tasks.md` de la 009 cuando el usuario confirme la base de commit.
-Veredicto: pendiente
-QA: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H5); spec aprobada por el usuario el 2026-10-23.
+Siguiente paso: implementar **T1 → T9** en orden, una tarea por vez, con su verificación (`plan.md` §10) y su commit; al terminar, validación RF por RF contra `Base: 3007c54`. **T9 la aplica el coordinator** (documentación).
+Veredicto: pendiente (implementación); el QA de la spec y del plan quedan resueltos.
+QA: spec: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H5); spec aprobada el 2026-10-23 · QA del plan: CAMBIOS NECESARIOS (B1, I1, I2, M1–M9) y re-QA APROBADO el 2026-10-29.
 
 ## Decisiones cerradas (2026-10-23)
 
@@ -56,7 +56,11 @@ QA: CAMBIOS NECESARIOS resueltos el 2026-10-23 (H1–H5); spec aprobada por el u
   contenido solo depende de la 009 y podría adelantarse, pero no aporta ventaja.
 - **Preferencias futuras.** El modelo no incluye recurrencias, excepciones por fecha ni pesos; si el
   solver las necesita, será otra spec.
-- **No hay plan ni tareas todavía.** Esta fase termina con la aprobación de la spec.
+- **Plan y tareas escritos (2026-10-29).** `plan.md` fija la base `3007c54` y `tasks.md` la lista T1–T9
+  con su trazabilidad; falta el QA y la aprobación.
+- **Cierre documental.** Tras el veredicto, el **planner** actualiza este `estado.md` y deja el
+  contenido completo de `MEMORY.md` (hoy dice «esquema v4»); el **coordinator** lo aplica en la raíz
+  porque el planner no escribe fuera de `specs/`.
 
 ## Tamaño previsto
 
