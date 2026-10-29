@@ -267,6 +267,77 @@ private slots:
                  qPrintable(resultado.mensajeError));
     }
 
+    // ─── Planes embebidos de cursos y docentes (RF-13) ──────────────────────
+
+    /// Plan del centro que ningún curso de la generación usa, para colgarlo de un docente.
+    static PlanEstudio planSoloDeDocentes()
+    {
+        Materia fisica;
+        fisica.nombre = QStringLiteral("Física");
+        MateriaEnPlan carga;
+        carga.curso = 2;
+        carga.horas = 3;
+        carga.materia = fisica;
+
+        PlanEstudio plan;
+        plan.codigo = QStringLiteral("Docentes");
+        plan.nombre = QStringLiteral("Plan de docentes");
+        plan.materias = {carga};
+        return plan;
+    }
+
+    /// Un plan que solo usa un docente viaja embebido, después de los de los cursos.
+    void planSoloDeDocentes_seEmbebeAlFinal()
+    {
+        DatosDominio datos = dominioCompleto();
+        datos.planes.append(planSoloDeDocentes());
+
+        SolverConfig p = parametros();
+        p.profesores[0].plan = QStringLiteral("Docentes");
+
+        const auto resultado = construirJsonEntrada(datos, p, 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+        const QJsonArray planes = resultado.valor[QStringLiteral("planes")].toArray();
+        QCOMPARE(planes.size(), 2);
+        // Orden determinista: primero los de los cursos y después los de los docentes.
+        QCOMPARE(planes[0].toObject()[QStringLiteral("codigo")].toString(),
+                 QStringLiteral("Ciencias"));
+        QCOMPARE(planes[1].toObject()[QStringLiteral("codigo")].toString(),
+                 QStringLiteral("Docentes"));
+        // La materia del plan del docente se resuelve por el pool global (Física = índice 1).
+        const QJsonArray materias = planes[1].toObject()[QStringLiteral("materias")].toArray();
+        QCOMPARE(materias.size(), 1);
+        QCOMPARE(materias[0].toObject()[QStringLiteral("materia_idx")].toInt(), 1);
+        QCOMPARE(materias[0].toObject()[QStringLiteral("horas_semanales")].toInt(), 3);
+    }
+
+    void planDeDocenteQueCoincideConElDelCurso_noSeDuplica()
+    {
+        SolverConfig p = parametros();
+        p.profesores[0].plan = QStringLiteral("Ciencias");  // el mismo del curso
+
+        const auto resultado = construirJsonEntrada(dominioCompleto(), p, 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+        QCOMPARE(resultado.valor[QStringLiteral("planes")].toArray().size(), 1);
+    }
+
+    void planDeDocenteInexistenteOVacio_seIgnora()
+    {
+        SolverConfig vacio = parametros();
+        vacio.profesores[0].plan.clear();
+        auto sinPlan = construirJsonEntrada(dominioCompleto(), vacio, 35, ahoraFijo());
+        QVERIFY2(sinPlan.ok, qPrintable(sinPlan.mensajeError));
+        QCOMPARE(sinPlan.valor[QStringLiteral("planes")].toArray().size(), 1);
+
+        SolverConfig inexistente = parametros();
+        inexistente.profesores[0].plan = QStringLiteral("NoExiste");
+        auto conInexistente =
+            construirJsonEntrada(dominioCompleto(), inexistente, 35, ahoraFijo());
+        QVERIFY2(conInexistente.ok, qPrintable(conInexistente.mensajeError));
+        QCOMPARE(conInexistente.valor[QStringLiteral("planes")].toArray().size(), 1);
+    }
+
     void cursosYprofesoresReferencianElPoolDeMaterias()
     {
         const QJsonObject json = entradaValida();

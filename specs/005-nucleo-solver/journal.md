@@ -91,3 +91,17 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
   `solver_reutilizarLaInstancia_noContaminaConOtraEntrada` (factible → infactible → factible sin
   heredar nada). Antes, la segunda resolución daba otro horario y la tercera era INFEASIBLE.
   Suite **54/54**.
+
+## T10 - Cierre de deudas: RF-13, cobertura RNF-4 y objetivo/contrato (2026-10-29)
+
+**Base:** `b1b9711`. Tres bloques, un commit cada uno.
+
+### C1 - Los planes de los docentes también se embeben (RF-13)
+
+- `ConstructorEntradaSolver`: `embeberPlan(codigo)` evita duplicados, resuelve el plan del centro y
+  lo añade; primero se recorren los **cursos** y después los **docentes**, en el orden de sus listas
+  (orden determinista). Un `plan` vacío no añade nada (D11) y un código inexistente se ignora (V10/V11
+  lo juzgan).
+- Tests: `planSoloDeDocentes_seEmbebeAlFinal` (plan sin curso que lo use viaja como segundo plan, con
+  su materia resuelta), `planDeDocenteQueCoincideConElDelCurso_noSeDuplica`,
+  `planDeDocenteInexistenteOVacio_seIgnora`. Rojo previo en el primero (planes 1 ≠ 2). Suite **54/54**.

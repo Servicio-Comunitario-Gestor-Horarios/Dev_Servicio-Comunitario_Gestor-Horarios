@@ -249,28 +249,6 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
         salida.cursos.append(curso);
     }
 
-    // Planes EMBEBIDOS: solo los referenciados por los cursos.
-    for (const CursoSolverConfig& c : salida.cursos)
-    {
-        bool ya = false;
-        for (const PlanSolverConfig& p : salida.planes)
-            if (p.codigo == c.plan) { ya = true; break; }
-        if (ya) continue;
-
-        const PlanEstudio* plan = planPorCodigo(datos.planes, c.plan);
-        if (!plan) continue;   // V10/V11 lo rechazaran
-
-        PlanSolverConfig embebido;
-        embebido.codigo = plan->codigo;
-        for (const MateriaEnPlan& m : plan->materias)
-        {
-            const int idx = indiceMateriaPorNombre(datos.materias, m.materia.nombre);
-            if (idx >= 0)
-                embebido.materias.append(PlanMateriaConfig{idx, m.curso, m.horas});
-        }
-        salida.planes.append(embebido);
-    }
-
     // Profesores: entidad del dominio + parámetros del solver casados por nombre.
     for (const ProfesorDTO& d : datos.docentes)
     {
@@ -306,6 +284,38 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
 
         salida.profesores.append(prof);
     }
+
+    // Planes EMBEBIDOS (RF-13): los referenciados por los cursos de la generación **más los
+    // que usan los docentes**. Criterio determinista: primero los de los cursos en su orden y
+    // después los de los docentes en el suyo; sin duplicados. Un docente sin plan (vacío =
+    // cualquiera, D11) no añade nada, y un código que no existe en el centro se ignora (V10/V11
+    // lo juzgan), igual que hoy con el plan de un curso.
+    const auto embeberPlan = [&datos, &salida](const QString& codigo) {
+        if (codigo.isEmpty())
+            return;
+        for (const PlanSolverConfig& p : salida.planes)
+            if (p.codigo == codigo)
+                return;
+
+        const PlanEstudio* plan = planPorCodigo(datos.planes, codigo);
+        if (!plan)
+            return;
+
+        PlanSolverConfig embebido;
+        embebido.codigo = plan->codigo;
+        for (const MateriaEnPlan& m : plan->materias)
+        {
+            const int idx = indiceMateriaPorNombre(datos.materias, m.materia.nombre);
+            if (idx >= 0)
+                embebido.materias.append(PlanMateriaConfig{idx, m.curso, m.horas});
+        }
+        salida.planes.append(embebido);
+    };
+
+    for (const CursoSolverConfig& c : salida.cursos)
+        embeberPlan(c.plan);
+    for (const ProfesorSolverConfig& p : salida.profesores)
+        embeberPlan(p.plan);
 
     // Dimensiones derivadas (conteos) + días/slots desde el preset.
     salida.dimensiones.num_profesores = salida.profesores.size();
