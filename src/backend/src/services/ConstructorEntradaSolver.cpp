@@ -1,6 +1,7 @@
 #include "backend/services/ConstructorEntradaSolver.hpp"
 
 #include "backend/services/ServicioCursos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 
 #include <QJsonArray>
 #include <QTime>
@@ -140,6 +141,7 @@ namespace
 
 Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
                                             const SolverConfig& parametros,
+                                            int duracionMinutos,
                                             const QDateTime& ahora)
 {
     // 1. Tipos obligatorios (RF-1). Orden determinista: aulas y luego materias, en el orden de la
@@ -167,6 +169,16 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
     salida.version        = QStringLiteral("2.0");
     salida.aula_fija      = parametros.aula_fija;      // modo GLOBAL (del preset)
     salida.franja_horaria = parametros.franja_horaria;
+
+    // La duración de la hora académica manda: el campo del preset es derivado y se
+    // sobrescribe SIEMPRE, antes de validar (RF-3, RF-5).
+    salida.franja_horaria.duracion_minutos = duracionMinutos;
+
+    // Se valida DESPUÉS de la sobrescritura: un preset con 0, 5 o 45 no bloquea, pero una D
+    // recibida fuera de 30–90 falla sin emitir JSON (mismo punto único que el contrato).
+    const QString errorDuracion = duracion_horaria::errorDeRango(duracionMinutos);
+    if (!errorDuracion.isEmpty())
+        return Resultado<QJsonObject>::error(errorDuracion);
 
     // Materias: pool global en el orden de la instantánea; el tipo viaja por su nombre.
     for (const MateriaDTO& m : datos.materias)
@@ -287,7 +299,7 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
             Disponibilidad sol;
             sol.dia  = disp.franja.dia - 1;   // dominio: 0=domingo; solver: 0=lunes
             sol.slot = slotsDeFranja(disp.franja, turnosOrdenados,
-                                     parametros.franja_horaria.duracion_minutos);
+                                     salida.franja_horaria.duracion_minutos);
             if (sol.dia >= 0)
                 prof.disponibilidad.append(sol);
         }
@@ -323,7 +335,8 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
 
 Resultado<QJsonObject> ConstructorEntradaSolver::construir(const DatosDominio& datos,
                                                            const SolverConfig& parametros,
+                                                           int duracionMinutos,
                                                            const QDateTime& ahora)
 {
-    return construirJsonEntrada(datos, parametros, ahora);
+    return construirJsonEntrada(datos, parametros, duracionMinutos, ahora);
 }

@@ -106,7 +106,7 @@ private:
 
     QJsonObject entradaValida() const
     {
-        const auto resultado = construirJsonEntrada(dominio(), parametros(),
+        const auto resultado = construirJsonEntrada(dominio(), parametros(), 35,
                                                     QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
         const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio())",
                                        qPrintable(resultado.mensajeError), __FILE__, __LINE__);
@@ -264,25 +264,25 @@ private slots:
 
     void huellaDatos_esDeterministaYcambiaConLosDatos()
     {
-        const QString h1 = huellaDatos(dominio());
-        QCOMPARE(h1, huellaDatos(dominio()));
+        const QString h1 = huellaDatos(dominio(), 35);
+        QCOMPARE(h1, huellaDatos(dominio(), 35));
 
         DatosDominio modificado = dominio();
         modificado.cursos[0].seccion = QStringLiteral("B");
-        QVERIFY(huellaDatos(modificado) != h1);
+        QVERIFY(huellaDatos(modificado, 35) != h1);
     }
 
     void huellaDatos_cambiaConElTipoDeAula()
     {
-        const QString h1 = huellaDatos(dominio());
+        const QString h1 = huellaDatos(dominio(), 35);
 
         DatosDominio otraAula = dominio();
         otraAula.aulas[0].idTipoAula = 7;
-        QVERIFY(huellaDatos(otraAula) != h1);
+        QVERIFY(huellaDatos(otraAula, 35) != h1);
 
         DatosDominio otraMateria = dominio();
         otraMateria.materias[0].idTipoAula = 7;
-        QVERIFY(huellaDatos(otraMateria) != h1);
+        QVERIFY(huellaDatos(otraMateria, 35) != h1);
     }
 
     void huellaDatos_cambiaConLosEventos()
@@ -297,17 +297,40 @@ private slots:
         evento.fin = QTime(8, 30);
 
         DatosDominio sinEventos = dominio();
-        const QString h1 = huellaDatos(sinEventos);
+        const QString h1 = huellaDatos(sinEventos, 35);
 
         DatosDominio conEvento = dominio();
         conEvento.turnos[0].eventos = {evento};
-        const QString h2 = huellaDatos(conEvento);
+        const QString h2 = huellaDatos(conEvento, 35);
         QVERIFY(h2 != h1);
 
         // El orden persistente del evento también entra en la huella.
         DatosDominio otroOrden = conEvento;
         otroOrden.turnos[0].eventos[0].orden = 2;
-        QVERIFY(huellaDatos(otroOrden) != h2);
+        QVERIFY(huellaDatos(otroOrden, 35) != h2);
+    }
+
+    /// La huella incluye la hora académica (RF-6): es estable y distinta con otra D.
+    void huellaDatos_incluyeLaDuracion()
+    {
+        const QString con35 = huellaDatos(dominio(), 35);
+        QCOMPARE(con35, huellaDatos(dominio(), 35));
+        QVERIFY(huellaDatos(dominio(), 45) != con35);
+    }
+
+    /// Un cambio de D entre el envío y la respuesta marca «datos anteriores» (RF-6).
+    void datosAnteriores_siCambiaLaDuracionEntreEnvioYRespuesta()
+    {
+        const DatosDominio d = dominio();
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0, [d]() { return huellaDatos(d, 45); });
+        servicio.generar(entradaValida(), huellaDatos(d, 35));
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::DatosAnteriores);
+        QVERIFY(r.datosAnteriores);
     }
 
     void estamparFechaGeneracion_usaElInstante()

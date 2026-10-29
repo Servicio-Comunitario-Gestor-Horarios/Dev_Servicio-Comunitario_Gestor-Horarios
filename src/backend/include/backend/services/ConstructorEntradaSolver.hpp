@@ -50,10 +50,17 @@ struct DatosDominio
 /// `materias_suplente`. Las entidades (materias, aulas, cursos, docentes y turnos
 /// con sus eventos) se toman de `datos`; la versión de la entrada es siempre 2.0.
 ///
+/// `duracionMinutos` es la duración efectiva de la hora académica: **sobrescribe
+/// siempre** la del preset (que es un campo derivado) y alinea con ella la rejilla
+/// de disponibilidad (RF-3, RF-5). Se valida **después** de la sobrescritura: un
+/// preset con 0, 5 o 45 no bloquea, pero una `duracionMinutos` fuera de 30–90 falla
+/// sin emitir JSON.
+///
 /// Devuelve error (sin emitir JSON) si un aula o una materia de `datos` no declara
 /// tipo de aula.
 Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
                                             const SolverConfig& parametros,
+                                            int duracionMinutos,
                                             const QDateTime& ahora);
 
 /// Fachada del constructor (equivalente a `construirJsonEntrada`).
@@ -62,5 +69,6 @@ class ConstructorEntradaSolver
 public:
     static Resultado<QJsonObject> construir(const DatosDominio& datos,
                                             const SolverConfig& parametros,
+                                            int duracionMinutos,
                                             const QDateTime& ahora);
 };

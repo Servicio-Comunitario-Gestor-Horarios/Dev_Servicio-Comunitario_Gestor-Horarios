@@ -40,9 +40,9 @@ private:
         EventoDTO evento;
         evento.id = 1; evento.nombre = QStringLiteral("Receso");
         evento.despuesDeSlot = 1; evento.orden = 1; evento.duracion = 10;
-        // Ventana de la posición 1 con la franja de 45 min: 07:00 + 45 = 07:45, y la
-        // duración de 10 min la cierra a las 07:55, donde cabe el evento.
-        evento.inicio = QTime(7, 45); evento.fin = QTime(7, 55);
+        // Ventana de la posición 1 con la franja de 35 min: 07:00 + 35 = 07:35, y la
+        // duración de 10 min la cierra a las 07:45, donde cabe el evento.
+        evento.inicio = QTime(7, 35); evento.fin = QTime(7, 45);
         TurnoDTO turno;
         turno.nombre = QStringLiteral("manana");
         turno.inicio = QTime(7, 0); turno.fin = QTime(12, 0);
@@ -102,7 +102,7 @@ private:
     /// Desempaqueta la construcción válida sin repetir el mensaje de error en cada caso.
     QJsonObject entradaValida() const
     {
-        const auto resultado = construirJsonEntrada(dominioCompleto(), parametros(), ahoraFijo());
+        const auto resultado = construirJsonEntrada(dominioCompleto(), parametros(), 35, ahoraFijo());
         const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominioCompleto())",
                                        qPrintable(resultado.mensajeError), __FILE__, __LINE__);
         Q_UNUSED(ok);
@@ -144,7 +144,7 @@ private slots:
     void metaUsaElInstanteInyectado()
     {
         const QDateTime ahora(QDate(2026, 10, 10), QTime(12, 30, 0));
-        const auto resultado = construirJsonEntrada(dominioCompleto(), parametros(), ahora);
+        const auto resultado = construirJsonEntrada(dominioCompleto(), parametros(), 35, ahora);
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
 
         QCOMPARE(resultado.valor["meta"].toObject()["fecha_modificacion"].toString(),
@@ -173,8 +173,8 @@ private slots:
         QCOMPARE(evento["despues_de_slot"].toInt(), 1);
         QCOMPARE(evento["orden"].toInt(), 1);
         QCOMPARE(evento["duracion"].toInt(), 10);
-        QCOMPARE(evento["inicio"].toString(), QStringLiteral("07:45"));
-        QCOMPARE(evento["fin"].toString(), QStringLiteral("07:55"));
+        QCOMPARE(evento["inicio"].toString(), QStringLiteral("07:35"));
+        QCOMPARE(evento["fin"].toString(), QStringLiteral("07:45"));
     }
 
     /// RF-1: se emite una entrada por evento, aunque compartan posición.
@@ -186,7 +186,7 @@ private slots:
         acto.despuesDeSlot = 1; acto.orden = 2; acto.duracion = 5;
         datos.turnos[0].eventos.append(acto);
 
-        const auto resultado = construirJsonEntrada(datos, parametros(), ahoraFijo());
+        const auto resultado = construirJsonEntrada(datos, parametros(), 35, ahoraFijo());
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
 
         const QJsonArray eventos = resultado.valor["eventos"].toArray();
@@ -227,7 +227,7 @@ private slots:
         DatosDominio datos = dominioCompleto();
         datos.aulas[0].tipoAula.clear();
 
-        const auto resultado = construirJsonEntrada(datos, parametros(), ahoraFijo());
+        const auto resultado = construirJsonEntrada(datos, parametros(), 35, ahoraFijo());
 
         QVERIFY(!resultado.ok);
         QVERIFY2(resultado.mensajeError.contains(QStringLiteral("A1")),
@@ -243,7 +243,7 @@ private slots:
         DatosDominio datos = dominioCompleto();
         datos.materias[1].tipoAula = QStringLiteral("   ");   // solo espacios: ausente
 
-        const auto resultado = construirJsonEntrada(datos, parametros(), ahoraFijo());
+        const auto resultado = construirJsonEntrada(datos, parametros(), 35, ahoraFijo());
 
         QVERIFY(!resultado.ok);
         QVERIFY2(resultado.mensajeError.contains(QStringLiteral("Física")),
@@ -260,7 +260,7 @@ private slots:
         datos.aulas[0].tipoAula.clear();
         datos.materias[0].tipoAula.clear();
 
-        const auto resultado = construirJsonEntrada(datos, parametros(), ahoraFijo());
+        const auto resultado = construirJsonEntrada(datos, parametros(), 35, ahoraFijo());
 
         QVERIFY(!resultado.ok);
         QVERIFY2(resultado.mensajeError.contains(QStringLiteral("A1")),
@@ -289,11 +289,12 @@ private slots:
             json["profesores"].toArray()[0].toObject()["disponibilidad"].toArray()[0].toObject();
         // Dominio: día 1 (lunes) → solver: día 0.
         QCOMPARE(disp["dia"].toInt(), 0);
-        // 07:00–09:00 con slots de 45 min → 2 slots (0 y 1) del turno de la mañana.
+        // 07:00–09:00 con franjas de 35 min → 3 slots (0, 1 y 2) del turno de la mañana.
         const QJsonArray listaSlots = disp["slot"].toArray();
-        QCOMPARE(listaSlots.size(), 2);
+        QCOMPARE(listaSlots.size(), 3);
         QCOMPARE(listaSlots[0].toInt(), 0);
         QCOMPARE(listaSlots[1].toInt(), 1);
+        QCOMPARE(listaSlots[2].toInt(), 2);
     }
 
     void jsonGeneradoEsConsumiblePorElSolver()
@@ -331,7 +332,7 @@ private slots:
         SolverConfig p = parametros();
         p.version.clear();   // el origen no declara version
 
-        const auto resultado = construirJsonEntrada(dominioCompleto(), p, ahoraFijo());
+        const auto resultado = construirJsonEntrada(dominioCompleto(), p, 35, ahoraFijo());
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
 
         QCOMPARE(resultado.valor[QStringLiteral("version")].toString(), QStringLiteral("2.0"));
@@ -342,9 +343,9 @@ private slots:
     /// La fachada devuelve el mismo resultado que la función libre.
     void fachadaDevuelveElMismoResultado()
     {
-        const auto libre = construirJsonEntrada(dominioCompleto(), parametros(), ahoraFijo());
+        const auto libre = construirJsonEntrada(dominioCompleto(), parametros(), 35, ahoraFijo());
         const auto fachada =
-            ConstructorEntradaSolver::construir(dominioCompleto(), parametros(), ahoraFijo());
+            ConstructorEntradaSolver::construir(dominioCompleto(), parametros(), 35, ahoraFijo());
 
         QCOMPARE(fachada.ok, libre.ok);
         QCOMPARE(fachada.valor, libre.valor);
@@ -353,11 +354,54 @@ private slots:
 
     void esPura_conElMismoInstanteDaLaMismaEntrada()
     {
-        const auto a = construirJsonEntrada(dominioCompleto(), parametros(), ahoraFijo());
-        const auto b = construirJsonEntrada(dominioCompleto(), parametros(), ahoraFijo());
+        const auto a = construirJsonEntrada(dominioCompleto(), parametros(), 35, ahoraFijo());
+        const auto b = construirJsonEntrada(dominioCompleto(), parametros(), 35, ahoraFijo());
 
         QVERIFY(a.ok && b.ok);
         QCOMPARE(a.valor, b.valor);
+    }
+
+    // ─── Duración de la hora académica recibida (RF-3, RF-5) ────────────────
+
+    /// La duración del preset es derivada: la salida lleva SIEMPRE la D recibida (RF-5).
+    void duracionDelPreset_seSobrescribeConLaRecibida()
+    {
+        for (int enPreset : {0, 5, 45}) {
+            SolverConfig p = parametros();
+            p.franja_horaria.duracion_minutos = enPreset;
+
+            const auto resultado = construirJsonEntrada(dominioCompleto(), p, 35, ahoraFijo());
+            QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+            QCOMPARE(resultado.valor["franja_horaria"].toObject()["duracion_minutos"].toInt(),
+                     35);
+            // El resto de la franja horaria sí se conserva del preset.
+            QCOMPARE(resultado.valor["franja_horaria"].toObject()["slots_por_turno"].toInt(), 6);
+        }
+
+        // La D recibida manda también cuando el preset trae 45.
+        const auto resultado =
+            construirJsonEntrada(dominioCompleto(), parametros(), 40, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+        QCOMPARE(resultado.valor["franja_horaria"].toObject()["duracion_minutos"].toInt(), 40);
+    }
+
+    /// Una D fuera de 30–90 falla por rango y no emite JSON (RF-5).
+    void duracionFueraDeRango_fallaSinEmitirJson()
+    {
+        for (int duracion : {5, 29, 91}) {
+            const auto resultado =
+                construirJsonEntrada(dominioCompleto(), parametros(), duracion, ahoraFijo());
+
+            QVERIFY2(!resultado.ok, qPrintable(QString::number(duracion)));
+            QVERIFY2(resultado.mensajeError.contains(QStringLiteral("30")),
+                     qPrintable(resultado.mensajeError));
+            QVERIFY2(resultado.mensajeError.contains(QStringLiteral("90")),
+                     qPrintable(resultado.mensajeError));
+            QVERIFY2(resultado.mensajeError.contains(
+                         QStringLiteral("Ajuste la duración a un valor del rango")),
+                     qPrintable(resultado.mensajeError));
+            QVERIFY(resultado.valor.isEmpty());
+        }
     }
 };
 

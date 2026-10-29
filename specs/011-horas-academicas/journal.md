@@ -492,3 +492,65 @@ $ ctest --preset backend
   de 1, que es justo la regla nueva.
 - No se tocaron `calculo_eventos` (legado vivo), el constructor, el seed, el esquema, `duracion_horaria`
   ni `docs/`.
+
+## T7 - Constructor con D y huella de datos con D (2026-10-29)
+
+**Requisito:** RF-5, RF-3 y RF-6 (y RNF-1 en los mensajes). **Plan:** §1.5, §1.6, §1.7, §2.4, §2.5 y
+§9 (T7). **Base:** `fbb1f68`.
+
+### Rojo (tests primero)
+
+Las llamadas de los tests se pasaron a la firma con D y se añadieron los casos de sobrescritura, rango y
+huella. Sin la firma nueva el árbol no compila:
+
+```text
+$ cmake --build --preset backend --parallel
+test_validador_entrada.cpp:85:78: error: invalid initialization of reference of type
+‘const QDateTime&’ from expression of type ‘int’
+test_servicio_generacion.cpp:267:39: error: demasiados argumentos para la función
+‘QString huellaDatos(const DatosDominio&)’
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_constructor_entrada|test_validador_entrada|test_servicio_generacion|test_ipc_aislamiento_bd)$'
+100% tests passed out of 4
+
+$ ctest --preset backend
+52/52 Test #52: test_ipc_aislamiento_bd ...............   Passed    0.08 sec
+100% tests passed out of 52
+```
+
+La huella **no** se movió a T9: cupo en la tarea.
+
+### Cambios
+
+- `ConstructorEntradaSolver.hpp` / `.cpp`:
+  - Firma obligatoria `construirJsonEntrada(datos, parametros, duracionMinutos, ahora)` (y la fachada
+    `ConstructorEntradaSolver::construir(..., duracionMinutos, ...)`), **sin** sobrecarga antigua.
+  - `salida.franja_horaria = parametros.franja_horaria` y **sobrescritura incondicional** de
+    `duracion_minutos` con la D recibida; la validación con `duracion_horaria::errorDeRango` va
+    **después** de la sobrescritura y antes de emitir JSON.
+  - `slotsDeFranja` usa la D efectiva de la salida, no la del preset.
+- `ServicioGeneracion.hpp` / `.cpp`: `huellaDatos(datos, duracionMinutos)` incluye `dur:<D>;` en el
+  resumen canónico; el resto del servicio no cambia (el llamador construye la huella con la D efectiva).
+- Tests: `test_constructor_entrada` (todas las llamadas + fachada), `test_validador_entrada`,
+  `test_servicio_generacion` (`entradaValida` y todas las `huellaDatos`) y
+  `test/test_ipc_aislamiento_bd`.
+
+### Notas
+
+- **Sobrescritura + validación:** el orden es tipos → `salida.franja_horaria = preset` → `duracion = D`
+  → `errorDeRango` → rejilla. Un preset con 0, 5 o 45 produce siempre la salida con 35 (probado con
+  los tres); `construirJsonEntrada(..., 5, ...)` devuelve error con el rango y la acción y **no** emite
+  JSON (`resultado.valor.isEmpty()`).
+- **Disponibilidad:** 07:00–09:00 con D = 35 → slots 0, 1 y 2 (antes 2 con 45).
+- **Fixture de eventos a 35:** el constructor conserva el evento del dominio (07:35–07:45) y V2 lo
+  acepta con la franja de 35; los eventos de `test_validador_entrada` se recalculan de 08:30 a **08:10**
+  (ventana de la posición 2: 08:10–08:20) y el déficit del turno sin encaje pasa a **180**
+  (`6 × 35 − 30`). `conFranjasUtiles40` vuelve a 07:00–11:40 (`8 × 35 = 280`).
+- **Frontend:** `src/frontend/src/services/entrada_solver_builder.cpp:165` sigue con la firma antigua;
+  el preset `backend` no lo compila y queda como deuda documentada (T10, RF-9). No se tocó.
+- No se tocaron `calculo_eventos` (legado vivo), `solver_config.cpp`, el seed, el esquema,
+  `duracion_horaria` ni `docs/`.

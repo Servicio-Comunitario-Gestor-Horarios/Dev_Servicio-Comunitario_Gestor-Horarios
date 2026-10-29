@@ -82,7 +82,7 @@ private:
 
     QJsonObject jsonValido() const
     {
-        const auto resultado = construirJsonEntrada(dominio(), parametros(),
+        const auto resultado = construirJsonEntrada(dominio(), parametros(), 35,
                                                     QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
         const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio())",
                                        qPrintable(resultado.mensajeError), __FILE__, __LINE__);
@@ -133,9 +133,9 @@ private:
         QJsonArray franjas;
         for (int s = 0; s < 8; ++s) franjas.append(s);
         manana[QStringLiteral("slot")] = franjas;
-        // 8 franjas × 45 min = 360: la ventana debe llegar a las 13:00 para encajar (RF-4).
+        // 8 franjas × 35 min = 280: la ventana debe llegar a las 11:40 para encajar (RF-4).
         manana[QStringLiteral("inicio")] = QStringLiteral("07:00");
-        manana[QStringLiteral("fin")] = QStringLiteral("13:00");
+        manana[QStringLiteral("fin")] = QStringLiteral("11:40");
         arrTurnos[0] = manana;
         turnos[QStringLiteral("turnos")] = arrTurnos;
         j[QStringLiteral("turnos")] = turnos;
@@ -548,12 +548,12 @@ private slots:
     // ─── V2: forma y temporalidad de los eventos (010) ─────────────────────
 
     /// V2: un evento con horario coherente y dentro de la ventana de su posición pasa.
-    /// Turno 07:00–12:00 con 6 franjas de 45 min: la posición 2 abarca 08:30–08:40.
+    /// Turno 07:00–12:00 con 6 franjas de 35 min: la posición 2 abarca 08:10–08:20.
     void v2_eventoConHorarioValido_pasa()
     {
         const QJsonObject j = conEventos(
             jsonValido(), QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
-                                            QStringLiteral("08:30"), QStringLiteral("08:40"))});
+                                            QStringLiteral("08:10"), QStringLiteral("08:20"))});
         const auto resultado = validarEntradaSolver(j);
         QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
     }
@@ -615,7 +615,7 @@ private slots:
         // Solo inicio: el par debe estar completo o ausente.
         exigeRechazoV2(conEventos(jsonValido(),
                                   QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
-                                                    QStringLiteral("08:30"))}),
+                                                    QStringLiteral("08:10"))}),
                        QStringLiteral("inicio/fin"));
     }
 
@@ -630,17 +630,17 @@ private slots:
 
     void v2_eventoDuracionNoCoincideConLasHoras_falla()
     {
-        // 08:30–08:40 son 10 min; la duración declara 9.
+        // 08:10–08:20 son 10 min; la duración declara 9.
         exigeRechazoV2(conEventos(jsonValido(),
                                   QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 9,
-                                                    QStringLiteral("08:30"),
-                                                    QStringLiteral("08:40"))}),
+                                                    QStringLiteral("08:10"),
+                                                    QStringLiteral("08:20"))}),
                        QStringLiteral("no coincide"));
     }
 
     void v2_eventoFueraDeLaVentanaDeSuPosicion_falla()
     {
-        // La posición 2 abarca 08:30–08:40; el intervalo 08:00–08:10 es anterior.
+        // La posición 2 abarca 08:10–08:20; el intervalo 08:00–08:10 es anterior.
         exigeRechazoV2(conEventos(jsonValido(),
                                   QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
                                                     QStringLiteral("08:00"),
@@ -653,7 +653,7 @@ private slots:
     {
         QJsonObject j = conEventos(
             jsonValido(), QJsonArray{evento(QStringLiteral("Receso"), 2, 1, 10,
-                                            QStringLiteral("08:30"), QStringLiteral("08:40"))});
+                                            QStringLiteral("08:10"), QStringLiteral("08:20"))});
         QJsonObject turnos = j[QStringLiteral("turnos")].toObject();
         QJsonArray arrTurnos = turnos[QStringLiteral("turnos")].toArray();
         QJsonObject manana = arrTurnos[0].toObject();
@@ -667,26 +667,26 @@ private slots:
     }
 
     /// V2: dos eventos de la misma posición con intervalos que se pisan se rechazan.
-    /// La suma de duraciones (12 min) deja la ventana de la posición en 08:30–08:42.
+    /// La suma de duraciones (12 min) deja la ventana de la posición en 08:10–08:22.
     void v2_eventosSolapados_fallan()
     {
         const QJsonArray eventos{
-            evento(QStringLiteral("Receso"), 2, 1, 6, QStringLiteral("08:30"),
-                   QStringLiteral("08:36")),
-            evento(QStringLiteral("Acto"), 2, 2, 6, QStringLiteral("08:34"),
-                   QStringLiteral("08:40"))};
+            evento(QStringLiteral("Receso"), 2, 1, 6, QStringLiteral("08:10"),
+                   QStringLiteral("08:16")),
+            evento(QStringLiteral("Acto"), 2, 2, 6, QStringLiteral("08:14"),
+                   QStringLiteral("08:20"))};
         exigeRechazoV2(conEventos(jsonValido(), eventos), QStringLiteral("solapan"));
     }
 
     /// V2: en la misma posición, un evento posterior en `orden` no puede empezar antes.
-    /// La ventana de la posición 2 es 08:30–08:39 (suma de duraciones 9 min).
+    /// La ventana de la posición 2 es 08:10–08:19 (suma de duraciones 9 min).
     void v2_eventosConCronologiaInvertida_fallan()
     {
         const QJsonArray eventos{
-            evento(QStringLiteral("Primero declarado"), 2, 1, 4, QStringLiteral("08:35"),
-                   QStringLiteral("08:39")),
-            evento(QStringLiteral("Segundo declarado"), 2, 2, 5, QStringLiteral("08:30"),
-                   QStringLiteral("08:35"))};
+            evento(QStringLiteral("Primero declarado"), 2, 1, 4, QStringLiteral("08:15"),
+                   QStringLiteral("08:19")),
+            evento(QStringLiteral("Segundo declarado"), 2, 2, 5, QStringLiteral("08:10"),
+                   QStringLiteral("08:15"))};
         exigeRechazoV2(conEventos(jsonValido(), eventos),
                        QStringLiteral("orden cronológico"));
     }
@@ -747,7 +747,7 @@ private slots:
                  qPrintable(resultado.mensajeError));
     }
 
-    /// V2: un turno sin eventos debe encajar igualmente (6 franjas × 45 > 30 de ventana).
+    /// V2: un turno sin eventos debe encajar igualmente (6 franjas × 35 > 30 de ventana).
     void v2_turnoQueNoEncaja_falla()
     {
         const QJsonObject j =
@@ -759,7 +759,7 @@ private slots:
                  qPrintable(resultado.mensajeError));
         QVERIFY2(resultado.mensajeError.contains(QStringLiteral("manana")),
                  qPrintable(resultado.mensajeError));
-        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("déficit 240")),
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("déficit 180")),
                  qPrintable(resultado.mensajeError));
     }
 

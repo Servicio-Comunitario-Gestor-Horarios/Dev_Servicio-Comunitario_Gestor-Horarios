@@ -81,7 +81,7 @@ private:
         p.profesores = {ps};
 
         const auto resultado =
-            construirJsonEntrada(d, p, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+            construirJsonEntrada(d, p, 35, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
         const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio)",
                                        qPrintable(resultado.mensajeError), __FILE__, __LINE__);
         Q_UNUSED(ok);

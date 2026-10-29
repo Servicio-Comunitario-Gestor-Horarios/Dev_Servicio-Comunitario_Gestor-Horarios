@@ -6,9 +6,13 @@
 #include <QCryptographicHash>
 #include <QTimer>
 
-QString huellaDatos(const DatosDominio& datos)
+QString huellaDatos(const DatosDominio& datos, int duracionMinutos)
 {
     QString canon;
+
+    // La hora académica entra en la huella (RF-6): un cambio de D entre el envío y la
+    // respuesta marca «datos anteriores».
+    canon += QStringLiteral("dur:%1;").arg(duracionMinutos);
 
     for (const ProfesorDTO& d : datos.docentes)
     {
