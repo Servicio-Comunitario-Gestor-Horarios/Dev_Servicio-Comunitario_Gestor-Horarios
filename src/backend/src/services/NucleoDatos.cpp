@@ -66,7 +66,8 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_composicion(db),
       m_cursos(db),
       m_turnos(db),
-      m_configuracion(db) {}
+      m_configuracion(db),
+      m_preferencias(db) {}
 
 // ─── Docentes ──────────────────────────────────────────────────────────────
 
@@ -399,6 +400,54 @@ Resultado<ConfiguracionHoraria> NucleoDatos::guardarConfiguracionHoraria(
     // La configuración es global, no un registro de dominio: no pasa por
     // `GestorPendientes` (plan §1.2).
     return m_configuracion.guardar(duracionMinutos);
+}
+
+// ─── Preferencias horarias del docente (RF-3) ──────────────────────────────
+
+Resultado<PreferenciaDTO> NucleoDatos::agregarPreferencia(const QString& idProfesor,
+                                                          const FranjaHoraria& franja,
+                                                          SentidoPreferencia sentido) {
+    const QString clave =
+        QStringLiteral("%1|%2|%3|%4|%5")
+            .arg(idProfesor)
+            .arg(franja.dia)
+            .arg(franja.inicio.toString(QStringLiteral("HH:mm")),
+                 franja.fin.toString(QStringLiteral("HH:mm")), textoDeSentido(sentido));
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), clave, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: preferencia del docente %1").arg(idProfesor),
+        [this, idProfesor, franja, sentido]() {
+            return m_preferencias.agregar(idProfesor, franja, sentido);
+        });
+}
+
+Resultado<QVector<PreferenciaDTO>> NucleoDatos::listarPreferencias(
+    const QString& idProfesor) const {
+    return m_preferencias.listar(idProfesor);
+}
+
+Resultado<PreferenciaDTO> NucleoDatos::actualizarPreferencia(int id, const FranjaHoraria& franja,
+                                                             SentidoPreferencia sentido) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), claveDe(id), TipoOperacion::Modificacion,
+        QStringLiteral("Pendiente de guardar: preferencia %1").arg(id),
+        [this, id, franja, sentido]() {
+            return m_preferencias.actualizar(id, franja, sentido);
+        });
+}
+
+Resultado<bool> NucleoDatos::eliminarPreferencia(int id) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), claveDe(id), TipoOperacion::Baja,
+        QStringLiteral("Pendiente de eliminar: preferencia %1").arg(id),
+        [this, id]() { return m_preferencias.eliminar(id); });
+}
+
+Resultado<int> NucleoDatos::limpiarPreferencias(const QString& idProfesor) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), idProfesor, TipoOperacion::Baja,
+        QStringLiteral("Pendiente de limpiar las preferencias del docente %1").arg(idProfesor),
+        [this, idProfesor]() { return m_preferencias.limpiar(idProfesor); });
 }
 
 // ─── Cambios pendientes y reintento (RF-3) ────────────────────────────────

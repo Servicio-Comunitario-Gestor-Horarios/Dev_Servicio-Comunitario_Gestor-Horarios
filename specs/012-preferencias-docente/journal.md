@@ -189,3 +189,55 @@ $ ctest --preset backend
   («…de la preferencia…»). Ningún rechazo queda sin valor y acción.
 - No se tocaron el esquema, `ProfesorDTO`/`NucleoDatos`, la cascada, el seed, `ServicioGeneracion` ni
   `docs/`.
+
+## T4 - `ProfesorDTO` con preferencias y fachada `NucleoDatos` (2026-10-29)
+
+**Requisito:** RF-3. **Plan:** §1.4, §2.3 (fachada) y §10 (T4). **Base:** `7405351`.
+
+### Rojo (tests primero)
+
+Se añadieron los casos en `test_servicio_profesor` y `test_nucleo_datos`; sin los campos ni los métodos
+el árbol no compila:
+
+```text
+$ cmake --build --preset backend --parallel
+test_servicio_profesor.cpp: error: ‘struct ProfesorDTO’ has no member named ‘preferencias’
+test_nucleo_datos.cpp: error: ‘class NucleoDatos’ has no member named ‘agregarPreferencia’
+[…]
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_profesor|test_backend_nucleo_datos|test_servicio_preferencias)$'
+100% tests passed out of 3
+
+$ ./build-backend/test/test_servicio_profesor     → Totals: 56 passed
+$ ./build-backend/test/test_backend_nucleo_datos  → Totals: 20 passed
+
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+### Cambios
+
+- `ServicioProfesor.hpp`: `ProfesorDTO` gana `QVector<PreferenciaDTO> preferencias` (lista propia,
+  junto a `disponibilidad`, **sin mezclarlas**) y `cargarPreferencias` queda en la sección privada,
+  junto a `cargarDisponibilidad`/`cargarMaterias`.
+- `ServicioProfesor.cpp`: `cargarPreferencias` delega en `ServicioPreferencias(m_db).listar(id)` (una
+  sola consulta y un solo orden); `obtenerProfesor` y `listarProfesores` la llaman.
+  `ProfesorDTO::toProfesor()` **no** la tiene en cuenta (el modelo del solver no cambia).
+- `NucleoDatos.hpp` / `.cpp`: miembro `m_preferencias` y las cinco operaciones con `conPendiente`.
+- Tests: preferencias separadas y ordenadas en `obtenerProfesor`/`listarProfesores`, `toProfesor` sin
+  preferencias (mismo `toJson` antes y después), fachada completa y escritura fallida reintentable.
+
+### Notas
+
+- **Registro y reintento:** `agregarPreferencia`, `actualizarPreferencia`, `eliminarPreferencia` y
+  `limpiarPreferencias` pasan por `conPendiente`; una escritura fallida se registra con dominio
+  `preferencia` y clave (alta: `idProfesor|dia|inicio|fin|sentido`; edición/baja: `id`; limpieza:
+  `idProfesor`) y la acción que repite la llamada. El test falla el alta con un docente inexistente,
+  crea el docente y `reintentarPendiente` aplica el cambio y retira el pendiente.
+- **Listas distintas:** una preferencia que coincide con la disponibilidad coexiste y no se mezcla
+  (`disponibilidad` sigue con 1 y `preferencias` con 2 en el test).
+- No se tocaron el esquema, la cascada, el seed, `ServicioGeneracion` ni `docs/`.

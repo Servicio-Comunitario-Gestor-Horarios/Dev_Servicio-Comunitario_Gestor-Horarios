@@ -8,6 +8,7 @@
 #include "backend/resultado.hpp"        // ← ajusta si tu ruta difiere
 #include "backend/data/profesor.hpp"
 #include "backend/data/franja_horaria.hpp"
+#include "backend/services/ServicioPreferencias.hpp"
 
 // ─── DTOs ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,9 @@ struct ProfesorDTO {
     QString telefono;
 
     QVector<DisponibilidadDTO>  disponibilidad;
+    /// Preferencias horarias (poder frente a querer): lista propia y ordenada por día,
+    /// inicio, fin e id. No entran en el modelo del solver (`toProfesor` las ignora).
+    QVector<PreferenciaDTO>     preferencias;
     QVector<MateriaAsignadaDTO> materias;
 
     Profesor toProfesor() const;
@@ -86,5 +90,6 @@ private:
     ProfesorDTO mapearARecord(const QSqlRecord& record) const;
 
     bool cargarDisponibilidad(ProfesorDTO& dto) const;
+    bool cargarPreferencias(ProfesorDTO& dto) const;
     bool cargarMaterias(ProfesorDTO& dto) const;
 };

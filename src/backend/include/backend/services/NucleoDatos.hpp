@@ -21,6 +21,7 @@
 #include "backend/services/ServicioCargaHoraria.hpp"
 #include "backend/services/ServicioComposicionPlan.hpp"
 #include "backend/services/ServicioConfiguracionHoraria.hpp"
+#include "backend/services/ServicioPreferencias.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
@@ -144,6 +145,22 @@ public:
     /// Valida 30–90 y guarda la configuración; inválida no cambia el anterior.
     Resultado<ConfiguracionHoraria> guardarConfiguracionHoraria(int duracionMinutos);
 
+    // ─── Preferencias horarias del docente (RF-3) ─────────────────────────
+
+    /// Alta de una preferencia; si falla queda pendiente y se puede reintentar.
+    Resultado<PreferenciaDTO> agregarPreferencia(const QString& idProfesor,
+                                                 const FranjaHoraria& franja,
+                                                 SentidoPreferencia sentido);
+    /// Preferencias del docente por día, inicio, fin e id; vacío no es error.
+    Resultado<QVector<PreferenciaDTO>> listarPreferencias(const QString& idProfesor) const;
+    /// Edición por identidad; si falla queda pendiente y se puede reintentar.
+    Resultado<PreferenciaDTO> actualizarPreferencia(int id, const FranjaHoraria& franja,
+                                                    SentidoPreferencia sentido);
+    /// Baja por identidad; distingue «no existe».
+    Resultado<bool> eliminarPreferencia(int id);
+    /// Borra solo las preferencias del docente y devuelve cuántas borró.
+    Resultado<int> limpiarPreferencias(const QString& idProfesor);
+
     // ─── Eliminación en cascada (RF-2) ────────────────────────────────────
 
     /**
@@ -198,6 +215,7 @@ private:
     ServicioCursos m_cursos;
     ServicioTurnosEventos m_turnos;
     ServicioConfiguracionHoraria m_configuracion;
+    ServicioPreferencias m_preferencias;
 
     /// Estado en memoria de las escrituras fallidas pendientes de reintento.
     GestorPendientes m_pendientes;

@@ -49,6 +49,16 @@ private:
         return query.exec() && query.next();
     }
 
+    /// Franja de conveniencia para las preferencias.
+    static FranjaHoraria franja(int dia, int hIni, int mIni, int hFin, int mFin)
+    {
+        FranjaHoraria f;
+        f.dia = dia;
+        f.inicio = QTime(hIni, mIni);
+        f.fin = QTime(hFin, mFin);
+        return f;
+    }
+
 private slots:
 
     void init()
@@ -339,6 +349,68 @@ private slots:
         const auto rechazado = m_nucleo->guardarConfiguracionHoraria(29);
         QVERIFY(!rechazado.ok);
         QCOMPARE(m_nucleo->configuracionHoraria().valor.duracionMinutos, 40);
+    }
+
+    // ─── Preferencias horarias: fachada (RF-3) ──────────────────────────────
+
+    void preferencias_fachadaAltaListadoEdicionBajaYlimpieza()
+    {
+        QVERIFY(m_nucleo->crearDocente(QStringLiteral("P-PREF"), QStringLiteral("Docente Pref"),
+                                       QStringLiteral("pref@centro.edu")).ok);
+
+        auto alta = m_nucleo->agregarPreferencia(QStringLiteral("P-PREF"), franja(1, 8, 0, 10, 0),
+                                                 SentidoPreferencia::Preferida);
+        QVERIFY2(alta.ok, qPrintable(alta.mensajeError));
+        QVERIFY(alta.valor.id > 0);
+
+        auto lista = m_nucleo->listarPreferencias(QStringLiteral("P-PREF"));
+        QVERIFY2(lista.ok, qPrintable(lista.mensajeError));
+        QCOMPARE(lista.valor.size(), 1);
+        QCOMPARE(lista.valor.first().franja.dia, 1);
+
+        auto edicion = m_nucleo->actualizarPreferencia(
+            alta.valor.id, franja(2, 9, 0, 11, 0), SentidoPreferencia::Evitada);
+        QVERIFY2(edicion.ok, qPrintable(edicion.mensajeError));
+        QCOMPARE(edicion.valor.franja.dia, 2);
+        QCOMPARE(edicion.valor.sentido, SentidoPreferencia::Evitada);
+
+        auto baja = m_nucleo->eliminarPreferencia(alta.valor.id);
+        QVERIFY2(baja.ok, qPrintable(baja.mensajeError));
+        QVERIFY(baja.valor);
+        QVERIFY(m_nucleo->listarPreferencias(QStringLiteral("P-PREF")).valor.isEmpty());
+
+        QVERIFY(m_nucleo->agregarPreferencia(QStringLiteral("P-PREF"), franja(1, 8, 0, 10, 0),
+                                             SentidoPreferencia::Preferida).ok);
+        QVERIFY(m_nucleo->agregarPreferencia(QStringLiteral("P-PREF"), franja(3, 8, 0, 10, 0),
+                                             SentidoPreferencia::Evitada).ok);
+        auto limpieza = m_nucleo->limpiarPreferencias(QStringLiteral("P-PREF"));
+        QVERIFY2(limpieza.ok, qPrintable(limpieza.mensajeError));
+        QCOMPARE(limpieza.valor, 2);
+        QVERIFY(m_nucleo->listarPreferencias(QStringLiteral("P-PREF")).valor.isEmpty());
+    }
+
+    /// Una escritura fallida queda pendiente y el reintento la aplica (RF-3).
+    void preferencias_escrituraFallidaQuedaPendienteYSeReintenta()
+    {
+        // Docente inexistente: el alta falla y no se descarta: queda pendiente.
+        const auto fallida = m_nucleo->agregarPreferencia(
+            QStringLiteral("P-PEND"), franja(1, 8, 0, 10, 0), SentidoPreferencia::Preferida);
+        QVERIFY(!fallida.ok);
+        QVERIFY(m_nucleo->hayPendientes());
+
+        const auto pendientes = m_nucleo->gestorPendientes().pendientes();
+        QCOMPARE(pendientes.size(), 1);
+        QCOMPARE(pendientes.first().dominio, QStringLiteral("preferencia"));
+        QCOMPARE(pendientes.first().tipo, TipoOperacion::Alta);
+
+        // Se crea el docente y el reintento aplica el cambio; el pendiente desaparece.
+        QVERIFY(m_nucleo->crearDocente(QStringLiteral("P-PEND"), QStringLiteral("Docente Pend"),
+                                       QStringLiteral("pend@centro.edu")).ok);
+        const auto reintento = m_nucleo->reintentarPendiente(pendientes.first().id);
+        QVERIFY2(reintento.ok, qPrintable(reintento.mensajeError));
+        QVERIFY(reintento.valor);
+        QVERIFY(!m_nucleo->hayPendientes());
+        QCOMPARE(m_nucleo->listarPreferencias(QStringLiteral("P-PEND")).valor.size(), 1);
     }
 
     // ─── Catálogo de tipos de aula ──────────────────────────────────────────

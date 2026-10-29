@@ -6,6 +6,7 @@
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioProfesor.hpp>
+#include <backend/services/ServicioPreferencias.hpp>
 
 #include <backend/services/ServicioMaterias.hpp>
 #include <backend/services/ServicioTiposAula.hpp>
@@ -367,6 +368,74 @@ private slots:
         QCOMPARE(obtenido.valor.disponibilidad[0].franja.inicio, QTime(8, 0));
         QCOMPARE(obtenido.valor.disponibilidad[1].franja.inicio, QTime(14, 0));
         QCOMPARE(obtenido.valor.disponibilidad[2].franja.dia, 3);
+    }
+
+    // ─── Preferencias del docente (RF-3) ───────────────────────────────────
+
+    void obtenerProfesor_incluyePreferenciasSeparadasYOrdenadas() {
+        QVERIFY(m_servicio->crearProfesor("P-1800", "Dra. Pref", "pref@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad("P-1800", franja(1, 8, 0, 10, 0)).ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-1800", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+        // Coincide con la disponibilidad: son listas distintas (poder frente a querer).
+        QVERIFY(preferencias.agregar("P-1800", franja(1, 8, 0, 10, 0),
+                                     SentidoPreferencia::Preferida).ok);
+
+        auto r = m_servicio->obtenerProfesor("P-1800");
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.disponibilidad.size(), 1);
+        QCOMPARE(r.valor.preferencias.size(), 2);
+
+        // Ordenadas por día y hora de inicio.
+        QCOMPARE(r.valor.preferencias[0].franja.dia, 1);
+        QCOMPARE(r.valor.preferencias[0].franja.inicio, QTime(8, 0));
+        QCOMPARE(r.valor.preferencias[0].sentido, SentidoPreferencia::Preferida);
+        QCOMPARE(r.valor.preferencias[1].franja.dia, 2);
+        QCOMPARE(r.valor.preferencias[1].sentido, SentidoPreferencia::Evitada);
+        QCOMPARE(r.valor.disponibilidad.first().franja.dia, 1);
+    }
+
+    void listarProfesores_cargaPreferenciasDeCadaDocente() {
+        QVERIFY(m_servicio->crearProfesor("P-1900", "Con Pref", "con@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-1901", "Sin Pref", "sin@uni.edu").ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-1900", franja(3, 9, 0, 11, 0),
+                                     SentidoPreferencia::Preferida).ok);
+
+        const auto r = m_servicio->listarProfesores();
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        for (const ProfesorDTO& dto : r.valor) {
+            if (dto.id == QStringLiteral("P-1900"))
+                QCOMPARE(dto.preferencias.size(), 1);
+            if (dto.id == QStringLiteral("P-1901"))
+                QVERIFY(dto.preferencias.isEmpty());
+        }
+    }
+
+    void toProfesor_noCopiaLasPreferencias() {
+        QVERIFY(m_servicio->crearProfesor("P-2000", "Dra. Solver", "solver@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad("P-2000", franja(1, 8, 0, 10, 0)).ok);
+
+        auto sinPreferencias = m_servicio->obtenerProfesor("P-2000");
+        QVERIFY(sinPreferencias.ok);
+        const Profesor antes = sinPreferencias.valor.toProfesor();
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-2000", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
+        auto conPreferencias = m_servicio->obtenerProfesor("P-2000");
+        QVERIFY(conPreferencias.ok);
+        QCOMPARE(conPreferencias.valor.preferencias.size(), 1);
+
+        const Profesor despues = conPreferencias.valor.toProfesor();
+        // La disponibilidad sí viaja; las preferencias no alteran el modelo del solver.
+        QCOMPARE(despues.disponibilidad.size(), 1);
+        QCOMPARE(despues.disponibilidad.first().dia, 1);
+        QCOMPARE(despues.toJson(), antes.toJson());
     }
 
     // ─── eliminarDisponibilidad / limpiarDisponibilidad ────────────────────

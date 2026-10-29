@@ -98,6 +98,17 @@ bool ServicioProfesor::cargarDisponibilidad(ProfesorDTO& dto) const {
     return true;
 }
 
+bool ServicioProfesor::cargarPreferencias(ProfesorDTO& dto) const {
+    // Una sola consulta y un solo orden: los pone `ServicioPreferencias::listar`.
+    const auto resultado = ServicioPreferencias(m_db).listar(dto.id);
+    if (!resultado.ok) {
+        qCritical() << "Error al cargar preferencias:" << resultado.mensajeError;
+        return false;
+    }
+    dto.preferencias = resultado.valor;
+    return true;
+}
+
 bool ServicioProfesor::cargarMaterias(ProfesorDTO& dto) const {
     QSqlQuery q(m_db);
     q.prepare(
@@ -194,7 +205,7 @@ Resultado<ProfesorDTO> ServicioProfesor::obtenerProfesor(const QString& id) cons
     }
 
     ProfesorDTO dto = mapearARecord(query.record());
-    if (!cargarDisponibilidad(dto) || !cargarMaterias(dto)) {
+    if (!cargarDisponibilidad(dto) || !cargarPreferencias(dto) || !cargarMaterias(dto)) {
         return Resultado<ProfesorDTO>::error(
             "Error al cargar los datos relacionados del profesor.");
     }
@@ -219,6 +230,7 @@ Resultado<QVector<ProfesorDTO>> ServicioProfesor::listarProfesores() const {
     while (query.next()) {
         ProfesorDTO dto = mapearARecord(query.record());
         cargarDisponibilidad(dto);
+        cargarPreferencias(dto);
         cargarMaterias(dto);
         resultados.append(dto);
     }
