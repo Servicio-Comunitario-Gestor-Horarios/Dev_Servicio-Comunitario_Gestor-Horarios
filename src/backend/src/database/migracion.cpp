@@ -101,6 +101,26 @@ namespace
             ")"
         )) return false;
 
+        // ── Preferencia_Profesor (preferencias horarias del docente) ──
+        // Replica el modelo de la disponibilidad (`dia` y horas como texto `HH:mm`) y
+        // añade el sentido. El `CHECK` del rango se apoya en que `HH:mm` está a dos
+        // dígitos y en 24 h: la comparación lexicográfica coincide con la temporal. El
+        // `UNIQUE` frena el duplicado exacto; los solapes los valida el servicio (RF-2).
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Preferencia_Profesor ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "id_Profesor TEXT NOT NULL REFERENCES Profesores(id),"
+            "dia TEXT NOT NULL CHECK(dia IN ('0','1','2','3','4','5','6')),"
+            "hora_inicio TEXT NOT NULL,"
+            "hora_fin TEXT NOT NULL,"
+            "sentido TEXT NOT NULL CHECK(sentido IN ('preferida','evitada')),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "CHECK(hora_inicio < hora_fin),"
+            "UNIQUE(id_Profesor, dia, hora_inicio, hora_fin, sentido)"
+            ")"
+        )) return false;
+
         // ── PlanEstudio ──
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS PlanEstudio ("

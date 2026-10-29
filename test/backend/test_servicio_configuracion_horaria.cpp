@@ -12,7 +12,7 @@
 
 /// Tests del servicio de la configuración global de la hora académica (RF-1,
 /// RF-2): valor efectivo con su origen, rango 30–90 y upsert de la fila única.
-/// La base se crea con el esquema v4, que ya deja `(1, 35)`.
+/// La base se crea con el esquema v5, que ya deja `(1, 35)`.
 class TestServicioConfiguracionHoraria : public QObject
 {
     Q_OBJECT

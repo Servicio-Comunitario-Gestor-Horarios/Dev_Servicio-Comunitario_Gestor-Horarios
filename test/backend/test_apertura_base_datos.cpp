@@ -157,6 +157,23 @@ private slots:
         QVERIFY(!resultado.ok());
     }
 
+    void abrir_baseV4_fallaEsquemaSinMigrarNiBorrar()
+    {
+        // La spec 012 sube el esquema a v5 (preferencias del docente). Una base con la
+        // marca 4 se rechaza al abrir, sin migrar, sin borrar datos y sin tocar la marca.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("v4.db"));
+        crearBaseConEsquema(ruta, 4);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.detalle.contains(QStringLiteral("4")));
+        QCOMPARE(leerVersion(ruta), 4); // la marca del archivo no se reescribe
+    }
+
     void abrir_baseV3_fallaEsquemaSinMigrarNiBorrar()
     {
         // La spec 011 sube el esquema a v4 (configuración global de la hora

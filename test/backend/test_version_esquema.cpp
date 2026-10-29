@@ -137,11 +137,40 @@ private:
         return query.exec();
     }
 
+    /// Inserta un docente mínimo para poder colgarle preferencias.
+    bool insertarProfesor(QSqlDatabase& db, const QString& id)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO Profesores (id, nombre, email) "
+                                     "VALUES (:id, :nombre, :email)"));
+        query.bindValue(QStringLiteral(":id"), id);
+        query.bindValue(QStringLiteral(":nombre"), QStringLiteral("Docente ") + id);
+        query.bindValue(QStringLiteral(":email"), id + QStringLiteral("@centro.edu"));
+        return query.exec();
+    }
+
+    /// Inserta una preferencia escribiendo directamente la tabla (como una escritura
+    /// ajena al servicio): el `CHECK`/`UNIQUE` debe frenarla.
+    bool insertarPreferencia(QSqlDatabase& db, const QString& idProfesor, const QString& dia,
+                             const QString& inicio, const QString& fin, const QString& sentido)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral("INSERT INTO Preferencia_Profesor "
+                                     "(id_Profesor, dia, hora_inicio, hora_fin, sentido) "
+                                     "VALUES (:profesor, :dia, :inicio, :fin, :sentido)"));
+        query.bindValue(QStringLiteral(":profesor"), idProfesor);
+        query.bindValue(QStringLiteral(":dia"), dia);
+        query.bindValue(QStringLiteral(":inicio"), inicio);
+        query.bindValue(QStringLiteral(":fin"), fin);
+        query.bindValue(QStringLiteral(":sentido"), sentido);
+        return query.exec();
+    }
+
 private slots:
 
-    void versionActual_esCuatro()
+    void versionActual_esCinco()
     {
-        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 4);
+        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 5);
     }
 
     // ─── decidirApertura ────────────────────────────────────────────────────
@@ -196,6 +225,7 @@ private slots:
         QVERIFY(tablaExiste(db, QStringLiteral("TiposAula")));
         QVERIFY(tablaExiste(db, QStringLiteral("Eventos")));
         QVERIFY(tablaExiste(db, QStringLiteral("ConfiguracionHoraria")));
+        QVERIFY(tablaExiste(db, QStringLiteral("Preferencia_Profesor")));
         QVERIFY(!tablaExiste(db, QStringLiteral("Curso_Materia")));
         QVERIFY(!tablaExiste(db, QStringLiteral("Recesos")));
 
@@ -501,6 +531,119 @@ private slots:
         cerrarBase(db);
     }
 
+    // ─── preferencias del docente: columnas, CHECK y UNIQUE ─────────────────
+
+    void crearEsquema_columnasDePreferencias()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"), QStringLiteral("id")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"),
+                              QStringLiteral("id_Profesor")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"), QStringLiteral("dia")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"),
+                              QStringLiteral("hora_inicio")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"),
+                              QStringLiteral("hora_fin")));
+        QVERIFY(columnaExiste(db, QStringLiteral("Preferencia_Profesor"),
+                              QStringLiteral("sentido")));
+        cerrarBase(db);
+    }
+
+    void preferencia_check_rechazaDiaSentidoYHorasInvalidas()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarProfesor(db, QStringLiteral("P1")));
+
+        // Día fuera de 0–6 (se guarda como texto).
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("-1"),
+                                     QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                     QStringLiteral("preferida")));
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("7"),
+                                     QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                     QStringLiteral("preferida")));
+
+        // Sentido distinto de «preferida»/«evitada».
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("1"),
+                                     QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                     QStringLiteral("neutra")));
+
+        // Inicio igual al fin y inicio posterior: `CHECK(hora_inicio < hora_fin)`.
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("1"),
+                                     QStringLiteral("10:00"), QStringLiteral("10:00"),
+                                     QStringLiteral("preferida")));
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("1"),
+                                     QStringLiteral("12:00"), QStringLiteral("08:00"),
+                                     QStringLiteral("preferida")));
+
+        // Una fila válida sí entra: el rechazo es de las restricciones, no de la tabla.
+        QVERIFY(insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("1"),
+                                    QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                    QStringLiteral("preferida")));
+
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral("SELECT COUNT(*) FROM Preferencia_Profesor")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 1);
+
+        cerrarBase(db);
+    }
+
+    void preferencia_unique_rechazaDuplicadoExacto()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarProfesor(db, QStringLiteral("P1")));
+        QVERIFY(insertarProfesor(db, QStringLiteral("P2")));
+
+        QVERIFY(insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("2"),
+                                    QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                    QStringLiteral("evitada")));
+        // Duplicado exacto: mismo docente, día, rango y sentido.
+        QVERIFY(!insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("2"),
+                                     QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                     QStringLiteral("evitada")));
+        // Mismo rango con otro sentido: el `UNIQUE` incluye `sentido`.
+        QVERIFY(insertarPreferencia(db, QStringLiteral("P1"), QStringLiteral("2"),
+                                    QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                    QStringLiteral("preferida")));
+        // Otro docente con el mismo rango y sentido: la identidad incluye al docente.
+        QVERIFY(insertarPreferencia(db, QStringLiteral("P2"), QStringLiteral("2"),
+                                    QStringLiteral("08:00"), QStringLiteral("10:00"),
+                                    QStringLiteral("evitada")));
+
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral("SELECT COUNT(*) FROM Preferencia_Profesor")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 3);
+
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_exigeLasPreferenciasYSusColumnas()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(VersionEsquema::esquemaEsperado(db));
+
+        // Sin la tabla, el motivo la nombra como faltante.
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("DROP TABLE Preferencia_Profesor")));
+        QString motivo;
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("Preferencia_Profesor")));
+
+        // Con la tabla pero sin `sentido`, el motivo nombra la columna.
+        QVERIFY(q.exec(QStringLiteral(
+            "CREATE TABLE Preferencia_Profesor (id INTEGER PRIMARY KEY)")));
+        QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+        QVERIFY(motivo.contains(QStringLiteral("sentido")));
+
+        cerrarBase(db);
+    }
+
     void esquemaEsperado_explicaElMotivo()
     {
         QSqlDatabase db = abrirBaseEnMemoria();
@@ -550,6 +693,7 @@ private slots:
             { 2, "b7684333c36458b0529308f9130e2a3b105c4cd4086b5f0e470a26ca917eb882" },
             { 3, "ba386397216ac9fb8d427ab4603c09ce3d8342cc5605dda16eecc78a02f1701b" },
             { 4, "f630cc2547e21454b8273fa255124142138e254bfa8b2a580c52bf8b051f7101" },
+            { 5, "eebe660c385f9802dc7b0b63abb6e7821db3ad3f2ec35982eeae55e49e9deaa0" },
         };
 
         QSqlDatabase db = abrirBaseEnMemoria();

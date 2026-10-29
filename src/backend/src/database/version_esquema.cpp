@@ -18,6 +18,7 @@ namespace
         QStringLiteral("Disponibilidad_Profesor"), QStringLiteral("PlanEstudio"),
         QStringLiteral("PlanEstudio_Materia"),     QStringLiteral("Turnos"),
         QStringLiteral("TiposAula"),    QStringLiteral("Eventos"),
+        QStringLiteral("Preferencia_Profesor"),
         QStringLiteral("Cursos")
     };
 
@@ -62,6 +63,12 @@ namespace
         QStringLiteral("id"), QStringLiteral("duracion_minutos")
     };
 
+    /// Columnas que debe tener la tabla `Preferencia_Profesor` (sentido propio).
+    const QStringList COLUMNAS_PREFERENCIAS = {
+        QStringLiteral("id"), QStringLiteral("id_Profesor"), QStringLiteral("dia"),
+        QStringLiteral("hora_inicio"), QStringLiteral("hora_fin"), QStringLiteral("sentido")
+    };
+
     /// Tablas del catálogo con sus columnas obligatorias.
     struct TablaConColumnas
     {
@@ -71,6 +78,7 @@ namespace
 
     const TablaConColumnas TABLAS_CON_COLUMNAS[] = {
         { "ConfiguracionHoraria", &COLUMNAS_CONFIGURACION },
+        { "Preferencia_Profesor", &COLUMNAS_PREFERENCIAS },
         { "Cursos", &COLUMNAS_CURSOS },
         { "Aulas", &COLUMNAS_AULAS },
         { "Materias", &COLUMNAS_MATERIAS },

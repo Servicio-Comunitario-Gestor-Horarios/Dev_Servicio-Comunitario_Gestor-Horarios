@@ -12,12 +12,15 @@ namespace VersionEsquema
 {
     /// Versión de esquema que espera esta compilación de la aplicación (marca única).
     ///
+    /// v5: preferencias horarias del docente (`Preferencia_Profesor`: día 0–6, rango e
+    /// inicio anterior al fin, sentido «preferida»/«evitada» y duplicado exacto único)
+    /// (spec 012).
     /// v4: configuración global de la hora académica (`ConfiguracionHoraria`, una
     /// sola fila, 35 minutos por defecto y rango 30–90) (spec 011).
     /// v3: catálogo de tipos de aula con clave normalizada, referencia de tipo
     /// obligatoria en aulas y materias, y eventos del turno con identidad y orden
     /// (se retira el registro de recesos).
-    constexpr int VERSION_ESQUEMA_ACTUAL = 4;
+    constexpr int VERSION_ESQUEMA_ACTUAL = 5;
 
     /// Resultado de decidir qué hacer al abrir una base de datos.
     enum class EstadoApertura
