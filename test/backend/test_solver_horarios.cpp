@@ -232,6 +232,35 @@ private slots:
         QVERIFY(resultado.tiempo_ms >= 0);
     }
 
+    // ── F2: la metadata publica datos reales de la salida, no el número de variables ──
+    void solver_metadataCuadraConLaSalida() {
+        SolverConfig config = crearConfigMinima();
+        Solver solver;
+        const auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        int clases = 0;
+        QSet<int> docentes;
+        for (auto it = resultado.resultado.horarios.constBegin();
+             it != resultado.resultado.horarios.constEnd(); ++it)
+            for (const DiaOutput& dia : it.value().dias)
+                for (const AsignacionOutput& asig : dia.asignaciones) {
+                    ++clases;
+                    if (asig.profesor >= 0)
+                        docentes.insert(asig.profesor);
+                }
+
+        const MetadataSalida& m = resultado.resultado.metadata;
+        QVERIFY(clases > 0);
+        // `total_asignaciones` son clases emitidas (2 materias × 4 h = 8), no las variables
+        // del modelo (cursos × materias × días × slots).
+        QCOMPARE(m.total_asignaciones, clases);
+        QCOMPARE(m.profesores_asignados, docentes.size());
+        QCOMPARE(m.cursos_generados, config.cursos.size());
+        QCOMPARE(m.tiempo_ejecucion_ms, static_cast<int>(resultado.tiempo_ms));
+        QVERIFY(m.tiempo_ejecucion_ms >= 0);
+    }
+
     void solver_respetaTurnoManana() {
         SolverConfig config = crearConfigMinima();
         Solver solver;

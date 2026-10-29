@@ -72,3 +72,13 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
   cubiertos y en verde. Suite **54/54**.
 - **Docs pendientes (no editadas):** `docs/interfaz-frontend.md:607` («avisos P1–P3 y conflictos
   P4») y `:667-669` (descripción de P1/P2/P3 en la tabla de `ValidadorSalidaSolver`).
+
+### F2 - Metadata de la salida con datos reales
+
+- `Solver::extraerSolucion` cuenta las **clases emitidas** (`total_asignaciones`), los **docentes
+  distintos** con al menos una clase (`profesores_asignados`) y publica el **tiempo** medido por el
+  solver (`tiempo_ejecucion_ms`, rellenado en `resolver` desde el `QElapsedTimer`).
+  `cursos_generados` sigue siendo el número de cursos.
+- Test `solver_metadataCuadraConLaSalida`: con el fixture mínimo, la metadata cuadra con lo emitido
+  (8 clases y los docentes de la salida). Antes `total_asignaciones` valía 48 (variables del modelo).
+  Suite **54/54**.

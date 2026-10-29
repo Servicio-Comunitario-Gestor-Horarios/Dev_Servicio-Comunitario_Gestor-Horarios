@@ -212,17 +212,20 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
     const CpSolverResponse response = SolveCpModel(model.Build(), &sat_model);
+    resultado.tiempo_ms = timer.elapsed();
 
     // Verificar status
     if (response.status() == CpSolverStatus::OPTIMAL ||
         response.status() == CpSolverStatus::FEASIBLE) {
             resultado.exito = true;
             resultado.resultado = extraerSolucion(response, config);
+            // La metadata publica el tiempo medido por el propio solver (F2).
+            resultado.resultado.metadata.tiempo_ejecucion_ms =
+                static_cast<int>(resultado.tiempo_ms);
         } else {
             resultado.errores = analizarFallo(response, config);
         }
-    
-    resultado.tiempo_ms = timer.elapsed();
+
     return resultado;
 }
 
@@ -260,6 +263,10 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
 
     QMap<int, QMap<int, QVector<AsignacionOutput>>> porCursoDia;
 
+    // Metadata real de la salida: clases emitidas y docentes distintos con alguna clase.
+    int totalAsignaciones = 0;
+    QSet<int> docentesAsignados;
+
     for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
         if (!SolutionBooleanValue(response, it.value())) continue;
 
@@ -283,6 +290,9 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
         asignacion.aula = aula;
 
         porCursoDia[c][d].append(asignacion);
+        ++totalAsignaciones;
+        if (p >= 0)
+            docentesAsignados.insert(p);
     }
 
     for (auto itC = porCursoDia.constBegin(); itC != porCursoDia.constEnd(); ++itC) {
@@ -303,7 +313,8 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
     }
 
     MetadataSalida metadata;
-    metadata.total_asignaciones = vars.assignment.size();
+    metadata.total_asignaciones = totalAsignaciones;
+    metadata.profesores_asignados = docentesAsignados.size();
     metadata.cursos_generados = config.cursos.size();
     horario.metadata = metadata;
 
