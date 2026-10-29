@@ -106,6 +106,203 @@ private slots:
         QCOMPARE(duracionFranjaEstimada(t), 0);
     }
 
+    // ─── minutosDeVentana y tiempoDeEventos (públicas desde la 011) ────────
+
+    void minutosDeVentanaYTiempoDeEventos_sumanLaVentanaYLosEventos()
+    {
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        t.eventos.append(evento("Receso", 2, 1, 10));
+        t.eventos.append(evento("SinDuracion", 8, 1, 0)); // no positiva: no suma
+
+        QCOMPARE(minutosDeVentana(t), 290);
+        QCOMPARE(tiempoDeEventos(t), 10);
+    }
+
+    // ─── franjasUtilizables(turno, D) (RF-4) ────────────────────────────────
+
+    void franjasUtilizables_conLaDuracionDeLaHoraAcademica()
+    {
+        // (290 − 10) / 35 = 8; (290 − 10) / 45 = 6,22 → 6. El sobrante no se reparte.
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        t.eventos.append(evento("Receso", 2, 1, 10));
+
+        QCOMPARE(franjasUtilizables(t, 35), 8);
+        QCOMPARE(franjasUtilizables(t, 45), 6);
+    }
+
+    void franjasUtilizables_turnoCortoYDuracionInvalida()
+    {
+        // (150 − 10) / 35 = 4.
+        TurnoDTO t = turno("Corto", QTime(7, 0), QTime(9, 30), 5);
+        t.eventos.append(evento("Receso", 1, 1, 10));
+
+        QCOMPARE(franjasUtilizables(t, 35), 4);
+        QCOMPARE(franjasUtilizables(t, 0), 0);
+        QCOMPARE(franjasUtilizables(turno("SinHoras", QTime(), QTime(), 5), 35), 0);
+    }
+
+    // ─── deficitDeEncaje(turno, D) (RF-4) ───────────────────────────────────
+
+    void deficitDeEncaje_conLaDuracionDeLaHoraAcademica()
+    {
+        // 8 × 45 + 10 = 370 > 290 → faltan 80.
+        TurnoDTO manana = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        manana.eventos.append(evento("Receso", 2, 1, 10));
+        QCOMPARE(deficitDeEncaje(manana, 45), 80);
+        // 8 × 35 + 10 = 290 = ventana → cabe justo.
+        QCOMPARE(deficitDeEncaje(manana, 35), 0);
+
+        // 8 × 35 + 10 = 290 ≤ 370 → sobrante no usado.
+        TurnoDTO largo = turno("Largo", QTime(7, 0), QTime(13, 10), 8);
+        largo.eventos.append(evento("Receso", 2, 1, 10));
+        QCOMPARE(deficitDeEncaje(largo, 35), 0);
+
+        // 5 × 35 + 10 = 185 > 150 → faltan 35.
+        TurnoDTO corto = turno("Corto", QTime(7, 0), QTime(9, 30), 5);
+        corto.eventos.append(evento("Receso", 1, 1, 10));
+        QCOMPARE(deficitDeEncaje(corto, 35), 35);
+    }
+
+    // ─── errorDeEncaje(turno, D) (RF-4, RNF-1) ──────────────────────────────
+
+    void errorDeEncaje_citaTurnoDuracionYDeficit()
+    {
+        TurnoDTO manana = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        manana.eventos.append(evento("Receso", 2, 1, 10));
+
+        const QString error = errorDeEncaje(manana, 45);
+
+        QVERIFY(!error.isEmpty());
+        QVERIFY2(error.contains(QStringLiteral("Mañana")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("45")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("déficit 80")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("Ajuste el número de franjas")), qPrintable(error));
+    }
+
+    void errorDeEncaje_siCabe_esVacio()
+    {
+        TurnoDTO largo = turno("Largo", QTime(7, 0), QTime(13, 10), 8);
+        largo.eventos.append(evento("Receso", 2, 1, 10));
+
+        QVERIFY(errorDeEncaje(largo, 35).isEmpty());
+    }
+
+    void errorDeEncaje_turnoCortoCon35_citaDeficit35()
+    {
+        TurnoDTO corto = turno("Corto", QTime(7, 0), QTime(9, 30), 5);
+        corto.eventos.append(evento("Receso", 1, 1, 10));
+
+        QVERIFY2(errorDeEncaje(corto, 35).contains(QStringLiteral("déficit 35")),
+                 qPrintable(errorDeEncaje(corto, 35)));
+    }
+
+    void errorDeEncaje_turnoSinVentana_pideDeclararLasHoras()
+    {
+        const TurnoDTO sinHoras = turno("SinHoras", QTime(), QTime(), 5);
+
+        const QString error = errorDeEncaje(sinHoras, 35);
+
+        QVERIFY(!error.isEmpty());
+        QVERIFY2(error.contains(QStringLiteral("SinHoras")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("Declare sus horas")), qPrintable(error));
+    }
+
+    void errorDeEncaje_duracionFueraDeRango_devuelveElMensajeDelRango()
+    {
+        // La validación del rango es la de `duracion_horaria`, no se duplica aquí.
+        const TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+
+        const QString error = errorDeEncaje(t, 5);
+
+        QVERIFY2(error.contains(QStringLiteral("30")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("90")), qPrintable(error));
+        QVERIFY2(error.contains(QStringLiteral("Ajuste la duración a un valor del rango")),
+                 qPrintable(error));
+    }
+
+    // ─── ventanaDePosicion(turno, posicion, D) (RF-4) ───────────────────────
+
+    void ventanaDePosicion_conDuracion_franjaDeAnchoD()
+    {
+        // 07:00–11:50, 8 franjas de 35 y un receso de 10 tras la 2.ª: la posición
+        // 2 va de 08:10 a 08:20 y la última empieza/termina en el fin del turno.
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        t.eventos.append(evento("Receso", 2, 1, 10));
+
+        const auto segunda = ventanaDePosicion(t, 2, 35);
+        QCOMPARE(segunda.first, QTime(8, 10));
+        QCOMPARE(segunda.second, QTime(8, 20));
+
+        const auto primera = ventanaDePosicion(t, 1, 35);
+        QCOMPARE(primera.first, QTime(7, 35));
+        QCOMPARE(primera.second, QTime(7, 35));
+
+        const auto ultima = ventanaDePosicion(t, 8, 35);
+        QCOMPARE(ultima.first, QTime(11, 50));
+        QCOMPARE(ultima.second, QTime(11, 50));
+    }
+
+    void ventanaDePosicion_conDuracion_invalidaFueraDeRangoSinFranjaOSinVentana()
+    {
+        const TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+
+        for (int posicion : {0, 9, -1})
+        {
+            const auto ventana = ventanaDePosicion(t, posicion, 35);
+            QVERIFY(!ventana.first.isValid());
+            QVERIFY(!ventana.second.isValid());
+        }
+
+        const auto sinFranja = ventanaDePosicion(t, 1, 0);
+        QVERIFY(!sinFranja.first.isValid());
+
+        const auto sinVentana = ventanaDePosicion(turno("SinHoras", QTime(), QTime(), 8), 1, 35);
+        QVERIFY(!sinVentana.first.isValid());
+    }
+
+    // ─── eventoDentroDeVentana(evento, turno, posicion, D) (RF-4) ───────────
+
+    void eventoDentroDeVentana_conDuracion_acotaLaVentanaDelEvento()
+    {
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(11, 50), 8);
+        const EventoDTO receso = evento("Receso", 2, 1, 10, QTime(8, 10), QTime(8, 20));
+        t.eventos.append(receso);
+
+        QVERIFY(eventoDentroDeVentana(receso, t, 2, 35));
+
+        // Con D = 45 la ventana de la posición 2 es 08:30–08:40: el receso no cabe.
+        QVERIFY(!eventoDentroDeVentana(receso, t, 2, 45));
+
+        // Sin horas no hay intervalo que comprobar.
+        const EventoDTO sinHoras = evento("SinHoras", 2, 1, 10);
+        QVERIFY(eventoDentroDeVentana(sinHoras, t, 2, 35));
+    }
+
+    // ─── legado temporal: las firmas antiguas delegan con D = estimada ─────
+
+    void ventanaDePosicion_legadoDelegaEnLaFranjaEstimada()
+    {
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(13, 0), 6);
+        t.eventos.append(evento("Receso", 2, 1, 10));
+        t.eventos.append(evento("Acto", 6, 1, 20));
+
+        const int estimada = duracionFranjaEstimada(t);
+        for (int posicion = 1; posicion <= t.numSlots; ++posicion)
+            QCOMPARE(ventanaDePosicion(t, posicion),
+                     ventanaDePosicion(t, posicion, estimada));
+    }
+
+    void eventoDentroDeVentana_legadoDelegaEnLaFranjaEstimada()
+    {
+        TurnoDTO t = turno("Mañana", QTime(7, 0), QTime(13, 0), 6);
+        const EventoDTO receso = evento("Receso", 2, 1, 10, QTime(8, 50), QTime(9, 0));
+        t.eventos.append(receso);
+
+        const int estimada = duracionFranjaEstimada(t);
+        QCOMPARE(eventoDentroDeVentana(receso, t, 2),
+                 eventoDentroDeVentana(receso, t, 2, estimada));
+    }
+
     // ─── ventanaDePosicion ──────────────────────────────────────────────────
 
     void ventanaDePosicion_delFinDeLaFranjaAlInicioDeLaSiguiente()

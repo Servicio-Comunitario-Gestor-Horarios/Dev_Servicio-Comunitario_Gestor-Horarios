@@ -224,3 +224,67 @@ $ ctest --preset backend
 - La fachada no registra pendientes: una configuración inválida no es un registro reintentable.
 - No se tocaron `calculo_eventos`, el constructor, el seed, el contrato, `duracion_horaria`, el DDL ni
   `docs/`.
+
+## T4 - Franja = D y encaje: funciones puras nuevas, con el legado temporal (2026-10-29)
+
+**Requisito:** RF-4 (y RNF-1/RNF-4 en mensajes y punto único). **Plan:** §1.4, §2.2, §9 (T4),
+decisiones 6 y 12. **Base:** `4262b49`.
+
+### Rojo (tests primero)
+
+Se añadieron los casos nuevos a `test_calculo_eventos` conservando los antiguos; el árbol no compila
+hasta que existen las firmas nuevas:
+
+```text
+$ cmake --build --preset backend --parallel
+test_calculo_eventos.cpp:117:18: error: ‘minutosDeVentana’ no se declaró en este ámbito
+test_calculo_eventos.cpp:129:18: error: ‘franjasUtilizables’ no se declaró en este ámbito
+test_calculo_eventos.cpp:151:18: error: ‘deficitDeEncaje’ no se declaró en este ámbito
+[...]
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_calculo_eventos$'
+1/1 Test #27: test_calculo_eventos .............   Passed    0.01 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_calculo_eventos
+Totals: 42 passed, 0 failed, 0 skipped, 0 blacklisted
+
+$ ctest --preset backend
+52/52 Test #52: test_ipc_aislamiento_bd ...............   Passed    0.08 sec
+100% tests passed out of 52
+```
+
+Casos nuevos: `minutosDeVentana`/`tiempoDeEventos`; `franjasUtilizables` 8/6 con 290/10 y 8 con 35,
+4 con 150/5 y 0 si D ≤ 0 o sin ventana; `deficitDeEncaje` 80 (45), 0 (cabe justo y sobrante), 35;
+`errorDeEncaje` con turno + «45» + «déficit 80», vacío al caber, «déficit 35», turno sin ventana con
+«Declare sus horas» y D fuera de rango con el mensaje de `duracion_horaria`; `ventanaDePosicion` con
+D = 35 → posición 2, 08:10–08:20, la última en el fin del turno e inválidas fuera de rango/sin D/sin
+ventana; `eventoDentroDeVentana` con D y sin horas; y las dos pruebas de delegación del legado.
+
+### Cambios
+
+- `calculo_eventos.hpp` / `.cpp`:
+  - **Nuevas:** `franjasUtilizables(turno, D)`, `deficitDeEncaje(turno, D)`, `errorDeEncaje(turno, D)`,
+    `ventanaDePosicion(turno, posicion, D)`, `eventoDentroDeVentana(evento, turno, posicion, D)`.
+  - Se hacen públicas `minutosDeVentana(turno)` y `tiempoDeEventos(turno)`.
+  - `duracionFranjaEstimada` conserva su fórmula; las firmas antiguas de `ventanaDePosicion` (2 args) y
+    `eventoDentroDeVentana` (3 args) son **envoltorios** que delegan en las nuevas con
+    `D = duracionFranjaEstimada(turno)`, marcados como legado temporal que se retira en T9.
+- `test/backend/test_calculo_eventos.cpp`: casos nuevos; los antiguos intactos.
+
+### Notas
+
+- **Sin duplicar aritmética:** `franjasUtilizables` y `deficitDeEncaje` delegan en `duracion_horaria`;
+  `errorDeEncaje` obtiene el rango de `duracion_horaria::errorDeRango` (RNF-4).
+- **Orden de `errorDeEncaje`:** primero rango de D, después ventana ausente, después el encaje (plan
+  §2.2). Un turno sin ventana devuelve el mensaje con la acción aunque D sea válida.
+- **Expectativa corregida en el test:** la ventana de la posición *k* empieza en `inicio + k×D`
+  (N5 de la 009), así que la posición 1 de 07:00–11:50 con D = 35 empieza a las 07:35, no a las 07:00.
+  El error era del test, no del código.
+- No se tocaron `ServicioTurnosEventos.cpp`, `solver_config.cpp`, `perfil.cpp`, el constructor, el seed,
+  `duracion_horaria`, el esquema ni `docs/`: son T5/T6/T7/T8/T10. El `grep` de `duracionFranjaEstimada`
+  sigue con resultados a propósito (T9).
