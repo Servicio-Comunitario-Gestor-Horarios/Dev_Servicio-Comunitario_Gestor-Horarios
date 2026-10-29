@@ -144,37 +144,7 @@ bool eventoDentroDeVentana(const EventoDTO& evento, const TurnoDTO& turno, int p
     return ventana.first <= evento.inicio && evento.fin <= ventana.second;
 }
 
-// ─── Legado temporal (T4–T8): se retira en T9 ───────────────────────────────
-// `duracionFranjaEstimada` conserva su fórmula de reparto y las firmas antiguas
-// son envoltorios finos de las nuevas con D = franja estimada, para no duplicar
-// la aritmética mientras T5, T6 y T8 migran a las firmas con D.
-
-int duracionFranjaEstimada(const TurnoDTO& turno)
-{
-    if (turno.numSlots <= 0)
-        return 0;
-
-    const int ventana = minutosDeVentana(turno);
-    if (ventana <= 0)
-        return 0;
-
-    const int restante = ventana - tiempoDeEventos(turno);
-    if (restante <= 0)
-        return 0;
-
-    const int franja = restante / turno.numSlots;
-    return franja > 0 ? franja : 0;
-}
-
-QPair<QTime, QTime> ventanaDePosicion(const TurnoDTO& turno, int posicion)
-{
-    return ventanaDePosicion(turno, posicion, duracionFranjaEstimada(turno));
-}
-
-bool eventoDentroDeVentana(const EventoDTO& evento, const TurnoDTO& turno, int posicion)
-{
-    return eventoDentroDeVentana(evento, turno, posicion, duracionFranjaEstimada(turno));
-}
+// ─── Coherencia temporal de los eventos ─────────────────────────────────────
 
 bool haySolapeCronologico(const QVector<EventoDTO>& eventos)
 {

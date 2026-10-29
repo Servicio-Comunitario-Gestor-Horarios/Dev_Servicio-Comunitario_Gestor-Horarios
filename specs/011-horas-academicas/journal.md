@@ -554,3 +554,65 @@ La huella **no** se movió a T9: cupo en la tarea.
   el preset `backend` no lo compila y queda como deuda documentada (T10, RF-9). No se tocó.
 - No se tocaron `calculo_eventos` (legado vivo), `solver_config.cpp`, el seed, el esquema,
   `duracion_horaria` ni `docs/`.
+
+## T9 - Limpieza del legado y cierre del punto único (2026-10-29)
+
+**Requisito:** RF-4, RNF-4. **Plan:** §1.4 (T9), §2.2 y §9 (T9). **Base:** `15db0d2`.
+
+### Cierre (el build es la prueba de aridad)
+
+Se comprobó antes de borrar que ningún consumidor seguía usando las firmas antiguas
+(`ServicioTurnosEventos`, `solver_config` y `perfil` ya llamaban con D desde T5/T6/T8).
+
+```text
+$ grep -rn "duracionFranjaEstimada" src test
+(vacío; exit 1)
+
+$ grep -rn "ventanaDePosicion\|eventoDentroDeVentana" src
+… solo la definición nueva de cada una (calculo_eventos.hpp/.cpp) y las llamadas con D
+de ServicioTurnosEventos, solver_config y perfil.
+
+$ ctest --test-dir build-backend --output-on-failure -R '^test_calculo_eventos$'
+1/1 Test #27: test_calculo_eventos .............   Passed    0.01 sec
+Totals: 30 passed, 0 failed, 0 skipped, 0 blacklisted
+
+$ ctest --preset backend
+52/52 Test #52: test_ipc_aislamiento_bd ...............   Passed    0.10 sec
+100% tests passed out of 52
+```
+
+### Cambios
+
+- `calculo_eventos.hpp` / `.cpp`: se borran `duracionFranjaEstimada` y las sobrecargas antiguas de
+  `ventanaDePosicion` (2 args) y `eventoDentroDeVentana` (3 args), con su bloque de comentario de
+  legado. Quedan solo las firmas con D.
+- `test/backend/test_calculo_eventos.cpp`: de 42 a **30 casos**.
+
+### Casos retirados y migrados
+
+Retirados por duplicar cobertura de T4 o por cubrir la función eliminada:
+- Los **7** de `duracionFranjaEstimada` (reparto, sin eventos, `numSlots` 0/negativo, ventana inválida,
+  eventos que no caben y reparto no positivo): el reparto ya no existe; su semántica la cubren
+  `franjasUtilizables`/`deficitDeEncaje`.
+- `ventanaDePosicion_posicionFueraDeRango_ventanaInvalida` (duplica el caso con D de T4, que prueba
+  0/9/−1).
+- `eventoDentroDeVentana_dentro_verdadero` y `eventoDentroDeVentana_sinHoras_verdadero` (duplican el
+  caso con D de T4).
+- Los dos casos de delegación del legado.
+
+Migrados a la firma con D (aportaban algo que T4 no cubre):
+- `ventanaDePosicion_delFinDeLaFranjaAlInicioDeLaSiguiente`: posición 2 = 08:10–08:20, la 3 empieza una
+  franja después más el receso (08:55) y la última llega al fin (10:40–13:00), con D = 35.
+- `ventanaDePosicion_ultimaLlegaAlFinDelTurnoConResto`: 8 × 35 + receso → última 11:50–12:31 (sobrante
+  de 41 min sin repartir).
+- `ventanaDePosicion_turnoSinFranjas_ventanaInvalida`: `numSlots = 0` con D = 35 → ventana inválida
+  (guarda distinta de la de D ≤ 0).
+- `eventoDentroDeVentana_antesDeLaVentana_falso` y `_despuesDeLaVentana_falso`: ventana 08:10–08:20 con
+  D = 35, intervalo anterior y posterior.
+
+### Notas
+
+- No se añadió producción nueva; solo se retiró legado y se recalcularon sus casos.
+- No quedan comentarios que anuncien el legado (`grep` de «legado» vacío en los archivos tocados).
+- No se tocaron `solver_config.cpp`, el constructor, el seed, el esquema, `duracion_horaria` ni
+  `docs/`.

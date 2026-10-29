@@ -61,22 +61,6 @@ QPair<QTime, QTime> ventanaDePosicion(const TurnoDTO& turno, int posicion,
 bool eventoDentroDeVentana(const EventoDTO& evento, const TurnoDTO& turno, int posicion,
                            int duracionMinutos);
 
-/// Minutos de franja que quedan al restar los eventos y repartir entre las franjas.
-///
-/// **Legado temporal (T4–T8): se retira en T9.** La 011 sustituye este reparto por
-/// la franja de ancho D; solo lo conservan las sobrecargas antiguas de
-/// `ventanaDePosicion`/`eventoDentroDeVentana`, que delegan en las nuevas. No se
-/// añaden llamadores nuevos.
-int duracionFranjaEstimada(const TurnoDTO& turno);
-
-/// **Legado temporal (T4–T8): se retira en T9.**
-/// Delega en `ventanaDePosicion(turno, posicion, duracionFranjaEstimada(turno))`.
-QPair<QTime, QTime> ventanaDePosicion(const TurnoDTO& turno, int posicion);
-
-/// **Legado temporal (T4–T8): se retira en T9.**
-/// Delega en `eventoDentroDeVentana(evento, turno, posicion, duracionFranjaEstimada(turno))`.
-bool eventoDentroDeVentana(const EventoDTO& evento, const TurnoDTO& turno, int posicion);
-
 /// Indica si dos eventos con horas se pisan o van en orden cronológico invertido.
 ///
 /// Recorre los eventos por `(posición, orden, id)` y exige que cada intervalo
