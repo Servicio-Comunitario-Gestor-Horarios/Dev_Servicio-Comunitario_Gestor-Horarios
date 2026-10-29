@@ -109,6 +109,12 @@ if(TARGET backend)
 
 	# Modelo puro de preferencias y validación compartida de franjas (012 T1).
 	add_gtest(test_preferencias backend/test_preferencias.cpp backend)
+
+	# Servicio de preferencias horarias del docente (012 T3).
+	add_qtest(test_servicio_preferencias
+				backend/test_servicio_preferencias.cpp
+				backend Qt6::Sql
+	)
 endif()
 
 # ============================================================

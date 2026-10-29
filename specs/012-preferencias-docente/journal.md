@@ -123,3 +123,69 @@ $ ctest --preset backend
 - La política sigue siendo **sin migración**: una base con `user_version = 4` se rechaza al abrir y
   conserva su marca.
 - No se tocaron los servicios de preferencias, el DTO, la cascada, el seed, `docs/` ni el contrato.
+
+## T3 - Servicio de preferencias: CRUD, validación y orden (2026-10-29)
+
+**Requisito:** RF-1, RF-2, RF-3, RNF-1. **Plan:** §1.3, §2.3, §3 y §10 (T3). **Base:** `3871488`.
+
+### Rojo (tests primero)
+
+`test/backend/test_servicio_preferencias.cpp` (30 casos) registrado con `add_qtest(... Qt6::Sql)`; sin
+el servicio el árbol no compila y el primer rojo real fue la regla de solape:
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_servicio_preferencias$'
+FAIL!  : …listar_ordenaPorDiaInicioFinEId() 'agregar(… día 1, 8–10, preferida).ok' returned FALSE
+Totals: 29 passed, 1 failed
+```
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^test_servicio_preferencias$'
+1/1 Test #47: test_servicio_preferencias .......   Passed    0.07 sec
+100% tests passed out of 1
+
+$ ./build-backend/test/test_servicio_preferencias
+Totals: 30 passed, 0 failed, 0 skipped, 0 blacklisted
+
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+### Cambios
+
+- **Nuevo** `src/backend/include/backend/services/ServicioPreferencias.hpp`: `PreferenciaDTO` y los
+  cinco métodos (`agregar`, `listar`, `actualizar`, `eliminar`, `limpiar`).
+- **Nuevo** `src/backend/src/services/ServicioPreferencias.cpp`: validación con
+  `franja_horaria::errorDeFranja` + `sentidoValido` + `SELECT` directo de `Profesores`; duplicado
+  exacto y solape opuesto con `haySolape`; `listar` ordena por día, inicio, fin e id; `actualizar`
+  compara contra el día nuevo excluyendo la propia fila; `eliminar` distingue «no existe»; `limpiar`
+  borra solo `Preferencia_Profesor`.
+- `src/backend/CMakeLists.txt` y `test/CMakeLists.txt`.
+
+### Casos delicados del test (30 en total)
+
+- `agregar_solapeDeSentidosOpuestos_fallaNombrandoLasDosFranjas`: el mensaje cita `08:00–10:00
+  (preferida)`, `09:00–11:00 (evitada)`, el docente y la acción.
+- `agregar_solapesDelMismoSentido_seAceptan` y `agregar_rangosContiguosDeSentidosOpuestos_seAceptan`.
+- `actualizar_solapeOpuesto_rechazaYConservaElAnterior`: tras el rechazo, la fila conserva 14:00–16:00
+  y su sentido.
+- `actualizar_cambioDeDiaQueCreaSolapeOpuesto_rechaza`: la comprobación usa el **día nuevo**; la fila
+  conserva el día 2.
+- `limpiar_borraSoloPreferenciasYNoLaDisponibilidad`: borra 2 de P1, deja 1 de P2 y la disponibilidad
+  intacta.
+- `agregar_preferenciaQueCoincideConDisponibilidad_seAcepta`; días 0 y 6 aceptados; cada rechazo con
+  valor y acción.
+
+### Notas
+
+- **Ajuste del test de orden:** la primera versión insertaba dos filas del mismo día y rango con
+  sentidos opuestos para probar el desempate por id; eso **es un solape opuesto** y el servicio lo
+  rechaza (correcto). El orden por id queda en el SQL como desempate estable, pero es inalcanzable con
+  filas válidas: el duplicado exacto se rechaza y el único par con mismo día/inicio/fin no puede tener
+  sentidos distintos por la regla de solape. El test ordena por día, inicio y fin.
+- **Mensajes:** se usan los de §2.3; en `actualizar` el docente inexistente conserva su mensaje
+  («…de la preferencia…»). Ningún rechazo queda sin valor y acción.
+- No se tocaron el esquema, `ProfesorDTO`/`NucleoDatos`, la cascada, el seed, `ServicioGeneracion` ni
+  `docs/`.

@@ -50,6 +50,7 @@ target_sources(backend PRIVATE
 				src/services/duracion_horaria.cpp
 				src/services/franja_horaria_validacion.cpp
 				src/services/preferencias.cpp
+				src/services/ServicioPreferencias.cpp
 				src/services/ServicioConfiguracionHoraria.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
