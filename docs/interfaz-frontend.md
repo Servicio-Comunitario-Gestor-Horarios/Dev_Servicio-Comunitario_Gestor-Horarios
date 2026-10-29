@@ -604,7 +604,7 @@ struct ResultadoGeneracion {
     QString       mensaje;
     bool          datosAnteriores = false;
     HorarioSalida horario;      // válido si presentable
-    AnalisisSalida analisis;    // avisos P1–P3 y conflictos P4
+    AnalisisSalida analisis;    // aviso P2 y conflictos P4
     bool          presentable = false;
 };
 
@@ -664,10 +664,11 @@ Un «preset» es un archivo JSON con el mismo formato (las 13 secciones) que la 
 
 ### 3.4 `AnalisisSalida` — validaciones posteriores (implementado)
 
-`ValidadorSalidaSolver` / `analizarSalidaSolver` (pura): P1 horas no cubiertas, P2 exceso de horas
-de docente y P3 exceso de capacidad de aula → `avisos`; P4 solapamiento (docente/aula/curso) →
-`conflictos` y `presentable() == false`. **Frontend:** panel de avisos junto al horario; nunca
-mostrar como válido un resultado con `hayConflictoSolapamiento()`.
+`ValidadorSalidaSolver` / `analizarSalidaSolver` (pura): **P2 exceso de horas de docente** →
+`avisos`; **P4 solapamiento** (docente/aula/curso) → `conflictos` y `presentable() == false`.
+Los avisos de **P1 horas no cubiertas** y **P3 capacidad de aula** están **retirados por la 005
+(decisión I2) hasta nuevo aviso**: no se emiten. **Frontend:** panel de avisos junto al horario;
+nunca mostrar como válido un resultado con `hayConflictoSolapamiento()`.
 
 ### 3.5 Proceso de cálculo y salud (implementado)
 

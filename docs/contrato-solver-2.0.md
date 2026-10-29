@@ -148,8 +148,9 @@ menos una materia en él (**V10**).
 - `turno` (**V7**) y `plan` (**V10**, **V11**) son obligatorios para generar.
 - `aula` es un **índice** al arreglo `aulas` (**V6**). Con `aula_fija: true` es obligatorio y es el
   **aula de referencia** del curso (**V8**); con `aula_fija: false` se ignora.
-- `num_estudiantes` es opcional (ausente = sin comprobación, **V9**); con `> 0` se compara con la
-  capacidad del **aula real** de cada clase (aviso P3).
+- `num_estudiantes` es opcional (ausente = sin comprobación, **V9**, que solo exige que sea positivo
+  si viene). La capacidad del **aula real** de cada clase ya **no** se compara al validar la salida:
+  el aviso **P3** está **retirado por la 005 (decisión I2)**.
 
 ### 2.6 `profesores`
 
@@ -196,7 +197,8 @@ menos una materia en él (**V10**).
   **convención por nombre**: el de clave normalizada `aula de estudio` (`claveTipo` = `trim` + plegado
   de caja). Un laboratorio, un taller o una cancha **no** pueden ser referencia. El contrato **no lleva
   ningún dato adicional** para distinguir tipos generales: no hay campo ni sección nuevos (sigue 2.0).
-- `capacidad` ≤ 0 significa «sin capacidad declarada» (no genera aviso P3).
+- `capacidad` ≤ 0 significa «sin capacidad declarada»: es un dato informativo del aula y no origina
+  ningún aviso (el **P3** está **retirado por la 005, decisión I2**).
 
 ---
 
@@ -360,9 +362,11 @@ verdad**, también en modo de aula fija (fragmento; la raíz del archivo lleva a
   clases de su tipo y la desplazada (`aula: 5`, un laboratorio) en las demás.
 - `aula` es un **índice** al arreglo `aulas` del preset; traducirlo a nombre es responsabilidad de
   quien muestra (la interfaz y el CSV).
-- Las validaciones posteriores (`ValidadorSalidaSolver`: P3 capacidad, P4 solapamientos) operan sobre
-  ese **aula real**, no sobre el aula declarada del curso. La capacidad se compara con el aula donde
-  se dio la clase; un aula con `capacidad <= 0` no genera aviso.
+- Las validaciones posteriores (`ValidadorSalidaSolver`) operan sobre ese **aula real**, no sobre el
+  aula declarada del curso: **P2 exceso de horas** del docente → `avisos` y **P4 solapamientos** →
+  `conflictos` (no presentable). Los avisos **P1 horas no cubiertas** y **P3 capacidad de aula** están
+  **retirados por la 005 (decisión I2) hasta nuevo aviso**; la `capacidad` sigue siendo un dato del
+  aula, pero ya no produce aviso.
 
 ---
 

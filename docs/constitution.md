@@ -90,4 +90,4 @@ Antes de construir el modelo se ejecutan las validaciones V1–V18; si alguna fa
 
 ### 7.5. Fuera de alcance de este contrato
 
-Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. La **capacidad de aula** y las **horas no cubiertas** podrían volver **como avisos posteriores** (ver spec 002). El **evento** de turno es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.
+Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. Los avisos de **capacidad de aula** y de **horas no cubiertas** están **retirados por la decisión I2 de la spec 005** (el único aviso vigente del validador de salida es el **exceso de horas del docente**); podrían volver **como avisos posteriores** al solver (ver spec 002). El **evento** de turno es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.
