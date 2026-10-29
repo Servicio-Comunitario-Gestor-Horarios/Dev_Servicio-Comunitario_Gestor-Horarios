@@ -3,14 +3,15 @@
 #include <QSet>
 
 #include "backend/services/calculo_eventos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 
 namespace seed {
 
 int bloques(int horas) {
     // Rectificación (2026-10-17, constitución §7 / spec 005-T11): la hora académica
     // es un bloque, no una hora de reloj. La conversión es la IDENTIDAD:
-    // bloques(horas) = horas. Los 40 minutos son la duración real de la franja y no
-    // intervienen en la conversión.
+    // bloques(horas) = horas. La duración real de la franja es la de la configuración
+    // global (35 min por defecto, spec 011) y no interviene en la conversión.
     return horas;
 }
 
@@ -279,25 +280,27 @@ const Perfil& perfilPorDefecto() {
             p.planes.append(plan);
         }
 
-        // Turnos (008-T3, RF-4, plan §4.1; 009-T7, RF-10): mañana y tarde, 8 franjas de 40 min
-        // y un evento «Receso» de 10 min tras la franja 2 (08:20–08:30 / 14:00–14:10). El `fin`
-        // es la campana (incluye el receso): la rejilla aritmética termina en 12:20/18:00 y el
-        // desfase de 10 min se asume (spec 008). El evento es la única fuente del receso.
+        // Turnos (008-T3, RF-4, plan §4.1; 009-T7, RF-10; 011-T8, RF-8): mañana y tarde,
+        // 8 franjas de la hora académica (35 min: 8 × 35 = 280) y un evento «Receso» de
+        // 10 min tras la franja 2. La rejilla de clases va de 07:00 a 11:40 y de 12:40 a
+        // 17:20; el `fin` (11:50 / 17:30) añade los 10 min del evento, de modo que el
+        // encaje es exacto: 8 × 35 + 10 = 290 = ventana. El evento es la única fuente del
+        // receso.
         {
             TurnoDef manana;
             manana.nombre = QStringLiteral("Mañana");
             manana.inicio = QTime(7, 0);
-            manana.fin = QTime(12, 30);
+            manana.fin = QTime(11, 50);
             manana.numSlots = 8;
-            manana.eventos.append(eventoReceso(QTime(8, 20), QTime(8, 30)));
+            manana.eventos.append(eventoReceso(QTime(8, 10), QTime(8, 20)));
             p.turnos.append(manana);
 
             TurnoDef tarde;
             tarde.nombre = QStringLiteral("Tarde");
             tarde.inicio = QTime(12, 40);
-            tarde.fin = QTime(18, 10);
+            tarde.fin = QTime(17, 30);
             tarde.numSlots = 8;
-            tarde.eventos.append(eventoReceso(QTime(14, 0), QTime(14, 10)));
+            tarde.eventos.append(eventoReceso(QTime(13, 50), QTime(14, 0)));
             p.turnos.append(tarde);
         }
 
@@ -442,8 +445,8 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
             const char* nombre;
             int hIni, mIni, hFin, mFin;
         } kTurnos[] = {
-            {"Mañana", 7, 0, 12, 30},
-            {"Tarde", 12, 40, 18, 10},
+            {"Mañana", 7, 0, 11, 50},
+            {"Tarde", 12, 40, 17, 30},
         };
         if (perfil.turnos.size() != 2) {
             return falla(QStringLiteral("El perfil debe tener 2 turnos (tiene %1).")
@@ -471,11 +474,12 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
         }
     }
 
-    // 0bis. Eventos de los turnos (009-T7, RF-1, RF-3, RF-10): nombre, posición, orden único
-    //    por posición, duración y, si declaran horario, par completo, diferencia coherente y
-    //    contención en la ventana de su posición. La ventana y el par se comprueban con las
-    //    funciones puras del servicio (`calculo_eventos`), para que el perfil y la base no
-    //    diverjan.
+    // 0bis. Eventos de los turnos (009-T7, RF-1, RF-3, RF-10; 011-T8, RF-4): el turno debe
+    //    encajar con la hora académica por defecto y el evento debe tener nombre, posición,
+    //    orden único por posición, duración y, si declara horario, par completo, diferencia
+    //    coherente y contención en la ventana de su posición. La ventana, el encaje y el par
+    //    se comprueban con las funciones puras del servicio (`calculo_eventos`), para que el
+    //    perfil y la base no diverjan.
     for (const TurnoDef& turno : perfil.turnos) {
         TurnoDTO turnoDto;
         turnoDto.nombre = turno.nombre;
@@ -493,6 +497,9 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
             turnoDto.eventos.append(dto);
         }
 
+        // Invariante de encaje: `franjas × D + eventos ≤ ventana` con D = 35 (RF-4, RF-8).
+        // Se comprueba tras validar cada evento para que sus errores propios (posición,
+        // orden, horas) se informen antes que el déficit.
         QSet<QString> ordenesOcupados;
         for (int i = 0; i < turno.eventos.size(); ++i) {
             const EventoDef& evento = turno.eventos[i];
@@ -553,9 +560,11 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
                                  .arg(turno.nombre)
                                  .arg(evento.inicio.secsTo(evento.fin) / 60));
             }
-            if (!eventoDentroDeVentana(turnoDto.eventos[i], turnoDto, evento.despuesDeSlot)) {
+            if (!eventoDentroDeVentana(turnoDto.eventos[i], turnoDto, evento.despuesDeSlot,
+                                       duracion_horaria::POR_DEFECTO)) {
                 const QPair<QTime, QTime> ventana =
-                    ventanaDePosicion(turnoDto, evento.despuesDeSlot);
+                    ventanaDePosicion(turnoDto, evento.despuesDeSlot,
+                                      duracion_horaria::POR_DEFECTO);
                 return falla(QStringLiteral("El evento «%1» del turno «%2» (%3–%4) queda fuera de "
                                             "la ventana de la posición %5 (%6–%7).")
                                  .arg(evento.nombre, turno.nombre)
@@ -565,6 +574,12 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
                                  .arg(ventana.first.toString(QStringLiteral("HH:mm")))
                                  .arg(ventana.second.toString(QStringLiteral("HH:mm"))));
             }
+        }
+
+        const QString errorEncaje =
+            errorDeEncaje(turnoDto, duracion_horaria::POR_DEFECTO);
+        if (!errorEncaje.isEmpty()) {
+            return falla(errorEncaje);
         }
     }
 

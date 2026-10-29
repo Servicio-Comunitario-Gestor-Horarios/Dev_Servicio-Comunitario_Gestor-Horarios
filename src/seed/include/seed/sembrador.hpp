@@ -40,6 +40,11 @@ struct ResultadoAplicacion {
     QString rutaRespaldo;
     Recuentos recuentos;
 
+    /// Valor efectivo de la hora académica que queda tras la siembra (35, RF-8).
+    int duracionMinutos = 0;
+    /// Filas de `ConfiguracionHoraria` tras la siembra (siempre 1, RF-8).
+    int configuraciones = 0;
+
     bool ok() const { return estado == EstadoAplicacion::Ok; }
 };
 
@@ -54,10 +59,12 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones);
 /// no escribe la base ni el respaldo; solo decide el nombre.
 QString rutaRespaldoLibre(const QString& rutaDb, const QDateTime& ahora);
 
-/// Informe determinista de la aplicación (RF-12, plan §8): variante, recuentos por entidad
-/// (leídos de la base), materias por año y totales semanales por plan en horas académicas
-/// (= bloques). No incluye la ruta de la base ni la del respaldo: las imprime la CLI, que
-/// dispone de ellas. La variante viaja como parámetro y no forma parte de `Recuentos`.
-QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recuentos& recuentos);
+/// Informe determinista de la aplicación (RF-12, plan §8): variante, hora académica efectiva
+/// y su recuento, recuentos por entidad (leídos de la base), materias por año y totales
+/// semanales por plan en horas académicas (= bloques). No incluye la ruta de la base ni la del
+/// respaldo: las imprime la CLI, que dispone de ellas. La variante y la configuración viajan
+/// como parámetros y no forman parte de `Recuentos`.
+QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recuentos& recuentos,
+                     int duracionMinutos, int configuraciones);
 
 } // namespace seed

@@ -12,6 +12,7 @@
 #include "backend/database/apertura_base_datos.hpp"
 #include "backend/database/respaldo.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 #include "datos/ContextoBaseDatos.hpp"
 
 namespace seed {
@@ -30,8 +31,10 @@ bool varianteValida(VarianteDocentes variante) {
     return false;
 }
 
-/// Las 11 tablas de dominio del esquema v3 (RF-10, detección de datos). `TiposAula` y
-/// `Eventos` son datos de dominio desde la spec 009; `Recesos` ya no existe.
+/// Las 11 tablas de dominio del esquema v4 (RF-10, detección de datos). `TiposAula` y
+/// `Eventos` son datos de dominio desde la spec 009; `Recesos` ya no existe. La configuración
+/// global (`ConfiguracionHoraria`) **no** es dato de dominio (spec 011, RF-8): no bloquea una
+/// base recién creada.
 const char* const kTablasDominio[] = {
     "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
     "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
@@ -60,8 +63,7 @@ int contarFilasDeDominio(QSqlDatabase& db) {
 }
 
 /// Recuentos leídos de la base (RF-12): se cuenta tras el commit, no desde el perfil.
-Recuentos leerRecuentos(QSqlDatabase& db) {
-    Recuentos r;
+Recuentos leerRecuentos(QSqlDatabase& db) {    Recuentos r;
     r.turnos           = contarFilas(db, QStringLiteral("Turnos"));
     r.eventos          = contarFilas(db, QStringLiteral("Eventos"));
     r.tiposAula        = contarFilas(db, QStringLiteral("TiposAula"));
@@ -74,6 +76,20 @@ Recuentos leerRecuentos(QSqlDatabase& db) {
     r.asignaciones     = contarFilas(db, QStringLiteral("Profesor_Materia"));
     r.disponibilidades = contarFilas(db, QStringLiteral("Disponibilidad_Profesor"));
     return r;
+}
+
+/// Valor efectivo y recuento de la configuración global leídos de la base tras el commit
+/// (RF-8). La duración queda en 0 si no hay fila legible.
+void leerConfiguracionSembrada(QSqlDatabase& db, int* duracionMinutos, int* configuraciones) {
+    *configuraciones = contarFilas(db, QStringLiteral("ConfiguracionHoraria"));
+    *duracionMinutos = 0;
+
+    QSqlQuery q(db);
+    if (q.exec(QStringLiteral(
+            "SELECT duracion_minutos FROM ConfiguracionHoraria WHERE id = 1")) &&
+        q.next()) {
+        *duracionMinutos = q.value(0).toInt();
+    }
 }
 
 /// ¿Los recuentos leídos coinciden con los esperados para la variante? (RF-12).
@@ -110,11 +126,17 @@ QString rutaRespaldoLibre(const QString& rutaDb, const QDateTime& ahora) {
     return QString();
 }
 
-QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recuentos& r) {
+QString resumenTexto(const Perfil& perfil, VarianteDocentes variante, const Recuentos& r,
+                     int duracionMinutos, int configuraciones) {
     QStringList lineas;
 
     // Variante (parámetro, plan §8): no forma parte de `Recuentos`, que cuenta filas.
     lineas << QStringLiteral("Variante: %1").arg(nombreVariante(variante));
+
+    // Configuración global de la hora académica (RF-8): valor efectivo y su recuento.
+    lineas << QStringLiteral("Hora académica: %1 min (configuraciones: %2)")
+                  .arg(duracionMinutos)
+                  .arg(configuraciones);
 
     // Recuentos por entidad, leídos de la base tras el commit (RF-12): el informe verifica
     // lo escrito, no lo declarado en el perfil.
@@ -271,6 +293,17 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         db.rollback();
         return fallo(EstadoAplicacion::FalloEscritura, detalle);
     };
+
+    // La configuración global no es dato de dominio (RF-8): se asegura en 35 dentro de la
+    // transacción y antes de crear turnos. Es idempotente (una sola fila) y participa del
+    // rollback si algo falla después.
+    {
+        const auto configuracion =
+            nucleo.guardarConfiguracionHoraria(duracion_horaria::POR_DEFECTO);
+        if (!configuracion.ok) {
+            return abortar(configuracion.mensajeError);
+        }
+    }
 
     // Borrado por SQL directo en orden FK-seguro (plan §6.3). Los métodos con transacción
     // propia (`eliminarProfesor`, `eliminarTurno`, `eliminarConCascada`) están prohibidos aquí.
@@ -509,6 +542,7 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
     resultado.estado = EstadoAplicacion::Ok;
     resultado.rutaRespaldo = rutaRespaldo;
     resultado.recuentos = leerRecuentos(db);
+    leerConfiguracionSembrada(db, &resultado.duracionMinutos, &resultado.configuraciones);
     return resultado;
 }
 

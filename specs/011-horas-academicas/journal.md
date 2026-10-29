@@ -351,3 +351,84 @@ $ ctest --test-dir build-backend --output-on-failure -R '^(test_servicio_turnos_
   es 08:10–08:20 y el alta se rechaza. Es exactamente lo que T8 migra (07:00–11:50, receso
   08:10–08:20). El `-R` de T5 no lo incluye y `perfil.cpp` está fuera de su alcance; el árbol compila
   y las tres suites de la tarea están en verde. `ctest --preset backend` da **51/52** por ese motivo.
+
+## T8 - Seed: turnos con D = 35, configuración asegurada y resultado (2026-10-29)
+
+**Requisito:** RF-8 (y RF-2/RF-4 para configuración y encaje). **Plan:** §1.8, §6 y §9 (T8). **Base:**
+`bc7122b`. **Tarea adelantada** por decisión del usuario tras T5: su servicio ya valida con D = 35 y el
+perfil del seed seguía con el inventario de 40 min (`test_seed_aplicacion` en rojo, 51/52).
+
+### Rojo (tests primero)
+
+Expectativas nuevas de perfil y de siembra contra el seed antiguo:
+
+```text
+$ cmake --build --preset backend --parallel
+test_seed_aplicacion.cpp:115:28: error: ‘const struct seed::ResultadoAplicacion’ has no member
+named ‘duracionMinutos’
+test_seed_aplicacion.cpp:630:45: error: demasiados argumentos para la función
+‘QString seed::resumenTexto(const Perfil&, VarianteDocentes, const Recuentos&)’
+```
+
+Con las estructuras ya ampliadas, la siembra seguía fallando por el perfil de 40 min (ventana de la
+posición 2 = 08:10–08:20 con D = 35).
+
+### Verde
+
+```text
+$ ctest --test-dir build-backend --output-on-failure -R '^(test_seed_perfil|test_seed_aplicacion)$'
+1/2 Test #47: test_seed_perfil .................   Passed    0.05 sec
+2/2 Test #48: test_seed_aplicacion .............   Passed    0.44 sec
+100% tests passed out of 2
+
+$ ctest --preset backend
+52/52 Test #52: test_ipc_aislamiento_bd ...............   Passed    0.08 sec
+100% tests passed out of 52
+```
+
+Comprobación real de la CLI y la base:
+
+```text
+$ gestor-horarios-seed --db …/centro.db
+Variante: holgada
+Hora académica: 35 min (configuraciones: 1)
+…
+1|35
+Mañana|07:00|11:50|8
+Tarde|12:40|17:30|8
+Mañana|08:10|08:20
+Tarde|13:50|14:00
+```
+
+### Cambios
+
+- `src/seed/src/perfil.cpp`:
+  - Turnos: Mañana 07:00–11:50 y Tarde 12:40–17:30, 8 franjas, recesos 08:10–08:20 y 13:50–14:00;
+    comentario con `8 × 35 = 280` de rejilla y `8 × 35 + 10 = 290` de ventana.
+  - `validarPerfil`: ventanas canónicas nuevas, `eventoDentroDeVentana`/`ventanaDePosicion` con
+    `duracion_horaria::POR_DEFECTO` y comprobación de encaje con `errorDeEncaje(turno, 35)` (tras los
+    errores propios de cada evento, para no eclipsarlos). Un turno que no encaja se rechaza.
+- `src/seed/include/seed/sembrador.hpp` / `src/seed/src/sembrador.cpp`:
+  - `ResultadoAplicacion` gana `duracionMinutos` y `configuraciones`.
+  - `resumenTexto` recibe ambos y emite `Hora académica: 35 min (configuraciones: 1)`.
+  - `aplicar` asegura la configuración con `NucleoDatos::guardarConfiguracionHoraria(35)` **dentro
+    de la transacción y antes de crear turnos**, en las dos ramas (`--reemplazar` y `--solo-docentes`);
+    al final `leerConfiguracionSembrada` lee valor y recuento de la base.
+  - `kTablasDominio` sigue **sin** `ConfiguracionHoraria`: no bloquea una base recién creada.
+- `src/seed/src/main.cpp`: pasa los dos valores al informe.
+- `test/backend/test_seed_perfil.cpp` y `test/backend/test_seed_aplicacion.cpp`: rejilla nueva, encaje y
+  turnos, configuración única, siembra sobre base solo con configuración, determinismo con
+  `ConfiguracionHoraria`, `--reemplazar`/`--solo-docentes`, rollback y resumen.
+
+### Notas
+
+- **Turnos/eventos:** Mañana 07:00–11:50 (rejilla 07:00–11:40, receso 08:10–08:20, `fin` = 11:40 + 10) y
+  Tarde 12:40–17:30 (rejilla 12:40–17:20, receso 13:50–14:00, `fin` = 17:20 + 10).
+  `8 × 35 + 10 = 290` en ambos: encaje exacto, sobrante 0.
+- **Rollback:** la fila `(1, 35)` la crea el esquema **fuera** de la transacción de la siembra; tras un
+  fallo queda 1 fila con 35 (no 0). El upsert de la siembra es idempotente y no duplica.
+- **Encaje en `validarPerfil`:** se comprueba después de los errores de cada evento para que una
+  posición/orden/duración incoherente se informe como tal; el caso nuevo de déficit usa un evento extra
+  de 20 min (`8 × 35 + 10 + 20 = 310 > 290`, «déficit 20»).
+- No se tocaron `calculo_eventos` (legado vivo), `solver_config.cpp`, el constructor, el esquema,
+  `duracion_horaria` ni `docs/`.

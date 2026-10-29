@@ -1,5 +1,6 @@
 #include <QSet>
 #include <QTest>
+#include <backend/services/duracion_horaria.hpp>
 #include <seed/docentes.hpp>
 #include <seed/perfil.hpp>
 
@@ -156,12 +157,12 @@ private slots:
 
         QCOMPARE(manana.nombre, QString("Mañana"));
         QCOMPARE(manana.inicio, QTime(7, 0));
-        QCOMPARE(manana.fin, QTime(12, 30));
+        QCOMPARE(manana.fin, QTime(11, 50));
         QCOMPARE(manana.numSlots, 8);
 
         QCOMPARE(tarde.nombre, QString("Tarde"));
         QCOMPARE(tarde.inicio, QTime(12, 40));
-        QCOMPARE(tarde.fin, QTime(18, 10));
+        QCOMPARE(tarde.fin, QTime(17, 30));
         QCOMPARE(tarde.numSlots, 8);
 
         // ── Aulas (RF-5): 16, nombre único, con laboratorio o taller.
@@ -356,10 +357,22 @@ private slots:
             QCOMPARE(evento.duracion, 10);
         }
 
-        QCOMPARE(perfil.turnos[0].eventos[0].inicio, QTime(8, 20));
-        QCOMPARE(perfil.turnos[0].eventos[0].fin, QTime(8, 30));
-        QCOMPARE(perfil.turnos[1].eventos[0].inicio, QTime(14, 0));
-        QCOMPARE(perfil.turnos[1].eventos[0].fin, QTime(14, 10));
+        QCOMPARE(perfil.turnos[0].eventos[0].inicio, QTime(8, 10));
+        QCOMPARE(perfil.turnos[0].eventos[0].fin, QTime(8, 20));
+        QCOMPARE(perfil.turnos[1].eventos[0].inicio, QTime(13, 50));
+        QCOMPARE(perfil.turnos[1].eventos[0].fin, QTime(14, 0));
+    }
+
+    void turnosEncajanConLaHoraAcademicaPorDefecto()
+    {
+        // La rejilla de clases es 8 × 35 = 280 min (07:00–11:40 / 12:40–17:20) y el
+        // `fin` añade los 10 min del receso: 8 × 35 + 10 = 290 = ventana del turno.
+        QCOMPARE(8 * duracion_horaria::POR_DEFECTO + 10, 290);
+        for (const TurnoDef& turno : perfilPorDefecto().turnos) {
+            QCOMPARE(turno.inicio.secsTo(turno.fin) / 60, 290);
+            QCOMPARE(turno.eventos.size(), 1);
+            QCOMPARE(turno.eventos.first().duracion, 10);
+        }
     }
 
     void recuentosNuevos()
@@ -474,6 +487,17 @@ private slots:
             QString error;
             QVERIFY(!validarPerfil(perfil, &error));
             QVERIFY2(error.contains(QStringLiteral("orden")), qPrintable(error));
+        }
+
+        // Un turno que no encaja con D = 35: 8 × 35 + 10 + 20 = 310 > 290.
+        {
+            Perfil perfil = perfilPorDefecto();
+            EventoDef extra{QStringLiteral("Acto cívico"), 2, 2, 20, QTime(), QTime()};
+            perfil.turnos[0].eventos.append(extra);
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("Mañana")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("déficit 20")), qPrintable(error));
         }
     }
 

@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include <backend/database/apertura_base_datos.hpp>
 #include <backend/database/respaldo.hpp>
 #include <seed/sembrador.hpp>
 
@@ -109,9 +110,41 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 65);
         QCOMPARE(resultado.recuentos.disponibilidades, 325);
 
+        // La configuración global se asegura en 35 con una sola fila (RF-8) y el resultado
+        // informa el valor efectivo y su recuento.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+
         // Inspección directa de la base.
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
+
+        // Turnos (RF-4, RF-8): 8 franjas de 35 min y ventana 07:00–11:50 / 12:40–17:30
+        // (8 × 35 + los 10 min del receso = 290).
+        {
+            QSqlQuery turnos(db);
+            QVERIFY2(turnos.exec("SELECT nombre, inicio, fin, slots FROM Turnos ORDER BY nombre"),
+                     qPrintable(turnos.lastError().text()));
+            QVector<QStringList> filasTurnos;
+            while (turnos.next()) {
+                filasTurnos.append({turnos.value(0).toString(), turnos.value(1).toString(),
+                                    turnos.value(2).toString(), turnos.value(3).toString()});
+            }
+            QCOMPARE(filasTurnos.size(), 2);
+            QCOMPARE(filasTurnos[0], QStringList({"Mañana", "07:00", "11:50", "8"}));
+            QCOMPARE(filasTurnos[1], QStringList({"Tarde", "12:40", "17:30", "8"}));
+        }
+
+        // Configuración global (RF-8): una sola fila `(1, 35)`, idempotente.
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        {
+            QSqlQuery config(db);
+            QVERIFY(config.exec("SELECT id, duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 1);
+            QCOMPARE(config.value(1).toInt(), 35);
+            QVERIFY(!config.next());
+        }
 
         // Tipos de aula (RF-5/RF-10): catálogo de 3 y todas las aulas y materias con un tipo
         // existente (nunca NULL ni huérfano).
@@ -144,12 +177,12 @@ private slots:
         QCOMPARE(filas.size(), 2);
         const QStringList eventoManana{QStringLiteral("Mañana"), QStringLiteral("Receso"),
                                        QStringLiteral("2"),      QStringLiteral("1"),
-                                       QStringLiteral("10"),     QStringLiteral("08:20"),
-                                       QStringLiteral("08:30")};
+                                       QStringLiteral("10"),     QStringLiteral("08:10"),
+                                       QStringLiteral("08:20")};
         const QStringList eventoTarde{QStringLiteral("Tarde"), QStringLiteral("Receso"),
                                       QStringLiteral("2"),     QStringLiteral("1"),
-                                      QStringLiteral("10"),    QStringLiteral("14:00"),
-                                      QStringLiteral("14:10")};
+                                      QStringLiteral("10"),    QStringLiteral("13:50"),
+                                      QStringLiteral("14:00")};
         QCOMPARE(filas[0], eventoManana);
         QCOMPARE(filas[1], eventoTarde);
 
@@ -264,6 +297,7 @@ private slots:
             const char* sql;
         } kComparaciones[] = {
             {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
+            {"ConfiguracionHoraria", "SELECT id, duracion_minutos FROM ConfiguracionHoraria"},
             {"TiposAula", "SELECT nombre, clave FROM TiposAula"},
             {"Eventos",
              "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin FROM Eventos"},
@@ -319,6 +353,15 @@ private slots:
         };
         for (const char* tabla : kTablas) {
             QCOMPARE(contar(db, QString::fromLatin1(tabla)), 0);
+        }
+        // La fila de configuración la deja la creación del esquema (fuera de la transacción)
+        // y el rollback no la duplica: sigue habiendo una con 35 (RF-2, RF-8).
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        {
+            QSqlQuery config(db);
+            QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 35);
         }
         cerrarInspeccion(db);
     }
@@ -389,6 +432,18 @@ private slots:
         QCOMPARE(resultado.recuentos.planMaterias, 210);
         QCOMPARE(resultado.recuentos.eventos, 2);
         QCOMPARE(resultado.recuentos.tiposAula, 3);
+
+        // El reemplazo no duplica ni borra la configuración: sigue habiendo una fila con 35.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        QSqlQuery config(db);
+        QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+        QVERIFY(config.next());
+        QCOMPARE(config.value(0).toInt(), 35);
+        cerrarInspeccion(db);
     }
 
     void reemplazoTotalConCursosAsignados()
@@ -531,6 +586,10 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 57);
         QCOMPARE(resultado.recuentos.disponibilidades, 215);
 
+        // La conmutación también asegura la configuración: una fila con 35, sin duplicar.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+
         QSqlDatabase despues = abrirInspeccion(ruta, m_contador);
         QVERIFY(despues.isOpen());
         // El resto de tablas queda idéntico (incluidas las 210 cargas, los tipos y los eventos).
@@ -542,7 +601,44 @@ private slots:
         }
         QCOMPARE(contar(despues, QStringLiteral("PlanEstudio_Materia")), 210);
         QCOMPARE(contar(despues, QStringLiteral("Profesores")), 43);
+        QCOMPARE(contar(despues, QStringLiteral("ConfiguracionHoraria")), 1);
+        {
+            QSqlQuery config(despues);
+            QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 35);
+        }
         cerrarInspeccion(despues);
+    }
+
+    void baseRecienCreadaSoloConConfiguracionSeSiembraSinReemplazar()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        // Una base recién creada solo tiene el esquema y su fila de configuración: la
+        // configuración no es dato de dominio y no bloquea la siembra (RF-8).
+        QCOMPARE(AperturaBaseDatos::abrir(ruta).estado, AperturaBaseDatos::Estado::OkCreada);
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion resultado = aplicar(opciones);
+
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+        QCOMPARE(resultado.recuentos.turnos, 2);
+    }
+
+    void resumenTexto_incluyeLaHoraAcademicaYSuRecuento()
+    {
+        const QString resumen = resumenTexto(perfilPorDefecto(), VarianteDocentes::Holgada,
+                                             Recuentos{}, 35, 1);
+
+        QVERIFY2(resumen.contains(QStringLiteral("35 min")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("configuraciones: 1")), qPrintable(resumen));
     }
 
     void atomicidadAnteFalloEnReemplazo()
