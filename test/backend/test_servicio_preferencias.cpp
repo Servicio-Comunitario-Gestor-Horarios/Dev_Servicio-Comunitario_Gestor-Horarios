@@ -387,6 +387,37 @@ private slots:
         QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 2);
     }
 
+    void actualizar_soloCambioDeSentidoQueCreaSolapeOpuesto_rechazaYConservaElAnterior()
+    {
+        // Dos preferencias del mismo sentido solapadas están permitidas.
+        QVERIFY(m_servicio->agregar(QStringLiteral("P1"), franja(1, 8, 0, 10, 0),
+                                    SentidoPreferencia::Preferida).ok);
+        auto segunda = m_servicio->agregar(QStringLiteral("P1"), franja(1, 9, 0, 11, 0),
+                                           SentidoPreferencia::Preferida);
+        QVERIFY(segunda.ok);
+
+        // Cambiar solo el sentido de la segunda crea un solape de sentidos opuestos.
+        auto r = m_servicio->actualizar(segunda.valor.id, franja(1, 9, 0, 11, 0),
+                                        SentidoPreferencia::Evitada);
+
+        exigirMensaje(r, {QStringLiteral("08:00–10:00"), QStringLiteral("09:00–11:00"),
+                          QStringLiteral("preferida"), QStringLiteral("evitada"),
+                          QStringLiteral("Cambie el rango o el sentido")});
+
+        // El valor anterior se conserva: misma franja y sentido «preferida».
+        const auto lista = m_servicio->listar(QStringLiteral("P1")).valor;
+        bool encontrada = false;
+        for (const PreferenciaDTO& p : lista) {
+            if (p.id == segunda.valor.id) {
+                encontrada = true;
+                QCOMPARE(p.franja.inicio, QTime(9, 0));
+                QCOMPARE(p.franja.fin, QTime(11, 0));
+                QCOMPARE(p.sentido, SentidoPreferencia::Preferida);
+            }
+        }
+        QVERIFY(encontrada);
+    }
+
     void actualizar_idInexistente_fallaConValorYAccion()
     {
         exigirMensaje(m_servicio->actualizar(9999, franja(1, 8, 0, 10, 0),

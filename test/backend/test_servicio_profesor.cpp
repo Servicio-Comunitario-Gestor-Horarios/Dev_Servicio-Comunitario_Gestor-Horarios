@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTime>
 #include <memory>
@@ -295,6 +296,46 @@ private slots:
         q.bindValue(":id", "P-900");
         QVERIFY(q.exec() && q.next());
         QCOMPARE(q.value(0).toInt(), 0);
+    }
+
+    // ─── agregarDisponibilidad ──────────────────────────────────────────────
+
+    void eliminarProfesor_falloALaMitad_noBorraNada() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-950", "Dr. Rollback", "rollback@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad(
+            "P-950", franja(1, 8, 0, 10, 0)).ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-950", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
+        // El trigger aborta al borrar el docente, después de borrar sus hijas.
+        {
+            QSqlQuery trigger(m_dbManager->database());
+            QVERIFY2(trigger.exec("CREATE TRIGGER fallo_baja BEFORE DELETE ON Profesores "
+                                  "BEGIN SELECT RAISE(ABORT, 'fallo simulado'); END;"),
+                     qPrintable(trigger.lastError().text()));
+        }
+
+        QVERIFY(!m_servicio->eliminarProfesor("P-950"));
+
+        // Rollback: docente, disponibilidad y preferencia siguen intactos.
+        QSqlQuery q(m_dbManager->database());
+        for (const char* sql : {"SELECT COUNT(*) FROM Profesores WHERE id = 'P-950'",
+                                "SELECT COUNT(*) FROM Disponibilidad_Profesor "
+                                "WHERE id_Profesor = 'P-950'",
+                                "SELECT COUNT(*) FROM Preferencia_Profesor "
+                                "WHERE id_Profesor = 'P-950'"}) {
+            QVERIFY2(q.exec(QString::fromLatin1(sql)), qPrintable(q.lastError().text()));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 1);
+        }
+
+        // Retirado el trigger, la baja vuelve a funcionar.
+        QSqlQuery drop(m_dbManager->database());
+        QVERIFY(drop.exec("DROP TRIGGER fallo_baja"));
+        QVERIFY(m_servicio->eliminarProfesor("P-950"));
     }
 
     // ─── agregarDisponibilidad ──────────────────────────────────────────────

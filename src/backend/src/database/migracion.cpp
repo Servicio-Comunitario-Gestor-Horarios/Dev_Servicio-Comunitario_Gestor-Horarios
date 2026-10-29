@@ -103,9 +103,15 @@ namespace
 
         // ── Preferencia_Profesor (preferencias horarias del docente) ──
         // Replica el modelo de la disponibilidad (`dia` y horas como texto `HH:mm`) y
-        // añade el sentido. El `CHECK` del rango se apoya en que `HH:mm` está a dos
-        // dígitos y en 24 h: la comparación lexicográfica coincide con la temporal. El
-        // `UNIQUE` frena el duplicado exacto; los solapes los valida el servicio (RF-2).
+        // añade el sentido.
+        //
+        // PRECONDICIÓN de `CHECK(hora_inicio < hora_fin)`: las horas se guardan SIEMPRE como
+        // `HH:mm` de 24 h y cero-rellenadas («08:00», nunca «8:00»); solo con ese formato el
+        // orden lexicográfico coincide con el temporal (`08:00 < 10:00`). El `CHECK` es una
+        // barrera contra escrituras directas, **no un parser**: «9:00–10:30» (válido) se
+        // rechazaría y «10:00–9:30» (inválido) pasaría. El formato lo exige la validación de
+        // negocio (`franja_horaria::errorDeFranja`). El `UNIQUE` frena el duplicado exacto;
+        // los solapes los valida el servicio (RF-2).
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Preferencia_Profesor ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"

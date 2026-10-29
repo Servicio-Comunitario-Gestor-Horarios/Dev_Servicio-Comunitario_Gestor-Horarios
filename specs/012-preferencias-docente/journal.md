@@ -453,3 +453,57 @@ $ ctest --preset backend
   coordinator llevará a la guía en T9. No se añadió ningún comentario en `ServicioGeneracion` (el
   `grep` sigue vacío).
 - No se tocaron el esquema, los servicios de escritura, el seed ni `docs/`.
+
+## T9 - Documentación (aplicada por el coordinator) y regresión global (2026-10-29)
+
+**Requisito:** RF-8, RNF-5, RNF-6. **Plan:** §1.8 y §8.1. **Base:** `94647ef`. La documentación la
+aplicó el coordinator en `98c9dbc` (`docs(sdd-012): T9 documentación de las preferencias y cierre de la
+implementación`); esta entrada cierra la bitácora.
+
+### Contenido aplicado
+
+- `docs/interfaz-frontend.md`:
+  - §2.2: `VERSION_ESQUEMA_ACTUAL = 5` con «v5: preferencias horarias del docente» y el párrafo de
+    apertura/versiones actualizado (v5 añade `Preferencia_Profesor`; una v4 no se migra).
+  - §2.4: «preferencias horarias» en los dominios, bloque de `NucleoDatos` con las cinco operaciones,
+    fila de §2.4.1 para `profesor` (profesor-materia, disponibilidad y **preferencias**), tabla de DTO
+    con `QVector<PreferenciaDTO> preferencias` y **§2.4.5 Preferencias horarias
+    (`ServicioPreferencias`)**.
+  - §4 y la nota de baja/cascada: los dos caminos borran preferencias y disponibilidad.
+- `docs/guias/datos-prueba.md`: fila «Preferencias (no se siembran) | 0» y ejemplo de salida con
+  `Hora académica: 35 min` y `Preferencias: 0`.
+- **Supersesión de la 008 (la anotó el planner al cerrar):** RF-9 queda superado «en lo que toca a las
+  preferencias» en los dos puntos de la conmutación de variante.
+
+### Verificación
+
+```text
+$ grep -c "VERSION_ESQUEMA_ACTUAL = 5" docs/interfaz-frontend.md   → 1
+$ grep -n "2.4.5" docs/interfaz-frontend.md                        → 413
+$ grep -n "Preferencias (no se siembran)" docs/guias/datos-prueba.md → 24
+$ ctest --preset backend
+100% tests passed out of 54
+```
+
+No se detectaron ficheros de otras specs en el `git diff --stat` del cierre.
+
+## Correcciones de la validación (2026-10-29)
+
+**Notas:** M1 (precondición del `CHECK` de texto), M2 (rollback del camino directo), M3 (mensajes de
+E/S con valor), M4 (comentario del seed), M5 (esta entrada de T9) y M6 (cambio solo de sentido).
+Sin bloqueantes. **Base:** `98c9dbc`.
+
+- **M1:** comentario del DDL de `Preferencia_Profesor` sin cambiar el esquema: el `CHECK(hora_inicio <
+  hora_fin)` es una **barrera lexicográfica** que exige `HH:mm` de 24 h cero-rellenado, no un parser
+  (`9:00–10:30` válido se rechazaría y `10:00–9:30` inválido pasaría); el formato lo garantiza
+  `franja_horaria::errorDeFranja`. Queda para que el coordinator lo anote en `docs/`.
+- **M2:** `eliminarProfesor_falloALaMitad_noBorraNada` (test_servicio_profesor): trigger
+  `BEFORE DELETE ON Profesores` que aborta tras borrar las hijas → la baja falla y docente,
+  disponibilidad y preferencia siguen; retirado el trigger, funciona.
+- **M3:** los tres fallos de E/S de `ServicioPreferencias` citan el docente o el id y «la base no
+  respondió», manteniendo la acción. Validaciones intactas.
+- **M4:** comentario de `--solo-docentes` en `sembrador.cpp` actualizado (también borra preferencias).
+- **M6:** `actualizar_soloCambioDeSentidoQueCreaSolapeOpuesto_rechazaYConservaElAnterior`: dos
+  preferidas solapadas son válidas; cambiar solo el sentido de una a evitada se rechaza nombrando las
+  dos franjas y conserva el sentido anterior.
+- Tests: `test_servicio_profesor` 57 casos, `test_servicio_preferencias` 32; suite **54/54**.

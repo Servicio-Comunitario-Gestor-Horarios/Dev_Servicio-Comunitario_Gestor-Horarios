@@ -187,7 +187,9 @@ Resultado<PreferenciaDTO> ServicioPreferencias::agregar(const QString& idProfeso
     {
         qCritical() << "Error al agregar la preferencia:" << query.lastError().text();
         return Resultado<PreferenciaDTO>::error(
-            QStringLiteral("No se pudo guardar la preferencia; intente de nuevo."));
+            QStringLiteral("No se pudo guardar la preferencia del docente «%1»: la base no "
+                           "respondió. Compruebe que esté disponible e intente de nuevo.")
+                .arg(id));
     }
 
     PreferenciaDTO creada;
@@ -324,7 +326,9 @@ Resultado<PreferenciaDTO> ServicioPreferencias::actualizar(int id, const FranjaH
     {
         qCritical() << "Error al actualizar la preferencia:" << query.lastError().text();
         return Resultado<PreferenciaDTO>::error(
-            QStringLiteral("No se pudo actualizar la preferencia; intente de nuevo."));
+            QStringLiteral("No se pudo actualizar la preferencia %1: la base no respondió. "
+                           "Compruebe que esté disponible e intente de nuevo.")
+                .arg(id));
     }
 
     actual.franja = franja;
@@ -350,7 +354,9 @@ Resultado<bool> ServicioPreferencias::eliminar(int id)
     {
         qCritical() << "Error al eliminar la preferencia:" << query.lastError().text();
         return Resultado<bool>::error(
-            QStringLiteral("No se pudo eliminar la preferencia; intente de nuevo."));
+            QStringLiteral("No se pudo eliminar la preferencia %1: la base no respondió. "
+                           "Compruebe que esté disponible e intente de nuevo.")
+                .arg(id));
     }
 
     if (query.numRowsAffected() == 0)

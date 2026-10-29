@@ -403,7 +403,8 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         return true;
     };
 
-    // ── Conmutación de docentes (RF-9): solo docentes + materias asignadas + disponibilidad ──
+    // ── Conmutación de docentes (RF-9): solo docentes + sus preferencias, materias asignadas
+    //    y disponibilidad ──
     if (opciones.soloDocentes) {
         // Orden FK-seguro: las preferencias (012) y la disponibilidad referencian al docente,
         // así que se borran antes que él; después, sus materias.
