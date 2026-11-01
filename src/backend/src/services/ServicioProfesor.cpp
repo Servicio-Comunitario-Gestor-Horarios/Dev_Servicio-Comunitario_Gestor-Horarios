@@ -1,4 +1,5 @@
 #include "backend/services/ServicioProfesor.hpp"
+#include "backend/services/franja_horaria_validacion.hpp"
 #include "backend/services/ordenacion.hpp"
 
 #include <algorithm>
@@ -10,28 +11,7 @@
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 
-static constexpr int DIA_MIN = 0;   // domingo
-static constexpr int DIA_MAX = 6;   // sábado
-
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
-
-// Valida una franja horaria reutilizable (no es miembro porque no usa estado).
-static bool validarFranja(const FranjaHoraria& f, QString& error) {
-    if (f.dia < DIA_MIN || f.dia > DIA_MAX) {
-        error = QString("El día debe estar entre %1 (domingo) y %2 (sábado).")
-                    .arg(DIA_MIN).arg(DIA_MAX);
-        return false;
-    }
-    if (!f.inicio.isValid() || !f.fin.isValid()) {
-        error = "Las horas de la franja no son válidas.";
-        return false;
-    }
-    if (f.inicio >= f.fin) {
-        error = "La hora de inicio debe ser anterior a la hora de fin.";
-        return false;
-    }
-    return true;
-}
 
 // ─── ProfesorDTO ───────────────────────────────────────────────────────────
 
@@ -115,6 +95,17 @@ bool ServicioProfesor::cargarDisponibilidad(ProfesorDTO& dto) const {
         d.franja.fin    = QTime::fromString(q.value("hora_fin").toString(),    FORMATO_HORA);
         dto.disponibilidad.append(d);
     }
+    return true;
+}
+
+bool ServicioProfesor::cargarPreferencias(ProfesorDTO& dto) const {
+    // Una sola consulta y un solo orden: los pone `ServicioPreferencias::listar`.
+    const auto resultado = ServicioPreferencias(m_db).listar(dto.id);
+    if (!resultado.ok) {
+        qCritical() << "Error al cargar preferencias:" << resultado.mensajeError;
+        return false;
+    }
+    dto.preferencias = resultado.valor;
     return true;
 }
 
@@ -214,7 +205,7 @@ Resultado<ProfesorDTO> ServicioProfesor::obtenerProfesor(const QString& id) cons
     }
 
     ProfesorDTO dto = mapearARecord(query.record());
-    if (!cargarDisponibilidad(dto) || !cargarMaterias(dto)) {
+    if (!cargarDisponibilidad(dto) || !cargarPreferencias(dto) || !cargarMaterias(dto)) {
         return Resultado<ProfesorDTO>::error(
             "Error al cargar los datos relacionados del profesor.");
     }
@@ -239,6 +230,7 @@ Resultado<QVector<ProfesorDTO>> ServicioProfesor::listarProfesores() const {
     while (query.next()) {
         ProfesorDTO dto = mapearARecord(query.record());
         cargarDisponibilidad(dto);
+        cargarPreferencias(dto);
         cargarMaterias(dto);
         resultados.append(dto);
     }
@@ -314,7 +306,8 @@ bool ServicioProfesor::eliminarProfesor(const QString& id) {
         return true;
     };
 
-    if (!borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
+    if (!borrarHijas("DELETE FROM Preferencia_Profesor    WHERE id_Profesor = :id") ||
+        !borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
         !borrarHijas("DELETE FROM Profesor_Materia       WHERE id_Profesor = :id")) {
         m_db.rollback();
         return false;
@@ -349,9 +342,10 @@ Resultado<DisponibilidadDTO> ServicioProfesor::agregarDisponibilidad(
         return Resultado<DisponibilidadDTO>::error("ID de profesor inválido.");
     }
 
-    QString error;
-    if (!validarFranja(franja, error)) {
-        return Resultado<DisponibilidadDTO>::error(error);
+    // Validación compartida con las preferencias: única definición de día y rango.
+    const QString errorFranja = franja_horaria::errorDeFranja(franja);
+    if (!errorFranja.isEmpty()) {
+        return Resultado<DisponibilidadDTO>::error(errorFranja);
     }
 
     // Verificar que el profesor exista antes de insertar (mejor mensaje que FK)

@@ -1,12 +1,30 @@
 #include "backend/solver/config/solver_config.hpp"
 
+#include "backend/services/calculo_eventos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QPair>
 #include <QStringList>
+#include <QTime>
+
+#include <cmath>
 
 namespace {
+
+const QString FORMATO_HORA = QStringLiteral("HH:mm");
+
+QString formatearHora(const QTime& hora)
+{
+    return hora.isValid() ? hora.toString(FORMATO_HORA) : QStringLiteral("—");
+}
+
+QString formatearIntervalo(const QTime& inicio, const QTime& fin)
+{
+    return QStringLiteral("%1–%2").arg(formatearHora(inicio), formatearHora(fin));
+}
 
 int leerEntero(const QJsonObject& obj, const char* clave, int porDefecto = 0)
 {
@@ -85,6 +103,8 @@ TurnosConfig parsearTurnos(const QJsonObject& obj)
         TurnoConfig t;
         t.nombre = leerTexto(o, "nombre");
         t.slot   = leerEnteros(o["slot"].toArray());
+        t.inicio = leerTexto(o, "inicio");
+        t.fin    = leerTexto(o, "fin");
         tc.turnos.append(t);
     }
     return tc;
@@ -96,6 +116,8 @@ QJsonObject aJson(const TurnosConfig& tc)
         QJsonObject obj;
         obj["nombre"] = t.nombre;
         obj["slot"]   = aJson(t.slot);
+        obj["inicio"] = t.inicio;
+        obj["fin"]    = t.fin;
         arr.append(obj);
     }
     QJsonObject obj;
@@ -103,32 +125,37 @@ QJsonObject aJson(const TurnosConfig& tc)
     return obj;
 }
 
-/* ── Recesos ── */
-QVector<RecesoConfig> parsearRecesos(const QJsonArray& arr)
+/* ── Eventos del turno ── */
+QVector<EventoConfig> parsearEventos(const QJsonArray& arr)
 {
-    QVector<RecesoConfig> recesos;
+    QVector<EventoConfig> eventos;
+    eventos.reserve(arr.size());
     for (const QJsonValue& valor : arr) {
         const QJsonObject o = valor.toObject();
-        RecesoConfig r;
-        r.turno           = leerTexto(o, "turno");
-        r.despues_de_slot = leerEntero(o, "despues_de_slot");
-        r.duracion        = leerEntero(o, "duracion");
-        r.inicio          = leerTexto(o, "inicio");
-        r.fin             = leerTexto(o, "fin");
-        recesos.append(r);
+        EventoConfig e;
+        e.nombre           = leerTexto(o, "nombre");
+        e.turno            = leerTexto(o, "turno");
+        e.despues_de_slot  = leerEntero(o, "despues_de_slot");
+        e.orden            = leerEntero(o, "orden");
+        e.duracion         = leerEntero(o, "duracion");
+        e.inicio           = leerTexto(o, "inicio");
+        e.fin              = leerTexto(o, "fin");
+        eventos.append(e);
     }
-    return recesos;
+    return eventos;
 }
-QJsonArray aJson(const QVector<RecesoConfig>& recesos)
+QJsonArray aJson(const QVector<EventoConfig>& eventos)
 {
     QJsonArray arr;
-    for (const RecesoConfig& r : recesos) {
+    for (const EventoConfig& e : eventos) {
         QJsonObject obj;
-        obj["turno"]           = r.turno;
-        obj["despues_de_slot"] = r.despues_de_slot;
-        obj["duracion"]        = r.duracion;
-        obj["inicio"]          = r.inicio;
-        obj["fin"]             = r.fin;
+        obj["nombre"]          = e.nombre;
+        obj["turno"]           = e.turno;
+        obj["despues_de_slot"] = e.despues_de_slot;
+        obj["orden"]           = e.orden;
+        obj["duracion"]        = e.duracion;
+        obj["inicio"]          = e.inicio;
+        obj["fin"]             = e.fin;
         arr.append(obj);
     }
     return arr;
@@ -297,8 +324,10 @@ QVector<MateriaSolverConfig> parsearMaterias(const QJsonArray& arr)
 {
     QVector<MateriaSolverConfig> materias;
     for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
         MateriaSolverConfig m;
-        m.nombre = leerTexto(valor.toObject(), "nombre");
+        m.nombre = leerTexto(o, "nombre");
+        m.tipo   = leerTexto(o, "tipo");
         materias.append(m);
     }
     return materias;
@@ -309,6 +338,7 @@ QJsonArray aJson(const QVector<MateriaSolverConfig>& materias)
     for (const MateriaSolverConfig& m : materias) {
         QJsonObject obj;
         obj["nombre"] = m.nombre;
+        obj["tipo"]   = m.tipo;
         arr.append(obj);
     }
     return arr;
@@ -357,36 +387,178 @@ const TurnoConfig* buscarTurno(const SolverConfig& c, const QString& nombre)
     return nullptr;
 }
 
-/// V1. Estructura: el JSON trae todas las secciones requeridas y una version reconocida (RF-10).
+/// V1. Estructura: la version se comprueba ANTES que las secciones y el JSON 2.0 trae todas las
+/// secciones requeridas, incluida la de eventos (RF-1).
 QString validarEstructura(const QJsonObject& obj)
 {
+    // La version manda: un 1.0 sin `eventos` se rechaza por version, no por «falta eventos».
+    const QString version = obj.value(QLatin1String("version")).toString();
+    if (version.isEmpty())
+        return QStringLiteral("V1: la configuración no declara versión; se espera '2.0'.");
+    if (version != QLatin1String("2.0"))
+        return QStringLiteral("V1: versión de configuración no reconocida ('%1'); se espera '2.0'.")
+            .arg(version);
+
     const QStringList requeridas = {QStringLiteral("version"),      QStringLiteral("dimensiones"),
                                     QStringLiteral("franja_horaria"), QStringLiteral("turnos"),
-                                    QStringLiteral("recesos"),       QStringLiteral("planes"),
+                                    QStringLiteral("eventos"),       QStringLiteral("planes"),
                                     QStringLiteral("cursos"),        QStringLiteral("profesores"),
                                     QStringLiteral("materias"),      QStringLiteral("aulas")};
     for (const QString& clave : requeridas)
         if (!obj.contains(clave))
             return QStringLiteral("V1: falta la seccion '%1'.").arg(clave);
 
-    // RF-10: esta spec produce y acepta la version `1.0`; otra (no reconocida) se rechaza con
-    // causa (1) entrada invalida. La version ausente ya se rechaza arriba (seccion requerida).
-    const QString version = obj.value(QLatin1String("version")).toString();
-    if (version != QLatin1String("1.0"))
-        return QStringLiteral("V1: version de configuracion no reconocida ('%1'); se espera '1.0'.")
-            .arg(version);
+    // La duración, si está, debe ser un número entero de minutos: `35.5` se rechaza aquí,
+    // citando el valor recibido, antes de que el parseo la convierta en 0 (RF-5, RNF-1).
+    const QJsonObject franja = obj.value(QLatin1String("franja_horaria")).toObject();
+    if (franja.contains(QLatin1String("duracion_minutos"))) {
+        const QJsonValue duracion = franja.value(QLatin1String("duracion_minutos"));
+        if (!duracion.isDouble() || duracion.toDouble() != std::floor(duracion.toDouble()))
+            return QStringLiteral("V1: duracion_minutos debe ser un entero; se recibió «%1».")
+                .arg(duracion.toVariant().toString());
+    }
     return {};
 }
 
-/// V2. Tipos/rangos + peso >= 0 + duracion_minutos > 0.
+/// V2. Tipos/rangos + peso >= 0 + duracion_minutos en 30–90 (punto único de la 011).
 QString validarTiposYRangos(const SolverConfig& c)
 {
-    if (c.franja_horaria.duracion_minutos <= 0)
-        return QStringLiteral("V2: duracion_minutos debe ser mayor que 0.");
+    const QString errorDuracion =
+        duracion_horaria::errorDeRango(c.franja_horaria.duracion_minutos);
+    if (!errorDuracion.isEmpty())
+        return QStringLiteral("V2: ") + errorDuracion;
     for (const ProfesorSolverConfig& p : c.profesores)
         for (const MateriaSuplente& s : p.materias_suplente)
             if (s.peso < 0)
                 return QStringLiteral("V2: peso negativo en una suplencia de '%1'.").arg(p.nombre);
+    return {};
+}
+
+/// V2 (eventos). Forma y temporalidad de los eventos del turno (RF-5 de la 010) y encaje de
+/// todos los turnos con la hora académica del contrato (RF-4, RF-5 de la 011).
+///
+/// Reutiliza las funciones puras de `calculo_eventos` —`errorDeEncaje`, `ventanaDePosicion`,
+/// `eventoDentroDeVentana` y `haySolapeCronologico`— convirtiendo
+/// `EventoConfig`/`TurnoConfig` a `EventoDTO`/`TurnoDTO`, de modo que la semántica es la misma
+/// que la del servicio de turnos. Puro: no lee el reloj.
+QString validarEventos(const SolverConfig& c)
+{
+    // 1. Forma de cada evento y referencia a su turno.
+    for (const EventoConfig& e : c.eventos) {
+        if (e.nombre.trimmed().isEmpty())
+            return QStringLiteral("V2: el evento del turno «%1» situado en la posición %2 no declara "
+                                  "nombre (campo 'nombre' vacío).")
+                .arg(e.turno).arg(e.despues_de_slot);
+
+        const TurnoConfig* turno = buscarTurno(c, e.turno);
+        if (!turno)
+            return QStringLiteral("V2: el evento «%1» referencia el turno «%2», que no existe.")
+                .arg(e.nombre, e.turno);
+
+        const int numSlots = turno->slot.size();
+        if (e.despues_de_slot < 1 || e.despues_de_slot > numSlots)
+            return QStringLiteral("V2: el evento «%1» declara la posición %2; debe estar entre 1 y %3.")
+                .arg(e.nombre).arg(e.despues_de_slot).arg(numSlots);
+
+        if (e.orden < 1)
+            return QStringLiteral("V2: el evento «%1» declara el orden %2; debe ser mayor o igual que 1.")
+                .arg(e.nombre).arg(e.orden);
+
+        if (e.duracion <= 0)
+            return QStringLiteral("V2: el evento «%1» declara la duración %2; debe ser mayor que 0.")
+                .arg(e.nombre).arg(e.duracion);
+
+        const bool hayInicio = !e.inicio.isEmpty();
+        const bool hayFin    = !e.fin.isEmpty();
+        if (hayInicio != hayFin)
+            return QStringLiteral("V2: el evento «%1» declara una sola de sus horas (inicio «%2», fin "
+                                  "«%3»); el par inicio/fin debe estar completo o ausente.")
+                .arg(e.nombre, e.inicio, e.fin);
+
+        if (!hayInicio)
+            continue;
+
+        const QTime inicio = QTime::fromString(e.inicio, FORMATO_HORA);
+        const QTime fin    = QTime::fromString(e.fin, FORMATO_HORA);
+        if (!inicio.isValid() || !fin.isValid())
+            return QStringLiteral("V2: el evento «%1» declara horas que no son HH:mm (inicio «%2», fin "
+                                  "«%3»).")
+                .arg(e.nombre, e.inicio, e.fin);
+
+        if (fin <= inicio)
+            return QStringLiteral("V2: el evento «%1» declara fin «%2», que no es posterior a su "
+                                  "inicio «%3».")
+                .arg(e.nombre, e.fin, e.inicio);
+
+        const int minutos = inicio.secsTo(fin) / 60;
+        if (minutos != e.duracion)
+            return QStringLiteral("V2: el evento «%1» declara una duración de %2 min, que no coincide "
+                                  "con sus horas (%3 min).")
+                .arg(e.nombre).arg(e.duracion).arg(minutos);
+    }
+
+    // 2. Temporalidad por turno: ventana del turno, ventana de la posición, cronología y solapes.
+    for (const TurnoConfig& t : c.turnos.turnos) {
+        TurnoDTO dto;
+        dto.nombre   = t.nombre;
+        dto.inicio   = QTime::fromString(t.inicio, FORMATO_HORA);
+        dto.fin      = QTime::fromString(t.fin, FORMATO_HORA);
+        dto.numSlots = t.slot.size();
+
+        bool hayHoras = false;
+        for (const EventoConfig& e : c.eventos) {
+            if (e.turno != t.nombre)
+                continue;
+            EventoDTO evento;
+            evento.nombre        = e.nombre;
+            evento.despuesDeSlot = e.despues_de_slot;
+            evento.orden         = e.orden;
+            evento.duracion      = e.duracion;
+            evento.inicio        = QTime::fromString(e.inicio, FORMATO_HORA);
+            evento.fin           = QTime::fromString(e.fin, FORMATO_HORA);
+            hayHoras = hayHoras || evento.inicio.isValid();
+            dto.eventos.append(evento);
+        }
+        // Un evento con horario exige la ventana del turno: sin ella no hay rejilla que comprobar.
+        if (hayHoras && (!dto.inicio.isValid() || !dto.fin.isValid()))
+            return QStringLiteral("V2: el turno «%1» no declara una ventana inicio/fin válida (inicio "
+                                  "«%2», fin «%3») y tiene eventos con horario.")
+                .arg(t.nombre, t.inicio, t.fin);
+
+        // Encaje con la hora académica del contrato, aunque el turno no tenga eventos (RF-4,
+        // RF-5): `franjas × D + eventos ≤ ventana`, con turno, D y déficit en el mensaje.
+        if (dto.inicio.isValid() && dto.fin.isValid()) {
+            const QString errorEncaje =
+                errorDeEncaje(dto, c.franja_horaria.duracion_minutos);
+            if (!errorEncaje.isEmpty())
+                return QStringLiteral("V2: ") + errorEncaje;
+        }
+
+        if (dto.eventos.isEmpty())
+            continue;
+
+        for (const EventoDTO& evento : dto.eventos) {
+            if (!evento.inicio.isValid() || !evento.fin.isValid())
+                continue;
+            if (eventoDentroDeVentana(evento, dto, evento.despuesDeSlot,
+                                      c.franja_horaria.duracion_minutos))
+                continue;
+
+            const QPair<QTime, QTime> ventana =
+                ventanaDePosicion(dto, evento.despuesDeSlot,
+                                  c.franja_horaria.duracion_minutos);
+            return QStringLiteral("V2: el intervalo %1 del evento «%2» no cabe en la ventana de la "
+                                  "posición %3 (%4).")
+                .arg(formatearIntervalo(evento.inicio, evento.fin), evento.nombre)
+                .arg(evento.despuesDeSlot)
+                .arg(formatearIntervalo(ventana.first, ventana.second));
+        }
+
+        if (haySolapeCronologico(dto.eventos))
+            return QStringLiteral("V2: los eventos del turno «%1» se solapan o van en orden "
+                                  "cronológico invertido; revise sus horas.")
+                .arg(t.nombre);
+    }
     return {};
 }
 
@@ -570,6 +742,91 @@ QString validarAulasMoviles(const SolverConfig& c)
     return {};
 }
 
+/// V16. Toda aula y toda materia declaran un tipo no vacio (RF-5 de la 010).
+///
+/// No se completa ningun tipo por defecto: una configuracion sin tipos se rechaza nombrando la
+/// entidad. Orden determinista: aulas y despues materias, en el orden de la configuracion.
+QString validarTiposDeclarados(const SolverConfig& c)
+{
+    for (const AulaSolverConfig& a : c.aulas)
+        if (a.tipo.trimmed().isEmpty())
+            return QStringLiteral("V16: el aula «%1» no declara tipo de aula (campo 'tipo' vacío).")
+                .arg(a.nombre);
+
+    for (const MateriaSolverConfig& m : c.materias)
+        if (m.tipo.trimmed().isEmpty())
+            return QStringLiteral("V16: la materia «%1» no declara tipo de aula requerido (campo "
+                                  "'tipo' vacío).")
+                .arg(m.nombre);
+    return {};
+}
+
+/// V17. El tipo requerido por cada materia de un curso tiene al menos un aula en el centro
+/// (comparacion por `claveTipo`), en los DOS modos de aula (RF-5 de la 010).
+///
+/// No se rechaza por un tipo declarado que ninguna materia requiera. Un tipo vacio lo rechaza
+/// antes V16, y un indice de materia fuera de rango lo rechaza antes V4.
+QString validarTiposConAulas(const SolverConfig& c)
+{
+    for (const CursoSolverConfig& cu : c.cursos) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(c, cu)) {
+            if (mc.materiaIDx < 0 || mc.materiaIDx >= c.materias.size())
+                continue;   // V4 ya lo rechaza; aqui solo se evita leer fuera de rango
+
+            const MateriaSolverConfig& materia = c.materias[mc.materiaIDx];
+            const QString claveRequerida = claveTipo(materia.tipo);
+            if (claveRequerida.isEmpty())
+                continue;   // V16 ya lo rechaza
+
+            bool hayAula = false;
+            for (const AulaSolverConfig& aula : c.aulas)
+                if (claveTipo(aula.tipo) == claveRequerida) {
+                    hayAula = true;
+                    break;
+                }
+
+            if (!hayAula)
+                return QStringLiteral("V17: el tipo de aula «%1» requerido por la materia «%2» del "
+                                      "curso %3%4 no tiene ninguna aula en el centro.")
+                    .arg(materia.tipo, materia.nombre)
+                    .arg(cu.anio)
+                    .arg(cu.seccion);
+        }
+    }
+    return {};
+}
+
+/// V18. El aula de referencia de cada curso es del tipo general/ordinario del centro (RF-3, RF-5).
+///
+/// El tipo general es una convencion fija de nombre (`tipoGeneralAula()`), comparada con
+/// `claveTipo`: no hay columna, seccion del contrato ni consulta a la base. Solo aplica con el modo
+/// de aula fija; con aulas moviles la referencia se ignora (V8). Un indice fuera de rango lo
+/// rechaza antes V6 y una referencia ausente, V8.
+QString validarReferenciaGeneral(const SolverConfig& c)
+{
+    if (!c.aula_fija)
+        return {};   // modo movil: el aula del curso se ignora (V8)
+
+    const QString claveGeneral = claveTipo(tipoGeneralAula());
+    for (const CursoSolverConfig& cu : c.cursos) {
+        if (cu.aula < 0 || cu.aula >= c.aulas.size())
+            continue;   // V6/V8 ya lo rechazan; aqui solo se evita leer fuera de rango
+
+        const AulaSolverConfig& aula = c.aulas[cu.aula];
+        if (claveTipo(aula.tipo) == claveGeneral)
+            continue;
+
+        return QStringLiteral("V18: el aula «%1», referencia del curso %2%3, es del tipo «%4»; el "
+                              "aula de referencia debe ser del tipo general «%5». Asigne al curso "
+                              "un aula del tipo general.")
+            .arg(aula.nombre)
+            .arg(cu.anio)
+            .arg(cu.seccion)
+            .arg(aula.tipo.trimmed(), tipoGeneralAula());
+    }
+    return {};
+}
+
 } // namespace
 
 Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
@@ -582,7 +839,7 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
     config.dimensiones    = parsearDimensiones(obj["dimensiones"].toObject());
     config.franja_horaria = parsearFranjaHoraria(obj["franja_horaria"].toObject());
     config.turnos         = parsearTurnos(obj["turnos"].toObject());
-    config.recesos        = parsearRecesos(obj["recesos"].toArray());
+    config.eventos        = parsearEventos(obj["eventos"].toArray());
     config.planes         = parsearPlanes(obj["planes"].toArray());
     config.cursos         = parsearCursos(obj["cursos"].toArray());
     config.profesores     = parsearProfesores(obj["profesores"].toArray());
@@ -594,11 +851,14 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
         return Resultado<SolverConfig>::error(v1);
 
     const QStringList errores = {
-        validarTiposYRangos(config),       validarDimensiones(config),       validarIndicesMaterias(config),
+        validarTiposYRangos(config),       validarEventos(config),
+        validarDimensiones(config),        validarIndicesMaterias(config),
         validarIndicesProfesores(config),  validarIndicesAulas(config),      validarTurnosDeCursos(config),
         validarAulasDeCursos(config),      validarNumeroEstudiantes(config), validarListasNoVacias(config),
         validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCoherenciaHoras(config),
-        validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config)};
+        validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config),
+        validarTiposDeclarados(config),    validarTiposConAulas(config),
+        validarReferenciaGeneral(config)};
     for (const QString& error : errores)
         if (!error.isEmpty())
             return Resultado<SolverConfig>::error(error);
@@ -609,14 +869,14 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
 QJsonObject SolverConfig::toJson() const
 {
     QJsonObject obj;
-    // Al PRODUCIR/serializar se sella siempre una version valida: si el origen no la declaro,
-    // se escribe "1.0" (nunca vacio). La LECTURA sigue rechazando ausente/no reconocida (RF-10).
-    obj["version"]        = version.isEmpty() ? QStringLiteral("1.0") : version;
+    // Al PRODUCIR/serializar se sella SIEMPRE la version 2.0 (nunca vacio ni 1.0). La LECTURA
+    // rechaza ausente, 1.0 o no reconocida (RF-1, RF-2).
+    obj["version"]        = QStringLiteral("2.0");
     obj["aula_fija"]      = aula_fija;
     obj["dimensiones"]    = aJson(dimensiones);
     obj["franja_horaria"] = aJson(franja_horaria);
     obj["turnos"]         = aJson(turnos);
-    obj["recesos"]        = aJson(recesos);
+    obj["eventos"]        = aJson(eventos);
     obj["planes"]         = aJson(planes);
     obj["cursos"]         = aJson(cursos);
     obj["profesores"]     = aJson(profesores);

@@ -31,7 +31,7 @@
 
 ## 5. Protección de los datos del usuario
 
-- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, asignaturas, cursos, turnos, recesos y configuración del solver) nunca se borran ni se sobrescriben sin confirmación explícita.
+- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, tipos de aula, asignaturas, cursos, turnos, eventos y configuración del solver) nunca se borran ni se sobrescriben sin confirmación explícita.
 - Los presets y los horarios guardados se gestionan como archivos JSON, no como datos de la base de datos; el usuario es dueño de esos archivos.
 - Toda operación destructiva o migración de esquema debe ser reversible o ir acompañada de respaldo.
 - La información sensible no se incluye en logs, dumps ni specs; los fixtures de test usan datos ficticios.
@@ -53,7 +53,7 @@ El solver es la única pieza que decide el horario. Esta sección fija su contra
 > disponibilidad). Afecta a §7.1.2 y a **V14** (§7.4); el detalle normativo queda en la spec 005.
 
 - **Frontera.** El solver no abre la base de datos ni depende de la interfaz. Recibe una configuración ya validada y devuelve una asignación o un fallo. La base aporta las entidades de dominio; el preset, los parámetros de cálculo.
-- **Comportamiento.** O encuentra una solución que respeta *todas* las restricciones duras, o declara el problema no factible con la causa. No completa ni corrige la entrada. Para la misma entrada el resultado es reproducible.
+- **Comportamiento.** O encuentra una solución que respeta *todas* las restricciones duras, o declara el problema no factible **con la causa cuando una categoría la explica y sin atribuirla cuando ninguna aplica**. No completa ni corrige la entrada. Para la misma entrada el resultado es reproducible.
 
 ### 7.1. Qué garantiza (invariantes)
 
@@ -61,7 +61,7 @@ El solver es la única pieza que decide el horario. Esta sección fija su contra
 2. **Horas de la materia-curso.** Cada materia-curso recibe exactamente sus **horas académicas semanales en bloques** (1 hora académica = 1 bloque).
 3. **Sin solapamientos.** Ni un curso, ni un profesor, ni un aula tienen dos clases a la vez.
 4. **Turno, plan y año.** Un profesor **no enseña fuera del turno, el plan ni los años que tenga definidos**; un criterio **ausente** se interpreta como **cualquiera**. (Se refiere a los filtros del **profesor**; el turno y el plan del **curso** son obligatorios para generar — ver spec 005.)
-5. **Aula.** Con el modo de aula fija **inactivo**, cada curso ocupa exactamente un aula en cada franja en que tiene clase (la decide el solver); con el modo **activo**, cada curso usa su aula fija.
+5. **Aula.** Toda clase se imparte en un aula cuyo **tipo** coincide con el tipo de aula requerido por su materia. Con el modo de aula fija **inactivo**, el solver elige un aula del tipo requerido en cada franja en que el curso tiene clase; con el modo **activo**, cada curso declara un **aula de referencia**: la usa cuando su tipo coincide, y las clases cuya materia requiere otro tipo se imparten en un aula de ese tipo y el curso **vuelve** a la referencia en las demás. Mientras un curso tiene una clase desplazada en una franja, su aula de referencia queda **vacía y bloqueada** en esa franja. La **exclusividad de aula** rige también las clases desplazadas. El **aula de referencia es siempre del tipo general/ordinario** del centro (el tipo de clave normalizada `aula de estudio`); las aulas de los demás tipos **nunca** quedan reservadas.
 
 ### 7.2. Qué prioriza (función objetivo)
 
@@ -75,17 +75,19 @@ El solver minimiza una penalización entera y **nunca** viola una restricción d
 ### 7.3. Contrato de configuración
 
 - La entrada es un JSON versionado; un preset es una configuración completa y reutilizable.
-- **Cursos:** se identifican por `anio` (entero) y `seccion` (carácter); el nombre se deriva de ellos (`"1ro A"`) y lo calcula **quien muestra**, no el solver. De cada curso se configuran su `plan` (del que se derivan sus materias y horas) y su `num_estudiantes`; su `turno` y su `aula` provienen de los datos del curso. El **modo de aula fija es global** (booleano, por defecto verdadero): activo → cada curso usa su aula fija; inactivo → aulas móviles que decide el solver. El **turno y el plan del curso son obligatorios para generar** (si faltan, la entrada se rechaza); la **asignación automática de turno** se difiere a la spec 006.
+- **Cursos:** se identifican por `anio` (entero) y `seccion` (carácter); el nombre se deriva de ellos (`"1ro A"`) y lo calcula **quien muestra**, no el solver. De cada curso se configuran su `plan` (del que se derivan sus materias y horas) y su `num_estudiantes`; su `turno` y su `aula` provienen de los datos del curso; esa `aula` **debe ser del tipo general/ordinario** (V18). El **modo de aula fija es global** (booleano, por defecto verdadero): activo → el aula del curso es su **aula de referencia** (§7.1.5: desplazamiento y vuelta); inactivo → el solver elige el aula de cada clase. El **turno y el plan del curso son obligatorios para generar** (si faltan, la entrada se rechaza); la **asignación automática de turno** se difiere a la spec 006. La configuración **no** lleva datos que distingan los tipos generales: la convención es el nombre del tipo (clave normalizada `aula de estudio`).
 - **Planes:** la entrada **embebe** los planes de estudio con sus materias y horas, para que el solver no acceda a la base de datos.
 - **Profesores:** además de materias (titular/suplente), turno y plan, tienen `anios` (años a los que pueden dictar; vacío = cualquiera).
-- **Aulas:** se referencian por su **índice** en el pool de aulas, no por nombre; la interfaz y el CSV traducen índice→nombre.
+- **Aulas:** se referencian por su **índice** en el pool de aulas, no por nombre; la interfaz y el CSV traducen índice→nombre. Cada aula declara su **tipo** y cada materia el **tipo de aula requerido**; la igualdad es exacta sobre la **clave normalizada** (sin espacios extremos y sin distinguir mayúsculas), aunque el nombre visible del tipo se conserva.
+- **Eventos:** la entrada lleva los eventos de cada turno (nombre, posición, orden, duración y horario opcional), que el solver ignora; sustituyen a la sección de recesos. La **identidad** del evento no viaja en el contrato.
 - La base define la estructura de cursos con `anio`, `seccion`, `turno` y `aula` (opcional, referencia a un aula), y **sin `nombre` almacenado**; `(anio, seccion)` es único en todo el sistema. La relación persistida curso–materia **no existe**.
 - La **construcción de la entrada** (leer los datos persistidos y el preset y producir el JSON) es responsabilidad de la **spec 005**; el solver **no** accede a la base.
+- La versión del contrato es **2.0**; una configuración `1.0` o sin versión se rechaza.
 
 ### 7.4. Validación previa
 
-Antes de construir el modelo se ejecutan las validaciones V1–V15; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas.
+Antes de construir el modelo se ejecutan las validaciones V1–V18; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas. **V1** espera la sección de **eventos** (no la de recesos); el contenido de V1, V2, V16, V17 y V18 vive en la spec 005 y en la 010.
 
 ### 7.5. Fuera de alcance de este contrato
 
-Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. La **capacidad de aula** y las **horas no cubiertas** podrían volver **como avisos posteriores** (ver spec 002). El receso es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.
+Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. Los avisos de **capacidad de aula** y de **horas no cubiertas** están **retirados por la decisión I2 de la spec 005** (el único aviso vigente del validador de salida es el **exceso de horas del docente**); podrían volver **como avisos posteriores** al solver (ver spec 002). El **evento** de turno es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.

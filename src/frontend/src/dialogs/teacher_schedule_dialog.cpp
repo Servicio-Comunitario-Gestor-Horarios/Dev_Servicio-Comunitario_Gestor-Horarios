@@ -175,10 +175,9 @@ void TeacherScheduleDialog::onScheduleChanged()
 {
     if (m_currentIndex < 0 || m_currentIndex >= m_teacherNames.size()) return;
     m_titleLabel->setText(m_teacherNames[m_currentIndex]);
-    m_subtitleLabel->setText(QString("Docente %1 de %2  ·  %3 clases  ·  %4 horas académicas")
+    m_subtitleLabel->setText(QString("Docente %1 de %2  ·  %3 bloques asignados")
                                  .arg(m_currentIndex + 1)
                                  .arg(m_teacherNames.size())
-                                 .arg(visualBlockCount())
                                  .arg(blockCount()));
 }
 

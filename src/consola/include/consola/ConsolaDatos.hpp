@@ -64,6 +64,7 @@ private:
     void cmdDocentes(const Args& args);
     void cmdAulas(const Args& args);
     void cmdMaterias(const Args& args);
+    void cmdTipos(const Args& args);
     void cmdPlanes(const Args& args);
     void cmdCursos(const Args& args);
     void cmdTurnos(const Args& args);

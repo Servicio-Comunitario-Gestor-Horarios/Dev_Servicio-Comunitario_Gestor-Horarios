@@ -1,4 +1,5 @@
 #include "backend/services/ServicioAula.hpp"
+#include "backend/services/ServicioTiposAula.hpp"
 #include "backend/services/ordenacion.hpp"
 
 #include <QSqlQuery>
@@ -11,6 +12,13 @@
 // ─── Constantes ─────────────────────────────────────────────────────────────
 static constexpr int CAPACIDAD_MINIMA = 1;
 static constexpr int CAPACIDAD_MAXIMA = 500;
+
+/// Columnas del aula con el nombre del tipo resuelto por JOIN.
+static const QString CONSULTA_AULA =
+    QStringLiteral("SELECT a.id AS id, a.nombre AS nombre, a.capacidad AS capacidad, "
+                   "a.edificio AS edificio, a.piso AS piso, "
+                   "a.id_tipo_aula AS id_tipo_aula, t.nombre AS tipo_aula "
+                   "FROM Aulas a LEFT JOIN TiposAula t ON t.id = a.id_tipo_aula");
 
 // ─── AulaDTO ────────────────────────────────────────────────────────────────
 
@@ -33,12 +41,34 @@ bool ServicioAula::validarAula(const QString& nombre, int capacidad, QString& er
     }
 
     if (capacidad < CAPACIDAD_MINIMA) {
-        error = QString("La capacidad debe ser al menos %1.").arg(CAPACIDAD_MINIMA);
+        error = QStringLiteral("La capacidad debe ser al menos %1; se recibió %2.")
+                    .arg(CAPACIDAD_MINIMA)
+                    .arg(capacidad);
         return false;
     }
 
     if (capacidad > CAPACIDAD_MAXIMA) {
-        error = QString("La capacidad no puede exceder %1.").arg(CAPACIDAD_MAXIMA);
+        error = QStringLiteral("La capacidad no puede exceder %1; se recibió %2.")
+                    .arg(CAPACIDAD_MAXIMA)
+                    .arg(capacidad);
+        return false;
+    }
+
+    return true;
+}
+
+bool ServicioAula::validarTipoAula(int idTipoAula, QString& error) const {
+    if (idTipoAula <= 0) {
+        if (tipos_aula::catalogoVacio(m_db)) {
+            error = "No hay tipos de aula registrados. Cree un tipo de aula antes de crear aulas.";
+            return false;
+        }
+        error = "El aula debe tener un tipo de aula (se recibió: sin tipo).";
+        return false;
+    }
+
+    if (!tipos_aula::existe(m_db, idTipoAula)) {
+        error = QStringLiteral("No existe el tipo de aula indicado (id %1).").arg(idTipoAula);
         return false;
     }
 
@@ -52,15 +82,23 @@ AulaDTO ServicioAula::mapearARecord(const QSqlRecord& record) const {
     dto.capacidad = record.value("capacidad").toInt();
     dto.edificio = record.value("edificio").toString();
     dto.piso = record.value("piso").toString();
+    const QVariant tipo = record.value("id_tipo_aula");
+    dto.idTipoAula = tipo.isNull() ? -1 : tipo.toInt();
+    dto.tipoAula = record.value("tipo_aula").toString();
     return dto;
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────
 
 Resultado<AulaDTO> ServicioAula::crearAula(const QString& nombre, int capacidad,
-                                           const QString& edificio, const QString& piso) {
+                                           const QString& edificio, const QString& piso,
+                                           int idTipoAula) {
     QString error;
     if (!validarAula(nombre, capacidad, error)) {
+        return Resultado<AulaDTO>::error(error);
+    }
+
+    if (!validarTipoAula(idTipoAula, error)) {
         return Resultado<AulaDTO>::error(error);
     }
 
@@ -74,13 +112,14 @@ Resultado<AulaDTO> ServicioAula::crearAula(const QString& nombre, int capacidad,
 
     QSqlQuery query(m_db);
     query.prepare(
-        "INSERT INTO Aulas (nombre, capacidad, edificio, piso) "
-        "VALUES (:nombre, :capacidad, :edificio, :piso)"
+        "INSERT INTO Aulas (nombre, capacidad, edificio, piso, id_tipo_aula) "
+        "VALUES (:nombre, :capacidad, :edificio, :piso, :id_tipo_aula)"
     );
     query.bindValue(":nombre", nombre.trimmed());
     query.bindValue(":capacidad", capacidad);
     query.bindValue(":edificio", edificio.trimmed());
     query.bindValue(":piso", piso.trimmed());
+    query.bindValue(":id_tipo_aula", idTipoAula);
 
     if (!query.exec()) {
         if (query.lastError().text().contains("UNIQUE")) {
@@ -100,7 +139,7 @@ Resultado<AulaDTO> ServicioAula::obtenerAula(int id) const {
     }
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, capacidad, edificio, piso FROM Aulas WHERE id = :id");
+    query.prepare(CONSULTA_AULA + QStringLiteral(" WHERE a.id = :id"));
     query.bindValue(":id", id);
 
     if (!query.exec()) {
@@ -119,7 +158,7 @@ Resultado<QVector<AulaDTO>> ServicioAula::listarAulas() const {
     QVector<AulaDTO> resultados;
 
     QSqlQuery query(m_db);
-    query.prepare("SELECT id, nombre, capacidad, edificio, piso FROM Aulas ORDER BY nombre");
+    query.prepare(CONSULTA_AULA + QStringLiteral(" ORDER BY a.nombre"));
 
     if (!query.exec()) {
         qCritical() << "Error al listar aulas:" << query.lastError().text();
@@ -141,9 +180,14 @@ Resultado<QVector<AulaDTO>> ServicioAula::listarAulas() const {
 }
 
 Resultado<AulaDTO> ServicioAula::actualizarAula(int id, const QString& nombre, int capacidad,
-                                                const QString& edificio, const QString& piso) {
+                                                const QString& edificio, const QString& piso,
+                                                int idTipoAula) {
     QString error;
     if (!validarAula(nombre, capacidad, error)) {
+        return Resultado<AulaDTO>::error(error);
+    }
+
+    if (!validarTipoAula(idTipoAula, error)) {
         return Resultado<AulaDTO>::error(error);
     }
 
@@ -154,6 +198,7 @@ Resultado<AulaDTO> ServicioAula::actualizarAula(int id, const QString& nombre, i
         "capacidad = :capacidad, "
         "edificio = :edificio, "
         "piso = :piso, "
+        "id_tipo_aula = :id_tipo_aula, "
         "fecha_modificacion = CURRENT_TIMESTAMP "
         "WHERE id = :id"
     );
@@ -161,6 +206,7 @@ Resultado<AulaDTO> ServicioAula::actualizarAula(int id, const QString& nombre, i
     query.bindValue(":capacidad", capacidad);
     query.bindValue(":edificio", edificio.trimmed());
     query.bindValue(":piso", piso.trimmed());
+    query.bindValue(":id_tipo_aula", idTipoAula);
     query.bindValue(":id", id);
 
     if (!query.exec()) {

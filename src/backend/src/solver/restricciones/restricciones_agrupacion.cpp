@@ -8,14 +8,14 @@
 using namespace operations_research::sat;
 
 /**
- * @brief Restricciones de agrupación S3.
+ * @brief Restricciones de agrupaciÃ³n S3.
  *
- * Formulación eficiente y exacta de la penalización por fragmentación:
- *   - isolated[s] = 1  ⇔  hay clase en s y NO en s-1 ni en s+1 (grupo de 1).
- *   - longGroup[s] = 1 ⇔  hay clase en s, s-1, s-2 y s-3 (4.ª franja o posterior).
+ * FormulaciÃ³n eficiente y exacta de la penalizaciÃ³n por fragmentaciÃ³n:
+ *   - isolated[s] = 1  â‡”  hay clase en s y NO en s-1 ni en s+1 (grupo de 1).
+ *   - longGroup[s] = 1 â‡”  hay clase en s, s-1, s-2 y s-3 (4.Âª franja o posterior).
  *
  * El objetivo suma `isolated + longGroup`, que equivale a f(len) de RF-2:
- *   len == 1 → 1; len == 2,3 → 0; len >= 4 → len − 3.
+ *   len == 1 â†’ 1; len == 2,3 â†’ 0; len >= 4 â†’ len âˆ’ 3.
  *
  * Los vecinos que no existen (sin ninguna x) se tratan como ausencia de clase.
  */
@@ -27,7 +27,7 @@ void agregarRestriccionesAgrupacion(
 
     QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
     for (const TurnoConfig& t : config.turnos.turnos)
-        segmentosPorTurno[t.nombre] = segmentosTurno(t, config.recesos);
+        segmentosPorTurno[t.nombre] = segmentosTurno(t, config.eventos);
 
     for (int c = 0; c < dim.num_cursos; ++c) {
         const CursoSolverConfig& curso = config.cursos[c];
@@ -42,7 +42,7 @@ void agregarRestriccionesAgrupacion(
                     const QVector<int>& franjas = segs[seg];
                     if (franjas.isEmpty()) continue;
 
-                    // ── hay[s] = OR de las x de la materia en esa franja ──
+                    // â”€â”€ hay[s] = OR de las x de la materia en esa franja â”€â”€
                     QVector<BoolVar> hays(franjas.size());
                     QVector<bool> existe(franjas.size(), false);
 
@@ -69,20 +69,20 @@ void agregarRestriccionesAgrupacion(
                         existe[i] = true;
                     }
 
-                    // ── isolated y longGroup por franja ──
+                    // â”€â”€ isolated y longGroup por franja â”€â”€
                     for (int i = 0; i < franjas.size(); ++i) {
                         if (!existe[i]) continue;
                         const auto key = std::make_tuple(m, c, d, seg, franjas[i]);
                         BoolVar hay = hays[i];
                         BoolVar iso = vars.isolated[key];
 
-                        // isolated ⇒ hay
+                        // isolated â‡’ hay
                         model.AddImplication(iso, hay);
-                        // isolated ⇒ ¬prev (si existe)
+                        // isolated â‡’ Â¬prev (si existe)
                         if (i > 0 && existe[i - 1]) model.AddImplication(iso, ~hays[i - 1]);
-                        // isolated ⇒ ¬next (si existe)
+                        // isolated â‡’ Â¬next (si existe)
                         if (i + 1 < franjas.size() && existe[i + 1]) model.AddImplication(iso, ~hays[i + 1]);
-                        // (hay ∧ ¬prev ∧ ¬next) ⇒ isolated
+                        // (hay âˆ§ Â¬prev âˆ§ Â¬next) â‡’ isolated
                         {
                             std::vector<BoolVar> rev = {~hay, iso};
                             if (i > 0 && existe[i - 1]) rev.push_back(hays[i - 1]);

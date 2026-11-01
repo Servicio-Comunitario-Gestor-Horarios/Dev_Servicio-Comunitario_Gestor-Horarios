@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include <backend/database/apertura_base_datos.hpp>
 #include <backend/database/respaldo.hpp>
 #include <seed/sembrador.hpp>
 
@@ -81,6 +82,28 @@ class TestSeedAplicacion : public QObject {
 private:
     int m_contador = 0;
 
+    /// Inserta un docente y una preferencia directamente (la siembra no las crea) para
+    /// comprobar que los borrados del seed respetan la FK y que el rollback las conserva.
+    void preinsertarPreferencia(const QString& ruta)
+    {
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+
+        QSqlQuery docente(db);
+        QVERIFY2(docente.exec("INSERT INTO Profesores (id, nombre, email) "
+                              "VALUES ('P-PREF', 'Docente Pref', 'pref@centro.edu')"),
+                 qPrintable(docente.lastError().text()));
+
+        QSqlQuery preferencia(db);
+        QVERIFY2(preferencia.exec(
+                     "INSERT INTO Preferencia_Profesor "
+                     "(id_Profesor, dia, hora_inicio, hora_fin, sentido) "
+                     "VALUES ('P-PREF', '1', '08:00', '10:00', 'preferida')"),
+                 qPrintable(preferencia.lastError().text()));
+
+        cerrarInspeccion(db);
+    }
+
 private slots:
     void creaBaseNuevaYPuebla()
     {
@@ -98,7 +121,8 @@ private slots:
         // Recuentos completos del conjunto (RF-12): la variante por defecto es la holgada
         // (65 docentes, 65 asignaciones y 325 disponibilidades = 65 × 5).
         QCOMPARE(resultado.recuentos.turnos, 2);
-        QCOMPARE(resultado.recuentos.recesos, 2);
+        QCOMPARE(resultado.recuentos.eventos, 2);
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
         QCOMPARE(resultado.recuentos.aulas, 16);
         QCOMPARE(resultado.recuentos.materias, 57);
         QCOMPARE(resultado.recuentos.planes, 4);
@@ -108,27 +132,85 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 65);
         QCOMPARE(resultado.recuentos.disponibilidades, 325);
 
+        // El conjunto no siembra preferencias (RF-7): recuento 0 y tabla vacía.
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
+        // La configuración global se asegura en 35 con una sola fila (RF-8) y el resultado
+        // informa el valor efectivo y su recuento.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+
         // Inspección directa de la base.
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
 
-        // Recesos exactos (RF-4): (Mañana, 2, 08:20, 08:30) y (Tarde, 2, 14:00, 14:10).
-        QCOMPARE(contar(db, QStringLiteral("Recesos")), 2);
-        QSqlQuery recesos(db);
-        QVERIFY(recesos.exec(
-            "SELECT turno, despues_de_slot, inicio, fin FROM Recesos ORDER BY inicio"));
+        // Turnos (RF-4, RF-8): 8 franjas de 35 min y ventana 07:00–11:50 / 12:40–17:30
+        // (8 × 35 + los 10 min del receso = 290).
+        {
+            QSqlQuery turnos(db);
+            QVERIFY2(turnos.exec("SELECT nombre, inicio, fin, slots FROM Turnos ORDER BY nombre"),
+                     qPrintable(turnos.lastError().text()));
+            QVector<QStringList> filasTurnos;
+            while (turnos.next()) {
+                filasTurnos.append({turnos.value(0).toString(), turnos.value(1).toString(),
+                                    turnos.value(2).toString(), turnos.value(3).toString()});
+            }
+            QCOMPARE(filasTurnos.size(), 2);
+            QCOMPARE(filasTurnos[0], QStringList({"Mañana", "07:00", "11:50", "8"}));
+            QCOMPARE(filasTurnos[1], QStringList({"Tarde", "12:40", "17:30", "8"}));
+        }
+
+        // Configuración global (RF-8): una sola fila `(1, 35)`, idempotente.
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
+        {
+            QSqlQuery config(db);
+            QVERIFY(config.exec("SELECT id, duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 1);
+            QCOMPARE(config.value(1).toInt(), 35);
+            QVERIFY(!config.next());
+        }
+
+        // Tipos de aula (RF-5/RF-10): catálogo de 3 y todas las aulas y materias con un tipo
+        // existente (nunca NULL ni huérfano).
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3);
+        for (const char* tabla : {"Aulas", "Materias"}) {
+            const QString nombre = QString::fromLatin1(tabla);
+            QSqlQuery conTipo(db);
+            QVERIFY2(conTipo.exec(QStringLiteral("SELECT COUNT(*) FROM %1 x "
+                                                 "JOIN TiposAula t ON t.id = x.id_tipo_aula")
+                                      .arg(nombre)),
+                     qPrintable(conTipo.lastError().text()));
+            QVERIFY(conTipo.next());
+            QCOMPARE(conTipo.value(0).toInt(), contar(db, nombre));
+        }
+
+        // Eventos exactos (RF-1): un «Receso» por turno, posición 2, orden 1, 10 min.
+        QCOMPARE(contar(db, QStringLiteral("Eventos")), 2);
+        QSqlQuery eventos(db);
+        QVERIFY(eventos.exec(
+            "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin "
+            "FROM Eventos ORDER BY turno"));
         QVector<QStringList> filas;
-        while (recesos.next()) {
-            filas.append({recesos.value(0).toString(), recesos.value(1).toString(),
-                          recesos.value(2).toString(), recesos.value(3).toString()});
+        while (eventos.next()) {
+            QStringList fila;
+            for (int i = 0; i < 7; ++i) {
+                fila.append(eventos.value(i).toString());
+            }
+            filas.append(fila);
         }
         QCOMPARE(filas.size(), 2);
-        const QStringList recesoManana{QStringLiteral("Mañana"), QStringLiteral("2"),
-                                       QStringLiteral("08:20"), QStringLiteral("08:30")};
-        const QStringList recesoTarde{QStringLiteral("Tarde"), QStringLiteral("2"),
-                                      QStringLiteral("14:00"), QStringLiteral("14:10")};
-        QCOMPARE(filas[0], recesoManana);
-        QCOMPARE(filas[1], recesoTarde);
+        const QStringList eventoManana{QStringLiteral("Mañana"), QStringLiteral("Receso"),
+                                       QStringLiteral("2"),      QStringLiteral("1"),
+                                       QStringLiteral("10"),     QStringLiteral("08:10"),
+                                       QStringLiteral("08:20")};
+        const QStringList eventoTarde{QStringLiteral("Tarde"), QStringLiteral("Receso"),
+                                      QStringLiteral("2"),     QStringLiteral("1"),
+                                      QStringLiteral("10"),    QStringLiteral("13:50"),
+                                      QStringLiteral("14:00")};
+        QCOMPARE(filas[0], eventoManana);
+        QCOMPARE(filas[1], eventoTarde);
 
         // 13 cursos con turno NULL y un aula distinta cada uno (RF-4, RF-5).
         QSqlQuery cursos(db);
@@ -174,7 +256,8 @@ private slots:
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
         QCOMPARE(contar(db, QStringLiteral("Turnos")), 2);
-        QCOMPARE(contar(db, QStringLiteral("Recesos")), 2);
+        QCOMPARE(contar(db, QStringLiteral("Eventos")), 2);
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3);
         QCOMPARE(contar(db, QStringLiteral("Aulas")), 16);
         QCOMPARE(contar(db, QStringLiteral("Materias")), 57);
         QCOMPARE(contar(db, QStringLiteral("PlanEstudio_Materia")), 210);
@@ -240,9 +323,18 @@ private slots:
             const char* sql;
         } kComparaciones[] = {
             {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
-            {"Recesos", "SELECT turno, despues_de_slot, duracion, inicio, fin FROM Recesos"},
-            {"Aulas", "SELECT nombre, capacidad, edificio, piso FROM Aulas"},
-            {"Materias", "SELECT nombre, requisitos FROM Materias"},
+            {"ConfiguracionHoraria", "SELECT id, duracion_minutos FROM ConfiguracionHoraria"},
+            {"Preferencia_Profesor",
+             "SELECT id_Profesor, dia, hora_inicio, hora_fin, sentido FROM Preferencia_Profesor"},
+            {"TiposAula", "SELECT nombre, clave FROM TiposAula"},
+            {"Eventos",
+             "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin FROM Eventos"},
+            {"Aulas",
+             "SELECT a.nombre, a.capacidad, a.edificio, a.piso, t.nombre "
+             "FROM Aulas a JOIN TiposAula t ON t.id = a.id_tipo_aula"},
+            {"Materias",
+             "SELECT m.nombre, m.requisitos, t.nombre "
+             "FROM Materias m JOIN TiposAula t ON t.id = m.id_tipo_aula"},
             {"PlanEstudio", "SELECT codigo, nombre, descripcion FROM PlanEstudio"},
             {"PlanEstudio_Materia",
              "SELECT codigo_PlanEstudio, id_Materia, curso, horas FROM PlanEstudio_Materia"},
@@ -280,15 +372,26 @@ private slots:
         QVERIFY(!resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
 
-        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 10 tablas.
+        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 12 tablas de
+        // dominio del esquema v5.
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
         const char* const kTablas[] = {
-            "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
-            "Turnos", "Recesos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+            "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
+            "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
+            "Preferencia_Profesor",
         };
         for (const char* tabla : kTablas) {
             QCOMPARE(contar(db, QString::fromLatin1(tabla)), 0);
+        }
+        // La fila de configuración la deja la creación del esquema (fuera de la transacción)
+        // y el rollback no la duplica: sigue habiendo una con 35 (RF-2, RF-8).
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        {
+            QSqlQuery config(db);
+            QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 35);
         }
         cerrarInspeccion(db);
     }
@@ -357,6 +460,72 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 65);
         QCOMPARE(resultado.recuentos.disponibilidades, 325);
         QCOMPARE(resultado.recuentos.planMaterias, 210);
+        QCOMPARE(resultado.recuentos.eventos, 2);
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
+
+        // El reemplazo no duplica ni borra la configuración: sigue habiendo una fila con 35.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("ConfiguracionHoraria")), 1);
+        QSqlQuery config(db);
+        QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+        QVERIFY(config.next());
+        QCOMPARE(config.value(0).toInt(), 35);
+        cerrarInspeccion(db);
+    }
+
+    void reemplazoTotalConCursosAsignados()
+    {
+        // El vaciado del reemplazo va en orden FK-seguro: los cursos pueden apuntar a un
+        // turno y a un aula (RF-10), de modo que Cursos debe borrarse antes que Turnos y
+        // Aulas, y Eventos antes que Turnos, o SQLite rechaza el DELETE por la FK.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion inicial = aplicar(opciones);
+        QVERIFY2(inicial.ok(), qPrintable(inicial.detalle));
+
+        // Asignación directa de turno y aula a todos los cursos, como haría la interfaz.
+        {
+            QSqlDatabase asignacion = abrirInspeccion(ruta, m_contador);
+            QVERIFY(asignacion.isOpen());
+            QSqlQuery query(asignacion);
+            QVERIFY2(query.exec("UPDATE Cursos SET turno = 'Mañana', "
+                                "aula = (SELECT MIN(id) FROM Aulas)"),
+                     qPrintable(query.lastError().text()));
+            QCOMPARE(contar(asignacion, QStringLiteral("Cursos")), 13);
+            cerrarInspeccion(asignacion);
+        }
+
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 17), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+        QCOMPARE(resultado.recuentos.cursos, 13);
+        QCOMPARE(resultado.recuentos.eventos, 2);
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
+
+        // La base queda repoblada como una siembra nueva: cursos sin turno, eventos y tipos.
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Cursos")), 13);
+        QCOMPARE(contar(db, QStringLiteral("Eventos")), 2);
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3);
+        QSqlQuery cursos(db);
+        QVERIFY(cursos.exec("SELECT COUNT(*) FROM Cursos WHERE turno IS NULL"));
+        QVERIFY(cursos.next());
+        QCOMPARE(cursos.value(0).toInt(), 13);
+        cerrarInspeccion(db);
     }
 
     void reemplazoTotalSinConfirmacion()
@@ -411,16 +580,22 @@ private slots:
             const char* sql;
         } kNoDocentes[] = {
             {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
-            {"Recesos", "SELECT turno, despues_de_slot, duracion, inicio, fin FROM Recesos"},
-            {"Aulas", "SELECT nombre, capacidad, edificio, piso FROM Aulas"},
-            {"Materias", "SELECT nombre, requisitos FROM Materias"},
+            {"TiposAula", "SELECT nombre, clave FROM TiposAula"},
+            {"Eventos",
+             "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin FROM Eventos"},
+            {"Aulas",
+             "SELECT a.nombre, a.capacidad, a.edificio, a.piso, t.nombre "
+             "FROM Aulas a JOIN TiposAula t ON t.id = a.id_tipo_aula"},
+            {"Materias",
+             "SELECT m.nombre, m.requisitos, t.nombre "
+             "FROM Materias m JOIN TiposAula t ON t.id = m.id_tipo_aula"},
             {"PlanEstudio", "SELECT codigo, nombre, descripcion FROM PlanEstudio"},
             {"PlanEstudio_Materia",
              "SELECT codigo_PlanEstudio, id_Materia, curso, horas FROM PlanEstudio_Materia"},
             {"Cursos", "SELECT anio, seccion, turno, aula FROM Cursos"},
         };
-        QStringList antesFilas[7];
-        for (int i = 0; i < 7; ++i) {
+        QStringList antesFilas[8];
+        for (int i = 0; i < 8; ++i) {
             antesFilas[i] = filasDe(antes, QString::fromLatin1(kNoDocentes[i].sql));
         }
         QCOMPARE(contar(antes, QStringLiteral("Profesores")), 65);
@@ -441,10 +616,14 @@ private slots:
         QCOMPARE(resultado.recuentos.asignaciones, 57);
         QCOMPARE(resultado.recuentos.disponibilidades, 215);
 
+        // La conmutación también asegura la configuración: una fila con 35, sin duplicar.
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+
         QSqlDatabase despues = abrirInspeccion(ruta, m_contador);
         QVERIFY(despues.isOpen());
-        // El resto de tablas queda idéntico (incluidas las 210 cargas).
-        for (int i = 0; i < 7; ++i) {
+        // El resto de tablas queda idéntico (incluidas las 210 cargas, los tipos y los eventos).
+        for (int i = 0; i < 8; ++i) {
             const QStringList filas = filasDe(despues, QString::fromLatin1(kNoDocentes[i].sql));
             QVERIFY2(filas == antesFilas[i],
                      qPrintable(QStringLiteral("La tabla %1 cambió durante «--solo-docentes».")
@@ -452,7 +631,138 @@ private slots:
         }
         QCOMPARE(contar(despues, QStringLiteral("PlanEstudio_Materia")), 210);
         QCOMPARE(contar(despues, QStringLiteral("Profesores")), 43);
+        QCOMPARE(contar(despues, QStringLiteral("ConfiguracionHoraria")), 1);
+        {
+            QSqlQuery config(despues);
+            QVERIFY(config.exec("SELECT duracion_minutos FROM ConfiguracionHoraria"));
+            QVERIFY(config.next());
+            QCOMPARE(config.value(0).toInt(), 35);
+        }
         cerrarInspeccion(despues);
+    }
+
+    void baseRecienCreadaSoloConConfiguracionSeSiembraSinReemplazar()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        // Una base recién creada solo tiene el esquema y su fila de configuración: la
+        // configuración no es dato de dominio y no bloquea la siembra (RF-8).
+        QCOMPARE(AperturaBaseDatos::abrir(ruta).estado, AperturaBaseDatos::Estado::OkCreada);
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion resultado = aplicar(opciones);
+
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+        QCOMPARE(resultado.duracionMinutos, 35);
+        QCOMPARE(resultado.configuraciones, 1);
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+        QCOMPARE(resultado.recuentos.turnos, 2);
+    }
+
+    void resumenTexto_incluyeLaHoraAcademicaYSuRecuento()
+    {
+        const QString resumen = resumenTexto(perfilPorDefecto(), VarianteDocentes::Holgada,
+                                             Recuentos{}, 35, 1);
+
+        QVERIFY2(resumen.contains(QStringLiteral("35 min")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("configuraciones: 1")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Preferencias: 0")), qPrintable(resumen));
+    }
+
+    void soloDocentes_conPreferenciaPreinsertada_borraSinFallarPorFK()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        // Sin borrar la preferencia antes que el docente, SQLite rechaza el DELETE por FK.
+        OpcionesAplicacion conmutacion;
+        conmutacion.rutaDb = ruta;
+        conmutacion.soloDocentes = true;
+        conmutacion.confirmado = true;
+        conmutacion.variante = VarianteDocentes::Suplentes;
+        conmutacion.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(conmutacion);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 43);   // variante suplentes
+        cerrarInspeccion(db);
+    }
+
+    void reemplazoTotal_conPreferenciaPreinsertada_borraSinFallarPorFK()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.recuentos.preferencias, 0);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 65);   // variante holgada
+        cerrarInspeccion(db);
+    }
+
+    /// Un fallo tras los docentes revierte también la preferencia preinsertada: la variante
+    /// anterior queda completa (RNF-4).
+    void falloSimulado_conPreferenciaPreinsertada_conservaLaVarianteYLaPreferencia()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+        preinsertarPreferencia(ruta);
+
+        OpcionesAplicacion conmutacion;
+        conmutacion.rutaDb = ruta;
+        conmutacion.soloDocentes = true;
+        conmutacion.confirmado = true;
+        conmutacion.variante = VarianteDocentes::Suplentes;
+        conmutacion.simularFalloTrasDocentes = true;
+        conmutacion.ahora = QDateTime(QDate(2026, 10, 29), QTime(12, 0, 0));
+
+        const ResultadoAplicacion resultado = aplicar(conmutacion);
+        QCOMPARE(resultado.estado, EstadoAplicacion::FalloEscritura);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        // La variante anterior (holgada + el docente preinsertado) sigue completa.
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 66);
+        QCOMPARE(contar(db, QStringLiteral("Profesor_Materia")), 65);
+        QCOMPARE(contar(db, QStringLiteral("Disponibilidad_Profesor")), 325);
+        QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 1);
+        cerrarInspeccion(db);
     }
 
     void atomicidadAnteFalloEnReemplazo()

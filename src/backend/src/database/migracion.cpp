@@ -23,6 +23,24 @@ namespace
     {
         QSqlQuery query(db);
 
+        // ── TiposAula (catálogo de tipos de aula) ──
+        // `clave` es la forma normalizada del nombre (recorte + plegado Unicode),
+        // calculada por el servicio; el índice único va sobre ella para frenar
+        // duplicados incluso en escrituras directas («Física»/«FÍSICA»).
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS TiposAula ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "nombre TEXT NOT NULL CHECK(trim(nombre) = nombre AND length(nombre) > 0),"
+            "clave TEXT NOT NULL CHECK(length(clave) > 0),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        if (!ejecutar(query,
+            "CREATE UNIQUE INDEX IF NOT EXISTS TiposAula_clave ON TiposAula(clave)"
+        )) return false;
+
         // ── Aulas ──
         if (!ejecutar(query,
             "CREATE TABLE IF NOT EXISTS Aulas ("
@@ -31,6 +49,7 @@ namespace
             "capacidad INTEGER NOT NULL CHECK(capacidad > 0),"
             "edificio TEXT,"
             "piso TEXT,"
+            "id_tipo_aula INTEGER NOT NULL REFERENCES TiposAula(id),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
@@ -54,6 +73,7 @@ namespace
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "nombre TEXT NOT NULL,"
             "requisitos TEXT,"
+            "id_tipo_aula INTEGER NOT NULL REFERENCES TiposAula(id),"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
@@ -78,6 +98,32 @@ namespace
             "hora_fin TEXT NOT NULL,"
             "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
             "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        // ── Preferencia_Profesor (preferencias horarias del docente) ──
+        // Replica el modelo de la disponibilidad (`dia` y horas como texto `HH:mm`) y
+        // añade el sentido.
+        //
+        // PRECONDICIÓN de `CHECK(hora_inicio < hora_fin)`: las horas se guardan SIEMPRE como
+        // `HH:mm` de 24 h y cero-rellenadas («08:00», nunca «8:00»); solo con ese formato el
+        // orden lexicográfico coincide con el temporal (`08:00 < 10:00`). El `CHECK` es una
+        // barrera contra escrituras directas, **no un parser**: «9:00–10:30» (válido) se
+        // rechazaría y «10:00–9:30» (inválido) pasaría. El formato lo exige la validación de
+        // negocio (`franja_horaria::errorDeFranja`). El `UNIQUE` frena el duplicado exacto;
+        // los solapes los valida el servicio (RF-2).
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS Preferencia_Profesor ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "id_Profesor TEXT NOT NULL REFERENCES Profesores(id),"
+            "dia TEXT NOT NULL CHECK(dia IN ('0','1','2','3','4','5','6')),"
+            "hora_inicio TEXT NOT NULL,"
+            "hora_fin TEXT NOT NULL,"
+            "sentido TEXT NOT NULL CHECK(sentido IN ('preferida','evitada')),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "CHECK(hora_inicio < hora_fin),"
+            "UNIQUE(id_Profesor, dia, hora_inicio, hora_fin, sentido)"
             ")"
         )) return false;
 
@@ -117,16 +163,43 @@ namespace
             ")"
         )) return false;
 
-        // ── Recesos (un receso pertenece a un turno) ──
+        // ── Eventos (recesos, actos cívicos y sucesos del turno) ──
+        // Identidad propia (`id`) y orden persistente dentro de la posición; varios
+        // eventos caben tras la misma franja. Las horas son un par opcional: o
+        // ambas o ninguna (NULL), nunca cadena vacía.
         if (!ejecutar(query,
-            "CREATE TABLE IF NOT EXISTS Recesos ("
+            "CREATE TABLE IF NOT EXISTS Eventos ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "nombre TEXT NOT NULL CHECK(length(trim(nombre)) > 0),"
             "turno TEXT NOT NULL REFERENCES Turnos(nombre),"
-            "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 0),"
+            "despues_de_slot INTEGER NOT NULL CHECK(despues_de_slot >= 1),"
+            "orden INTEGER NOT NULL CHECK(orden >= 1),"
             "duracion INTEGER NOT NULL CHECK(duracion > 0),"
             "inicio TEXT,"
             "fin TEXT,"
-            "PRIMARY KEY (turno, despues_de_slot)"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "CHECK((inicio IS NULL) = (fin IS NULL)),"
+            "UNIQUE(turno, despues_de_slot, orden)"
             ")"
+        )) return false;
+
+        // ── ConfiguracionHoraria (configuración global de la hora académica) ──
+        // Una sola fila (`CHECK(id = 1)`) con la duración en minutos; el rango
+        // 30–90 es la última barrera para escrituras directas (la validación de
+        // negocio es la de `duracion_horaria`). La creación deja el valor por
+        // defecto de 35 minutos (spec 011, RF-1 y RF-2).
+        if (!ejecutar(query,
+            "CREATE TABLE IF NOT EXISTS ConfiguracionHoraria ("
+            "id INTEGER PRIMARY KEY CHECK(id = 1),"
+            "duracion_minutos INTEGER NOT NULL CHECK(duracion_minutos BETWEEN 30 AND 90),"
+            "fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+            "fecha_modificacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        )) return false;
+
+        if (!ejecutar(query,
+            "INSERT OR IGNORE INTO ConfiguracionHoraria (id, duracion_minutos) VALUES (1, 35)"
         )) return false;
 
         // ── Cursos ──

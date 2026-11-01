@@ -1,13 +1,18 @@
 #include "backend/services/ServicioGeneracion.hpp"
 
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/services/ValidadorEntradaSolver.hpp"
 
 #include <QCryptographicHash>
 #include <QTimer>
 
-QString huellaDatos(const DatosDominio& datos)
+QString huellaDatos(const DatosDominio& datos, int duracionMinutos)
 {
     QString canon;
+
+    // La hora académica entra en la huella (RF-6): un cambio de D entre el envío y la
+    // respuesta marca «datos anteriores».
+    canon += QStringLiteral("dur:%1;").arg(duracionMinutos);
 
     for (const ProfesorDTO& d : datos.docentes)
     {
@@ -21,9 +26,13 @@ QString huellaDatos(const DatosDominio& datos)
             canon += QStringLiteral("mat:%1;").arg(m.id);
     }
     for (const AulaDTO& a : datos.aulas)
-        canon += QStringLiteral("A:%1|%2|%3;").arg(a.id).arg(a.nombre).arg(a.capacidad);
+        canon += QStringLiteral("A:%1|%2|%3|%4;")
+                     .arg(a.id)
+                     .arg(a.nombre)
+                     .arg(a.capacidad)
+                     .arg(a.idTipoAula);
     for (const MateriaDTO& m : datos.materias)
-        canon += QStringLiteral("M:%1|%2;").arg(m.id).arg(m.nombre);
+        canon += QStringLiteral("M:%1|%2|%3;").arg(m.id).arg(m.nombre).arg(m.idTipoAula);
     for (const PlanEstudio& p : datos.planes)
     {
         canon += QStringLiteral("P:%1|%2;").arg(p.codigo, p.nombre);
@@ -47,8 +56,17 @@ QString huellaDatos(const DatosDominio& datos)
                      .arg(t.inicio.toString(QStringLiteral("HH:mm")),
                           t.fin.toString(QStringLiteral("HH:mm")))
                      .arg(t.numSlots);
-        for (const RecesoDTO& r : t.recesos)
-            canon += QStringLiteral("r:%1,%2;").arg(r.despuesDeSlot).arg(r.duracion);
+        for (const EventoDTO& e : t.eventos)
+            canon += QStringLiteral("e:%1|%2|%3|%4|%5|%6|%7;")
+                         .arg(e.id)
+                         .arg(e.nombre)
+                         .arg(e.despuesDeSlot)
+                         .arg(e.orden)
+                         .arg(e.duracion)
+                         .arg(e.inicio.isValid() ? e.inicio.toString(QStringLiteral("HH:mm"))
+                                                 : QString(),
+                              e.fin.isValid() ? e.fin.toString(QStringLiteral("HH:mm"))
+                                              : QString());
     }
 
     return QString::fromLatin1(

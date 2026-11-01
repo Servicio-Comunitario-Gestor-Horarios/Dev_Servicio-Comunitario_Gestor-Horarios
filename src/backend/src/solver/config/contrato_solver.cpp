@@ -28,6 +28,16 @@ QString claveCurso(int anio, const QString& seccion) {
     return QStringLiteral("%1|%2").arg(anio).arg(seccion);
 }
 
+QString claveTipo(const QString& nombre) {
+    return nombre.trimmed().toCaseFolded();
+}
+
+QString tipoGeneralAula() {
+    // Convención fija por nombre (decisión del 2026-10-26): no hay columna, sección de contrato ni
+    // consulta a la base. V18 y las cuentas de capacidad la reconocen con `claveTipo`.
+    return QStringLiteral("Aula de estudio");
+}
+
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig &config, const CursoSolverConfig &curso){
     for (const PlanSolverConfig& plan : config.planes) {
         if (plan.codigo != curso.plan) {
@@ -45,14 +55,63 @@ QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig &config, const Cu
     return {};
 }
 
-namespace {
-    /// Slots declarados por el turno `nombre`, o vacío si no existe.
-    QVector<int> slotsDelTurno(const SolverConfig& config, const QString& nombre) {
-        for (const TurnoConfig& t : config.turnos.turnos)
-            if (t.nombre == nombre)
-                return t.slot;
-        return {};
+QVector<int> slotsTurno(const SolverConfig& config, const QString& turno) {
+    for (const TurnoConfig& t : config.turnos.turnos)
+        if (t.nombre == turno)
+            return t.slot;
+    return {};
+}
+
+QSet<FranjaSemana> franjasDelCurso(const SolverConfig& config, const CursoSolverConfig& curso) {
+    QSet<FranjaSemana> franjas;
+    const QVector<int> slotsDelCurso = slotsTurno(config, curso.turno);
+    for (int d = 0; d < config.dimensiones.num_dias; ++d)
+        for (int s : slotsDelCurso)
+            franjas.insert(FranjaSemana{d, s});
+    return franjas;
+}
+
+int franjasSemanales(const SolverConfig& config, const CursoSolverConfig& curso) {
+    return franjasDelCurso(config, curso).size();
+}
+
+QSet<FranjaSemana> franjasDelTipo(const SolverConfig& config, const QString& clave) {
+    QSet<FranjaSemana> franjas;
+    for (const CursoSolverConfig& curso : config.cursos) {
+        bool requiereElTipo = false;
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
+            if (mc.materiaIDx < 0 || mc.materiaIDx >= config.materias.size()) continue;
+            if (claveTipo(config.materias[mc.materiaIDx].tipo) == clave) {
+                requiereElTipo = true;
+                break;
+            }
+        }
+        if (requiereElTipo) franjas.unite(franjasDelCurso(config, curso));
     }
+    return franjas;
+}
+
+int demandaDelTipo(const SolverConfig& config, const QString& clave) {
+    int total = 0;
+    for (const CursoSolverConfig& curso : config.cursos) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
+            if (mc.materiaIDx < 0 || mc.materiaIDx >= config.materias.size()) continue;
+            if (claveTipo(config.materias[mc.materiaIDx].tipo) == clave)
+                total += bloques(mc.horasSemanales, config.franja_horaria.duracion_minutos);
+        }
+    }
+    return total;
+}
+
+int aulasDelTipo(const SolverConfig& config, const QString& clave) {
+    int aulas = 0;
+    for (const AulaSolverConfig& aula : config.aulas)
+        if (claveTipo(aula.tipo) == clave) ++aulas;
+    return aulas;
+}
+
+int capacidadDelTipo(const SolverConfig& config, const QString& clave) {
+    return aulasDelTipo(config, clave) * franjasDelTipo(config, clave).size();
 }
 
 bool docenteOptaPorMateria(const ProfesorSolverConfig& prof, int materiaIDx) {
@@ -65,9 +124,9 @@ bool docenteOptaPorMateria(const ProfesorSolverConfig& prof, int materiaIDx) {
 QVector<int> slotsDisponibles(const SolverConfig& config, const CursoSolverConfig& curso,
                               const ProfesorSolverConfig& prof, int dia) {
     QVector<int> disponibles;
-    const QVector<int> slotsCurso = slotsDelTurno(config, curso.turno);          // D11
+    const QVector<int> slotsCurso = slotsTurno(config, curso.turno);            // D11
     const QVector<int> slotsProfesor =
-        prof.turno.isEmpty() ? QVector<int>() : slotsDelTurno(config, prof.turno);
+        prof.turno.isEmpty() ? QVector<int>() : slotsTurno(config, prof.turno);
 
     QVector<int> dispDia;
     for (const Disponibilidad& disp : prof.disponibilidad)
@@ -91,21 +150,23 @@ bool docenteCandidatoElegible(const SolverConfig& config, const CursoSolverConfi
     return false;
 }
 
-QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<RecesoConfig>& recesos)
+QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<EventoConfig>& eventos)
 {
-    // 1. Obtener recesos de este turno
-    QVector<RecesoConfig> recesosTurno;
-    for (const RecesoConfig& r : recesos)
-        if (r.turno == turno.nombre)
-            recesosTurno.append(r);
+    // 1. Obtener eventos de este turno
+    QVector<EventoConfig> eventosTurno;
+    for (const EventoConfig& e : eventos)
+        if (e.turno == turno.nombre)
+            eventosTurno.append(e);
 
-    // 2. Ordenar recesos por despues_de_slot
-    std::sort(recesosTurno.begin(), recesosTurno.end(),
-              [](const RecesoConfig& a, const RecesoConfig& b) {
-                  return a.despues_de_slot < b.despues_de_slot;
+    // 2. Ordenar eventos por despues_de_slot (y orden dentro de la posición)
+    std::sort(eventosTurno.begin(), eventosTurno.end(),
+              [](const EventoConfig& a, const EventoConfig& b) {
+                  if (a.despues_de_slot != b.despues_de_slot)
+                      return a.despues_de_slot < b.despues_de_slot;
+                  return a.orden < b.orden;
               });
 
-    // 3. Cortar slots por recesos
+    // 3. Cortar slots por eventos
     // `despues_de_slot` es 1-based y RELATIVO al turno: 2 significa "tras la
     // segunda franja del turno". Se convierte a índice 0-based relativo.
     if (turno.slot.isEmpty()) {
@@ -114,8 +175,8 @@ QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<Rec
 
     QVector<QVector<int>> segmentos;
     int inicioRel = 0;  // índice relativo dentro de turno.slot
-    for (const RecesoConfig& r : recesosTurno) {
-        int corteRel = r.despues_de_slot - 1;   // 1-based → 0-based
+    for (const EventoConfig& e : eventosTurno) {
+        int corteRel = e.despues_de_slot - 1;   // 1-based → 0-based
         if (corteRel >= 0 && corteRel < turno.slot.size() && inicioRel <= corteRel) {
             QVector<int> seg;
             for (int i = inicioRel; i <= corteRel; ++i)
@@ -131,7 +192,7 @@ QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<Rec
             seg.append(turno.slot[i]);
         if (!seg.isEmpty()) segmentos.append(seg);
     }
-    // Si no hay recesos, devolver todos los slots
+    // Si no hay eventos, devolver todos los slots
     if (segmentos.isEmpty() && !turno.slot.isEmpty()) {
         segmentos.append(turno.slot);
     }

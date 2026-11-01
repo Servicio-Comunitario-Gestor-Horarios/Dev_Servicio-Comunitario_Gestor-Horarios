@@ -60,11 +60,14 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_profesor(db),
       m_aula(db),
       m_materias(db),
+      m_tipos(db),
       m_planes(db),
       m_carga(db),
       m_composicion(db),
       m_cursos(db),
-      m_turnos(db) {}
+      m_turnos(db),
+      m_configuracion(db),
+      m_preferencias(db) {}
 
 // ─── Docentes ──────────────────────────────────────────────────────────────
 
@@ -129,23 +132,23 @@ Resultado<QVector<AulaDTO>> NucleoDatos::listarAulas() const {
 
 Resultado<AulaDTO> NucleoDatos::crearAula(const QString& nombre, int capacidad,
                                           const QString& edificio,
-                                          const QString& piso) {
+                                          const QString& piso, int idTipoAula) {
     return conPendiente(
         m_pendientes, QStringLiteral("aula"), nombre, TipoOperacion::Alta,
         QStringLiteral("Pendiente de guardar: aula %1").arg(nombre),
-        [this, nombre, capacidad, edificio, piso]() {
-            return m_aula.crearAula(nombre, capacidad, edificio, piso);
+        [this, nombre, capacidad, edificio, piso, idTipoAula]() {
+            return m_aula.crearAula(nombre, capacidad, edificio, piso, idTipoAula);
         });
 }
 
 Resultado<AulaDTO> NucleoDatos::actualizarAula(int id, const QString& nombre,
                                                int capacidad, const QString& edificio,
-                                               const QString& piso) {
+                                               const QString& piso, int idTipoAula) {
     return conPendiente(
         m_pendientes, QStringLiteral("aula"), claveDe(id), TipoOperacion::Modificacion,
         QStringLiteral("Pendiente de guardar: aula %1").arg(nombre),
-        [this, id, nombre, capacidad, edificio, piso]() {
-            return m_aula.actualizarAula(id, nombre, capacidad, edificio, piso);
+        [this, id, nombre, capacidad, edificio, piso, idTipoAula]() {
+            return m_aula.actualizarAula(id, nombre, capacidad, edificio, piso, idTipoAula);
         });
 }
 
@@ -163,22 +166,24 @@ Resultado<QVector<MateriaDTO>> NucleoDatos::listarMaterias() const {
 }
 
 Resultado<MateriaDTO> NucleoDatos::crearMateria(const QString& nombre,
-                                                const QString& requisitos) {
+                                                const QString& requisitos,
+                                                int idTipoAula) {
     return conPendiente(
         m_pendientes, QStringLiteral("materia"), nombre, TipoOperacion::Alta,
         QStringLiteral("Pendiente de guardar: materia %1").arg(nombre),
-        [this, nombre, requisitos]() {
-            return m_materias.crearMateria(nombre, requisitos);
+        [this, nombre, requisitos, idTipoAula]() {
+            return m_materias.crearMateria(nombre, requisitos, idTipoAula);
         });
 }
 
 Resultado<MateriaDTO> NucleoDatos::actualizarMateria(int id, const QString& nombre,
-                                                     const QString& requisitos) {
+                                                     const QString& requisitos,
+                                                     int idTipoAula) {
     return conPendiente(
         m_pendientes, QStringLiteral("materia"), claveDe(id), TipoOperacion::Modificacion,
         QStringLiteral("Pendiente de guardar: materia %1").arg(nombre),
-        [this, id, nombre, requisitos]() {
-            return m_materias.actualizarMateria(id, nombre, requisitos);
+        [this, id, nombre, requisitos, idTipoAula]() {
+            return m_materias.actualizarMateria(id, nombre, requisitos, idTipoAula);
         });
 }
 
@@ -187,6 +192,36 @@ bool NucleoDatos::eliminarMateria(int id) {
         m_pendientes, QStringLiteral("materia"), claveDe(id), TipoOperacion::Baja,
         QStringLiteral("Pendiente de eliminar: materia %1").arg(id),
         [this, id]() { return m_materias.eliminarMateria(id); });
+}
+
+// ─── Tipos de aula ─────────────────────────────────────────────────────────
+
+Resultado<QVector<TipoAulaDTO>> NucleoDatos::listarTiposAula() const {
+    return m_tipos.listarTiposAula();
+}
+
+Resultado<TipoAulaDTO> NucleoDatos::obtenerTipoAula(int id) const {
+    return m_tipos.obtenerTipoAula(id);
+}
+
+Resultado<TipoAulaDTO> NucleoDatos::crearTipoAula(const QString& nombre) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("tipo_aula"), nombre, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: tipo de aula %1").arg(nombre),
+        [this, nombre]() { return m_tipos.crearTipoAula(nombre); });
+}
+
+Resultado<TipoAulaDTO> NucleoDatos::renombrarTipoAula(int id, const QString& nombre) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("tipo_aula"), claveDe(id), TipoOperacion::Modificacion,
+        QStringLiteral("Pendiente de guardar: tipo de aula %1").arg(nombre),
+        [this, id, nombre]() { return m_tipos.renombrarTipoAula(id, nombre); });
+}
+
+Resultado<bool> NucleoDatos::eliminarTipoAula(int id) {
+    // El borrado en uso siempre se rechaza (RF-5): no se registra como pendiente
+    // confirmable, sino que se devuelve el error con los dependientes.
+    return m_tipos.eliminarTipoAula(id);
 }
 
 // ─── Planes de estudio ─────────────────────────────────────────────────────
@@ -274,10 +309,14 @@ bool NucleoDatos::eliminarCurso(int id) {
         [this, id]() { return m_cursos.eliminarCurso(id); });
 }
 
-// ─── Turnos y recesos ──────────────────────────────────────────────────────
+// ─── Turnos y eventos ──────────────────────────────────────────────────────
 
 Resultado<QVector<TurnoDTO>> NucleoDatos::listarTurnos() const {
     return m_turnos.listarTurnos();
+}
+
+Resultado<TurnoDTO> NucleoDatos::obtenerTurno(const QString& nombre) const {
+    return m_turnos.obtenerTurno(nombre);
 }
 
 Resultado<TurnoDTO> NucleoDatos::crearTurno(const QString& nombre, const QTime& inicio,
@@ -292,12 +331,14 @@ Resultado<TurnoDTO> NucleoDatos::crearTurno(const QString& nombre, const QTime& 
 
 Resultado<TurnoDTO> NucleoDatos::actualizarTurno(const QString& nombre,
                                                  const QTime& inicio, const QTime& fin,
-                                                 int numSlots) {
+                                                 int numSlots,
+                                                 bool eliminarEventosFueraDeRango) {
     return conPendiente(
         m_pendientes, QStringLiteral("turno"), nombre, TipoOperacion::Modificacion,
         QStringLiteral("Pendiente de guardar: turno %1").arg(nombre),
-        [this, nombre, inicio, fin, numSlots]() {
-            return m_turnos.actualizarTurno(nombre, inicio, fin, numSlots);
+        [this, nombre, inicio, fin, numSlots, eliminarEventosFueraDeRango]() {
+            return m_turnos.actualizarTurno(nombre, inicio, fin, numSlots,
+                                            eliminarEventosFueraDeRango);
         });
 }
 
@@ -308,24 +349,105 @@ bool NucleoDatos::eliminarTurno(const QString& nombre) {
         [this, nombre]() { return m_turnos.eliminarTurno(nombre); });
 }
 
-Resultado<RecesoDTO> NucleoDatos::agregarReceso(const QString& turno, int despuesDeSlot,
-                                                int duracion, const QTime& inicio,
-                                                const QTime& fin) {
-    const QString clave = QStringLiteral("%1-%2").arg(turno).arg(despuesDeSlot);
+Resultado<EventoDTO> NucleoDatos::agregarEvento(const QString& turno, const QString& nombre,
+                                                     int despuesDeSlot, int duracion,
+                                                     const QTime& inicio, const QTime& fin,
+                                                     int orden) {
+    const QString clave =
+        QStringLiteral("%1-%2-%3").arg(turno).arg(despuesDeSlot).arg(orden);
     return conPendiente(
-        m_pendientes, QStringLiteral("receso"), clave, TipoOperacion::Alta,
-        QStringLiteral("Pendiente de guardar: receso del turno %1").arg(turno),
-        [this, turno, despuesDeSlot, duracion, inicio, fin]() {
-            return m_turnos.agregarReceso(turno, despuesDeSlot, duracion, inicio, fin);
+        m_pendientes, QStringLiteral("evento"), clave, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: evento «%1» del turno %2").arg(nombre, turno),
+        [this, turno, nombre, despuesDeSlot, duracion, inicio, fin, orden]() {
+            return m_turnos.agregarEvento(turno, nombre, despuesDeSlot, duracion,
+                                          inicio, fin, orden);
         });
 }
 
-bool NucleoDatos::eliminarReceso(const QString& turno, int despuesDeSlot) {
-    const QString clave = QStringLiteral("%1-%2").arg(turno).arg(despuesDeSlot);
+Resultado<EventoDTO> NucleoDatos::actualizarEvento(int id, const QString& nombre,
+                                                  int despuesDeSlot, int duracion,
+                                                  const QTime& inicio, const QTime& fin,
+                                                  int orden) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("evento"), claveDe(id), TipoOperacion::Modificacion,
+        QStringLiteral("Pendiente de guardar: evento %1").arg(id),
+        [this, id, nombre, despuesDeSlot, duracion, inicio, fin, orden]() {
+            return m_turnos.actualizarEvento(id, nombre, despuesDeSlot, duracion,
+                                             inicio, fin, orden);
+        });
+}
+
+bool NucleoDatos::eliminarEvento(int id) {
     return conPendienteBool(
-        m_pendientes, QStringLiteral("receso"), clave, TipoOperacion::Baja,
-        QStringLiteral("Pendiente de eliminar: receso del turno %1").arg(turno),
-        [this, turno, despuesDeSlot]() { return m_turnos.eliminarReceso(turno, despuesDeSlot); });
+        m_pendientes, QStringLiteral("evento"), claveDe(id), TipoOperacion::Baja,
+        QStringLiteral("Pendiente de eliminar: evento %1").arg(id),
+        [this, id]() { return m_turnos.eliminarEvento(id); });
+}
+
+Resultado<QVector<EventoDTO>> NucleoDatos::eventosFueraDeRango(const QString& turno,
+                                                               int numSlots) const {
+    return m_turnos.eventosFueraDeRango(turno, numSlots);
+}
+
+// ─── Configuración global de la hora académica (RF-1, RF-2) ────────────────
+
+Resultado<ConfiguracionHoraria> NucleoDatos::configuracionHoraria() const {
+    return m_configuracion.consultar();
+}
+
+Resultado<ConfiguracionHoraria> NucleoDatos::guardarConfiguracionHoraria(
+    int duracionMinutos) {
+    // La configuración es global, no un registro de dominio: no pasa por
+    // `GestorPendientes` (plan §1.2).
+    return m_configuracion.guardar(duracionMinutos);
+}
+
+// ─── Preferencias horarias del docente (RF-3) ──────────────────────────────
+
+Resultado<PreferenciaDTO> NucleoDatos::agregarPreferencia(const QString& idProfesor,
+                                                          const FranjaHoraria& franja,
+                                                          SentidoPreferencia sentido) {
+    const QString clave =
+        QStringLiteral("%1|%2|%3|%4|%5")
+            .arg(idProfesor)
+            .arg(franja.dia)
+            .arg(franja.inicio.toString(QStringLiteral("HH:mm")),
+                 franja.fin.toString(QStringLiteral("HH:mm")), textoDeSentido(sentido));
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), clave, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: preferencia del docente %1").arg(idProfesor),
+        [this, idProfesor, franja, sentido]() {
+            return m_preferencias.agregar(idProfesor, franja, sentido);
+        });
+}
+
+Resultado<QVector<PreferenciaDTO>> NucleoDatos::listarPreferencias(
+    const QString& idProfesor) const {
+    return m_preferencias.listar(idProfesor);
+}
+
+Resultado<PreferenciaDTO> NucleoDatos::actualizarPreferencia(int id, const FranjaHoraria& franja,
+                                                             SentidoPreferencia sentido) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), claveDe(id), TipoOperacion::Modificacion,
+        QStringLiteral("Pendiente de guardar: preferencia %1").arg(id),
+        [this, id, franja, sentido]() {
+            return m_preferencias.actualizar(id, franja, sentido);
+        });
+}
+
+Resultado<bool> NucleoDatos::eliminarPreferencia(int id) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), claveDe(id), TipoOperacion::Baja,
+        QStringLiteral("Pendiente de eliminar: preferencia %1").arg(id),
+        [this, id]() { return m_preferencias.eliminar(id); });
+}
+
+Resultado<int> NucleoDatos::limpiarPreferencias(const QString& idProfesor) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("preferencia"), idProfesor, TipoOperacion::Baja,
+        QStringLiteral("Pendiente de limpiar las preferencias del docente %1").arg(idProfesor),
+        [this, idProfesor]() { return m_preferencias.limpiar(idProfesor); });
 }
 
 // ─── Cambios pendientes y reintento (RF-3) ────────────────────────────────

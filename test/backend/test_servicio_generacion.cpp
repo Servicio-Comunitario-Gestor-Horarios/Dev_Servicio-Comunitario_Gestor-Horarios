@@ -9,6 +9,7 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
+#include <backend/services/ServicioTurnosEventos.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 
 using Estado = ResultadoGeneracion::Estado;
@@ -46,9 +47,11 @@ private:
         DatosDominio d;
 
         MateriaDTO mat; mat.id = 1; mat.nombre = QStringLiteral("Matemática");
+        mat.idTipoAula = 1; mat.tipoAula = QStringLiteral("Aula de estudio");
         d.materias = {mat};
 
         AulaDTO aula; aula.id = 10; aula.nombre = QStringLiteral("A1"); aula.capacidad = 30;
+        aula.idTipoAula = 1; aula.tipoAula = QStringLiteral("Aula de estudio");
         d.aulas = {aula};
 
         TurnoDTO turno;
@@ -84,7 +87,7 @@ private:
     SolverConfig parametros() const
     {
         SolverConfig p;
-        p.version = QStringLiteral("1.0");
+        p.version = QStringLiteral("2.0");
         p.dimensiones.num_dias = 5;
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
@@ -103,8 +106,12 @@ private:
 
     QJsonObject entradaValida() const
     {
-        return construirJsonEntrada(dominio(), parametros(),
-                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const auto resultado = construirJsonEntrada(dominio(), parametros(), 35,
+                                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio())",
+                                       qPrintable(resultado.mensajeError), __FILE__, __LINE__);
+        Q_UNUSED(ok);
+        return resultado.valor;
     }
 
     /// Salida válida: cubre las 2 horas sin solapamientos.
@@ -257,12 +264,73 @@ private slots:
 
     void huellaDatos_esDeterministaYcambiaConLosDatos()
     {
-        const QString h1 = huellaDatos(dominio());
-        QCOMPARE(h1, huellaDatos(dominio()));
+        const QString h1 = huellaDatos(dominio(), 35);
+        QCOMPARE(h1, huellaDatos(dominio(), 35));
 
         DatosDominio modificado = dominio();
         modificado.cursos[0].seccion = QStringLiteral("B");
-        QVERIFY(huellaDatos(modificado) != h1);
+        QVERIFY(huellaDatos(modificado, 35) != h1);
+    }
+
+    void huellaDatos_cambiaConElTipoDeAula()
+    {
+        const QString h1 = huellaDatos(dominio(), 35);
+
+        DatosDominio otraAula = dominio();
+        otraAula.aulas[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraAula, 35) != h1);
+
+        DatosDominio otraMateria = dominio();
+        otraMateria.materias[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraMateria, 35) != h1);
+    }
+
+    void huellaDatos_cambiaConLosEventos()
+    {
+        EventoDTO evento;
+        evento.id = 3;
+        evento.nombre = QStringLiteral("Receso");
+        evento.despuesDeSlot = 2;
+        evento.orden = 1;
+        evento.duracion = 10;
+        evento.inicio = QTime(8, 20);
+        evento.fin = QTime(8, 30);
+
+        DatosDominio sinEventos = dominio();
+        const QString h1 = huellaDatos(sinEventos, 35);
+
+        DatosDominio conEvento = dominio();
+        conEvento.turnos[0].eventos = {evento};
+        const QString h2 = huellaDatos(conEvento, 35);
+        QVERIFY(h2 != h1);
+
+        // El orden persistente del evento también entra en la huella.
+        DatosDominio otroOrden = conEvento;
+        otroOrden.turnos[0].eventos[0].orden = 2;
+        QVERIFY(huellaDatos(otroOrden, 35) != h2);
+    }
+
+    /// La huella incluye la hora académica (RF-6): es estable y distinta con otra D.
+    void huellaDatos_incluyeLaDuracion()
+    {
+        const QString con35 = huellaDatos(dominio(), 35);
+        QCOMPARE(con35, huellaDatos(dominio(), 35));
+        QVERIFY(huellaDatos(dominio(), 45) != con35);
+    }
+
+    /// Un cambio de D entre el envío y la respuesta marca «datos anteriores» (RF-6).
+    void datosAnteriores_siCambiaLaDuracionEntreEnvioYRespuesta()
+    {
+        const DatosDominio d = dominio();
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0, [d]() { return huellaDatos(d, 45); });
+        servicio.generar(entradaValida(), huellaDatos(d, 35));
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::DatosAnteriores);
+        QVERIFY(r.datosAnteriores);
     }
 
     void estamparFechaGeneracion_usaElInstante()

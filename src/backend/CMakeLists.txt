@@ -31,6 +31,7 @@ target_sources(backend PRIVATE
 
 				# Services - Issue #23 (Aulas)
 				src/services/ServicioAula.cpp
+				src/services/ServicioTiposAula.cpp
 
 				# Services - Issue #21 (Materias - usando tablas existentes)
 				src/services/ServicioMaterias.cpp
@@ -42,9 +43,15 @@ target_sources(backend PRIVATE
 				src/services/ServicioConsultaHorario.cpp
 				src/services/ServicioProfesor.cpp
 
-				# Services - Nucleo de datos (Cursos, Turnos/Recesos y fachada)
+				# Services - Nucleo de datos (Cursos, Turnos/Eventos y fachada)
 				src/services/ServicioCursos.cpp
-				src/services/ServicioTurnosRecesos.cpp
+				src/services/ServicioTurnosEventos.cpp
+				src/services/calculo_eventos.cpp
+				src/services/duracion_horaria.cpp
+				src/services/franja_horaria_validacion.cpp
+				src/services/preferencias.cpp
+				src/services/ServicioPreferencias.cpp
+				src/services/ServicioConfiguracionHoraria.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
 				src/services/cascada.cpp

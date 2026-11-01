@@ -57,7 +57,8 @@ void imprimirResumen(QTextStream& salida, const seed::OpcionesAplicacion& opcion
                      const seed::ResultadoAplicacion& resultado) {
     salida << "Base: " << opciones.rutaDb << '\n';
     salida << seed::resumenTexto(seed::perfilPorDefecto(), opciones.variante,
-                                 resultado.recuentos)
+                                 resultado.recuentos, resultado.duracionMinutos,
+                                 resultado.configuraciones)
            << '\n';
     if (resultado.rutaRespaldo.isEmpty()) {
         salida << "Respaldo: no aplica\n";

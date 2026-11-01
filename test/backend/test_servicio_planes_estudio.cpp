@@ -5,6 +5,7 @@
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioPlanesEstudio.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
 
 class TestServicioPlanesEstudio : public QObject {
     Q_OBJECT
@@ -20,9 +21,15 @@ private slots:
         QVERIFY(m_dbManager->isInitialized());
 
         m_servicio.reset(new ServicioPlanesEstudio(m_dbManager->database()));
+
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        m_idTipoAula = tipo.valor.id;
     }
 
     void cleanup() {
+        m_tipos.reset();
         m_servicio.reset();
         m_dbManager->close();
         m_dbManager.reset();
@@ -137,7 +144,9 @@ private slots:
 
         // Crear una materia y asociarla al plan
         QSqlQuery query(m_dbManager->database());
-        query.prepare("INSERT INTO Materias (nombre) VALUES ('Materia Test')");
+        query.prepare("INSERT INTO Materias (nombre, id_tipo_aula) "
+                      "VALUES ('Materia Test', :idTipo)");
+        query.bindValue(":idTipo", m_idTipoAula);
         QVERIFY(query.exec());
         int materiaId = query.lastInsertId().toInt();
 
@@ -172,6 +181,8 @@ private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;
     std::unique_ptr<ServicioPlanesEstudio> m_servicio;
+    std::unique_ptr<ServicioTiposAula> m_tipos;
+    int m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioPlanesEstudio)
