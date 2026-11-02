@@ -143,6 +143,7 @@
 
 - **Preferencias del docente y cierre limpio (2026-11-02):**
   - **Formulario del docente**: tres desplegables **opcionales** —turno, plan de estudio y año preferencial— que no se muestran en la tabla. Se guardan en `QSettings` (`docentes/<id>/{turno,plan,anio}`) y la tabla de docentes de «Generación de horario» los **precarga**; un preset cargado los sobrescribe. Al eliminar el docente se limpian.
+  - **Altas y bajas visibles en Generación**: la tabla de docentes se poblaba solo al arrancar. Ahora `sincronizarDocentes()` la pone al día **al entrar en la vista** (añade y quita filas) conservando los valores ya ajustados de los docentes que siguen; un docente nuevo entra con sus preferencias. Test de regresión en `test_selector_generacion`.
   - **Cierre sin avisos**: `GestorProcesoBackend` marca la parada intencional (`m_deteniendo`) y no emite `backendColapsado` al detener el proceso; además el frontend ignora la señal durante `aboutToQuit`/`closingDown`. Ya no aparece «El proceso de cálculo dejó de responder» (ni su código) al cerrar la aplicación con normalidad.
   - El test de la vista de generación aísla `QSettings` en un INI temporal para no depender de las preferencias de la máquina.
 
