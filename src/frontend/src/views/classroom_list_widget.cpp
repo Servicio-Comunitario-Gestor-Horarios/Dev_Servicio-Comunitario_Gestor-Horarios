@@ -13,6 +13,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QFrame>
 
@@ -52,8 +54,15 @@ void ClassroomListWidget::setupUi() {
     m_registerButton->setCursor(Qt::PointingHandCursor);
     m_registerButton->setStyleSheet("QPushButton { background-color: #1a237e; color: white; font-weight: bold; padding: 10px 20px; border-radius: 6px; font-size: 14px; } QPushButton:hover { background-color: #283593; }");
 
+    m_typesButton = new QPushButton("+ Tipo de aula", this);
+    m_typesButton->setObjectName("ClassroomTypeBtn");
+    m_typesButton->setCursor(Qt::PointingHandCursor);
+    m_typesButton->setStyleSheet("QPushButton { background-color: white; color: #1a237e; font-weight: 600; padding: 10px 18px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #f1f5f9; }");
+    m_typesButton->setToolTip("Agrega un tipo al catálogo; el solver lo usará para exigir aulas de ese tipo");
+
     topSectionLayout->addLayout(textLayout);
     topSectionLayout->addStretch();
+    topSectionLayout->addWidget(m_typesButton, 0, Qt::AlignVCenter);
     topSectionLayout->addWidget(m_registerButton, 0, Qt::AlignVCenter);
 
     // ==========================================
@@ -146,6 +155,7 @@ void ClassroomListWidget::setupUi() {
     mainLayout->addLayout(contentLayout);
 
     connect(m_registerButton, &QPushButton::clicked, this, &ClassroomListWidget::abrirFormularioNuevo);
+    connect(m_typesButton, &QPushButton::clicked, this, &ClassroomListWidget::abrirFormularioNuevoTipo);
 }
 
 // ==========================================
@@ -288,6 +298,34 @@ void ClassroomListWidget::abrirFormularioNuevo() {
     dialogo.exec();
 }
 
+void ClassroomListWidget::abrirFormularioNuevoTipo()
+{
+    if (!m_nucleo)
+        return;
+
+    bool ok = false;
+    const QString nombre = QInputDialog::getText(
+        this, QStringLiteral("Nuevo tipo de aula"),
+        QStringLiteral("Nombre del tipo (por ejemplo, «Taller» o «Cancha»):"),
+        QLineEdit::Normal, QString(), &ok).trimmed();
+
+    if (!ok || nombre.isEmpty())
+        return;
+
+    const auto resultado = m_nucleo->crearTipoAula(nombre);
+    if (!resultado.ok) {
+        QMessageBox::warning(this, QStringLiteral("No se pudo crear el tipo de aula"),
+                             resultado.mensajeError);
+        return;
+    }
+
+    QMessageBox::information(
+        this, QStringLiteral("Tipo de aula agregado"),
+        QStringLiteral("Se agregó el tipo «%1». Ya está disponible al crear o editar "
+                       "aulas y materias, y el solver lo usará para exigir aulas de "
+                       "ese tipo.").arg(resultado.valor.nombre));
+}
+
 // ==========================================
 // TEMA VISUAL (Modo Oscuro / Claro)
 // ==========================================
@@ -310,6 +348,8 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
         for (QLabel *lbl : findChildren<QLabel*>("CardBadge")) {
             lbl->setStyleSheet("background-color: #333333; border-radius: 12px; font-weight: bold; color: #ffffff; border: none; font-size: 12px;");
         }
+
+        if (m_typesButton) m_typesButton->setStyleSheet("QPushButton { background-color: #252525; color: #ffffff; font-weight: 600; padding: 10px 18px; border: 1px solid #3a3a3a; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #333333; }");
 
         if (m_table) {
             m_table->setStyleSheet(
@@ -336,6 +376,8 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
         for (QLabel *lbl : findChildren<QLabel*>("CardBadge")) {
             lbl->setStyleSheet("background-color: #e5e7eb; border-radius: 12px; font-weight: bold; color: #374151; border: none; font-size: 12px;");
         }
+
+        if (m_typesButton) m_typesButton->setStyleSheet("QPushButton { background-color: white; color: #1a237e; font-weight: 600; padding: 10px 18px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #f1f5f9; }");
 
         if (m_table) {
             m_table->setStyleSheet(
