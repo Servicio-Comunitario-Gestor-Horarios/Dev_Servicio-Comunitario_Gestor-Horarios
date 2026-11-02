@@ -188,14 +188,27 @@ bool SettingsDialog::guardarConfiguracionAvanzada() {
 
     const int duracion = m_spinDuracion->value();
 
-    // La duración debe encajar en TODOS los turnos: el generador la aplica
-    // siempre y un valor incompatible dejaría la generación inválida.
+    // La duración debe encajar en TODOS los turnos y en la ventana de cada
+    // evento: el generador la aplica siempre y un valor incompatible dejaría
+    // la generación inválida.
     if (const auto turnos = m_nucleo->listarTurnos(); turnos.ok) {
         for (const TurnoDTO& turno : turnos.valor) {
             const QString error = errorDeEncaje(turno, duracion);
             if (!error.isEmpty()) {
                 QMessageBox::warning(this, "Duración incompatible", error);
                 return false;
+            }
+            for (const EventoDTO& evento : turno.eventos) {
+                if (!eventoDentroDeVentana(evento, turno, evento.despuesDeSlot, duracion)) {
+                    QMessageBox::warning(
+                        this, "Duración incompatible",
+                        QStringLiteral("El evento «%1» del turno «%2» no cabe en su "
+                                       "franja con una hora académica de %3 min. "
+                                       "Ajuste la duración o el horario del evento.")
+                            .arg(evento.nombre, turno.nombre)
+                            .arg(duracion));
+                    return false;
+                }
             }
         }
     }
