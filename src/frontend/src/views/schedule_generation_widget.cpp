@@ -22,6 +22,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -109,6 +110,7 @@ ScheduleGenerationWidget::ScheduleGenerationWidget(QWidget* parent)
     : QWidget(parent)
 {
     construirUi();
+    recargarConfiguracionAvanzada();
     aplicarEstilo();
 }
 
@@ -157,23 +159,56 @@ void ScheduleGenerationWidget::recargarDesdeNucleo()
     poblarCursos();
     poblarDocentes();
 
-    // En la primera carga, alinear los slots por día con los turnos de la base.
-    // La duración del bloque ya NO se deriva del turno (spec 011): es global
-    // (configuración horaria del núcleo). Solo sumamos los slots de los turnos.
-    if (!m_defaultsApplied && m_nucleo) {
-        if (const auto turnos = m_nucleo->listarTurnos(); turnos.ok && !turnos.valor.isEmpty()) {
-            int total = 0;
-            for (const TurnoDTO& turno : turnos.valor)
-                total += qMax(0, turno.numSlots);
-            if (total > 0 && m_spinSlotsDia)
-                m_spinSlotsDia->setValue(qBound(1, total, 24));
-        }
-        m_defaultsApplied = true;
-    }
+    // Días, aula fija y duración viven en Configuración → Avanzado; las franjas
+    // por día se derivan de los turnos de la base.
+    recargarConfiguracionAvanzada();
 
     // Los combos se crean al poblar: reaplicar el estilo deja sus popups con la
     // paleta del tema (si no, la del árbol deja los ítems sin fondo y en negro).
     aplicarEstilo();
+}
+
+void ScheduleGenerationWidget::recargarConfiguracionAvanzada()
+{
+    if (m_nucleo) {
+        if (const auto turnos = m_nucleo->listarTurnos(); turnos.ok) {
+            int total = 0;
+            for (const TurnoDTO& turno : turnos.valor)
+                total += qMax(0, turno.numSlots);
+            m_slotsDia = total;
+        }
+    }
+
+    const QSettings settings(QStringLiteral("LiceoRobertSerra"),
+                             QStringLiteral("GestorHorarios"));
+    m_numDias = qBound(1, settings.value(QStringLiteral("generacion/dias"), 5).toInt(), 7);
+    m_usarAulasFijas = settings.value(QStringLiteral("generacion/aulaFija"), true).toBool();
+
+    actualizarResumenParametros();
+}
+
+void ScheduleGenerationWidget::actualizarResumenParametros()
+{
+    if (!m_lblParametros)
+        return;
+
+    int duracion = 0;
+    if (m_nucleo) {
+        if (const auto config = m_nucleo->configuracionHoraria(); config.ok)
+            duracion = config.valor.duracionMinutos;
+    }
+
+    QStringList partes;
+    partes << QStringLiteral("%1 día%2").arg(m_numDias).arg(m_numDias == 1 ? QString() : QStringLiteral("s"));
+    if (m_slotsDia > 0)
+        partes << QStringLiteral("%1 franjas/día").arg(m_slotsDia);
+    partes << (m_usarAulasFijas ? QStringLiteral("aula fija por curso")
+                                : QStringLiteral("aulas asignadas por el motor"));
+    if (duracion > 0)
+        partes << QStringLiteral("%1 min por franja").arg(duracion);
+
+    m_lblParametros->setText(
+        QStringLiteral("Generación con: %1.").arg(partes.join(QStringLiteral(" · "))));
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -222,27 +257,15 @@ void ScheduleGenerationWidget::construirUi()
         QVBoxLayout* contenido = nullptr;
         QFrame* tarjeta = crearTarjeta(QStringLiteral("Parámetros generales"), contenido, contenedor);
 
-        auto* form = new QFormLayout();
-        form->setHorizontalSpacing(18);
-        form->setVerticalSpacing(10);
-        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+        m_lblParametros = new QLabel(tarjeta);
+        m_lblParametros->setObjectName(QStringLiteral("genParametros"));
+        m_lblParametros->setWordWrap(true);
+        contenido->addWidget(m_lblParametros);
 
-        m_spinDias = crearSpin(tarjeta, 1, 7, 5);
-        m_spinSlotsDia = crearSpin(tarjeta, 1, 24, 12);
-        m_checkAulasFijas = new QCheckBox(
-            QStringLiteral("Usar el aula fija asignada a cada curso"), tarjeta);
-        m_checkAulasFijas->setChecked(true);
-
-        form->addRow(QStringLiteral("Días a planificar"), m_spinDias);
-        form->addRow(QStringLiteral("Slots por día"), m_spinSlotsDia);
-        form->addRow(QString(), m_checkAulasFijas);
-
-        contenido->addLayout(form);
         contenido->addWidget(crearAyuda(
-            QStringLiteral("Los slots de cada turno se toman de los turnos definidos en "
-                           "la base de datos; «slots por día» es su suma. La duración de "
-                           "la hora académica es global y se configura en el centro."),
+            QStringLiteral("Los días a planificar, el aula fija y la duración de la hora "
+                           "académica se configuran en «Configuración → Avanzado». Las "
+                           "franjas por día se calculan sumando las de los turnos."),
             tarjeta));
         columna->addWidget(tarjeta);
     }
@@ -639,9 +662,11 @@ void ScheduleGenerationWidget::poblarDocentes()
 GeneracionSolver::OpcionesUI ScheduleGenerationWidget::leerOpciones() const
 {
     GeneracionSolver::OpcionesUI opciones;
-    opciones.numDias = m_spinDias->value();
-    opciones.numSlotsDia = m_spinSlotsDia->value();
-    opciones.usarAulasFijas = m_checkAulasFijas->isChecked();
+    // Días, franjas por día y aula fija vienen de Configuración → Avanzado y de
+    // los turnos de la base; el preset puede haberlos ajustado al cargarse.
+    opciones.numDias = m_numDias;
+    opciones.numSlotsDia = m_slotsDia;
+    opciones.usarAulasFijas = m_usarAulasFijas;
 
     for (int fila = 0; fila < m_cursosNombres.size(); ++fila) {
         GeneracionSolver::ParametrosCurso pc;
@@ -683,11 +708,13 @@ GeneracionSolver::OpcionesUI ScheduleGenerationWidget::leerOpciones() const
 
 void ScheduleGenerationWidget::aplicarOpciones(const GeneracionSolver::OpcionesUI& opciones)
 {
-    // La duración ya NO se aplica a la UI (spec 011): es global y se lee del núcleo.
-    m_spinDias->setValue(opciones.numDias);
-    if (opciones.numSlotsDia > 0)
-        m_spinSlotsDia->setValue(opciones.numSlotsDia);
-    m_checkAulasFijas->setChecked(opciones.usarAulasFijas);
+    // La duración es global y se lee del núcleo; los días y el aula fija sí
+    // pueden venir en el preset que se cargue.
+    m_numDias = qBound(1, opciones.numDias, 7);
+    m_usarAulasFijas = opciones.usarAulasFijas;
+    if (opciones.numSlotsDia > 0 && m_slotsDia <= 0)
+        m_slotsDia = opciones.numSlotsDia;
+    actualizarResumenParametros();
 
     for (int fila = 0; fila < m_cursosNombres.size(); ++fila) {
         const GeneracionSolver::ParametrosCurso pc =

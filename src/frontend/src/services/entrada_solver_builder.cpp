@@ -91,11 +91,15 @@ CuadriculaVisual leerCuadricula(const QJsonObject& entrada, const QVector<TurnoD
     }
 
     // Contrato 2.0: los eventos del turno (los antiguos recesos) viven en la
-    // sección `eventos` de la entrada; la visualización los dibuja como cortes.
+    // sección `eventos` de la entrada; la visualización los dibuja como cortes
+    // y conserva su nombre (Receso, Acto cívico…).
     const QJsonArray eventosJson = entrada.value(QStringLiteral("eventos")).toArray();
     for (const QJsonValue& v : eventosJson) {
         const QJsonObject o = v.toObject();
         RecesoVisual r;
+        r.nombre = o.value(QStringLiteral("nombre")).toString();
+        if (r.nombre.isEmpty())
+            r.nombre = QStringLiteral("Receso");
         r.turno = o.value(QStringLiteral("turno")).toString();
         r.despuesDeSlot = o.value(QStringLiteral("despues_de_slot")).toInt(0);
         r.duracion = o.value(QStringLiteral("duracion")).toInt(0);
@@ -132,6 +136,7 @@ QJsonObject cuadriculaAJson(const CuadriculaVisual& c)
     QJsonArray recesos;
     for (const RecesoVisual& r : c.recesos) {
         QJsonObject obj;
+        obj.insert(QStringLiteral("nombre"), r.nombre);
         obj.insert(QStringLiteral("turno"), r.turno);
         obj.insert(QStringLiteral("despues_de_slot"), r.despuesDeSlot);
         obj.insert(QStringLiteral("duracion"), r.duracion);

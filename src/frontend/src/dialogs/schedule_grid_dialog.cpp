@@ -372,14 +372,21 @@ void ScheduleGridDialog::rebuildGrid()
         const int gridRow = r + 1;
 
         if (rd.recess) {
-            auto* cornerRecess = new QLabel("R", m_gridHost);
+            const QString nombreEvento = rd.nombre.isEmpty() ? rd.label : rd.nombre;
+            const QColor colorEvento =
+                nombreEvento.compare(QStringLiteral("Receso"), Qt::CaseInsensitive) == 0
+                    ? p.warning
+                    : p.accent;
+
+            auto* cornerRecess = new QLabel(nombreEvento.left(2).toUpper(), m_gridHost);
             cornerRecess->setFixedSize(kTimeColW, kRecessH);
             cornerRecess->setAlignment(Qt::AlignCenter);
             cornerRecess->setStyleSheet(QString(
                 "background-color:%1; color:%2; font-weight:700; font-size:10px;"
                 "letter-spacing:1px; border:none; border-radius:8px;")
-                .arg(p.surface2, p.warning));
-            cornerRecess->setToolTip(QString("RECESO  ·  %1  ·  %2").arg(rd.turno, rd.detalle));
+                .arg(p.surface2, colorEvento.name()));
+            cornerRecess->setToolTip(QString("%1  ·  %2  ·  %3")
+                                         .arg(nombreEvento.toUpper(), rd.turno, rd.detalle));
             m_scheduleGrid->addWidget(cornerRecess, gridRow, 0);
 
             auto* bar = new QFrame(m_gridHost);
@@ -387,15 +394,17 @@ void ScheduleGridDialog::rebuildGrid()
             bar->setFixedHeight(kRecessH);
             bar->setStyleSheet(QString(
                 "#RecessRow { background-color:%1; border:1px dashed %2; border-radius:8px; }")
-                .arg(p.surface2, p.warning));
+                .arg(p.surface2, colorEvento.name()));
             auto* barLayout = new QHBoxLayout(bar);
             barLayout->setContentsMargins(0, 0, 0, 0);
-            // El receso lleva su turno y su duración real (no siempre son 30 min).
-            auto* barLabel = new QLabel(QString("RECESO   %1  ·  %2").arg(rd.turno, rd.detalle), bar);
+            // Cada evento lleva su nombre y su duración real (no siempre son 30 min).
+            auto* barLabel = new QLabel(QString("%1   %2  ·  %3")
+                                            .arg(nombreEvento.toUpper(), rd.turno, rd.detalle),
+                                        bar);
             barLabel->setAlignment(Qt::AlignCenter);
             barLabel->setStyleSheet(QString(
                 "color:%1; font-size:10px; font-weight:700; letter-spacing:2px; background:transparent;")
-                .arg(p.warning));
+                .arg(colorEvento.name()));
             barLayout->addWidget(barLabel);
             m_scheduleGrid->addWidget(bar, gridRow, 1, 1, numDias);
             continue;

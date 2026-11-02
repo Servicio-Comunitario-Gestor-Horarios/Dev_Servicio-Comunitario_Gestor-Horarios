@@ -400,8 +400,15 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
 
 void MainWindow::abrirConfiguracion() {
     SettingsDialog dialog(this);
+    dialog.setNucleoDatos(m_nucleo);
 
     connect(&dialog, &SettingsDialog::themeChanged, this, &MainWindow::aplicarTemaGlobal);
 
-    dialog.exec();
+    if (dialog.exec() == QDialog::Accepted) {
+        // Días / aula fija se guardan en QSettings: la vista de generación los
+        // relee para no quedar con los valores anteriores.
+        if (auto generacion =
+                qobject_cast<ScheduleGenerationWidget*>(m_contenedorVistas->widget(4)))
+            generacion->recargarConfiguracionAvanzada();
+    }
 }

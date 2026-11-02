@@ -437,6 +437,7 @@ struct RowDef {
     QString horaFin;        ///< "07:40"
     int minutos = 0;        ///< Duración de la franja académica (min)
     int indiceTurno = -1;   ///< Posición dentro del turno (-1 en los recesos)
+    QString nombre;         ///< Nombre del evento ("Receso", "Acto cívico"…); vacío en la plantilla.
 };
 
 inline QStringList dayNames()
@@ -475,6 +476,7 @@ inline QVector<RowDef> rowDefs()
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct RecesoGrid {
+    QString nombre;          ///< "Receso", "Acto cívico"… (por defecto "Receso").
     int despuesDeSlot = 0;   ///< Se inserta tras esa cantidad de franjas del turno.
     int duracion = 0;        ///< Minutos.
 };
@@ -523,6 +525,9 @@ inline GridSpec parseGrid(const QJsonObject& root)
         const QJsonObject o = v.toObject();
         const QString turno = o.value("turno").toString();
         RecesoGrid r;
+        r.nombre = o.value("nombre").toString();
+        if (r.nombre.isEmpty())
+            r.nombre = QStringLiteral("Receso");
         r.despuesDeSlot = o.value("despues_de_slot").toInt(0);
         r.duracion = o.value("duracion").toInt(0);
         for (TurnoGrid& t : g.turnos)
@@ -596,7 +601,8 @@ inline QVector<RowDef> rowsFor(const QJsonObject& root, const Ref& ref)
                 fila.minutos = r.duracion;
                 fila.horaInicio = horaDesde(t.inicio, reloj);
                 fila.horaFin = horaDesde(t.inicio, reloj + r.duracion);
-                fila.label = QStringLiteral("RECESO");
+                fila.nombre = r.nombre;
+                fila.label = r.nombre.toUpper();
                 fila.detalle = fila.horaInicio.isEmpty()
                                    ? QString("%1 min").arg(r.duracion)
                                    : QString("%1 - %2  ·  %3 min")

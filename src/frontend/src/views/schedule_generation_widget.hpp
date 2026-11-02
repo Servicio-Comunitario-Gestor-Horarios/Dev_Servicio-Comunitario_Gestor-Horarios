@@ -59,6 +59,10 @@ public:
     /// Vuelve a leer cursos/docentes/planes del núcleo y repuebla las tablas.
     void recargarDesdeNucleo();
 
+    /// Relee días/aula fija de la configuración (ventana de Configuración → Avanzado)
+    /// sin tocar las tablas de cursos y docentes.
+    void recargarConfiguracionAvanzada();
+
     /// Reaplica los colores del tema (claro/oscuro) en caliente.
     void actualizarTema(bool modoOscuro);
 
@@ -82,6 +86,9 @@ private:
     /// Reúne los años de los cursos y las materias existentes (para los selectores).
     void poblarCatalogos();
 
+    /// Relee los ajustes avanzados y refresca el resumen visible.
+    void actualizarResumenParametros();
+
     GeneracionSolver::OpcionesUI leerOpciones() const;
     void aplicarOpciones(const GeneracionSolver::OpcionesUI& opciones);
 
@@ -96,9 +103,7 @@ private:
     QString m_schedulesDir;
 
     // ── Controles ─────────────────────────────────────────────────────────
-    QSpinBox* m_spinDias = nullptr;
-    QSpinBox* m_spinSlotsDia = nullptr;
-    QCheckBox* m_checkAulasFijas = nullptr;
+    QLabel* m_lblParametros = nullptr;
     QTableWidget* m_tablaCursos = nullptr;
     QTableWidget* m_tablaDocentes = nullptr;
     QPushButton* m_btnGenerar = nullptr;
@@ -107,6 +112,11 @@ private:
     QPushButton* m_btnSugerirHoras = nullptr;
     QLabel* m_lblEstado = nullptr;
     QProgressBar* m_progreso = nullptr;
+
+    // Parámetros que vienen de Configuración → Avanzado (QSettings y núcleo).
+    int  m_numDias = 5;
+    bool m_usarAulasFijas = true;
+    int  m_slotsDia = 0;          ///< Suma de las franjas de los turnos de la base.
 
     // ── Estado de generación ──────────────────────────────────────────────
     ServicioGeneracion* m_servicio = nullptr;
