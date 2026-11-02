@@ -19,6 +19,7 @@
  */
 
 #include <QJsonObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -98,6 +99,10 @@ private:
     /// Relee los ajustes avanzados y refresca el resumen visible.
     void actualizarResumenParametros();
 
+    /// Rellena con las preferencias del formulario las filas de docente que el
+    /// usuario no haya ajustado a mano (ni vengan de un preset cargado).
+    void aplicarPreferenciasDocentes();
+
     GeneracionSolver::OpcionesUI leerOpciones() const;
     void aplicarOpciones(const GeneracionSolver::OpcionesUI& opciones);
 
@@ -139,6 +144,7 @@ private:
     QStringList m_cursosNombres;
     QStringList m_docentesNombres;
     QStringList m_docentesIds;         ///< Id de cada fila de la tabla de docentes.
+    QSet<QString> m_docentesAjustados; ///< Filas con valores propios (manuales o de un preset).
     QVector<int> m_aniosDisponibles;   ///< Años de los cursos de la base.
     QStringList m_materiasDisponibles; ///< Materias existentes (para suplencias).
     bool m_defaultsApplied = false; ///< Los valores por defecto se derivan una vez.

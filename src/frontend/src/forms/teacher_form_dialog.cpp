@@ -63,7 +63,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
 
     comboAnio = new QComboBox(this);
     comboAnio->setStyleSheet(inputStyle);
-    comboAnio->addItem(QStringLiteral("— Sin preferencia —"), 0);
+    comboAnio->addItem(QStringLiteral("Todos"), 0);
 
     botonCancelar = new QPushButton("Cancelar", this);
     botonCancelar->setStyleSheet(isDark ?
@@ -212,7 +212,7 @@ void TeacherFormDialog::cargarOpcionesGeneracion(const QStringList& turnos,
         comboPlan->addItem(plan, plan);
 
     comboAnio->clear();
-    comboAnio->addItem(sinPreferencia, 0);
+    comboAnio->addItem(QStringLiteral("Todos"), 0);
     for (int anio : anios)
         comboAnio->addItem(QString::number(anio), anio);
 }

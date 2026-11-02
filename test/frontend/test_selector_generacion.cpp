@@ -12,7 +12,6 @@
 #include <QComboBox>
 #include <QHeaderView>
 #include <QPalette>
-#include <QSettings>
 #include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -25,6 +24,7 @@
 #include <seed/sembrador.hpp>
 
 #include "dialogs/schedule_theme.hpp"
+#include "services/preferencias_docente_ui.hpp"
 #include "views/schedule_generation_widget.hpp"
 #include "widgets/combo_multiple.hpp"
 #include "widgets/selector_materias.hpp"
@@ -166,13 +166,12 @@ private slots:
         QVERIFY(dir.isValid());
 
         // La vista lee de QSettings las preferencias de los docentes (turno,
-        // plan y año): se aíslan en un INI temporal para que el resultado no
-        // dependa de la configuración de la máquina.
-        QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
-        QSettings ajustesPrueba(QStringLiteral("LiceoRobertSerra"),
-                                QStringLiteral("GestorHorarios"));
-        ajustesPrueba.clear();
+        // plan y año): se aíslan en un espacio propio para no depender de la
+        // configuración de la máquina.
+        PreferenciasDocenteUI::usarOrganizacion(
+            QStringLiteral("LiceoRobertSerraPrueba"),
+            QStringLiteral("GestorHorariosPrueba"));
+        PreferenciasDocenteUI::limpiar();
 
         seed::OpcionesAplicacion siembra;
         siembra.rutaDb = dir.filePath(QStringLiteral("centro.db"));
@@ -210,10 +209,11 @@ private slots:
             QCOMPARE(comboAnios->count(), 5); // el conjunto siembra 5 años
             QCOMPARE(comboAnios->resumen(), QStringLiteral("Todos"));
 
-            // Materias suplentes: botón que abre la rejilla de materias.
-            auto* botonSuplentes =
-                qobject_cast<BotonMateriasSuplentes*>(tablaDocentes->cellWidget(0, 7));
-            QVERIFY2(botonSuplentes, "la columna «Materias suplentes» debe ser un botón");
+            // La tabla solo lleva las columnas de configuración del docente.
+            QCOMPARE(tablaDocentes->columnCount(), 6);
+
+            // Materias suplentes: ya no forman parte de la tabla de docentes.
+            QVERIFY(!tablaDocentes->cellWidget(0, 7));
 
             // Todos los popups de la vista llevan la paleta del tema (en claro,
             // fondo claro; sin esto el delegado pinta los ítems en negro).
@@ -252,11 +252,10 @@ private slots:
         QVERIFY(dir.isValid());
 
         // Aislar QSettings (la vista precarga turno/plan/año del docente).
-        QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
-        QSettings ajustesPrueba(QStringLiteral("LiceoRobertSerra"),
-                                QStringLiteral("GestorHorarios"));
-        ajustesPrueba.clear();
+        PreferenciasDocenteUI::usarOrganizacion(
+            QStringLiteral("LiceoRobertSerraPrueba"),
+            QStringLiteral("GestorHorariosPrueba"));
+        PreferenciasDocenteUI::limpiar();
 
         seed::OpcionesAplicacion siembra;
         siembra.rutaDb = dir.filePath(QStringLiteral("centro.db"));
@@ -285,6 +284,32 @@ private slots:
             const int indiceManana = turno->findText(QStringLiteral("Mañana"));
             QVERIFY(indiceManana > 0);
             turno->setCurrentIndex(indiceManana);
+
+            // Preferencias editadas después de crear la vista: al volver a
+            // sincronizar, las filas limpias quedan precargadas aunque el
+            // conjunto de docentes no haya cambiado.
+            const QString segundoDocente = tabla->item(1, 0)->text();
+            QString idSegundo;
+            for (const ProfesorDTO& docente : nucleo.listarDocentes().valor) {
+                if (docente.nombre == segundoDocente)
+                    idSegundo = docente.id;
+            }
+            QVERIFY(!idSegundo.isEmpty());
+
+            PreferenciasDocenteUI::Preferencia preferencia;
+            preferencia.turno = QStringLiteral("Tarde");
+            preferencia.plan = QStringLiteral("NAT");
+            preferencia.anio = 2;
+            PreferenciasDocenteUI::guardar(idSegundo, preferencia);
+
+            vista.sincronizarDocentes();
+            QCOMPARE(qobject_cast<QComboBox*>(tabla->cellWidget(1, 3))->currentText(),
+                     QStringLiteral("Tarde"));
+            QCOMPARE(qobject_cast<QComboBox*>(tabla->cellWidget(1, 4))->currentText(),
+                     QStringLiteral("NAT"));
+            auto* aniosSegundo = qobject_cast<ComboMultiple*>(tabla->cellWidget(1, 5));
+            QVERIFY(aniosSegundo);
+            QCOMPARE(aniosSegundo->datosSeleccionados(), QVariantList{2});
 
             const auto creado = nucleo.crearDocente(
                 QStringLiteral("T999"), QStringLiteral("Docente Nuevo"),

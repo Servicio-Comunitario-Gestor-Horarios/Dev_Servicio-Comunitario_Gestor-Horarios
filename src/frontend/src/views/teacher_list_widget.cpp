@@ -13,7 +13,6 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QApplication>
-#include <QSettings>
 
 #include <algorithm>
 
@@ -421,13 +420,11 @@ void TeacherListWidget::abrirFormularioNuevo() {
     dialogo.exec();
 
     if (dialogo.result() == QDialog::Accepted) {
-        QSettings settings(QStringLiteral("LiceoRobertSerra"),
-                           QStringLiteral("GestorHorarios"));
         PreferenciasDocenteUI::Preferencia preferencia;
         preferencia.turno = dialogo.turnoSeleccionado();
         preferencia.plan = dialogo.planSeleccionado();
         preferencia.anio = dialogo.anioSeleccionado();
-        PreferenciasDocenteUI::guardar(settings, dialogo.cedula(), preferencia);
+        PreferenciasDocenteUI::guardar(dialogo.cedula(), preferencia);
     }
 }
 
@@ -447,10 +444,8 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
                                      planesDelNucleo(m_nucleo),
                                      aniosDelNucleo(m_nucleo));
 
-    QSettings settings(QStringLiteral("LiceoRobertSerra"),
-                       QStringLiteral("GestorHorarios"));
     const PreferenciasDocenteUI::Preferencia preferencia =
-        PreferenciasDocenteUI::leer(settings, cedula);
+        PreferenciasDocenteUI::leer(cedula);
     dialogo.cargarPreferencias(preferencia.turno, preferencia.plan, preferencia.anio);
 
     dialogo.cargarDatos(cedula, nombre, email, telefono, materias);
@@ -490,9 +485,9 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
         nueva.turno = dialogo.turnoSeleccionado();
         nueva.plan = dialogo.planSeleccionado();
         nueva.anio = dialogo.anioSeleccionado();
-        PreferenciasDocenteUI::guardar(settings, dialogo.cedula(), nueva);
+        PreferenciasDocenteUI::guardar(dialogo.cedula(), nueva);
         if (dialogo.cedula() != cedula)
-            PreferenciasDocenteUI::eliminar(settings, cedula);
+            PreferenciasDocenteUI::eliminar(cedula);
     }
 }
 
@@ -502,9 +497,7 @@ void TeacherListWidget::eliminarDocente(int fila) {
     QString cedula = m_table->item(fila, 0)->text();
     if (QMessageBox::question(this, "Confirmar", "¿Está seguro de eliminar a este docente?") == QMessageBox::Yes) {
         if (m_nucleo->eliminarDocente(cedula)) {
-            QSettings settings(QStringLiteral("LiceoRobertSerra"),
-                               QStringLiteral("GestorHorarios"));
-            PreferenciasDocenteUI::eliminar(settings, cedula);
+            PreferenciasDocenteUI::eliminar(cedula);
             cargarDocentes();
         } else {
             QMessageBox::warning(this, "Error", "No se pudo eliminar el docente de la base de datos.");
