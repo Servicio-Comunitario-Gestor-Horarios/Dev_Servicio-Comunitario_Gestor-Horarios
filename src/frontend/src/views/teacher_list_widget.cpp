@@ -6,12 +6,53 @@
 #include "teacher_list_widget.hpp"
 #include "../forms/teacher_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "services/preferencias_docente_ui.hpp"
 #include "services/tipos_aula_ui.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QApplication>
+#include <QSettings>
+
+#include <algorithm>
+
+namespace {
+
+QStringList turnosDelNucleo(NucleoDatos* nucleo)
+{
+    QStringList nombres;
+    if (const auto turnos = nucleo->listarTurnos(); turnos.ok) {
+        for (const TurnoDTO& turno : turnos.valor)
+            nombres << turno.nombre;
+    }
+    return nombres;
+}
+
+QStringList planesDelNucleo(NucleoDatos* nucleo)
+{
+    QStringList codigos;
+    if (const auto planes = nucleo->listarPlanes(); planes.ok) {
+        for (const PlanDTO& plan : planes.valor)
+            codigos << plan.codigo;
+    }
+    return codigos;
+}
+
+QVector<int> aniosDelNucleo(NucleoDatos* nucleo)
+{
+    QVector<int> anios;
+    if (const auto cursos = nucleo->listarCursos(); cursos.ok) {
+        for (const CursoDTO& curso : cursos.valor) {
+            if (curso.anio > 0 && !anios.contains(curso.anio))
+                anios.append(curso.anio);
+        }
+    }
+    std::sort(anios.begin(), anios.end());
+    return anios;
+}
+
+} // namespace
 
 TeacherListWidget::TeacherListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
@@ -348,6 +389,9 @@ void TeacherListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
     gestor::frontend::forms::TeacherFormDialog dialogo(this);
+    dialogo.cargarOpcionesGeneracion(turnosDelNucleo(m_nucleo),
+                                     planesDelNucleo(m_nucleo),
+                                     aniosDelNucleo(m_nucleo));
     connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
             this, [this](const QString& cedula, const QString& nombre,
                    const QString& email, const QString& telefono,
@@ -375,6 +419,16 @@ void TeacherListWidget::abrirFormularioNuevo() {
                 }
             });
     dialogo.exec();
+
+    if (dialogo.result() == QDialog::Accepted) {
+        QSettings settings(QStringLiteral("LiceoRobertSerra"),
+                           QStringLiteral("GestorHorarios"));
+        PreferenciasDocenteUI::Preferencia preferencia;
+        preferencia.turno = dialogo.turnoSeleccionado();
+        preferencia.plan = dialogo.planSeleccionado();
+        preferencia.anio = dialogo.anioSeleccionado();
+        PreferenciasDocenteUI::guardar(settings, dialogo.cedula(), preferencia);
+    }
 }
 
 void TeacherListWidget::abrirFormularioEditar(int fila) {
@@ -389,6 +443,16 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
 
     gestor::frontend::forms::TeacherFormDialog dialogo(this);
     dialogo.setWindowTitle("Editar Docente");
+    dialogo.cargarOpcionesGeneracion(turnosDelNucleo(m_nucleo),
+                                     planesDelNucleo(m_nucleo),
+                                     aniosDelNucleo(m_nucleo));
+
+    QSettings settings(QStringLiteral("LiceoRobertSerra"),
+                       QStringLiteral("GestorHorarios"));
+    const PreferenciasDocenteUI::Preferencia preferencia =
+        PreferenciasDocenteUI::leer(settings, cedula);
+    dialogo.cargarPreferencias(preferencia.turno, preferencia.plan, preferencia.anio);
+
     dialogo.cargarDatos(cedula, nombre, email, telefono, materias);
 
     connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
@@ -420,6 +484,16 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
                 }
             });
     dialogo.exec();
+
+    if (dialogo.result() == QDialog::Accepted) {
+        PreferenciasDocenteUI::Preferencia nueva;
+        nueva.turno = dialogo.turnoSeleccionado();
+        nueva.plan = dialogo.planSeleccionado();
+        nueva.anio = dialogo.anioSeleccionado();
+        PreferenciasDocenteUI::guardar(settings, dialogo.cedula(), nueva);
+        if (dialogo.cedula() != cedula)
+            PreferenciasDocenteUI::eliminar(settings, cedula);
+    }
 }
 
 void TeacherListWidget::eliminarDocente(int fila) {
@@ -428,6 +502,9 @@ void TeacherListWidget::eliminarDocente(int fila) {
     QString cedula = m_table->item(fila, 0)->text();
     if (QMessageBox::question(this, "Confirmar", "¿Está seguro de eliminar a este docente?") == QMessageBox::Yes) {
         if (m_nucleo->eliminarDocente(cedula)) {
+            QSettings settings(QStringLiteral("LiceoRobertSerra"),
+                               QStringLiteral("GestorHorarios"));
+            PreferenciasDocenteUI::eliminar(settings, cedula);
             cargarDocentes();
         } else {
             QMessageBox::warning(this, "Error", "No se pudo eliminar el docente de la base de datos.");

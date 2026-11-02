@@ -2,6 +2,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFormLayout>
+#include <QLabel>
 #include <QMessageBox>
 #include <QApplication>
 
@@ -9,7 +10,7 @@ namespace gestor::frontend::forms {
 
 TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Docente");
-    resize(450, 350);
+    resize(450, 460);
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -24,7 +25,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setStyleSheet(QString("QDialog { background-color: %1; color: %2; }").arg(bgColor, textColor));
 
     QString inputStyle = QString(
-                             "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
+                             "QLineEdit, QComboBox { border: 1px solid %1; border-radius: 6px; padding: 8px; "
                              "background-color: %2; color: %3; font-size: 13px; }"
                              "QLineEdit::placeholder { color: %4; }"
                              "QLineEdit.error { border: 2px solid #dc2626; }"
@@ -50,6 +51,19 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoMaterias = new QLineEdit(this);
     campoMaterias->setStyleSheet(inputStyle);
     campoMaterias->setPlaceholderText("Ej. Física, Matemáticas");
+
+    // Configuración opcional del generador (no se muestra en la tabla).
+    comboTurno = new QComboBox(this);
+    comboTurno->setStyleSheet(inputStyle);
+    comboTurno->addItem(QStringLiteral("— Sin preferencia —"), QString());
+
+    comboPlan = new QComboBox(this);
+    comboPlan->setStyleSheet(inputStyle);
+    comboPlan->addItem(QStringLiteral("— Sin preferencia —"), QString());
+
+    comboAnio = new QComboBox(this);
+    comboAnio->setStyleSheet(inputStyle);
+    comboAnio->addItem(QStringLiteral("— Sin preferencia —"), 0);
 
     botonCancelar = new QPushButton("Cancelar", this);
     botonCancelar->setStyleSheet(isDark ?
@@ -81,6 +95,16 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     formLayout->addRow(labelStyle + "Email:</span>", campoEmail);
     formLayout->addRow(labelStyle + "Teléfono:</span>", campoTelefono);
     formLayout->addRow(labelStyle + "Materias:</span>", campoMaterias);
+    formLayout->addRow(labelStyle + "Turno (opcional):</span>", comboTurno);
+    formLayout->addRow(labelStyle + "Plan de estudio (opcional):</span>", comboPlan);
+    formLayout->addRow(labelStyle + "Año preferencial (opcional):</span>", comboAnio);
+
+    QLabel *ayuda = new QLabel(
+        "Turno, plan y año solo se usan como valores iniciales de la "
+        "configuración del generador de horarios.", this);
+    ayuda->setWordWrap(true);
+    ayuda->setStyleSheet(QString("color: %1; font-size: 11px;")
+                             .arg(isDark ? "#9ca3af" : "#6b7280"));
 
     QHBoxLayout *botonesLayout = new QHBoxLayout();
     botonesLayout->addStretch();
@@ -90,6 +114,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(25, 25, 25, 25);
     mainLayout->addLayout(formLayout);
+    mainLayout->addWidget(ayuda);
     mainLayout->addStretch();
     mainLayout->addLayout(botonesLayout);
 
@@ -168,6 +193,64 @@ void TeacherFormDialog::cargarDatos(const QString& cedula, const QString& nombre
     campoEmail->setText(email);
     campoTelefono->setText(telefono);
     campoMaterias->setText(materias);
+}
+
+void TeacherFormDialog::cargarOpcionesGeneracion(const QStringList& turnos,
+                                                 const QStringList& planes,
+                                                 const QVector<int>& anios)
+{
+    const QString sinPreferencia = QStringLiteral("— Sin preferencia —");
+
+    comboTurno->clear();
+    comboTurno->addItem(sinPreferencia, QString());
+    for (const QString& turno : turnos)
+        comboTurno->addItem(turno, turno);
+
+    comboPlan->clear();
+    comboPlan->addItem(sinPreferencia, QString());
+    for (const QString& plan : planes)
+        comboPlan->addItem(plan, plan);
+
+    comboAnio->clear();
+    comboAnio->addItem(sinPreferencia, 0);
+    for (int anio : anios)
+        comboAnio->addItem(QString::number(anio), anio);
+}
+
+void TeacherFormDialog::cargarPreferencias(const QString& turno, const QString& plan,
+                                           int anio)
+{
+    if (!turno.isEmpty()) {
+        const int indice = comboTurno->findData(turno);
+        if (indice >= 0)
+            comboTurno->setCurrentIndex(indice);
+    }
+    if (!plan.isEmpty()) {
+        const int indice = comboPlan->findData(plan);
+        if (indice >= 0)
+            comboPlan->setCurrentIndex(indice);
+    }
+    if (anio > 0) {
+        const int indice = comboAnio->findData(anio);
+        if (indice >= 0)
+            comboAnio->setCurrentIndex(indice);
+    }
+}
+
+QString TeacherFormDialog::cedula() const {
+    return campoCedula->text().trimmed();
+}
+
+QString TeacherFormDialog::turnoSeleccionado() const {
+    return comboTurno->currentData().toString();
+}
+
+QString TeacherFormDialog::planSeleccionado() const {
+    return comboPlan->currentData().toString();
+}
+
+int TeacherFormDialog::anioSeleccionado() const {
+    return comboAnio->currentData().toInt();
 }
 
 } // namespace gestor::frontend::forms

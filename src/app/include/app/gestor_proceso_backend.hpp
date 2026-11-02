@@ -102,4 +102,5 @@ private:
     InternalClient *m_clienteVerificacion = nullptr;    ///< Cliente IPC para health-check
     QString m_ejecutableBackend;                        ///< Ruta al propio binario
     int m_intentosVerificacion = 0;                     ///< Reintentos de salud consumidos
+    bool m_deteniendo = false;                          ///< Parada intencional (no es un crash)
 };

@@ -155,10 +155,20 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
     //    se manejan por señales, no por valor de retorno.
     GestorProcesoBackend gestor;
 
+    // Cierre normal: el backend se detiene a propósito y no debe mostrarse un
+    // aviso de caída (ni el que lleva el código de salida).
+    bool cerrando = false;
+    QObject::connect(qApp, &QCoreApplication::aboutToQuit, [&cerrando]() {
+        cerrando = true;
+    });
+
     QObject::connect(&gestor, &GestorProcesoBackend::backendListo, []() {
         qDebug() << "[frontend] Backend listo";
     });
-    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado, [](int codigo) {
+    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado,
+                     [&cerrando](int codigo) {
+        if (cerrando || QCoreApplication::closingDown())
+            return;
         QMessageBox::critical(nullptr, QStringLiteral("Backend"),
                               detalleColapsoBackend(codigo));
     });

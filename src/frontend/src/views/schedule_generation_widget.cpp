@@ -42,6 +42,7 @@
 
 #include "dialogs/schedule_theme.hpp"
 #include "services/entrada_solver_builder.hpp"
+#include "services/preferencias_docente_ui.hpp"
 #include "services/puerto_solver_ipc.hpp"
 #include "widgets/combo_multiple.hpp"
 #include "widgets/selector_materias.hpp"
@@ -618,10 +619,17 @@ void ScheduleGenerationWidget::poblarDocentes()
     }
 
     const QVector<ProfesorDTO>& docentes = r.valor;
+    const QSettings preferenciasGuardadas(QStringLiteral("LiceoRobertSerra"),
+                                          QStringLiteral("GestorHorarios"));
     m_tablaDocentes->setRowCount(docentes.size());
     for (int fila = 0; fila < docentes.size(); ++fila) {
         const ProfesorDTO& docente = docentes[fila];
         m_docentesNombres << docente.nombre;
+
+        // Preferencias capturadas en el formulario del docente (opcionales).
+        // Un preset cargado después las sobrescribe con sus propios valores.
+        const PreferenciasDocenteUI::Preferencia preferencia =
+            PreferenciasDocenteUI::leer(preferenciasGuardadas, docente.id);
 
         auto* itemNombre = new QTableWidgetItem(docente.nombre);
         itemNombre->setFlags(itemNombre->flags() & ~Qt::ItemIsEditable);
@@ -631,12 +639,16 @@ void ScheduleGenerationWidget::poblarDocentes()
         m_tablaDocentes->setCellWidget(fila, 1, crearSpin(m_tablaDocentes, 1, 80, porDefecto));
         m_tablaDocentes->setCellWidget(fila, 2, crearSpin(m_tablaDocentes, 1, 80, porDefecto));
 
-        m_tablaDocentes->setCellWidget(fila, 3, crearCombo(m_tablaDocentes, turnos));
-        m_tablaDocentes->setCellWidget(fila, 4, crearCombo(m_tablaDocentes, m_planesCodigos));
+        m_tablaDocentes->setCellWidget(
+            fila, 3, crearCombo(m_tablaDocentes, turnos, preferencia.turno));
+        m_tablaDocentes->setCellWidget(
+            fila, 4, crearCombo(m_tablaDocentes, m_planesCodigos, preferencia.plan));
 
         auto* comboAnios = new ComboMultiple(m_tablaDocentes);
         comboAnios->setTextoVacio(QStringLiteral("Todos"));
         comboAnios->agregarOpciones(textosAnios, datosAnios);
+        if (preferencia.anio > 0)
+            comboAnios->setSeleccionDatos(QVariantList{preferencia.anio});
         m_tablaDocentes->setCellWidget(fila, 5, comboAnios);
 
         QString materias;

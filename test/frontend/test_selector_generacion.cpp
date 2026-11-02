@@ -12,6 +12,7 @@
 #include <QComboBox>
 #include <QHeaderView>
 #include <QPalette>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -163,6 +164,15 @@ private slots:
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
+
+        // La vista lee de QSettings las preferencias de los docentes (turno,
+        // plan y año): se aíslan en un INI temporal para que el resultado no
+        // dependa de la configuración de la máquina.
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+        QSettings ajustesPrueba(QStringLiteral("LiceoRobertSerra"),
+                                QStringLiteral("GestorHorarios"));
+        ajustesPrueba.clear();
 
         seed::OpcionesAplicacion siembra;
         siembra.rutaDb = dir.filePath(QStringLiteral("centro.db"));
