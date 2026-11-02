@@ -131,6 +131,11 @@
   - **Rejilla que se reescala:** las celdas se dimensionan para llenar el área visible y se recalculan al redimensionar o maximizar (con un tamaño mínimo que activa las barras de scroll cuando no cabe, p. ej. el docente con los dos turnos).
   - **Pantalla completa:** el diálogo de horarios se abre maximizado y con botones de maximizar/restaurar; mientras está abierto, la **ventana principal se oculta** y vuelve al cerrarlo. Durante la transición se desactiva «cerrar al cerrar la última ventana» para que la app no termine.
 
+- **Bienvenida y tipos de aula (2026-11-02):**
+  - **Panel principal**: pasa a una ventana de bienvenida con el **logo del liceo**, «Bienvenido», una frase («Enseñar y aprender: dos caminos que crecen juntos.») y los totales de **docentes, aulas y materias** en tarjetas pequeñas al pie. Se retiran el gauge de generación, las notificaciones y los diálogos de detalles/conflictos.
+  - **Logo**: se carga de `:/logo.png`; la biblioteca `frontend` es estática, así que `dashboard_widget.cpp` fuerza el enlace del `.qrc` con `Q_INIT_RESOURCE(resources)`.
+  - **Tipos de aula**: botón «+ Tipo de aula» en Gestión de Aulas que llama a `NucleoDatos::crearTipoAula`; el tipo queda disponible de inmediato en los formularios de aulas y materias y el solver lo exigirá para las materias de ese tipo.
+
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
