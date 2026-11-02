@@ -88,15 +88,21 @@ void TeacherScheduleDialog::setupUi()
 
     root->addWidget(header);
 
-    // ── Cuerpo: cuadrícula + navegador ───────────────────────────────────
+    // ── Cuerpo: cuadrícula + barra lateral (navegador y leyenda) ─────────
     QHBoxLayout* body = new QHBoxLayout();
     body->setSpacing(16);
     body->addWidget(buildGridCard(this), 1);
-    body->addWidget(buildNavigator(this), 0, Qt::AlignTop);
-    root->addLayout(body, 1);
 
-    // ── Leyenda ──────────────────────────────────────────────────────────
-    root->addWidget(buildLegendCard(this));
+    QWidget* sidebar = new QWidget(this);
+    sidebar->setFixedWidth(248);
+    QVBoxLayout* sideLayout = new QVBoxLayout(sidebar);
+    sideLayout->setContentsMargins(0, 0, 0, 0);
+    sideLayout->setSpacing(16);
+    sideLayout->addWidget(buildNavigator(this), 1);
+    sideLayout->addWidget(buildLegendCard(this), 0);
+    body->addWidget(sidebar, 0);
+
+    root->addLayout(body, 1);
 
     updateNavButtons();
 }
@@ -106,7 +112,6 @@ QWidget* TeacherScheduleDialog::buildNavigator(QWidget* parent)
     QFrame* navCard = new QFrame(parent);
     navCard->setObjectName("NavCard");
     applyShadow(navCard, darkMode());
-    navCard->setFixedWidth(238);
 
     QVBoxLayout* navLayout = new QVBoxLayout(navCard);
     navLayout->setContentsMargins(12, 14, 12, 14);

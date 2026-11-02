@@ -87,15 +87,21 @@ void StudentScheduleDialog::setupUi()
 
     root->addWidget(header);
 
-    // ── Cuerpo: cuadrícula + navegador de secciones ──────────────────────
+    // ── Cuerpo: cuadrícula + barra lateral (secciones y leyenda) ─────────
     QHBoxLayout* body = new QHBoxLayout();
     body->setSpacing(16);
     body->addWidget(buildGridCard(this), 1);
-    body->addWidget(buildSectionNavigator(this), 0, Qt::AlignTop);
-    root->addLayout(body, 1);
 
-    // ── Leyenda ──────────────────────────────────────────────────────────
-    root->addWidget(buildLegendCard(this));
+    QWidget* sidebar = new QWidget(this);
+    sidebar->setFixedWidth(248);
+    QVBoxLayout* sideLayout = new QVBoxLayout(sidebar);
+    sideLayout->setContentsMargins(0, 0, 0, 0);
+    sideLayout->setSpacing(16);
+    sideLayout->addWidget(buildSectionNavigator(this), 1);
+    sideLayout->addWidget(buildLegendCard(this), 0);
+    body->addWidget(sidebar, 0);
+
+    root->addLayout(body, 1);
 
     createYearNavigation();
 }
@@ -105,7 +111,6 @@ QWidget* StudentScheduleDialog::buildSectionNavigator(QWidget* parent)
     QFrame* sectionCard = new QFrame(parent);
     sectionCard->setObjectName("NavCard");
     applyShadow(sectionCard, darkMode());
-    sectionCard->setFixedWidth(124);
 
     QVBoxLayout* sectionLayout = new QVBoxLayout(sectionCard);
     sectionLayout->setContentsMargins(12, 14, 12, 14);
