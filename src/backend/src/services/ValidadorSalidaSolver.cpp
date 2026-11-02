@@ -1,5 +1,7 @@
 #include "backend/services/ValidadorSalidaSolver.hpp"
 
+#include "backend/solver/config/contrato_solver.hpp"
+
 #include <QMap>
 #include <QSet>
 
@@ -24,6 +26,15 @@ namespace
             return slot < otro.slot;
         }
     };
+
+    /// Índice en `config.cursos` del curso con esa clave (`año|sección`), o -1.
+    int indiceCurso(const SolverConfig& config, const QString& clave)
+    {
+        for (int i = 0; i < config.cursos.size(); ++i)
+            if (claveCurso(config.cursos[i].anio, config.cursos[i].seccion) == clave)
+                return i;
+        return -1;
+    }
 } // namespace
 
 AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverConfig& config)

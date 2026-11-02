@@ -6,6 +6,7 @@
 #include "teacher_list_widget.hpp"
 #include "../forms/teacher_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "services/tipos_aula_ui.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QHeaderView>
@@ -358,11 +359,14 @@ void TeacherListWidget::abrirFormularioNuevo() {
                 } else {
                     // Si hay materias, se crean (si no existen) y se asignan al momento
                     if (!materias.isEmpty()) {
+                        int idTipoMateria = -1;
+                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
+                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
                         QStringList listaMaterias = materias.split(",");
                         for (const QString& mat : listaMaterias) {
                             QString materiaLimpia = mat.trimmed();
                             if (!materiaLimpia.isEmpty()) {
-                                m_nucleo->crearMateria(materiaLimpia);
+                                m_nucleo->crearMateria(materiaLimpia, QString(), idTipoMateria);
                                 m_nucleo->asignarMateriaPorNombre(cedula, materiaLimpia);
                             }
                         }
@@ -400,11 +404,14 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
                     m_nucleo->limpiarMaterias(nCedula);
 
                     if (!nMaterias.isEmpty()) {
+                        int idTipoMateria = -1;
+                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
+                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
                         QStringList listaMaterias = nMaterias.split(",");
                         for (const QString& mat : listaMaterias) {
                             QString materiaLimpia = mat.trimmed();
                             if (!materiaLimpia.isEmpty()) {
-                                m_nucleo->crearMateria(materiaLimpia);
+                                m_nucleo->crearMateria(materiaLimpia, QString(), idTipoMateria);
                                 m_nucleo->asignarMateriaPorNombre(nCedula, materiaLimpia);
                             }
                         }

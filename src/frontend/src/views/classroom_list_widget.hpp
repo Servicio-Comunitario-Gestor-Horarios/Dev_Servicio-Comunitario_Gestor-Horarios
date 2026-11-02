@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QTableWidget>
 #include <QPushButton>
+#include <QLabel>
 
 class NucleoDatos;
 

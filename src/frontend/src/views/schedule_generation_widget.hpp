@@ -96,7 +96,6 @@ private:
     QString m_schedulesDir;
 
     // ── Controles ─────────────────────────────────────────────────────────
-    QSpinBox* m_spinDuracion = nullptr;
     QSpinBox* m_spinDias = nullptr;
     QSpinBox* m_spinSlotsDia = nullptr;
     QCheckBox* m_checkAulasFijas = nullptr;

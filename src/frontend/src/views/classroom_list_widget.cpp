@@ -8,6 +8,7 @@
 #include "classroom_list_widget.hpp"
 #include "../forms/classroom_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "services/tipos_aula_ui.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -62,9 +63,9 @@ void ClassroomListWidget::setupUi() {
     contentLayout->setSpacing(25);
 
     // 1. Configuración de la Tabla (Lado Izquierdo)
-    m_table = new QTableWidget(0, 5, this);
+    m_table = new QTableWidget(0, 6, this);
     m_table->setObjectName("ClassroomTable");
-    m_table->setHorizontalHeaderLabels({"Nombre", "Capacidad", "Edificio", "Piso", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Nombre", "Capacidad", "Tipo de aula", "Edificio", "Piso", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
@@ -75,8 +76,9 @@ void ClassroomListWidget::setupUi() {
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
-    m_table->setColumnWidth(4, 180);
+    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Fixed);
+    m_table->setColumnWidth(5, 180);
     m_table->verticalHeader()->setVisible(false);
     m_table->setShowGrid(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -164,6 +166,10 @@ void ClassroomListWidget::cargarAulas() {
     int contadorLabs = 0;
     int contadorCanchas = 0;
 
+    QVector<TipoAulaDTO> tiposAula;
+    if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
+        tiposAula = tipos.valor;
+
     for (const auto& aula : res.valor) {
         int fila = m_table->rowCount();
         m_table->insertRow(fila);
@@ -176,14 +182,15 @@ void ClassroomListWidget::cargarAulas() {
 
         m_table->setItem(fila, 0, crearItemCentrado(aula.nombre));
         m_table->setItem(fila, 1, crearItemCentrado(QString::number(aula.capacidad)));
-        m_table->setItem(fila, 2, crearItemCentrado(aula.edificio.isEmpty() ? "N/A" : aula.edificio));
-        m_table->setItem(fila, 3, crearItemCentrado(aula.piso.isEmpty() ? "N/A" : aula.piso));
+        m_table->setItem(fila, 2, crearItemCentrado(aula.tipoAula));
+        m_table->setItem(fila, 3, crearItemCentrado(aula.edificio.isEmpty() ? "N/A" : aula.edificio));
+        m_table->setItem(fila, 4, crearItemCentrado(aula.piso.isEmpty() ? "N/A" : aula.piso));
 
-        // Clasificar tipos para el resumen
-        QString nombreLower = aula.nombre.toLower();
-        if (nombreLower.contains("lab") || nombreLower.contains("laboratorio")) {
+        // Clasificar por el tipo de aula del catálogo (spec 009), no por el nombre.
+        const QString tipoLower = aula.tipoAula.toLower();
+        if (tipoLower.contains("lab") || tipoLower.contains("laboratorio")) {
             contadorLabs++;
-        } else if (nombreLower.contains("cancha") || nombreLower.contains("deporte")) {
+        } else if (tipoLower.contains("cancha") || tipoLower.contains("deporte")) {
             contadorCanchas++;
         } else {
             contadorTeoricas++;
@@ -208,7 +215,7 @@ void ClassroomListWidget::cargarAulas() {
         layoutAcciones->addWidget(btnEliminar);
         layoutAcciones->addStretch();
 
-        m_table->setCellWidget(fila, 4, panelAcciones);
+        m_table->setCellWidget(fila, 5, panelAcciones);
 
         int aulaId = aula.id;
 
@@ -222,14 +229,19 @@ void ClassroomListWidget::cargarAulas() {
             }
         });
 
-        connect(btnEditar, &QPushButton::clicked, this, [this, aulaId, aula]() {
+        connect(btnEditar, &QPushButton::clicked, this, [this, aulaId, aula, tiposAula]() {
             gestor::frontend::forms::ClassroomFormDialog dialogo(this);
             dialogo.setWindowTitle("Editar Aula");
-            dialogo.cargarDatos(aula.nombre, aula.capacidad, aula.edificio, aula.piso);
+            dialogo.cargarTiposAula(tiposAula, aula.idTipoAula);
+            dialogo.cargarDatos(aula.nombre, aula.capacidad, aula.edificio, aula.piso,
+                                aula.idTipoAula);
 
             connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-                    this, [this, aulaId](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
-                        auto resultado = m_nucleo->actualizarAula(aulaId, nNombre, nCapacidad, nEdificio, nPiso);
+                    this, [this, aulaId](const QString& nNombre, int nCapacidad,
+                                         const QString& nEdificio, const QString& nPiso,
+                                         int nIdTipoAula) {
+                        auto resultado = m_nucleo->actualizarAula(aulaId, nNombre, nCapacidad,
+                                                                  nEdificio, nPiso, nIdTipoAula);
                         if (!resultado.ok) {
                             QMessageBox::warning(this, "Error", "No se pudo actualizar el aula: " + resultado.mensajeError);
                         } else {
@@ -249,10 +261,24 @@ void ClassroomListWidget::cargarAulas() {
 void ClassroomListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
+    QVector<TipoAulaDTO> tiposAula;
+    if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
+        tiposAula = tipos.valor;
+
+    if (tiposAula.isEmpty()) {
+        QMessageBox::warning(this, "Catálogo vacío",
+                             "No hay tipos de aula en el catálogo. Cargue los datos base "
+                             "o registre un tipo de aula antes de crear aulas.");
+        return;
+    }
+
     gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+    dialogo.cargarTiposAula(tiposAula, TiposAulaUI::idTipoGeneral(tiposAula));
     connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-            this, [this](const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
-                auto resultado = m_nucleo->crearAula(nombre, capacidad, edificio, piso);
+            this, [this](const QString& nombre, int capacidad, const QString& edificio,
+                         const QString& piso, int idTipoAula) {
+                auto resultado = m_nucleo->crearAula(nombre, capacidad, edificio, piso,
+                                                     idTipoAula);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo crear el aula: " + resultado.mensajeError);
                 } else {

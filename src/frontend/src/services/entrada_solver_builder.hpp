@@ -45,6 +45,15 @@ struct Composicion {
 Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opciones);
 
 /**
+ * @brief Huella de la instantánea actual del dominio (spec 011, RF-6).
+ *
+ * Lee el dominio del núcleo y la duración efectiva de la hora académica y
+ * devuelve la misma huella que `ServicioGeneracion` compara para marcar
+ * «datos anteriores». Si la configuración horaria no se puede leer, usa 35.
+ */
+QString huellaActual(const NucleoDatos& nucleo);
+
+/**
  * @brief Carga horaria semanal sugerida por docente.
  *
  * Suma las horas de las materias que cada docente dicta, considerando los planes

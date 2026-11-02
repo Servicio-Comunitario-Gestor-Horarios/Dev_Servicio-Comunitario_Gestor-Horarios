@@ -6,6 +6,7 @@
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "services/tipos_aula_ui.hpp"
 #include "../../../middleware/include/middleware/internalclient.h"
 #include "../../../middleware/include/middleware/messages.h"
 #include <QHBoxLayout>
@@ -55,7 +56,7 @@ void SubjectListWidget::setupUi() {
     titulo->setObjectName("SubjectTitle");
     titulo->setStyleSheet("font-size: 24px; font-weight: 800; color: #0f172a; border: none; background: transparent;");
 
-    QLabel *subtitulo = new QLabel("Administra las asignaturas y sus requisitos académicos", this);
+    QLabel *subtitulo = new QLabel("Administra las asignaturas y su tipo de aula", this);
     subtitulo->setObjectName("SubjectSub");
     subtitulo->setStyleSheet("font-size: 14px; color: #64748b; border: none; background: transparent;");
 
@@ -78,7 +79,7 @@ void SubjectListWidget::setupUi() {
     // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
     m_table->setObjectName("SubjectTable");
-    m_table->setHorizontalHeaderLabels({"Nombre", "Requisitos", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; gridline-color: transparent; outline: none; color: #0f172a; }"
         "QHeaderView::section { background-color: #f8fafc; font-weight: 700; color: #475569; "
@@ -187,7 +188,8 @@ void SubjectListWidget::cargarMaterias() {
     }
 
     for (const auto& materia : res.valor) {
-        insertarMateriaEnTabla(materia.id, materia.nombre, materia.requisitos);
+        insertarMateriaEnTabla(materia.id, materia.nombre, materia.requisitos,
+                               materia.tipoAula, materia.idTipoAula);
     }
 
     // Actualizar dinámicamente el panel lateral con datos reales de aulas y materias
@@ -211,16 +213,17 @@ void SubjectListWidget::actualizarPanelLateral() {
         auto aulasDisponibles = resAulas.valor;
 
         for (const auto& materia : resMaterias.valor) {
-            QString req = materia.requisitos.toLower().trimmed();
+            // El emparejamiento usa el tipo de aula del catálogo (spec 009):
+            // una materia solo puede ocupar aulas de su mismo tipo.
+            const QString tipoMateria = materia.tipoAula.toLower().trimmed();
 
             for (int i = 0; i < aulasDisponibles.size(); ++i) {
-                QString nombreAula = aulasDisponibles[i].nombre.toLower().trimmed();
+                const QString tipoAula = aulasDisponibles[i].tipoAula.toLower().trimmed();
 
-                // Si el requisito coincide con el nombre del aula (ej. "cancha" con "cancha")
-                // o si es un aula general (Aula de estudio) y el aula no es especializada
-                bool coincidenciaDirecta = (!req.isEmpty() && (nombreAula.contains(req) || req.contains(nombreAula)));
-                bool coincidenciaGeneral = (req.contains("estudio") || req.isEmpty()) &&
-                                           !nombreAula.contains("cancha") && !nombreAula.contains("lab");
+                bool coincidenciaDirecta = !tipoMateria.isEmpty() && tipoMateria == tipoAula;
+                bool coincidenciaGeneral =
+                    tipoMateria.isEmpty() && tipoAula.compare(TiposAulaUI::nombreTipoGeneral(),
+                                                              Qt::CaseInsensitive) == 0;
 
                 if (coincidenciaDirecta || coincidenciaGeneral) {
                     aulasOcupadasEstimadas++;
@@ -274,18 +277,21 @@ void SubjectListWidget::actualizarPanelLateral() {
                    totalAulas > 0 ? QString("%1 espacios pre-asignables").arg(aulasOcupadasEstimadas) : "⚠️ Sin aulas registradas");
 }
 
-void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, const QString& requisitos) {
+void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre,
+                                               const QString& requisitos,
+                                               const QString& tipoAula, int idTipoAula) {
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
     QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
-    QTableWidgetItem *itemReq = new QTableWidgetItem(requisitos.isEmpty() ? "Ninguno" : requisitos);
+    QTableWidgetItem *itemTipo =
+        new QTableWidgetItem(tipoAula.isEmpty() ? TiposAulaUI::nombreTipoGeneral() : tipoAula);
 
     itemNombre->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    itemReq->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    itemTipo->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     m_table->setItem(fila, 0, itemNombre);
-    m_table->setItem(fila, 1, itemReq);
+    m_table->setItem(fila, 1, itemTipo);
 
     QWidget *panelAcciones = new QWidget();
     QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
@@ -325,14 +331,21 @@ void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, co
         }
     });
 
-    connect(btnEditar, &QPushButton::clicked, this, [this, materiaId, nombre, requisitos]() {
+    connect(btnEditar, &QPushButton::clicked, this, [this, materiaId, nombre, requisitos, idTipoAula]() {
+        QVector<TipoAulaDTO> tipos;
+        if (const auto resultado = m_nucleo->listarTiposAula(); resultado.ok)
+            tipos = resultado.valor;
+
         gestor::frontend::forms::SubjectFormDialog dialogo(this);
         dialogo.setWindowTitle("Editar Asignatura");
-        dialogo.cargarDatos(nombre, requisitos);
+        dialogo.cargarTiposAula(tipos, idTipoAula);
+        dialogo.cargarDatos(nombre, requisitos, idTipoAula);
 
         connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-                this, [this, materiaId](const QString& nNombre, const QString& nRequisitos) {
-                    auto resultado = m_nucleo->actualizarMateria(materiaId, nNombre, nRequisitos);
+                this, [this, materiaId](const QString& nNombre, const QString& nRequisitos,
+                                        int nIdTipoAula) {
+                    auto resultado = m_nucleo->actualizarMateria(materiaId, nNombre, nRequisitos,
+                                                                 nIdTipoAula);
                     if (!resultado.ok) {
                         QMessageBox::warning(this, "Error", "No se pudo actualizar la asignatura: " + resultado.mensajeError);
                     } else {
@@ -348,10 +361,22 @@ void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, co
 void SubjectListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
+    QVector<TipoAulaDTO> tipos;
+    if (const auto resultado = m_nucleo->listarTiposAula(); resultado.ok)
+        tipos = resultado.valor;
+
+    if (tipos.isEmpty()) {
+        QMessageBox::warning(this, "Catálogo vacío",
+                             "No hay tipos de aula en el catálogo. Cargue los datos base "
+                             "o registre un tipo de aula antes de crear asignaturas.");
+        return;
+    }
+
     gestor::frontend::forms::SubjectFormDialog dialogo(this);
+    dialogo.cargarTiposAula(tipos, TiposAulaUI::idTipoGeneral(tipos));
     connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
-            this, [this](const QString& nombre, const QString& requisitos) {
-                auto resultado = m_nucleo->crearMateria(nombre, requisitos);
+            this, [this](const QString& nombre, const QString& requisitos, int idTipoAula) {
+                auto resultado = m_nucleo->crearMateria(nombre, requisitos, idTipoAula);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo crear la asignatura: " + resultado.mensajeError);
                 } else {

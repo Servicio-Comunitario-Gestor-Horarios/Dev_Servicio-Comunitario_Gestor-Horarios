@@ -33,7 +33,8 @@ private slots:
 private:
     void setupUi();
     void actualizarPanelLateral(); // <-- NUEVO: Para refrescar ocupación y notificaciones dinámicamente
-    void insertarMateriaEnTabla(int id, const QString& nombre, const QString& requisitos);
+    void insertarMateriaEnTabla(int id, const QString& nombre, const QString& requisitos,
+                                const QString& tipoAula, int idTipoAula);
 
     void enviarCrearMateria(const QString& nombre, const QString& requisitos);
     void enviarActualizarMateria(int id, const QString& nombre, const QString& requisitos);
