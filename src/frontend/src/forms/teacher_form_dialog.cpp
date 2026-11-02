@@ -9,7 +9,7 @@ namespace gestor::frontend::forms {
 
 TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Docente");
-    resize(450, 350);
+    resize(450, 310); // Reducido ligeramente al quitar el campo de materias
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -27,12 +27,11 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
                              "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
                              "background-color: %2; color: %3; font-size: 13px; }"
                              "QLineEdit::placeholder { color: %4; }"
-                             "QLineEdit.error { border: 2px solid #dc2626; }"
                              ).arg(inputBorder, inputBg, textColor, placeholderColor);
 
     campoCedula = new QLineEdit(this);
     campoCedula->setStyleSheet(inputStyle);
-    campoCedula->setPlaceholderText("Ej. 12345678");
+    campoCedula->setPlaceholderText("Ej. 12345678 (Solo números)");
 
     campoNombre = new QLineEdit(this);
     campoNombre->setStyleSheet(inputStyle);
@@ -45,11 +44,6 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoTelefono = new QLineEdit(this);
     campoTelefono->setStyleSheet(inputStyle);
     campoTelefono->setPlaceholderText("Opcional: 0412-1234567");
-
-    // NUEVO: Campo de Materias
-    campoMaterias = new QLineEdit(this);
-    campoMaterias->setStyleSheet(inputStyle);
-    campoMaterias->setPlaceholderText("Ej. Física, Matemáticas");
 
     botonCancelar = new QPushButton("Cancelar", this);
     botonCancelar->setStyleSheet(isDark ?
@@ -68,19 +62,22 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     // Validadores
     QRegularExpression regexEmail("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}$");
     campoEmail->setValidator(new QRegularExpressionValidator(regexEmail, this));
+
     QRegularExpression regexTelefono("^[0-9+()\\- ]+$");
     campoTelefono->setValidator(new QRegularExpressionValidator(regexTelefono, this));
-    campoCedula->setValidator(new QRegularExpressionValidator(regexTelefono, this));
+
+    // Validador estricto de Cédula: Solo números, sin símbolos ni espacios
+    QRegularExpression regexCedula("^[0-9]*$");
+    campoCedula->setValidator(new QRegularExpressionValidator(regexCedula, this));
 
     QFormLayout *formLayout = new QFormLayout();
     formLayout->setSpacing(15);
 
     QString labelStyle = QString("<span style='font-weight:bold; color:%1; font-size: 13px;'>").arg(labelColor);
-    formLayout->addRow(labelStyle + "Cédula / ID:</span>", campoCedula);
+    formLayout->addRow(labelStyle + "Cédula:</span>", campoCedula);
     formLayout->addRow(labelStyle + "Nombre:</span>", campoNombre);
     formLayout->addRow(labelStyle + "Email:</span>", campoEmail);
     formLayout->addRow(labelStyle + "Teléfono:</span>", campoTelefono);
-    formLayout->addRow(labelStyle + "Materias:</span>", campoMaterias);
 
     QHBoxLayout *botonesLayout = new QHBoxLayout();
     botonesLayout->addStretch();
@@ -97,11 +94,15 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     connect(botonCancelar, &QPushButton::clicked, this, &QDialog::reject);
 }
 
+void TeacherFormDialog::setDocentesExistentes(const QMap<QString, QString>& cedulaANombre, const QString& cedulaActual) {
+    m_docentesExistentes = cedulaANombre;
+    m_cedulaOriginal = cedulaActual;
+}
+
 bool TeacherFormDialog::validarCampos() {
     bool ok = true;
     QString errores;
 
-    // Restaurar estilos (manteniendo el color base según el tema)
     bool isDark = qApp->property("isDarkMode").toBool();
     QString baseInputStyle = QString(
                                  "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
@@ -112,27 +113,41 @@ bool TeacherFormDialog::validarCampos() {
     campoNombre->setStyleSheet(baseInputStyle);
     campoEmail->setStyleSheet(baseInputStyle);
     campoTelefono->setStyleSheet(baseInputStyle);
-    campoMaterias->setStyleSheet(baseInputStyle);
 
-    if (campoCedula->text().trimmed().isEmpty()) {
+    QString cedulaStr = campoCedula->text().trimmed();
+
+    if (cedulaStr.isEmpty()) {
         errores += "• Cédula es obligatoria.\n";
         campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
+    } else {
+        // Verificar formato numérico estricto
+        QRegularExpression rxNum("^[0-9]+$");
+        if (!rxNum.match(cedulaStr).hasMatch()) {
+            errores += "• La cédula debe contener únicamente números (sin puntos, espacios ni símbolos).\n";
+            campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
+            ok = false;
+        } else if ((m_cedulaOriginal.isEmpty() || cedulaStr != m_cedulaOriginal) && m_docentesExistentes.contains(cedulaStr)) {
+            // Verificar duplicados en la base de datos
+            QString nombrePropietario = m_docentesExistentes.value(cedulaStr);
+            errores += QString("• La cédula %1 ya pertenece al docente: %2.\n").arg(cedulaStr, nombrePropietario);
+            campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
+            ok = false;
+        }
     }
+
     if (campoNombre->text().trimmed().isEmpty()) {
         errores += "• Nombre es obligatorio.\n";
         campoNombre->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
-    if (campoEmail->text().trimmed().isEmpty()) {
-        errores += "• Email es obligatorio.\n";
-        campoEmail->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
-        ok = false;
-    } else if (!campoEmail->hasAcceptableInput()) {
+
+    if (!campoEmail->text().trimmed().isEmpty() && !campoEmail->hasAcceptableInput()) {
         errores += "• Formato de email inválido.\n";
         campoEmail->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
     }
+
     if (!campoTelefono->text().trimmed().isEmpty() && !campoTelefono->hasAcceptableInput()) {
         errores += "• Formato de teléfono inválido (use solo dígitos, espacios, +, -, (, )).\n";
         campoTelefono->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
@@ -154,20 +169,18 @@ void TeacherFormDialog::guardarProfesor() {
         campoCedula->text().trimmed(),
         campoNombre->text().trimmed(),
         campoEmail->text().trimmed(),
-        campoTelefono->text().trimmed(),
-        campoMaterias->text().trimmed()
+        campoTelefono->text().trimmed()
         );
     accept();
 }
 
 void TeacherFormDialog::cargarDatos(const QString& cedula, const QString& nombre,
-                                    const QString& email, const QString& telefono,
-                                    const QString& materias) {
+                                    const QString& email, const QString& telefono) {
     campoCedula->setText(cedula);
+    m_cedulaOriginal = cedula;
     campoNombre->setText(nombre);
     campoEmail->setText(email);
     campoTelefono->setText(telefono);
-    campoMaterias->setText(materias);
 }
 
 } // namespace gestor::frontend::forms
