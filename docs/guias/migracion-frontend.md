@@ -3,6 +3,11 @@
 > **Para:** equipo de `src/frontend`.
 > **Fecha:** 2026-10-29 · **Rama:** `feat/Base-datos` · **Suite del backend:** 54/54.
 > **Contrato vigente:** `2.0` (`docs/contrato-solver-2.0.md`). **Esquema de base:** `v5`.
+>
+> **Estado (2026-11-01): completada.** La interfaz se migró en `feat/frontend-generacion` al
+> integrar `feat/Base-datos` por merge; `cmake --preset full && cmake --build build` compila y
+> `ctest` da **53/53** en el host. Lo único que no se hizo fue la pantalla de gestión del catálogo
+> de tipos de aula (funcionalidad nueva, no bloqueante).
 
 Este documento dice **qué hay que cambiar en la interfaz para que vuelva a compilar** y
 **qué cambió en el backend** en las specs 009, 010, 011 y 012 más las correcciones del
@@ -116,18 +121,21 @@ ventana queda al final. Derivarla del turno da otro número.
 
 ## 4. Lista de cambios a hacer
 
-- [ ] **Builder con D** (§2.1): leer la duración efectiva de `NucleoDatos::configuracionHoraria()` y
+- [x] **Builder con D** (§2.1): leer la duración efectiva de `NucleoDatos::configuracionHoraria()` y
       pasarla como tercer argumento. Dejar de leer `opciones.duracionMinutos` y
       `preset.franja_horaria.duracion_minutos` para el cálculo.
-- [ ] **Recesos → eventos** (§2.2): sustituir `RecesoDTO`/`turno.recesos`; dejar de derivar la duración
+- [x] **Recesos → eventos** (§2.2): sustituir `RecesoDTO`/`turno.recesos`; dejar de derivar la duración
       de la franja del turno.
-- [ ] **Cablear `huellaActual`** con D para que «datos anteriores» funcione.
-- [ ] **Retirar el selector de duración**; si se quiere ofrecer, que edite la configuración global
+- [x] **Cablear `huellaActual`** con D para que «datos anteriores» funcione.
+- [x] **Retirar el selector de duración**; si se quiere ofrecer, que edite la configuración global
       (`consultar`/`guardar`), no el preset.
-- [ ] **Panel de avisos**: dejar solo P2.
-- [ ] **`test/frontend/test_generacion_seed.cpp`**: fija `duracion_minutos == 40`; al migrar el builder,
+- [x] **Panel de avisos**: dejar solo P2.
+- [x] **`test/frontend/test_generacion_seed.cpp`**: fija `duracion_minutos == 40`; al migrar el builder,
       reescribirlo a **35** y a la rejilla nueva del seed.
 - [ ] **Opcional**: mostrar `ProfesorDTO.preferencias` (API nueva de la 012, sin UI todavía).
+      *(Sigue pendiente; no bloquea.)*
+- [x] **Formularios y listas con el catálogo** (deuda de la 009): `idTipoAula` en aulas y materias,
+      clasificación y ocupación por `tipoAula`. *(La gestión del catálogo sigue sin pantalla.)*
 
 ---
 

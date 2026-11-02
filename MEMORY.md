@@ -4,9 +4,9 @@
 
 ## Fase actual
 
-- **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. Suite **54/54** en verde (`ctest --preset backend`, 54 tests registrados).
-- **Fecha:** 2026-10-29
-- **Rama:** `feat/Base-datos` (HEAD `0946600`; **83 commits** por delante de `develop` = `5d6b1da`; sin PR abierto).
+- **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. **Interfaz migrada al contrato 2.0 y al esquema v5**: la rama de frontend integró `feat/Base-datos` por *merge* y ya compila con `BUILD_FRONTEND=ON`. Suite **53/53** en verde con el preset `full` (backend + interfaz, host).
+- **Fecha:** 2026-11-01
+- **Rama:** `feat/frontend-generacion` (merge de `origin/feat/Base-datos`; sin push). El trabajo de backend de la 012 sigue en `feat/Base-datos` (`0946600`, 83 commits por delante de `develop` = `5d6b1da`).
 - **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**, y la 005 cerró su **T10** el 2026-10-29. El resto, implementadas (ver tabla).
 - **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (deudas del frontend, `release/1.0` y PR a `develop`).
 
@@ -114,11 +114,17 @@
   - **Esquema v5** con catálogo y `HUELLAS_CONOCIDAS` en el mismo cambio; **sin migración** (una base v4 se rechaza al abrir). `CHECK(hora_inicio < hora_fin)` **depende del formato `HH:mm`** (barrera lexicográfica, no un parser), y el `UNIQUE` frena el duplicado exacto.
   - **Seed con 0 preferencias** (`Preferencias: 0`, 12 tablas de dominio); `--solo-docentes` y el reemplazo total **borran preferencias antes que docentes** y disponibilidad, en una transacción; **supersede RF-9 y la definición de reemplazo de docentes de la 008**.
 
+- **Integración del frontend con la base de datos (2026-11-01):**
+  - **Merge, no rebase:** `origin/feat/Base-datos` se integró en `feat/frontend-generacion` con un commit de merge, conservando la historia de ambas ramas. Se mantiene la agrupación S3 de bloques (spec `009-agrupacion-bloques-materias`, que vive en `develop`/`release/1.0` y no en la rama de datos) adaptada al contrato 2.0.
+  - **Migración según `docs/guias/migracion-frontend.md`:** el builder lee la D global de `NucleoDatos::configuracionHoraria()` y maneja el `Resultado` de `construirJsonEntrada`; la rejilla de visualización se alimenta del array `eventos` (sin `recesos` en el contrato) y `huellaActual` cablea `huellaDatos(datos, D)`; se retira el selector de duración y `OpcionesUI::duracionMinutos`.
+  - **Catálogo de tipos de aula (009) en la interfaz:** aulas y materias se dan de alta con `idTipoAula` desde `listarTiposAula()`; la clasificación y la estimación de ocupación usan `AulaDTO.tipoAula`/`MateriaDTO.tipoAula` en vez de heurísticas por nombre o por `requisitos`. La **gestión del catálogo** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) sigue sin pantalla: es deuda declarada, no afecta a la compilación.
+  - **`test_generacion_seed` con la regla de tipo exacto:** el seed (un solo laboratorio) no admite los 13 cursos; el test recorta su copia temporal a 8 cursos —los cinco años y ambos turnos— para que la demanda de laboratorio de cada turno quepa en su capacidad semanal (5 días × 8 franjas) y el motor resuelva. El seed en disco no cambia.
+
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
-2. **Deudas del frontend** (documentadas en `docs/interfaz-frontend.md` §6): el builder no compila con la firma nueva `construirJsonEntrada(datos, preset, D, ahora)`/`huellaDatos(datos, D)`; el selector de duración del editor y de la vista deja de ofrecerse; `horasAula` y la aritmética en minutos de la vista; «datos anteriores» sin cablear (`huellaActual = {}`); `test_generacion_seed` aún fija 40. De la 012, **no hay UI de preferencias** (solo API); sus cambios de firma son aditivos.
-3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; ambas ramas tocan el **solver**, así que el conflicto será real. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
+2. **Deudas del frontend:** **resueltas en `feat/frontend-generacion` (2026-11-01)** — builder con D, `huellaActual` cableado, selector de duración retirado, eventos en lugar de recesos, `test_generacion_seed` reescrito (35 min, rejilla del seed). Queda solo la **pantalla de gestión del catálogo de tipos de aula** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) y, de la 012, la **UI de preferencias** (solo API): ambas son funcionalidad nueva, no bloquean la compilación.
+3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; `feat/frontend-generacion` **sí la tiene** (viene de `develop`) y la conservó al integrar la rama de datos: la agrupación S3 del solver convive con la ocupación por `ClaveOcupacion` de la 010. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
 4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
 5. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y de la T10 de la 005.
 6. **DistribuciÃ³n:** el **ZIP portable** ya se genera con `cmake --build build-rel --target package` (`cmake/Packaging.cmake`; ver `docs/guias/desarrollo/CMAKE_GUIDE.md` Â§Empaquetado). Falta lo que venga despuÃ©s: un instalador (Inno Setup o NSIS) que envuelva ese ZIP y firmar el binario con `signtool` para evitar el aviso de SmartScreen.

@@ -869,6 +869,13 @@ tipos, y la verificación de la entrega es la suite del preset `backend`
 (`ctest --preset backend`), sin los tests de frontend. El contrato 1.0 del solver sigue derivando su
 sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo por el contrato 2.0.
 
+> **Actualización 2026-11-01.** La interfaz se migró en `feat/frontend-generacion` al integrar
+> `feat/Base-datos` (merge): los formularios de aula y materia piden el tipo del catálogo
+> (`listarTiposAula()`), el resumen de aulas clasifica por `AulaDTO.tipoAula`, la ocupación de
+> asignaturas cruza `MateriaDTO.tipoAula` con el de las aulas y la vista de generación recorre
+> `turno.eventos`. Queda sin pantalla la **gestión del catálogo**
+> (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`).
+
 ---
 
 ## 6. Deuda del frontend y alcance (spec 011)
@@ -894,3 +901,8 @@ firmas nuevas. El equipo de interfaz debe migrar:
    `duracion_horaria::minutosDeHorasAcademicas`.
 5. **Tests de frontend.** `test/frontend/test_generacion_seed.cpp` fija `duracion_minutos == 40` y
    queda fuera del preset `backend`; se reescribe al migrar el builder con D.
+
+> **Actualización 2026-11-01.** Resuelto en `feat/frontend-generacion`: el builder pasa la D global,
+> `huellaActual` usa `huellaDatos(datos, D)`, el selector de duración ya no se ofrece y
+> `test_generacion_seed` se reescribió a 35 min con la rejilla y los eventos del seed. Verificado con
+> `cmake --preset full && cmake --build build` y `ctest` (**53/53** en el host).
