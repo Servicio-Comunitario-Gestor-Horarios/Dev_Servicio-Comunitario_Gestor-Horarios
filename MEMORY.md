@@ -120,6 +120,12 @@
   - **Catálogo de tipos de aula (009) en la interfaz:** aulas y materias se dan de alta con `idTipoAula` desde `listarTiposAula()`; la clasificación y la estimación de ocupación usan `AulaDTO.tipoAula`/`MateriaDTO.tipoAula` en vez de heurísticas por nombre o por `requisitos`. La **gestión del catálogo** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) sigue sin pantalla: es deuda declarada, no afecta a la compilación.
   - **`test_generacion_seed` con la regla de tipo exacto:** el seed (un solo laboratorio) no admite los 13 cursos; el test recorta su copia temporal a 8 cursos —los cinco años y ambos turnos— para que la demanda de laboratorio de cada turno quepa en su capacidad semanal (5 días × 8 franjas) y el motor resuelva. El seed en disco no cambia.
 
+- **Centro generable y paleta mate del horario (2026-11-02):**
+  - **Presupuesto del solver:** el límite determinista sube de **2.0 a 6.0** s. Con 13 cursos, 2.0 devolvía `UNKNOWN` (no encontraba la primera solución); con 6.0 el centro 31059 resuelve, P4 sale sin conflictos y la S3 queda en 166. Se mantiene la reproducibilidad (1 worker, seed 0). Documentado en `specs/009-agrupacion-bloques-materias/estado.md`.
+  - **Capacidad de laboratorio:** con un solo laboratorio la instancia es **INFEASIBLE** (107 bloques de laboratorio frente a 80 franjas); con **tres** laboratorios y el presupuesto nuevo genera. El aula del tipo sobrante no se usa si ninguna materia la requiere.
+  - **Preset 2.0 del centro:** `datos-prueba/preset-centro-31059-2.0.json` (local; `datos-prueba/` está en `.gitignore`), con el reparto plan/turno original, D=40 y las opciones de docentes calculadas. Se carga con «Cargar preset…»; la generación se verificó reproduciendo ese camino (cargar preset → construir entrada → resolver).
+  - **Colores de los bloques:** `schedule_theme.hpp` pasa a una paleta **mate** (tonos medios poco saturados, texto claro) con familias por **prefijo** —«Matemáticas 1º», «Física Aplicada», «Ciencias de la Tierra 5º»…—, en vez de coincidencia exacta; en oscuro se aclaran ligeramente. El fallback por nombre también es mate.
+
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
