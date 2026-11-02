@@ -243,6 +243,77 @@ private slots:
         }
         QSqlDatabase::removeDatabase(conexion);
     }
+
+    /// Un alta de docente en la base debe aparecer al entrar de nuevo en la
+    /// vista de generación, sin perder los ajustes ya hechos en las filas.
+    void sincronizaDocentesNuevosSinPerderLoAjustado()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+
+        // Aislar QSettings (la vista precarga turno/plan/año del docente).
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir.path());
+        QSettings ajustesPrueba(QStringLiteral("LiceoRobertSerra"),
+                                QStringLiteral("GestorHorarios"));
+        ajustesPrueba.clear();
+
+        seed::OpcionesAplicacion siembra;
+        siembra.rutaDb = dir.filePath(QStringLiteral("centro.db"));
+        QVERIFY2(seed::aplicar(siembra).ok(), "no se pudo sembrar el centro");
+
+        const QString conexion = QStringLiteral("test_selector_generacion_sync");
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conexion);
+            db.setDatabaseName(siembra.rutaDb);
+            QVERIFY2(db.open(), qPrintable(db.lastError().text()));
+            NucleoDatos nucleo(db);
+
+            ScheduleGenerationWidget vista;
+            vista.setNucleoDatos(&nucleo);
+
+            auto* tabla =
+                vista.findChild<QTableWidget*>(QStringLiteral("genTablaDocentes"));
+            QVERIFY(tabla);
+            const int inicial = tabla->rowCount();
+            QVERIFY(inicial > 0);
+            const QString primerDocente = tabla->item(0, 0)->text();
+
+            // Ajuste manual en la primera fila: debe sobrevivir a la sincronización.
+            auto* turno = qobject_cast<QComboBox*>(tabla->cellWidget(0, 3));
+            QVERIFY(turno);
+            const int indiceManana = turno->findText(QStringLiteral("Mañana"));
+            QVERIFY(indiceManana > 0);
+            turno->setCurrentIndex(indiceManana);
+
+            const auto creado = nucleo.crearDocente(
+                QStringLiteral("T999"), QStringLiteral("Docente Nuevo"),
+                QStringLiteral("t999@centro-de-prueba.edu.ve"));
+            QVERIFY2(creado.ok, qPrintable(creado.mensajeError));
+
+            vista.sincronizarDocentes();
+            QCOMPARE(tabla->rowCount(), inicial + 1);
+
+            int filaNuevo = -1;
+            int filaPrimero = -1;
+            for (int fila = 0; fila < tabla->rowCount(); ++fila) {
+                const QString nombre = tabla->item(fila, 0)->text();
+                if (nombre == QStringLiteral("Docente Nuevo"))
+                    filaNuevo = fila;
+                if (nombre == primerDocente)
+                    filaPrimero = fila;
+            }
+            QVERIFY2(filaNuevo >= 0, "el docente nuevo debe aparecer en la tabla");
+            QVERIFY(filaPrimero >= 0);
+            QCOMPARE(qobject_cast<QComboBox*>(tabla->cellWidget(filaPrimero, 3))->currentText(),
+                     QStringLiteral("Mañana"));
+
+            QVERIFY(nucleo.eliminarDocente(QStringLiteral("T999")));
+            vista.sincronizarDocentes();
+            QCOMPARE(tabla->rowCount(), inicial);
+        }
+        QSqlDatabase::removeDatabase(conexion);
+    }
 };
 
 QTEST_MAIN(TestSelectorGeneracion)

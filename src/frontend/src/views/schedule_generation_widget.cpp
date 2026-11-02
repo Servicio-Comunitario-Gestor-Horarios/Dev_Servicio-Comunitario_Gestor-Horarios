@@ -594,6 +594,7 @@ void ScheduleGenerationWidget::poblarCursos()
 void ScheduleGenerationWidget::poblarDocentes()
 {
     m_docentesNombres.clear();
+    m_docentesIds.clear();
     if (!m_tablaDocentes)
         return;
     m_tablaDocentes->setRowCount(0);
@@ -625,6 +626,7 @@ void ScheduleGenerationWidget::poblarDocentes()
     for (int fila = 0; fila < docentes.size(); ++fila) {
         const ProfesorDTO& docente = docentes[fila];
         m_docentesNombres << docente.nombre;
+        m_docentesIds << docente.id;
 
         // Preferencias capturadas en el formulario del docente (opcionales).
         // Un preset cargado después las sobrescribe con sus propios valores.
@@ -664,6 +666,79 @@ void ScheduleGenerationWidget::poblarDocentes()
         auto* botonSuplentes = new BotonMateriasSuplentes(m_tablaDocentes);
         botonSuplentes->setDisponibles(m_materiasDisponibles);
         m_tablaDocentes->setCellWidget(fila, 7, botonSuplentes);
+    }
+}
+
+void ScheduleGenerationWidget::sincronizarDocentes()
+{
+    if (!m_nucleo || !m_tablaDocentes)
+        return;
+
+    const auto resultado = m_nucleo->listarDocentes();
+    if (!resultado.ok)
+        return;
+
+    QStringList ids;
+    for (const ProfesorDTO& docente : resultado.valor)
+        ids << docente.id;
+    if (ids == m_docentesIds)
+        return;   // nada cambió: se respeta lo que el usuario haya ajustado
+
+    // Conservar lo elegido para los docentes que siguen en la base.
+    QMap<QString, GeneracionSolver::ParametrosDocente> valores;
+    QMap<QString, QStringList> suplentes;
+    const int filas = qMin(m_docentesIds.size(), m_tablaDocentes->rowCount());
+    for (int fila = 0; fila < filas; ++fila) {
+        GeneracionSolver::ParametrosDocente pd;
+        if (auto* spin = qobject_cast<QSpinBox*>(m_tablaDocentes->cellWidget(fila, 1)))
+            pd.horasRequeridas = spin->value();
+        if (auto* spin = qobject_cast<QSpinBox*>(m_tablaDocentes->cellWidget(fila, 2)))
+            pd.horasAula = spin->value();
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaDocentes->cellWidget(fila, 3)))
+            pd.turno = combo->currentText().trimmed();
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaDocentes->cellWidget(fila, 4)))
+            pd.plan = combo->currentText().trimmed();
+        if (auto* combo = qobject_cast<ComboMultiple*>(m_tablaDocentes->cellWidget(fila, 5))) {
+            for (const QVariant& dato : combo->datosSeleccionados()) {
+                const int anio = dato.toInt();
+                if (anio > 0)
+                    pd.anios.append(anio);
+            }
+        }
+        if (auto* boton = qobject_cast<BotonMateriasSuplentes*>(
+                m_tablaDocentes->cellWidget(fila, 7)))
+            suplentes.insert(m_docentesIds[fila], boton->seleccion());
+        valores.insert(m_docentesIds[fila], pd);
+    }
+
+    poblarDocentes();
+
+    for (int fila = 0; fila < m_docentesIds.size() && fila < m_tablaDocentes->rowCount(); ++fila) {
+        const auto it = valores.constFind(m_docentesIds[fila]);
+        if (it == valores.constEnd())
+            continue;   // docente nuevo: se queda con sus preferencias por defecto
+
+        if (auto* spin = qobject_cast<QSpinBox*>(m_tablaDocentes->cellWidget(fila, 1)))
+            spin->setValue(it->horasRequeridas);
+        if (auto* spin = qobject_cast<QSpinBox*>(m_tablaDocentes->cellWidget(fila, 2)))
+            spin->setValue(it->horasAula);
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaDocentes->cellWidget(fila, 3))) {
+            const int indice = combo->findText(it->turno);
+            combo->setCurrentIndex(indice < 0 ? 0 : indice);
+        }
+        if (auto* combo = qobject_cast<QComboBox*>(m_tablaDocentes->cellWidget(fila, 4))) {
+            const int indice = combo->findText(it->plan);
+            combo->setCurrentIndex(indice < 0 ? 0 : indice);
+        }
+        if (auto* combo = qobject_cast<ComboMultiple*>(m_tablaDocentes->cellWidget(fila, 5))) {
+            QVariantList anios;
+            for (int anio : it->anios)
+                anios << anio;
+            combo->setSeleccionDatos(anios);
+        }
+        if (auto* boton = qobject_cast<BotonMateriasSuplentes*>(
+                m_tablaDocentes->cellWidget(fila, 7)))
+            boton->setSeleccion(suplentes.value(m_docentesIds[fila]));
     }
 }
 

@@ -63,6 +63,15 @@ public:
     /// sin tocar las tablas de cursos y docentes.
     void recargarConfiguracionAvanzada();
 
+    /**
+     * @brief Refresca la tabla de docentes si la base ganó o perdió docentes.
+     *
+     * Conserva los valores ya elegidos para los docentes que siguen; los nuevos
+     * entran con sus preferencias (o los valores por defecto). Se llama al abrir
+     * la vista, para no exigir reiniciar la aplicación tras un alta.
+     */
+    void sincronizarDocentes();
+
     /// Reaplica los colores del tema (claro/oscuro) en caliente.
     void actualizarTema(bool modoOscuro);
 
@@ -129,6 +138,7 @@ private:
     QStringList m_turnosNombres;
     QStringList m_cursosNombres;
     QStringList m_docentesNombres;
+    QStringList m_docentesIds;         ///< Id de cada fila de la tabla de docentes.
     QVector<int> m_aniosDisponibles;   ///< Años de los cursos de la base.
     QStringList m_materiasDisponibles; ///< Materias existentes (para suplencias).
     bool m_defaultsApplied = false; ///< Los valores por defecto se derivan una vez.

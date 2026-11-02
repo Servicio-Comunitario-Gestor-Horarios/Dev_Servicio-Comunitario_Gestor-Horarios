@@ -298,6 +298,10 @@ void MainWindow::mostrarAsignaturas() {
 }
 
 void MainWindow::mostrarGeneracion() {
+    // Si se dieron de alta o se borraron docentes, la tabla se pone al día al
+    // entrar (sin exigir reiniciar la aplicación ni recargar todo).
+    if (m_generationWidget)
+        m_generationWidget->sincronizarDocentes();
     m_contenedorVistas->setCurrentIndex(4);
     activarBoton(m_btnGeneracion);
 }
