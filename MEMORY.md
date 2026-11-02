@@ -136,6 +136,11 @@
   - **Logo**: se carga de `:/logo.png`; la biblioteca `frontend` es estática, así que `dashboard_widget.cpp` fuerza el enlace del `.qrc` con `Q_INIT_RESOURCE(resources)`.
   - **Tipos de aula**: botón «+ Tipo de aula» en Gestión de Aulas que llama a `NucleoDatos::crearTipoAula`; el tipo queda disponible de inmediato en los formularios de aulas y materias y el solver lo exigirá para las materias de ese tipo.
 
+- **Eventos con nombre y configuración de generación (2026-11-02):**
+  - **Eventos del turno**: el contrato 2.0 ya envía `eventos` (metadata que el solver ignora) y la entrada del centro lleva 3: receso de mañana, **acto cívico** de mañana y receso de tarde. El frontend conserva su `nombre` en `_cuadricula` y lo pinta: el receso en ámbar y los demás eventos en el acento, con sus horas reales.
+  - **Datos del centro**: se añadió «Acto cívico» (Mañana, tras el receso, 10 min, 08:30–08:40) y la ventana del turno de mañana pasó a **07:00–12:40** (8 × 40 + 10 + 10). La generación de 13 cursos sigue siendo factible y presentable.
+  - **Configuración de generación**: la vista ya no expone franjas por día (se derivan de los turnos) ni días, aula fija o duración. Esos ajustes viven en **Configuración → Avanzado**: días y aula fija en `QSettings` (`generacion/dias`, `generacion/aulaFija`); la duración en la base, validando el encaje de todos los turnos antes de guardar. La vista muestra un resumen de la configuración vigente.
+
 ## Siguiente paso
 
 1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
