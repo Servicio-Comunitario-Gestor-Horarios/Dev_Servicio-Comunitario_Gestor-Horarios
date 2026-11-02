@@ -278,10 +278,10 @@ QFrame* ScheduleGridDialog::createBlockCell(int day, int slot, const ScheduleMod
         label->setToolTip(text);
         lay->addWidget(label);
     };
-    addMeta(line2, 225);   // profesor
-    addMeta(line3, 185);   // aula (+ curso)
+    addMeta(line2, 232);   // profesor
+    addMeta(line3, 205);   // aula (+ curso)
     if (span > 1 && !rangoHoras.isEmpty())
-        addMeta(rangoHoras, 170);   // tiempo académico del bloque
+        addMeta(rangoHoras, 190);   // tiempo académico del bloque
 
     lay->addStretch(0);
     return cell;
