@@ -176,49 +176,16 @@ void MainWindow::setupCentralArea() {
     btnMenuRayas->setStyleSheet("QPushButton { font-size: 20px; border: none; background: transparent; padding-left: 15px; }"
                                 "QPushButton::menu-indicator { image: none; }");
 
+    // El programa no usa cuentas: el menú solo ofrece Configuración (#98).
     QMenu *menuOpciones = new QMenu(this);
-
-    QWidget *headerWidget = new QWidget(this);
-    headerWidget->setObjectName("WidgetMenuCorreo");
-    QVBoxLayout *menuHeaderLayout = new QVBoxLayout(headerWidget);
-    menuHeaderLayout->setContentsMargins(20, 10, 20, 10);
-    menuHeaderLayout->setSpacing(2);
-
-    QLabel *lblRole = new QLabel("Administrador", headerWidget);
-    lblRole->setObjectName("LblRoleMenu");
-    lblRole->setStyleSheet("font-weight: bold; font-size: 15px; background: transparent;");
-
-    QLabel *lblEmail = new QLabel("admin@liceorobertserra.com", headerWidget);
-    lblEmail->setObjectName("LblEmailMenu");
-    lblEmail->setStyleSheet("font-size: 13px; background: transparent;");
-
-    menuHeaderLayout->addWidget(lblRole);
-    menuHeaderLayout->addWidget(lblEmail);
-
-    QWidgetAction *headerAction = new QWidgetAction(menuOpciones);
-    headerAction->setDefaultWidget(headerWidget);
-
-    QAction *accionPerfil = new QAction("👤  Mi Perfil", this);
     QAction *accionConfig = new QAction("⚙️  Configuración", this);
-    QAction *accionCerrarSesion = new QAction("🚪  Cerrar Sesión", this);
-
-    menuOpciones->addAction(headerAction);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionPerfil);
     menuOpciones->addAction(accionConfig);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionCerrarSesion);
 
     btnMenuRayas->setMenu(menuOpciones);
     connect(accionConfig, &QAction::triggered, this, &MainWindow::abrirConfiguracion);
 
-    QLabel *userProfile = new QLabel("A  Header Subhead", topHeader);
-    userProfile->setObjectName("UserProfileText");
-    userProfile->setStyleSheet("border: none; background: transparent; padding-right: 15px;");
-
     headerLayout->addWidget(btnMenuRayas);
     headerLayout->addStretch();
-    headerLayout->addWidget(userProfile);
 
     m_contenedorVistas = new QStackedWidget(this);
     m_contenedorVistas->setObjectName("ContenedorVistas");
@@ -331,7 +298,7 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             "#FondoPrincipal { background-color: #121212; border: none; }"
             "#Sidebar { background-color: #121212; border-right: 1px solid #333333; border-radius: 0px; }"
             "#TopHeader { background-color: #121212; border-bottom: 1px solid #333333; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             // Textos
             "QLabel { background: transparent; color: #ffffff; border: none; }"
@@ -360,7 +327,7 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"
             "#Sidebar { background-color: white; border: none; border-right: 1px solid #e0e0e0; border-radius: 0px; }"
             "#TopHeader { background-color: white; border: none; border-bottom: 1px solid #e0e0e0; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             "QLabel { background: transparent; color: #334155; border: none; }"
             "QHeaderView::section { background-color: white; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
