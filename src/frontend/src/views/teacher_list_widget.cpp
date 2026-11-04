@@ -7,10 +7,10 @@
 #include "../forms/teacher_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
 #include "services/preferencias_docente_ui.hpp"
-#include "services/tipos_aula_ui.hpp"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QHeaderView>
+#include <QMap>
 #include <QMessageBox>
 #include <QApplication>
 
@@ -49,6 +49,16 @@ QVector<int> aniosDelNucleo(NucleoDatos* nucleo)
     }
     std::sort(anios.begin(), anios.end());
     return anios;
+}
+
+QMap<QString, QString> docentesExistentes(NucleoDatos* nucleo)
+{
+    QMap<QString, QString> mapa;
+    if (const auto docentes = nucleo->listarDocentes(); docentes.ok) {
+        for (const ProfesorDTO& docente : docentes.valor)
+            mapa.insert(docente.id, docente.nombre);
+    }
+    return mapa;
 }
 
 } // namespace
@@ -108,7 +118,7 @@ void TeacherListWidget::setupUi() {
     // Tabla de 6 columnas
     m_table = new QTableWidget(0, 6, leftWidget);
     m_table->setObjectName("TeacherTable");
-    m_table->setHorizontalHeaderLabels({"Cédula/ID", "Nombre", "Email", "Teléfono", "Materias", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Cédula", "Nombre", "Email", "Teléfono", "Materias", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; "
@@ -391,29 +401,15 @@ void TeacherListWidget::abrirFormularioNuevo() {
     dialogo.cargarOpcionesGeneracion(turnosDelNucleo(m_nucleo),
                                      planesDelNucleo(m_nucleo),
                                      aniosDelNucleo(m_nucleo));
+    dialogo.setDocentesExistentes(docentesExistentes(m_nucleo));
     connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
             this, [this](const QString& cedula, const QString& nombre,
-                   const QString& email, const QString& telefono,
-                   const QString& materias) {
+                   const QString& email, const QString& telefono) {
 
                 auto resultado = m_nucleo->crearDocente(cedula, nombre, email, telefono);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo crear el docente: " + resultado.mensajeError);
                 } else {
-                    // Si hay materias, se crean (si no existen) y se asignan al momento
-                    if (!materias.isEmpty()) {
-                        int idTipoMateria = -1;
-                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
-                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
-                        QStringList listaMaterias = materias.split(",");
-                        for (const QString& mat : listaMaterias) {
-                            QString materiaLimpia = mat.trimmed();
-                            if (!materiaLimpia.isEmpty()) {
-                                m_nucleo->crearMateria(materiaLimpia, QString(), idTipoMateria);
-                                m_nucleo->asignarMateriaPorNombre(cedula, materiaLimpia);
-                            }
-                        }
-                    }
                     cargarDocentes();
                 }
             });
@@ -435,8 +431,6 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
     QString nombre = m_table->item(fila, 1)->text();
     QString email = m_table->item(fila, 2)->text();
     QString telefono = m_table->item(fila, 3)->text();
-    QString materias = m_table->item(fila, 4)->text();
-    if (materias == "-") materias = "";
 
     gestor::frontend::forms::TeacherFormDialog dialogo(this);
     dialogo.setWindowTitle("Editar Docente");
@@ -448,33 +442,18 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
         PreferenciasDocenteUI::leer(cedula);
     dialogo.cargarPreferencias(preferencia.turno, preferencia.plan, preferencia.anio);
 
-    dialogo.cargarDatos(cedula, nombre, email, telefono, materias);
+    dialogo.cargarDatos(cedula, nombre, email, telefono);
+    dialogo.setDocentesExistentes(docentesExistentes(m_nucleo), cedula);
 
     connect(&dialogo, &gestor::frontend::forms::TeacherFormDialog::profesorGuardado,
-            this, [this, cedula](const QString& nCedula, const QString& nNombre,
-                           const QString& nEmail, const QString& nTelefono,
-                           const QString& nMaterias) {
+            this, [this](const QString& nCedula, const QString& nNombre,
+                           const QString& nEmail, const QString& nTelefono) {
 
                 auto resultado = m_nucleo->actualizarDocente(nCedula, nNombre, nEmail, nTelefono);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo actualizar el docente: " + resultado.mensajeError);
                 } else {
-                    // Limpiar materias viejas y asignar las nuevas
-                    m_nucleo->limpiarMaterias(nCedula);
-
-                    if (!nMaterias.isEmpty()) {
-                        int idTipoMateria = -1;
-                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
-                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
-                        QStringList listaMaterias = nMaterias.split(",");
-                        for (const QString& mat : listaMaterias) {
-                            QString materiaLimpia = mat.trimmed();
-                            if (!materiaLimpia.isEmpty()) {
-                                m_nucleo->crearMateria(materiaLimpia, QString(), idTipoMateria);
-                                m_nucleo->asignarMateriaPorNombre(nCedula, materiaLimpia);
-                            }
-                        }
-                    }
+                    // Las materias no se tocan aquí: se gestionan en el panel de asignaturas.
                     cargarDocentes();
                 }
             });
