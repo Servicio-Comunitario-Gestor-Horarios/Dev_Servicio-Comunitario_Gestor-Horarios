@@ -4,6 +4,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
+#include "backend/database/comprobacion_validez.hpp"
 #include "backend/services/duracion_horaria.hpp"
 
 ServicioConfiguracionHoraria::ServicioConfiguracionHoraria(QSqlDatabase& db) : m_db(db) {}
@@ -40,6 +41,16 @@ Resultado<ConfiguracionHoraria> ServicioConfiguracionHoraria::consultar() const
 
 Resultado<ConfiguracionHoraria> ServicioConfiguracionHoraria::guardar(int duracionMinutos)
 {
+    // Validez de la base primero (016 RF-1): un fallo estructural se informa antes que el
+    // rango y no se escribe nada.
+    const validez_base::Comprobacion base = validez_base::comprobar(m_db);
+    if (!base.valida())
+    {
+        return Resultado<ConfiguracionHoraria>::error(
+            base.mensaje
+            + QStringLiteral(" No se guardó la configuración de la hora académica."));
+    }
+
     // Punto único de validación del rango (RNF-4). Si falla, no se escribe nada.
     const QString error = duracion_horaria::errorDeRango(duracionMinutos);
     if (!error.isEmpty())

@@ -30,6 +30,7 @@
 
 #include <middleware/internalclient.h>
 
+#include "backend/database/comprobacion_validez.hpp"
 #include "backend/services/CargadorConfiguracionSolver.hpp"
 #include "backend/services/NucleoDatos.hpp"
 #include "backend/services/ServicioAula.hpp"
@@ -130,7 +131,11 @@ void ScheduleGenerationWidget::setClient(InternalClient* client)
             [this]() {
                 return m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo) : QString();
             },
-            {}, this);
+            {},
+            [this]() {
+                return m_nucleo ? m_nucleo->comprobarValidezBase().mensaje : QString();
+            },
+            this);
         connect(m_servicio, &ServicioGeneracion::finalizada,
                 this, &ScheduleGenerationWidget::onGeneracionFinalizada);
     }
@@ -926,6 +931,18 @@ void ScheduleGenerationWidget::onGenerarClicked()
     }
     if (m_servicio->enCurso())
         return;
+
+    // Validez de la base antes de componer (016 RF-1): sin esto, un catálogo roto se
+    // manifestaría como «el aula no tiene tipo» y taparía la causa real.
+    if (m_nucleo) {
+        const validez_base::Comprobacion base = m_nucleo->comprobarValidezBase();
+        if (!base.valida()) {
+            establecerEstado(base.mensaje, true);
+            ScheduleTheme::showStyledMessage(
+                this, QStringLiteral("La base de datos no es válida"), base.mensaje, true);
+            return;
+        }
+    }
 
 #if defined(GESTOR_SOLVER_REQUIERE_RELEASE)
     // Build Debug de MSVC con OR-Tools en release: resolver corrompe el heap del

@@ -24,7 +24,9 @@ target_sources(backend PRIVATE
 
 				# Database
 				src/database/DatabaseManager.cpp
+				src/database/comprobacion_validez.cpp
 				src/database/migracion.cpp
+				src/database/tipo_general.cpp
 				src/database/version_esquema.cpp
 				src/database/respaldo.cpp
 				src/database/apertura_base_datos.cpp
@@ -78,6 +80,7 @@ target_include_directories(backend PRIVATE
 target_link_libraries(backend PUBLIC
 				Qt6::Core
 				Qt6::Sql
+				common
 )
 
 set_project_warnings(backend)

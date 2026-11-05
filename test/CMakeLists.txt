@@ -101,6 +101,12 @@ if(TARGET backend)
 	# Punto único de duración de la hora académica (rango, minutos y encaje, 011 T1).
 	add_gtest(test_duracion_horaria backend/test_duracion_horaria.cpp backend)
 
+	# Predicado puro de la fila del tipo general y traducción del rechazo (015 T4).
+	add_gtest(test_tipo_general backend/test_tipo_general.cpp backend)
+
+	# Comprobación única de validez de la base (016 T1).
+	add_gtest(test_comprobacion_validez backend/test_comprobacion_validez.cpp backend)
+
 	# Configuración global de la hora académica: valor efectivo y edición (011 T3).
 	add_qtest(test_servicio_configuracion_horaria
 				backend/test_servicio_configuracion_horaria.cpp
@@ -156,6 +162,11 @@ if(TARGET frontend AND TARGET backend)
 	# es lógica pura del modelo de la visualización.
 	add_qtest(test_cuadricula_horario frontend/test_cuadricula_horario.cpp frontend)
 	target_include_directories(test_cuadricula_horario PRIVATE
+					${CMAKE_SOURCE_DIR}/src/frontend/src)
+
+	# Ayuda estricta que resuelve el tipo general (016 T4): falla en vez de devolver otro tipo.
+	add_qtest(test_tipos_aula_ui frontend/test_tipos_aula_ui.cpp frontend)
+	target_include_directories(test_tipos_aula_ui PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
 
 	# Selectores de la vista de generación (años como desplegable múltiple y

@@ -269,8 +269,9 @@ private:
         QVERIFY2(resultado.mensajeError.contains(curso), qPrintable(resultado.mensajeError));
     }
 
-    /// Exige que la entrada se rechace por V18 nombrando el aula, el curso y el tipo, y con la
-    /// acción disponible (asignar al curso un aula del tipo general).
+    /// Exige que la entrada se rechace por V18 nombrando el aula, el curso y el tipo, con la
+    /// convención del tipo general y la acción doble (asignar un aula del tipo general y
+    /// comprobar que la base es válida).
     void exigeRechazoV18(const QJsonObject& j, const QString& aula, const QString& curso,
                          const QString& tipo) const
     {
@@ -282,6 +283,14 @@ private:
         QVERIFY2(resultado.mensajeError.contains(curso), qPrintable(resultado.mensajeError));
         QVERIFY2(resultado.mensajeError.contains(tipo), qPrintable(resultado.mensajeError));
         QVERIFY2(resultado.mensajeError.contains(QStringLiteral("tipo general")),
+                 qPrintable(resultado.mensajeError));
+        // Convención del tipo general y acción doble (016 RF-3).
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("Aula de estudio")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(
+                     QStringLiteral("Asigne al curso un aula del tipo general")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("base es válida")),
                  qPrintable(resultado.mensajeError));
     }
 

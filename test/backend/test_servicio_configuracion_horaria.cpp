@@ -12,7 +12,7 @@
 
 /// Tests del servicio de la configuración global de la hora académica (RF-1,
 /// RF-2): valor efectivo con su origen, rango 30–90 y upsert de la fila única.
-/// La base se crea con el esquema v5, que ya deja `(1, 35)`.
+/// La base se crea con el esquema v6, que ya deja `(1, 35)`.
 class TestServicioConfiguracionHoraria : public QObject
 {
     Q_OBJECT
@@ -38,6 +38,37 @@ private:
             || !query.next())
             return -1;
         return query.value(0).toInt();
+    }
+
+    /// P10 de la 015: quita los dos disparadores y borra la fila del tipo general.
+    void invalidarSinTipoGeneral()
+    {
+        QSqlQuery query(m_dbManager->database());
+        QVERIFY2(query.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")),
+                 qPrintable(query.lastError().text()));
+        QVERIFY2(query.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_renombrar")),
+                 qPrintable(query.lastError().text()));
+        QVERIFY2(query.exec(QStringLiteral("DELETE FROM TiposAula")),
+                 qPrintable(query.lastError().text()));
+    }
+
+    /// Quita solo el disparador de borrado: la base deja de ser válida.
+    void invalidarSinDisparadorDeBorrado()
+    {
+        QSqlQuery query(m_dbManager->database());
+        QVERIFY2(query.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")),
+                 qPrintable(query.lastError().text()));
+    }
+
+    /// El rechazo de la base lleva la causa y el sufijo de la operación (RNF-1).
+    void esperarRechazoDeBase(const Resultado<ConfiguracionHoraria>& resultado)
+    {
+        QVERIFY(!resultado.ok);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("esquema esperado")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(
+                     QStringLiteral("No se guardó la configuración de la hora académica.")),
+                 qPrintable(resultado.mensajeError));
     }
 
     /// El mensaje identifica el rango, el valor y la acción disponible (RNF-1).
@@ -136,6 +167,72 @@ private slots:
         QCOMPARE(conservada.valor.duracionMinutos, 45);
         QVERIFY(!conservada.valor.porDefecto);
         QCOMPARE(filas(), 1);
+    }
+
+    void guardar_baseSinElTipoGeneral_rechazaSinEscribir()
+    {
+        QVERIFY(m_servicio->guardar(45).ok);
+        invalidarSinTipoGeneral();
+
+        const auto resultado = m_servicio->guardar(40);
+
+        esperarRechazoDeBase(resultado);
+        QVERIFY2(resultado.mensajeError.contains(QStringLiteral("aula de estudio")),
+                 qPrintable(resultado.mensajeError));
+
+        // No se escribió: el valor anterior y el número de filas se conservan.
+        QCOMPARE(filas(), 1);
+        const auto conservada = m_servicio->consultar();
+        QVERIFY2(conservada.ok, qPrintable(conservada.mensajeError));
+        QCOMPARE(conservada.valor.duracionMinutos, 45);
+        QVERIFY(!conservada.valor.porDefecto);
+    }
+
+    void guardar_baseSinDisparador_rechazaSinEscribir()
+    {
+        invalidarSinDisparadorDeBorrado();
+
+        const auto resultado = m_servicio->guardar(40);
+
+        esperarRechazoDeBase(resultado);
+        QVERIFY2(resultado.mensajeError.contains(
+                     QStringLiteral("TiposAula_general_no_borrar")),
+                 qPrintable(resultado.mensajeError));
+
+        QCOMPARE(filas(), 1);
+        const auto conservada = m_servicio->consultar();
+        QVERIFY2(conservada.ok, qPrintable(conservada.mensajeError));
+        QCOMPARE(conservada.valor.duracionMinutos, 35);
+        QVERIFY(!conservada.valor.porDefecto);
+    }
+
+    void guardar_baseInvalidaTienePrioridadSobreElRango()
+    {
+        invalidarSinDisparadorDeBorrado();
+
+        // 29 está fuera de rango, pero el fallo estructural se informa primero.
+        const auto resultado = m_servicio->guardar(29);
+
+        esperarRechazoDeBase(resultado);
+        QVERIFY2(resultado.mensajeError.contains(
+                     QStringLiteral("TiposAula_general_no_borrar")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(!resultado.mensajeError.contains(
+                     QStringLiteral("Ajuste la duración a un valor del rango")),
+                 qPrintable(resultado.mensajeError));
+    }
+
+    void consultar_conBaseInvalida_sigueLeyendo()
+    {
+        QVERIFY(m_servicio->guardar(45).ok);
+        invalidarSinDisparadorDeBorrado();
+
+        // La comprobación es solo al guardar: consultar sigue devolviendo el valor.
+        const auto leida = m_servicio->consultar();
+
+        QVERIFY2(leida.ok, qPrintable(leida.mensajeError));
+        QCOMPARE(leida.valor.duracionMinutos, 45);
+        QVERIFY(!leida.valor.porDefecto);
     }
 
     void guardar_sinFila_creaLaFila()

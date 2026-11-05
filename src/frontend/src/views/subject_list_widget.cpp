@@ -361,19 +361,22 @@ void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre,
 void SubjectListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
-    QVector<TipoAulaDTO> tipos;
-    if (const auto resultado = m_nucleo->listarTiposAula(); resultado.ok)
-        tipos = resultado.valor;
+    const auto tipos = m_nucleo->listarTiposAula();
+    if (!tipos.ok) {
+        QMessageBox::warning(this, "Catálogo no disponible",
+                             "No se pudo leer el catálogo de tipos de aula. " + tipos.mensajeError);
+        return;
+    }
 
-    if (tipos.isEmpty()) {
-        QMessageBox::warning(this, "Catálogo vacío",
-                             "No hay tipos de aula en el catálogo. Cargue los datos base "
-                             "o registre un tipo de aula antes de crear asignaturas.");
+    // 016 RF-2: resolver el general antes de abrir el diálogo; si no está, no se usa otro.
+    const auto idGeneral = TiposAulaUI::idTipoGeneral(tipos.valor);
+    if (!idGeneral.ok) {
+        QMessageBox::warning(this, "Tipo general no disponible", idGeneral.mensajeError);
         return;
     }
 
     gestor::frontend::forms::SubjectFormDialog dialogo(this);
-    dialogo.cargarTiposAula(tipos, TiposAulaUI::idTipoGeneral(tipos));
+    dialogo.cargarTiposAula(tipos.valor, idGeneral.valor);
     connect(&dialogo, &gestor::frontend::forms::SubjectFormDialog::materiaGuardada,
             this, [this](const QString& nombre, const QString& requisitos, int idTipoAula) {
                 auto resultado = m_nucleo->crearMateria(nombre, requisitos, idTipoAula);

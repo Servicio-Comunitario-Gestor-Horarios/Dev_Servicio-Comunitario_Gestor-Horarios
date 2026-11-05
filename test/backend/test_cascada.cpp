@@ -94,6 +94,17 @@ private:
         return total;
     }
 
+    /// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+    int idTipoGeneral() const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"))
+            || !query.next()) {
+            return -1;
+        }
+        return query.value(0).toInt();
+    }
+
 private slots:
 
     void init()
@@ -103,9 +114,8 @@ private slots:
         m_ruta = m_dir->filePath("cascada.db");
         abrirBase();
 
-        const auto tipo = m_nucleo->crearTipoAula(QStringLiteral("Aula de estudio"));
-        QVERIFY2(tipo.ok, qPrintable(tipo.mensajeError));
-        m_idTipoAula = tipo.valor.id;
+        m_idTipoAula = idTipoGeneral();
+        QVERIFY2(m_idTipoAula > 0, "La base nueva debe traer el tipo general (RF-1).");
     }
 
     void cleanup()

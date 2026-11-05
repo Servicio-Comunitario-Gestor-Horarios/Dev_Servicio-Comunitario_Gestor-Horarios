@@ -36,15 +36,17 @@ bool columnaExiste(QSqlDatabase& db, const QString& tabla, const QString& column
     return false;
 }
 
-/// Huella SHA-256 del catálogo real de la base: tablas y su DDL tal y como los
-/// registró SQLite, en orden estable y con el espacio normalizado. Cualquier
-/// cambio de esquema (tabla, columna, restricción) cambia la huella.
+/// Huella SHA-256 del catálogo real de la base: tablas, índices y disparadores con su
+/// DDL tal y como los registró SQLite, en orden estable (por tipo y nombre) y con el
+/// espacio normalizado. Cualquier cambio de esquema (tabla, columna, restricción,
+/// índice o disparador) cambia la huella.
 QByteArray huellaEsquema(QSqlDatabase& db)
 {
     QSqlQuery query(db);
     if (!query.exec(QStringLiteral("SELECT name, sql FROM sqlite_master "
-                                  "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
-                                  "ORDER BY name")))
+                                  "WHERE type IN ('table','index','trigger') "
+                                  "AND name NOT LIKE 'sqlite_%' "
+                                  "ORDER BY type, name")))
         return QByteArray();
 
     QCryptographicHash hash(QCryptographicHash::Sha256);
@@ -168,9 +170,9 @@ private:
 
 private slots:
 
-    void versionActual_esCinco()
+    void versionActual_esSeis()
     {
-        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 5);
+        QCOMPARE(VersionEsquema::VERSION_ESQUEMA_ACTUAL, 6);
     }
 
     // ─── decidirApertura ────────────────────────────────────────────────────
@@ -232,6 +234,89 @@ private slots:
         // Idempotente: repetir no falla ni cambia la versión.
         QVERIFY(VersionEsquema::crearEsquema(db));
         QCOMPARE(VersionEsquema::leerVersionEsquema(db), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+        cerrarBase(db);
+    }
+
+    void crearEsquema_dejaElTipoGeneral()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Toda base nueva queda con exactamente una fila del tipo general (RF-1).
+        QSqlQuery query(db);
+        QVERIFY2(query.exec(QStringLiteral("SELECT nombre, clave FROM TiposAula")),
+                 qPrintable(query.lastError().text()));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("Aula de estudio"));
+        QCOMPARE(query.value(1).toString(), QStringLiteral("aula de estudio"));
+        QVERIFY(!query.next()); // exactamente una fila
+
+        cerrarBase(db);
+    }
+
+    void crearEsquema_esIdempotente()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery primera(db);
+        QVERIFY(primera.exec(QStringLiteral("SELECT id, nombre, clave FROM TiposAula")));
+        QVERIFY(primera.next());
+        const int idAntes = primera.value(0).toInt();
+        const QString nombreAntes = primera.value(1).toString();
+        const QString claveAntes = primera.value(2).toString();
+
+        // Repetir el paso que garantiza el tipo general no lo duplica ni lo cambia.
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral("SELECT COUNT(*) FROM TiposAula")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 1);
+
+        QSqlQuery despues(db);
+        QVERIFY(despues.exec(QStringLiteral("SELECT id, nombre, clave FROM TiposAula")));
+        QVERIFY(despues.next());
+        QCOMPARE(despues.value(0).toInt(), idAntes);
+        QCOMPARE(despues.value(1).toString(), nombreAntes);
+        QCOMPARE(despues.value(2).toString(), claveAntes);
+        QCOMPARE(VersionEsquema::leerVersionEsquema(db), VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+
+        cerrarBase(db);
+    }
+
+    void crearEsquema_fallido_noDejaEsquemaParcial()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+
+        // Fuerza un fallo POSTERIOR al alta del tipo general y a los dos disparadores:
+        // `ConfiguracionHoraria` preexistente sin `duracion_minutos` hace fallar el
+        // `INSERT OR IGNORE` de la migración. La tabla preexistente queda (se creó fuera de
+        // la transacción), pero todo lo escrito dentro se revierte (RF-1).
+        QSqlQuery previa(db);
+        QVERIFY(previa.exec(QStringLiteral(
+            "CREATE TABLE ConfiguracionHoraria (id INTEGER PRIMARY KEY CHECK(id = 1))")));
+
+        QVERIFY(!VersionEsquema::crearEsquema(db));
+
+        // La marca no se fija y no queda ninguna tabla del esquema…
+        QCOMPARE(VersionEsquema::leerVersionEsquema(db), 0);
+        QVERIFY(tablaExiste(db, QStringLiteral("ConfiguracionHoraria"))); // la preexistente
+        QVERIFY(!tablaExiste(db, QStringLiteral("TiposAula")));
+        QVERIFY(!tablaExiste(db, QStringLiteral("Aulas")));
+        QVERIFY(!tablaExiste(db, QStringLiteral("Cursos")));
+
+        // …ni la fila canónica ni los dos disparadores.
+        QSqlQuery fila(db);
+        QVERIFY(!fila.exec(QStringLiteral("SELECT 1 FROM TiposAula LIMIT 1"))); // tabla revertida
+
+        QSqlQuery disparadores(db);
+        QVERIFY(disparadores.exec(QStringLiteral(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN "
+            "('TiposAula_general_no_borrar', 'TiposAula_general_no_renombrar')")));
+        QVERIFY(disparadores.next());
+        QCOMPARE(disparadores.value(0).toInt(), 0);
 
         cerrarBase(db);
     }
@@ -298,6 +383,139 @@ private slots:
         QSqlDatabase db = abrirBaseEnMemoria();
         QVERIFY(VersionEsquema::crearEsquema(db));
         QVERIFY(VersionEsquema::esquemaEsperado(db));
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_exigeElIndiceYLosDosDisparadores()
+    {
+        // Cada objeto exigido se comprueba por nombre: quitarlo invalida la base y el
+        // motivo lo nombra (RF-6).
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP INDEX TiposAula_clave")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("TiposAula_clave")));
+            cerrarBase(db);
+        }
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("TiposAula_general_no_borrar")));
+            cerrarBase(db);
+        }
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_renombrar")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("TiposAula_general_no_renombrar")));
+            cerrarBase(db);
+        }
+    }
+
+    void esquemaEsperado_exigeExactamenteUnaFila()
+    {
+        // P10: el disparador de borrado impide quitar la fila; se quita el disparador en el
+        // montaje (base en memoria y por caso; no se restaura).
+
+        // Caso 1: 0 filas.
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")));
+            QVERIFY(q.exec(QStringLiteral("DELETE FROM TiposAula")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("0")));
+            QVERIFY(motivo.contains(QStringLiteral("aula de estudio")));
+            cerrarBase(db);
+        }
+
+        // Caso 2: dos filas con nombre canónico (la segunda con la clave en mayúsculas).
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QVERIFY(insertarTipo(db, QStringLiteral("AULA DE ESTUDIO"),
+                                 QStringLiteral("AULA DE ESTUDIO")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("2")));
+            QVERIFY(motivo.contains(QStringLiteral("aula de estudio")));
+            cerrarBase(db);
+        }
+
+        // Caso 3: una sola fila canónica con la clave almacenada distinta.
+        {
+            QSqlDatabase db = abrirBaseEnMemoria();
+            QVERIFY(VersionEsquema::crearEsquema(db));
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")));
+            QVERIFY(q.exec(QStringLiteral("DELETE FROM TiposAula")));
+            QVERIFY(insertarTipo(db, QStringLiteral("Aula de estudio"),
+                                 QStringLiteral("AULA DE ESTUDIO")));
+
+            QString motivo;
+            QVERIFY(!VersionEsquema::esquemaEsperado(db, &motivo));
+            QVERIFY(motivo.contains(QStringLiteral("1")));
+            QVERIFY(motivo.contains(QStringLiteral("AULA DE ESTUDIO")));
+            QVERIFY(motivo.contains(QStringLiteral("se esperaba")));
+            cerrarBase(db);
+        }
+    }
+
+    void esquemaEsperado_toleraObjetosDeMas()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Un índice de más no invalida la base (RF-6).
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral("CREATE INDEX indice_extra ON Aulas(nombre)")));
+        QVERIFY(VersionEsquema::esquemaEsperado(db));
+
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_noDejaTransaccionAbierta()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        QString motivo;
+        QVERIFY(VersionEsquema::esquemaEsperado(db, &motivo));
+
+        // Si la guardia hubiera abierto una transacción y no la cerrara, esta fallaría.
+        QVERIFY(db.transaction());
+        QVERIFY(db.commit());
+
+        cerrarBase(db);
+    }
+
+    void esquemaEsperado_funcionaDentroDeUnaTransaccion()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // P5: con una transacción ya abierta, la guardia usa esa instantánea y no la cierra.
+        QVERIFY(db.transaction());
+        QVERIFY(VersionEsquema::esquemaEsperado(db));
+        QVERIFY(db.commit());
+
         cerrarBase(db);
     }
 
@@ -472,6 +690,114 @@ private slots:
 
         QVERIFY(!insertarTipo(db, QStringLiteral(" Laboratorio"), QStringLiteral(" laboratorio")));
         QVERIFY(!insertarTipo(db, QStringLiteral("Laboratorio"), QString()));
+        cerrarBase(db);
+    }
+
+    // ─── protección del tipo general: borrado (015 T2) ─────────────────────
+
+    void proteccion_borradoDirecto_delGeneral_esRechazado()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Escritura directa que no pasa por el servicio: el disparador la rechaza (RF-3).
+        QSqlQuery borrado(db);
+        QVERIFY(!borrado.exec(QStringLiteral(
+            "DELETE FROM TiposAula WHERE clave = 'aula de estudio'")));
+        QVERIFY(borrado.lastError().text().contains(
+            QStringLiteral("No se puede eliminar el tipo de aula general del centro")));
+
+        // La fila sigue existiendo: no se puede dejar el centro sin el tipo general.
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral(
+            "SELECT COUNT(*) FROM TiposAula WHERE clave = 'aula de estudio'")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 1);
+
+        cerrarBase(db);
+    }
+
+    void proteccion_borradoDeUnEspecializado_sePermite()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+        QVERIFY(insertarTipo(db, QStringLiteral("Laboratorio"), QStringLiteral("laboratorio")));
+
+        // Control positivo: un tipo especializado sin dependientes se borra con normalidad.
+        QSqlQuery borrado(db);
+        QVERIFY2(borrado.exec(QStringLiteral(
+                     "DELETE FROM TiposAula WHERE clave = 'laboratorio'")),
+                 qPrintable(borrado.lastError().text()));
+
+        QSqlQuery cuenta(db);
+        QVERIFY(cuenta.exec(QStringLiteral("SELECT COUNT(*) FROM TiposAula")));
+        QVERIFY(cuenta.next());
+        QCOMPARE(cuenta.value(0).toInt(), 1); // solo queda el tipo general
+
+        cerrarBase(db);
+    }
+
+    // ─── protección del tipo general: renombrado (015 T3) ──────────────────
+
+    void proteccion_renombradoDirecto_delGeneral_esRechazado()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Cambiar solo el nombre visible: rechazado (RF-4).
+        QSqlQuery porNombre(db);
+        QVERIFY(!porNombre.exec(QStringLiteral(
+            "UPDATE TiposAula SET nombre = 'Aula común' WHERE clave = 'aula de estudio'")));
+        QVERIFY(porNombre.lastError().text().contains(
+            QStringLiteral("No se puede renombrar el tipo de aula general del centro")));
+
+        // Cambiar solo la clave almacenada: rechazado igualmente.
+        QSqlQuery porClave(db);
+        QVERIFY(!porClave.exec(QStringLiteral(
+            "UPDATE TiposAula SET clave = 'AULA DE ESTUDIO' "
+            "WHERE clave = 'aula de estudio'")));
+        QVERIFY(porClave.lastError().text().contains(
+            QStringLiteral("No se puede renombrar el tipo de aula general del centro")));
+
+        // La fila conserva el nombre y la clave anteriores.
+        QSqlQuery fila(db);
+        QVERIFY(fila.exec(QStringLiteral(
+            "SELECT nombre, clave FROM TiposAula WHERE clave = 'aula de estudio'")));
+        QVERIFY(fila.next());
+        QCOMPARE(fila.value(0).toString(), QStringLiteral("Aula de estudio"));
+        QCOMPARE(fila.value(1).toString(), QStringLiteral("aula de estudio"));
+        QVERIFY(!fila.next());
+
+        cerrarBase(db);
+    }
+
+    void proteccion_updateSoloDeFecha_delGeneral_sePermite()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // `BEFORE UPDATE OF nombre, clave` no se dispara si solo cambia la fecha.
+        QSqlQuery fecha(db);
+        QVERIFY2(fecha.exec(QStringLiteral(
+                     "UPDATE TiposAula SET fecha_modificacion = '2030-01-01 00:00:00' "
+                     "WHERE clave = 'aula de estudio'")),
+                 qPrintable(fecha.lastError().text()));
+
+        cerrarBase(db);
+    }
+
+    void proteccion_updateSinCambios_sePermite()
+    {
+        QSqlDatabase db = abrirBaseEnMemoria();
+        QVERIFY(VersionEsquema::crearEsquema(db));
+
+        // Asignar el mismo nombre y la misma clave no es un renombrado: `NEW <> OLD` es falso.
+        QSqlQuery iguales(db);
+        QVERIFY2(iguales.exec(QStringLiteral(
+                     "UPDATE TiposAula SET nombre = 'Aula de estudio', "
+                     "clave = 'aula de estudio' WHERE clave = 'aula de estudio'")),
+                 qPrintable(iguales.lastError().text()));
+
         cerrarBase(db);
     }
 
@@ -689,11 +1015,17 @@ private slots:
         //      creado; cópiala a HUELLAS_CONOCIDAS más abajo y repite.
         // Cambiar el DDL sin subir la versión vuelve a romper las bases de los
         // usuarios: la marca ya no las distingue y solo el catálogo las rechaza.
+        // Las entradas 2–5 son históricas: se calcularon con el resumen de solo tablas.
+        // Este test solo compara la entrada de VERSION_ESQUEMA_ACTUAL (v6), calculada con
+        // tablas, índices y disparadores.
         static const struct { int version; const char* huella; } HUELLAS_CONOCIDAS[] = {
             { 2, "b7684333c36458b0529308f9130e2a3b105c4cd4086b5f0e470a26ca917eb882" },
             { 3, "ba386397216ac9fb8d427ab4603c09ce3d8342cc5605dda16eecc78a02f1701b" },
             { 4, "f630cc2547e21454b8273fa255124142138e254bfa8b2a580c52bf8b051f7101" },
             { 5, "eebe660c385f9802dc7b0b63abb6e7821db3ad3f2ec35982eeae55e49e9deaa0" },
+            // v6: huella del esquema con tablas, índice y disparadores (incluye el cuerpo
+            // del disparador: es guardia de release, no forma parte de la validez).
+            { 6, "15d99b8628a43a09542db1e0a443c15f52302ba893a6af107445370d9fe7ac3a" },
         };
 
         QSqlDatabase db = abrirBaseEnMemoria();

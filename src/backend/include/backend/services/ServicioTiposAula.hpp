@@ -70,6 +70,23 @@ public:
 private:
     QSqlDatabase& m_db;
 
+    /// Fila actual del catálogo, tal y como está en la base (P4): la relectura tras un
+    /// fallo de escritura decide si el rechazo era del tipo general.
+    struct FilaTipoActual {
+        bool existe = false;
+        QString nombre;
+        QString clave;
+    };
+
+    /** @brief Lee la fila actual del catálogo; `existe` es falso si no hay o no se puede leer. */
+    FilaTipoActual leerFila(int id) const;
+
+    /** @brief ¿La fila es el tipo general? Por nombre normalizado o por clave almacenada. */
+    static bool esFilaGeneral(const FilaTipoActual& fila);
+
+    /** @brief ¿El id corresponde al tipo general? */
+    bool esTipoGeneral(int id) const;
+
     /** @brief Valida nombre/clave y busca duplicados salvo en `excluirId`. */
     bool validarNombreYClave(const QString& nombre, int excluirId, QString& error) const;
 

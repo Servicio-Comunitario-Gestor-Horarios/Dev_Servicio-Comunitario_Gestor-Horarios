@@ -213,17 +213,21 @@ private slots:
     {
         const Perfil& perfil = perfilPorDefecto();
 
-        // 3 tipos: el genérico y los dos especializados que usan las aulas.
-        QCOMPARE(perfil.tiposAula.size(), 3);
-        QCOMPARE(perfil.tiposAula.at(0), QStringLiteral("Aula de estudio"));
-        QCOMPARE(perfil.tiposAula.at(1), QStringLiteral("Laboratorio"));
-        QCOMPARE(perfil.tiposAula.at(2), QStringLiteral("Taller"));
+        // 2 tipos declarados: los especializados que usan las aulas. El general lo aporta
+        // la creación de la base y el perfil ya no lo declara (015 RF-5).
+        QCOMPARE(perfil.tiposAula.size(), 2);
+        QCOMPARE(perfil.tiposAula.at(0), QStringLiteral("Laboratorio"));
+        QCOMPARE(perfil.tiposAula.at(1), QStringLiteral("Taller"));
+        QVERIFY(!perfil.tiposAula.contains(QStringLiteral("Aula de estudio")));
 
-        // Toda aula declara un tipo del catálogo; las genéricas son «Aula de estudio».
+        // Toda aula declara un tipo del catálogo declarado o el general del esquema; las
+        // genéricas son el tipo general.
         int genericas = 0;
         for (const AulaDef& aula : perfil.aulas) {
             QVERIFY2(!aula.tipo.isEmpty(), qPrintable(aula.nombre));
-            QVERIFY2(perfil.tiposAula.contains(aula.tipo), qPrintable(aula.nombre));
+            QVERIFY2(perfil.tiposAula.contains(aula.tipo)
+                         || aula.tipo == QStringLiteral("Aula de estudio"),
+                     qPrintable(aula.nombre));
             if (aula.tipo == QStringLiteral("Aula de estudio")) {
                 ++genericas;
             }
@@ -234,11 +238,24 @@ private slots:
         QCOMPARE(perfil.aulas[14].tipo, QStringLiteral("Laboratorio"));       // Laboratorio de Ciencias
         QCOMPARE(perfil.aulas[15].tipo, QStringLiteral("Taller"));            // Taller de Informática
 
-        // Todo tipo del catálogo lo usa al menos un aula («los que usan las aulas»).
+        // Todo tipo declarado lo usa al menos un aula, y las aulas usan el general + los dos
+        // especializados («los que usan las aulas»).
         QCOMPARE(tiposDeAulasDe(perfil).size(), 3);
+        QVERIFY(tiposDeAulasDe(perfil).contains(QStringLiteral("Aula de estudio")));
         for (const QString& tipo : perfil.tiposAula) {
             QVERIFY2(tiposDeAulasDe(perfil).contains(tipo), qPrintable(tipo));
         }
+    }
+
+    void validarPerfilAceptaElTipoGeneralDelEsquema()
+    {
+        // El perfil no declara el general, pero sus aulas lo usan: la validación lo acepta
+        // porque lo garantiza el esquema (015 RF-1/RF-5).
+        const Perfil& perfil = perfilPorDefecto();
+        QVERIFY(!perfil.tiposAula.contains(QStringLiteral("Aula de estudio")));
+
+        QString error;
+        QVERIFY2(validarPerfil(perfil, &error), qPrintable(error));
     }
 
     void tipoEspecializadoDeMateriaPorArea()
@@ -386,12 +403,12 @@ private slots:
         QCOMPARE(recuentos.tiposAula, 0);
 
         QCOMPARE(eventosDe(perfil), 2);
-        QCOMPARE(perfil.tiposAula.size(), 3);
+        QCOMPARE(perfil.tiposAula.size(), 2); // los especializados; el general lo aporta el esquema
         QCOMPARE(perfil.turnos.size(), 2);
 
         const Recuentos esperados = seed::recuentosEsperados(perfil, VarianteDocentes::Holgada);
         QCOMPARE(esperados.eventos, 2);
-        QCOMPARE(esperados.tiposAula, 3);
+        QCOMPARE(esperados.tiposAula, 3); // general + Laboratorio + Taller
         QCOMPARE(esperados.preferencias, 0);
     }
 

@@ -79,7 +79,8 @@ int aulasDelTipo(const SolverConfig& config, const QString& clave);
 /// Capacidad del tipo `clave`: `aulasDelTipo × |franjasDelTipo|`.
 int capacidadDelTipo(const SolverConfig& config, const QString& clave);
 
-/// Tipo de aula general/ordinario del centro, por convención de nombre: «Aula de estudio».
+/// Tipo de aula general/ordinario del centro, por la convención de nombre única:
+/// el tipo general. La definición del literal vive en `common/tipo_general.hpp`.
 QString tipoGeneralAula();
 
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig& config, const CursoSolverConfig& curso);

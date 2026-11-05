@@ -1,12 +1,22 @@
 #include "backend/database/migracion.hpp"
+#include "backend/database/tipo_general.hpp"
 
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QString>
 
+#include "common/tipo_general.hpp"
+
 namespace
 {
+    /// Escapa una cadena para usarla como literal SQL entre comillas simples. `CREATE
+    /// TRIGGER` no admite parámetros enlazados, así que clave y mensaje se interpolan.
+    QString escaparLiteralSql(const QString& valor)
+    {
+        return QString(valor).replace(QLatin1Char('\''), QStringLiteral("''"));
+    }
+
     /// Ejecuta una sentencia SQL; registra el error si falla.
     bool ejecutar(QSqlQuery& query, const QString& sql)
     {
@@ -40,6 +50,58 @@ namespace
         if (!ejecutar(query,
             "CREATE UNIQUE INDEX IF NOT EXISTS TiposAula_clave ON TiposAula(clave)"
         )) return false;
+
+        // El tipo general del centro forma parte de la creación de la base (015 RF-1):
+        // o queda con la estructura, o la transacción se revierte entera. Es idempotente
+        // (`OR IGNORE` con el índice único) y el nombre y la clave salen de la definición
+        // única (015 RF-2).
+        {
+            QSqlQuery altaTipoGeneral(db);
+            altaTipoGeneral.prepare(QStringLiteral(
+                "INSERT OR IGNORE INTO TiposAula (nombre, clave) VALUES (:nombre, :clave)"));
+            altaTipoGeneral.bindValue(QStringLiteral(":nombre"), tipo_general::nombre());
+            altaTipoGeneral.bindValue(QStringLiteral(":clave"), tipo_general::clave());
+            if (!altaTipoGeneral.exec())
+            {
+                qCritical() << "Error al insertar el tipo general de aula:"
+                            << altaTipoGeneral.lastError().text();
+                return false;
+            }
+        }
+
+        // El tipo general no se puede eliminar por ninguna vía (015 RF-3): disparador
+        // BEFORE DELETE con la clave y el mensaje del catálogo. `CREATE TRIGGER` no admite
+        // parámetros enlazados; el texto se interpola con escapado de comillas.
+        {
+            const QString claveSql = escaparLiteralSql(tipo_general::clave());
+            const QString mensajeSql = escaparLiteralSql(
+                tipo_general::mensajeProteccionAlmacenamiento(
+                    tipo_general::OperacionProtegida::Borrado));
+            const QString sql = QStringLiteral(
+                "CREATE TRIGGER IF NOT EXISTS TiposAula_general_no_borrar "
+                "BEFORE DELETE ON TiposAula "
+                "WHEN OLD.clave = '%1' "
+                "BEGIN SELECT RAISE(ABORT, '%2'); END").arg(claveSql, mensajeSql);
+            if (!ejecutar(query, sql)) return false;
+        }
+
+        // El tipo general tampoco se puede renombrar por ninguna vía (015 RF-4): el
+        // disparador cubre los cambios de `nombre` o `clave`, y deja pasar las
+        // actualizaciones que no tocan ninguna de las dos (p. ej. la fecha) o que asignan
+        // los mismos valores. Mismo escapado y mensaje fijo de la definición única.
+        {
+            const QString claveSql = escaparLiteralSql(tipo_general::clave());
+            const QString mensajeSql = escaparLiteralSql(
+                tipo_general::mensajeProteccionAlmacenamiento(
+                    tipo_general::OperacionProtegida::Renombrado));
+            const QString sql = QStringLiteral(
+                "CREATE TRIGGER IF NOT EXISTS TiposAula_general_no_renombrar "
+                "BEFORE UPDATE OF nombre, clave ON TiposAula "
+                "WHEN OLD.clave = '%1' AND "
+                "(NEW.nombre <> OLD.nombre OR NEW.clave <> OLD.clave) "
+                "BEGIN SELECT RAISE(ABORT, '%2'); END").arg(claveSql, mensajeSql);
+            if (!ejecutar(query, sql)) return false;
+        }
 
         // ── Aulas ──
         if (!ejecutar(query,

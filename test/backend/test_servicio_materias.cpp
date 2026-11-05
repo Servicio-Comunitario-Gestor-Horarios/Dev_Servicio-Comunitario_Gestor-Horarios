@@ -1,11 +1,26 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioMaterias.hpp>
 #include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioMaterias : public QObject {
     Q_OBJECT
@@ -23,9 +38,8 @@ private slots:
         m_servicio.reset(new ServicioMaterias(m_dbManager->database()));
 
         m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
-        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
-        QVERIFY(tipo.ok);
-        m_idTipoAula = tipo.valor.id;
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
@@ -74,8 +88,8 @@ private slots:
         QVERIFY(m_servicio->listarMaterias().valor.isEmpty());
     }
 
-    void crearMateria_catalogoVacio_falla() {
-        // Base nueva sin tipos: el catálogo vacío impide crear materias.
+    void crearMateria_sinTipoValido_falla() {
+        // Base nueva con el tipo general del esquema: «catálogo vacío» ya no existe.
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         DatabaseManager db;
@@ -85,11 +99,19 @@ private slots:
 
         auto sinTipo = servicio.crearMateria("Matemática", QString(), -1);
         QVERIFY(!sinTipo.ok);
-        QVERIFY(sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
+        QVERIFY(sinTipo.mensajeError.contains("sin tipo"));
+        QVERIFY(!sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
 
-        auto tipoInexistente = servicio.crearMateria("Matemática", QString(), 1);
+        // El tipo general del esquema sirve para dar de alta la materia (RF-1).
+        const int idGeneral = idTipoGeneral(db.database());
+        QVERIFY(idGeneral > 0);
+        auto conGeneral = servicio.crearMateria("Matemática", QString(), idGeneral);
+        QVERIFY(conGeneral.ok);
+        QCOMPARE(conGeneral.valor.idTipoAula, idGeneral);
+
+        // Un id inexistente sigue rechazándose.
+        auto tipoInexistente = servicio.crearMateria("Física", QString(), 9999);
         QVERIFY(!tipoInexistente.ok);
-        QVERIFY(servicio.listarMaterias().valor.isEmpty());
 
         db.close();
     }

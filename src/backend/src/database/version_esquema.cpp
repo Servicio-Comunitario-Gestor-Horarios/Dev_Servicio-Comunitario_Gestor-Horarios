@@ -1,12 +1,16 @@
 #include "backend/database/version_esquema.hpp"
 
 #include "backend/database/migracion.hpp"
+#include "backend/database/tipo_general.hpp"
 
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QString>
 #include <QStringList>
+#include <QVector>
+
+#include "common/tipo_general.hpp"
 
 namespace
 {
@@ -21,6 +25,18 @@ namespace
         QStringLiteral("Preferencia_Profesor"),
         QStringLiteral("Cursos")
     };
+
+    /// Índices que debe tener el esquema, por nombre (no se exigen los `sqlite_autoindex_*`).
+    const QStringList INDICES_ESPERADOS = {
+        QStringLiteral("TiposAula_clave")
+    };
+
+    /// Disparadores que debe tener el esquema, por nombre (su cuerpo no es identidad).
+    const QStringList DISPARADORES_ESPERADOS = {
+        QStringLiteral("TiposAula_general_no_borrar"),
+        QStringLiteral("TiposAula_general_no_renombrar")
+    };
+
 
     /// Tablas que NO deben existir (retiradas en el modelo nuevo).
     const QStringList TABLAS_RETIRADAS = {
@@ -109,6 +125,17 @@ namespace
 
         return false;
     }
+
+    /// ¿Existe el objeto `nombre` de tipo `tipo` (`index`/`trigger`) en `sqlite_master`?
+    bool objetoExiste(QSqlDatabase& db, const QString& tipo, const QString& nombre)
+    {
+        QSqlQuery query(db);
+        query.prepare(QStringLiteral(
+            "SELECT name FROM sqlite_master WHERE type = :tipo AND name = :nombre"));
+        query.bindValue(QStringLiteral(":tipo"), tipo);
+        query.bindValue(QStringLiteral(":nombre"), nombre);
+        return query.exec() && query.next();
+    }
 } // namespace
 
 VersionEsquema::EstadoApertura VersionEsquema::decidirApertura(bool existe,
@@ -177,7 +204,9 @@ bool VersionEsquema::crearEsquema(QSqlDatabase& db)
     if (!ok)
     {
         db.rollback();
-        qCritical() << "La creacion del esquema fallo; se revierte.";
+        qCritical() << "La creación del esquema falló y se revirtió: no quedó esquema parcial. "
+                       "El archivo puede descartarse y crearse de nuevo (con respaldo "
+                       "obligatorio).";
         return false;
     }
 
@@ -193,58 +222,125 @@ bool VersionEsquema::crearEsquema(QSqlDatabase& db)
 
 bool VersionEsquema::esquemaEsperado(QSqlDatabase& db, QString* motivo)
 {
-    QStringList faltantes;
+    // P5: toda la comprobación —tablas/columnas, objetos y fila— en una sola instantánea.
+    // Si ya hay una transacción abierta (`transaction()` devuelve false), se usa esa y no se
+    // cierra; la instantánea la da la externa. La comprobación no escribe nunca.
+    const bool transaccionPropia = db.transaction();
 
-    for (const QString& tabla : TABLAS_ESPERADAS)
-        if (!tablaExiste(db, tabla))
-            faltantes << tabla;
-
-    // Columnas que faltan, agrupadas por tabla (el motivo nombra tabla y columna).
-    QStringList piezasColumnas;
-    for (const TablaConColumnas& entrada : TABLAS_CON_COLUMNAS)
+    const bool ok = [&db, motivo]() -> bool
     {
-        const QString tabla = QString::fromLatin1(entrada.tabla);
-        if (!tablaExiste(db, tabla))
-            continue; // ya figura como tabla faltante
+        QStringList faltantes;
 
-        QStringList columnasFaltantes;
-        for (const QString& columna : *entrada.columnas)
-            if (!columnaExiste(db, tabla, columna))
-                columnasFaltantes << columna;
+        for (const QString& tabla : TABLAS_ESPERADAS)
+            if (!tablaExiste(db, tabla))
+                faltantes << tabla;
 
-        if (!columnasFaltantes.isEmpty())
-            piezasColumnas << QStringLiteral("faltan las columnas «%1» de la tabla «%2»")
-                                  .arg(columnasFaltantes.join(QStringLiteral("», «")), tabla);
-    }
+        // Columnas que faltan, agrupadas por tabla (el motivo nombra tabla y columna).
+        QStringList piezasColumnas;
+        for (const TablaConColumnas& entrada : TABLAS_CON_COLUMNAS)
+        {
+            const QString tabla = QString::fromLatin1(entrada.tabla);
+            if (!tablaExiste(db, tabla))
+                continue; // ya figura como tabla faltante
 
-    QStringList retiradasPresentes;
-    for (const QString& retirada : TABLAS_RETIRADAS)
-        if (tablaExiste(db, retirada))
-            retiradasPresentes << retirada;
+            QStringList columnasFaltantes;
+            for (const QString& columna : *entrada.columnas)
+                if (!columnaExiste(db, tabla, columna))
+                    columnasFaltantes << columna;
 
-    if (faltantes.isEmpty() && piezasColumnas.isEmpty() && retiradasPresentes.isEmpty())
+            if (!columnasFaltantes.isEmpty())
+                piezasColumnas << QStringLiteral("faltan las columnas «%1» de la tabla «%2»")
+                                      .arg(columnasFaltantes.join(QStringLiteral("», «")), tabla);
+        }
+
+        QStringList retiradasPresentes;
+        for (const QString& retirada : TABLAS_RETIRADAS)
+            if (tablaExiste(db, retirada))
+                retiradasPresentes << retirada;
+
+        // Objetos exigidos por nombre: índice único del catálogo y los dos disparadores.
+        // No se comparan cuerpos ni se exigen los `sqlite_autoindex_*`; los objetos de más
+        // se toleran (salvo las tablas retiradas, ya comprobadas).
+        QStringList objetosFaltantes;
+        for (const QString& indice : INDICES_ESPERADOS)
+            if (!objetoExiste(db, QStringLiteral("index"), indice))
+                objetosFaltantes << QStringLiteral("índice %1").arg(indice);
+        for (const QString& disparador : DISPARADORES_ESPERADOS)
+            if (!objetoExiste(db, QStringLiteral("trigger"), disparador))
+                objetosFaltantes << QStringLiteral("disparador %1").arg(disparador);
+
+        // Fila del tipo general: solo se evalúa si la tabla está y tiene `nombre` y `clave`.
+        // Si falta una columna ya se informa de ella y evaluar la fila taparía el motivo real.
+        bool filaValida = true;
+        QString motivoFila;
+        if (tablaExiste(db, QStringLiteral("TiposAula"))
+            && columnaExiste(db, QStringLiteral("TiposAula"), QStringLiteral("nombre"))
+            && columnaExiste(db, QStringLiteral("TiposAula"), QStringLiteral("clave")))
+        {
+            QSqlQuery query(db);
+            if (!query.exec(QStringLiteral("SELECT id, nombre, clave FROM TiposAula ORDER BY id")))
+            {
+                filaValida = false;
+                motivoFila = QStringLiteral("no se pudo leer el catálogo de tipos de aula");
+            }
+            else
+            {
+                QVector<tipo_general::Fila> filas;
+                while (query.next())
+                    filas.append(tipo_general::Fila{query.value(0).toInt(),
+                                                    query.value(1).toString(),
+                                                    query.value(2).toString()});
+
+                filaValida = tipo_general::evaluar(filas, &motivoFila)
+                             == tipo_general::EstadoFila::Valida;
+            }
+        }
+
+        const bool correcto = faltantes.isEmpty() && piezasColumnas.isEmpty()
+                              && retiradasPresentes.isEmpty() && objetosFaltantes.isEmpty()
+                              && filaValida;
+        if (correcto)
+        {
+            if (motivo)
+                motivo->clear();
+            return true;
+        }
+
+        if (motivo)
+        {
+            QStringList piezas;
+
+            if (!faltantes.isEmpty())
+                piezas << QStringLiteral("faltan las tablas «%1»")
+                              .arg(faltantes.join(QStringLiteral("», «")));
+
+            piezas << piezasColumnas;
+
+            if (!retiradasPresentes.isEmpty())
+                piezas << QStringLiteral("existe la tabla retirada «%1»")
+                              .arg(retiradasPresentes.join(QStringLiteral("», «")));
+
+            if (!objetosFaltantes.isEmpty())
+                piezas << QStringLiteral("faltan los objetos «%1»")
+                              .arg(objetosFaltantes.join(QStringLiteral("», «")));
+
+            if (!filaValida)
+                piezas << (motivoFila.isEmpty()
+                               ? QStringLiteral("la fila del tipo general no es válida")
+                               : motivoFila);
+
+            *motivo = piezas.join(QStringLiteral("; "));
+        }
+
+        return false;
+    }();
+
+    if (transaccionPropia && !db.commit())
     {
         if (motivo)
-            motivo->clear();
-        return true;
+            *motivo = QStringLiteral("no se pudo cerrar la comprobación del esquema");
+        return false;
     }
 
-    if (motivo)
-    {
-        QStringList piezas;
-
-        if (!faltantes.isEmpty())
-            piezas << QStringLiteral("faltan las tablas «%1»")
-                          .arg(faltantes.join(QStringLiteral("», «")));
-
-        piezas << piezasColumnas;
-
-        if (!retiradasPresentes.isEmpty())
-            piezas << QStringLiteral("existe la tabla retirada «%1»")
-                          .arg(retiradasPresentes.join(QStringLiteral("», «")));
-
-        *motivo = piezas.join(QStringLiteral("; "));
-    }
-
-    return false;
+    return ok;
 }

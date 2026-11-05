@@ -16,6 +16,7 @@
 #include <QVector>
 
 #include "backend/resultado.hpp"
+#include "backend/database/comprobacion_validez.hpp"
 #include "backend/services/GestorPendientes.hpp"
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCargaHoraria.hpp"
@@ -194,6 +195,12 @@ public:
      * Si tiene éxito, deja de estar pendiente; si vuelve a fallar, se conserva.
      */
     Resultado<bool> reintentarPendiente(qint64 id);
+
+    // ─── Validez de la base (016 RF-1) ────────────────────────────────────
+
+    /// Comprobación única de validez de la base. Solo lectura; mismo predicado que la
+    /// apertura y que los otros dos momentos. Coste de metadatos, sin datos de dominio.
+    validez_base::Comprobacion comprobarValidezBase() const;
 
 private:
     QSqlDatabase& m_db;

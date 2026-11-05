@@ -64,7 +64,7 @@ struct CursoDef {
 
 /// Conjunto de datos de prueba del centro.
 struct Perfil {
-    QStringList          tiposAula; ///< catálogo de tipos: 3 («Aula de estudio», «Laboratorio», «Taller»)
+    QStringList          tiposAula; ///< catálogo declarado: 2 («Laboratorio» y «Taller»); el general lo pone el esquema
     QVector<TurnoDef>    turnos;   ///< 2 (se rellena en 008-T3)
     QVector<AulaDef>     aulas;    ///< 16 (se rellena en 008-T3)
     QVector<MateriaAnio> materias; ///< 51 del 31059 (57 con las nuevas en 008-T2)
@@ -108,11 +108,11 @@ bool esMateriaNueva(const QString& nombre);
 /// Tipo de aula que pide una materia por su área (prefijo, no nombre exacto): ciencias
 /// experimentales (Física, Química, Biología, Ciencias Naturales y Ciencias de la Tierra,
 /// incluidas las «Aplicada») → «Laboratorio»; informática/taller → «Taller»; Educación
-/// Física → «Cancha»; el resto → «Aula de estudio» (RF-10). Pura.
+/// Física → «Cancha»; el resto → el tipo general (RF-10). Pura.
 QString tipoEspecializadoDeMateria(const QString& nombre);
 
 /// Tipo final de una materia: el especializado de su área si el conjunto tiene al menos un
-/// aula de ese tipo; en caso contrario, «Aula de estudio» (N1, RF-10). Pura.
+/// aula de ese tipo; en caso contrario, el tipo general (N1, RF-10). Pura.
 QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas);
 
 /// Horas máximas de una materia entre los planes que la incluyen (0 si no la incluye ninguno).

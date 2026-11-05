@@ -1,6 +1,9 @@
 #include "backend/services/ServicioTiposAula.hpp"
 #include "backend/services/ordenacion.hpp"
 
+#include "backend/database/tipo_general.hpp"
+#include "common/tipo_general.hpp"
+
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -68,7 +71,49 @@ ServicioTiposAula::ServicioTiposAula(QSqlDatabase& db) : m_db(db) {}
 
 QString ServicioTiposAula::claveTipo(const QString& nombre)
 {
-    return nombre.trimmed().toCaseFolded();
+    // Envoltorio conservado por compatibilidad de firma: el algoritmo es único y
+    // vive en `common/tipo_general.hpp`.
+    return tipo_general::claveNormalizada(nombre);
+}
+
+ServicioTiposAula::FilaTipoActual ServicioTiposAula::leerFila(int id) const
+{
+    FilaTipoActual fila;
+    if (id <= 0) {
+        return fila;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT nombre, clave FROM TiposAula WHERE id = :id"));
+    query.bindValue(QStringLiteral(":id"), id);
+    if (!query.exec()) {
+        qCritical() << "Error al leer la fila del tipo de aula:" << query.lastError().text();
+        return fila;
+    }
+
+    if (query.next()) {
+        fila.existe = true;
+        fila.nombre = query.value(0).toString();
+        fila.clave = query.value(1).toString();
+    }
+    return fila;
+}
+
+bool ServicioTiposAula::esFilaGeneral(const FilaTipoActual& fila)
+{
+    if (!fila.existe) {
+        return false;
+    }
+
+    // Doble lectura: el nombre normalizado es lo que ve el usuario y la clave almacenada
+    // cubre una fila escrita directamente en la base con la clave válida y otro nombre.
+    return tipo_general::esNombreCanonico(fila.nombre)
+           || tipo_general::claveNormalizada(fila.clave) == tipo_general::clave();
+}
+
+bool ServicioTiposAula::esTipoGeneral(int id) const
+{
+    return esFilaGeneral(leerFila(id));
 }
 
 bool ServicioTiposAula::validarNombreYClave(const QString& nombre, int excluirId,
@@ -193,6 +238,14 @@ Resultado<TipoAulaDTO> ServicioTiposAula::renombrarTipoAula(int id, const QStrin
         return Resultado<TipoAulaDTO>::error(existente.mensajeError, existente.codigoError);
     }
 
+    // RF-4: el servicio no admite ninguna petición de renombrado del tipo general,
+    // aunque el nombre recibido sea idéntico o solo cambie la grafía.
+    if (esTipoGeneral(id)) {
+        return Resultado<TipoAulaDTO>::error(
+            tipo_general::mensajeProteccionServicio(
+                tipo_general::OperacionProtegida::Renombrado, nombre));
+    }
+
     QString error;
     if (!validarNombreYClave(nombre, id, error)) {
         return Resultado<TipoAulaDTO>::error(error);
@@ -211,6 +264,17 @@ Resultado<TipoAulaDTO> ServicioTiposAula::renombrarTipoAula(int id, const QStrin
             return Resultado<TipoAulaDTO>::error(
                 QStringLiteral("Ya existe un tipo de aula con ese nombre."), -2);
         }
+
+        // RF-7 (P4): nunca se devuelve el texto crudo del almacenamiento. Se relee la fila
+        // y, si el rechazo era del tipo general, se traduce al mensaje del catálogo.
+        const FilaTipoActual fila = leerFila(id);
+        const QString traducido = tipo_general::traducirRechazo(
+            tipo_general::OperacionProtegida::Renombrado, true,
+            tipo_general::EstadoFilaProtegida{fila.existe, esFilaGeneral(fila)}, nombre);
+        if (!traducido.isEmpty()) {
+            return Resultado<TipoAulaDTO>::error(traducido);
+        }
+
         qCritical() << "Error al renombrar el tipo de aula:" << query.lastError().text();
         return Resultado<TipoAulaDTO>::error(
             "Error al actualizar el tipo de aula en la base de datos.");
@@ -250,6 +314,14 @@ Resultado<bool> ServicioTiposAula::eliminarTipoAula(int id)
         return Resultado<bool>::error(existente.mensajeError, existente.codigoError);
     }
 
+    // RF-3 (prioridad): el tipo general se rechaza antes de mirar dependientes; el motivo
+    // es «es el tipo general», no la lista de aulas o materias.
+    if (esTipoGeneral(id)) {
+        return Resultado<bool>::error(
+            tipo_general::mensajeProteccionServicio(
+                tipo_general::OperacionProtegida::Borrado, QString()));
+    }
+
     const QVector<QString> aulas = dependientesDe(QStringLiteral("Aulas"), id);
     const QVector<QString> materias = dependientesDe(QStringLiteral("Materias"), id);
 
@@ -271,6 +343,16 @@ Resultado<bool> ServicioTiposAula::eliminarTipoAula(int id)
     query.bindValue(QStringLiteral(":id"), id);
 
     if (!query.exec()) {
+        // RF-7 (P4): si el rechazo viene del almacenamiento, se relee la fila y se traduce;
+        // nunca se devuelve el texto crudo del driver.
+        const FilaTipoActual fila = leerFila(id);
+        const QString traducido = tipo_general::traducirRechazo(
+            tipo_general::OperacionProtegida::Borrado, true,
+            tipo_general::EstadoFilaProtegida{fila.existe, esFilaGeneral(fila)}, QString());
+        if (!traducido.isEmpty()) {
+            return Resultado<bool>::error(traducido);
+        }
+
         qCritical() << "Error al eliminar el tipo de aula:" << query.lastError().text();
         return Resultado<bool>::error(
             "Error al eliminar el tipo de aula de la base de datos.");

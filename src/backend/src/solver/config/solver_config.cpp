@@ -799,9 +799,10 @@ QString validarTiposConAulas(const SolverConfig& c)
 /// V18. El aula de referencia de cada curso es del tipo general/ordinario del centro (RF-3, RF-5).
 ///
 /// El tipo general es una convencion fija de nombre (`tipoGeneralAula()`), comparada con
-/// `claveTipo`: no hay columna, seccion del contrato ni consulta a la base. Solo aplica con el modo
-/// de aula fija; con aulas moviles la referencia se ignora (V8). Un indice fuera de rango lo
-/// rechaza antes V6 y una referencia ausente, V8.
+/// `claveTipo`: no hay columna, seccion del contrato ni consulta a la base. El mensaje nombra la
+/// convencion y la accion doble (asignar un aula del tipo general y comprobar que la base es
+/// valida). Solo aplica con el modo de aula fija; con aulas moviles la referencia se ignora (V8).
+/// Un indice fuera de rango lo rechaza antes V6 y una referencia ausente, V8.
 QString validarReferenciaGeneral(const SolverConfig& c)
 {
     if (!c.aula_fija)
@@ -816,9 +817,11 @@ QString validarReferenciaGeneral(const SolverConfig& c)
         if (claveTipo(aula.tipo) == claveGeneral)
             continue;
 
-        return QStringLiteral("V18: el aula «%1», referencia del curso %2%3, es del tipo «%4»; el "
-                              "aula de referencia debe ser del tipo general «%5». Asigne al curso "
-                              "un aula del tipo general.")
+        return QStringLiteral(
+                   "V18: el aula «%1», referencia del curso %2%3, es del tipo «%4». El tipo "
+                   "general del centro es el de nombre «%5» y el aula de referencia de cada "
+                   "curso debe ser de ese tipo. Asigne al curso un aula del tipo general y "
+                   "compruebe que la base es válida.")
             .arg(aula.nombre)
             .arg(cu.anio)
             .arg(cu.seccion)

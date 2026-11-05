@@ -1,6 +1,8 @@
 #include "backend/solver/config/contrato_solver.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
+#include "common/tipo_general.hpp"
+
 namespace {
     int bloquesConDuracion(int horas, int duracion_minutos) {
         // Rectificación (2026-10-17, constitución §7): la hora académica es un bloque, no una
@@ -29,13 +31,15 @@ QString claveCurso(int anio, const QString& seccion) {
 }
 
 QString claveTipo(const QString& nombre) {
-    return nombre.trimmed().toCaseFolded();
+    // Envoltorio conservado por compatibilidad de firma: el algoritmo es único y
+    // vive en `common/tipo_general.hpp`.
+    return tipo_general::claveNormalizada(nombre);
 }
 
 QString tipoGeneralAula() {
-    // Convención fija por nombre (decisión del 2026-10-26): no hay columna, sección de contrato ni
-    // consulta a la base. V18 y las cuentas de capacidad la reconocen con `claveTipo`.
-    return QStringLiteral("Aula de estudio");
+    // Convención fija por nombre (decisión del 2026-10-26): no hay columna, sección de
+    // contrato ni consulta a la base. El literal vive en la definición única.
+    return tipo_general::nombre();
 }
 
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig &config, const CursoSolverConfig &curso){

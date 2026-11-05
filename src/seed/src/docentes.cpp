@@ -169,7 +169,7 @@ Recuentos recuentosEsperados(const Perfil& perfil, VarianteDocentes variante) {
     for (const TurnoDef& turno : perfil.turnos) {
         r.eventos += turno.eventos.size();  // un evento «Receso» por turno (RF-10).
     }
-    r.tiposAula    = perfil.tiposAula.size();
+    r.tiposAula    = perfil.tiposAula.size() + 1; // + el tipo general que garantiza el esquema
     r.aulas        = perfil.aulas.size();
     r.materias     = perfil.materias.size();
     r.planes       = perfil.planes.size();

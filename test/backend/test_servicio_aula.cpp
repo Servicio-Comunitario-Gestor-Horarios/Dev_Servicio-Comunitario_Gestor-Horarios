@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
@@ -7,6 +8,20 @@
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioAula.hpp>
 #include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioAula : public QObject {
     Q_OBJECT
@@ -24,9 +39,8 @@ private slots:
         m_servicio.reset(new ServicioAula(m_dbManager->database()));
 
         m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
-        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
-        QVERIFY(tipo.ok);
-        m_idTipoAula = tipo.valor.id;
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
@@ -69,8 +83,8 @@ private slots:
         QVERIFY(m_servicio->listarAulas().valor.isEmpty());
     }
 
-    void crearAula_catalogoVacio_falla() {
-        // Base nueva sin tipos: el catálogo vacío impide crear aulas.
+    void crearAula_sinTipoValido_falla() {
+        // Base nueva con el tipo general del esquema: «catálogo vacío» ya no existe.
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         DatabaseManager db;
@@ -80,11 +94,19 @@ private slots:
 
         auto sinTipo = servicio.crearAula("Aula 101", 30, "", "", -1);
         QVERIFY(!sinTipo.ok);
-        QVERIFY(sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
+        QVERIFY(sinTipo.mensajeError.contains("sin tipo"));
+        QVERIFY(!sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
 
-        auto tipoInexistente = servicio.crearAula("Aula 101", 30, "", "", 1);
+        // El tipo general del esquema sirve para dar de alta el aula (RF-1).
+        const int idGeneral = idTipoGeneral(db.database());
+        QVERIFY(idGeneral > 0);
+        auto conGeneral = servicio.crearAula("Aula 101", 30, "", "", idGeneral);
+        QVERIFY(conGeneral.ok);
+        QCOMPARE(conGeneral.valor.idTipoAula, idGeneral);
+
+        // Un id inexistente sigue rechazándose.
+        auto tipoInexistente = servicio.crearAula("Aula 102", 30, "", "", 9999);
         QVERIFY(!tipoInexistente.ok);
-        QVERIFY(servicio.listarAulas().valor.isEmpty());
 
         db.close();
     }

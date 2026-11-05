@@ -271,19 +271,22 @@ void ClassroomListWidget::cargarAulas() {
 void ClassroomListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
-    QVector<TipoAulaDTO> tiposAula;
-    if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
-        tiposAula = tipos.valor;
+    const auto tipos = m_nucleo->listarTiposAula();
+    if (!tipos.ok) {
+        QMessageBox::warning(this, "Catálogo no disponible",
+                             "No se pudo leer el catálogo de tipos de aula. " + tipos.mensajeError);
+        return;
+    }
 
-    if (tiposAula.isEmpty()) {
-        QMessageBox::warning(this, "Catálogo vacío",
-                             "No hay tipos de aula en el catálogo. Cargue los datos base "
-                             "o registre un tipo de aula antes de crear aulas.");
+    // 016 RF-2: resolver el general antes de abrir el diálogo; si no está, no se usa otro.
+    const auto idGeneral = TiposAulaUI::idTipoGeneral(tipos.valor);
+    if (!idGeneral.ok) {
+        QMessageBox::warning(this, "Tipo general no disponible", idGeneral.mensajeError);
         return;
     }
 
     gestor::frontend::forms::ClassroomFormDialog dialogo(this);
-    dialogo.cargarTiposAula(tiposAula, TiposAulaUI::idTipoGeneral(tiposAula));
+    dialogo.cargarTiposAula(tipos.valor, idGeneral.valor);
     connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
             this, [this](const QString& nombre, int capacidad, const QString& edificio,
                          const QString& piso, int idTipoAula) {

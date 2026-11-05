@@ -85,12 +85,14 @@ ServicioGeneracion::ServicioGeneracion(PuertoSolver& puerto,
                                        int plazoMs,
                                        std::function<QString()> huellaActual,
                                        std::function<QDateTime()> reloj,
+                                       std::function<QString()> revisarBase,
                                        QObject* padre)
     : QObject(padre)
     , m_puerto(puerto)
     , m_plazoMs(plazoMs)
     , m_huellaActual(std::move(huellaActual))
     , m_reloj(std::move(reloj))
+    , m_revisarBase(std::move(revisarBase))
 {
 }
 
@@ -104,6 +106,21 @@ void ServicioGeneracion::generar(const QJsonObject& entrada, const QString& huel
     // Segunda generación concurrente: no admitida.
     if (m_enCurso)
         return;
+
+    // Validez de la base (016 RF-1): va antes de validar la entrada y de enviar. Con una
+    // base inválida el diagnóstico útil es el de la base, no el de los datos.
+    if (m_revisarBase)
+    {
+        const QString mensajeBase = m_revisarBase();
+        if (!mensajeBase.isEmpty())
+        {
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado  = ResultadoGeneracion::Estado::BaseInvalida;
+            m_ultimo.mensaje = mensajeBase;
+            emit finalizada();
+            return;
+        }
+    }
 
     // Validaciones previas (RF-1): si no pasan, no se envía.
     const Resultado<SolverConfig> validacion = validarEntradaSolver(entrada);

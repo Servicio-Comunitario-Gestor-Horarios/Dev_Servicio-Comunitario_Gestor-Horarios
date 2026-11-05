@@ -63,7 +63,8 @@ struct ResultadoGeneracion
         ContratoInvalido, ///< La respuesta no corresponde al contrato.
         CalculoFallido,   ///< La validación posterior (P4) detectó solapamientos.
         TiempoAgotado,    ///< Se superó el plazo o se perdió la comunicación.
-        EntradaInvalida   ///< La entrada no superó las validaciones previas.
+        EntradaInvalida,  ///< La entrada no superó las validaciones previas.
+        BaseInvalida      ///< La base no es válida: no se valida la entrada ni se envía.
     };
 
     Estado        estado = Estado::Inactivo;
@@ -86,11 +87,16 @@ public:
     ///                     recibir la respuesta difiere de la enviada, el
     ///                     resultado se marca «datos anteriores». Vacío = nunca.
     /// @param reloj        Reloj para `metadata.fecha_generacion` (inyectable).
+    /// @param revisarBase  Comprobación de validez de la base (016 RF-1): devuelve
+    ///                     el mensaje con causa y acción, o vacío si es válida. Se
+    ///                     comprueba antes de validar la entrada y de enviar. Va
+    ///                     antes de `padre` para que olvidar el cableado no compile.
     /// @param padre        Objeto Qt padre.
     explicit ServicioGeneracion(PuertoSolver& puerto,
                                 int plazoMs = 60000,
                                 std::function<QString()> huellaActual = {},
                                 std::function<QDateTime()> reloj = {},
+                                std::function<QString()> revisarBase = {},
                                 QObject* padre = nullptr);
 
     /// Inicia una generación. Si ya hay una en curso, no hace nada.
@@ -112,6 +118,7 @@ private:
     int m_plazoMs;
     std::function<QString()> m_huellaActual;
     std::function<QDateTime()> m_reloj;
+    std::function<QString()> m_revisarBase;
 
     bool m_enCurso = false;
     quint64 m_generacion = 0;

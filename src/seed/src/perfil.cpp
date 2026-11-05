@@ -4,6 +4,7 @@
 
 #include "backend/services/calculo_eventos.hpp"
 #include "backend/services/duracion_horaria.hpp"
+#include "common/tipo_general.hpp"
 
 namespace seed {
 
@@ -39,9 +40,9 @@ int seccionesDeAnio(int anio) {
 
 namespace {
 
-/// Tipos de aula del conjunto (RF-5, RF-10): el genérico y los dos especializados que usan
-/// las aulas. «Cancha» no entra en el catálogo: el conjunto no tiene ninguna.
-const char* const kTipoGenerico = "Aula de estudio";
+/// Tipos de aula del conjunto (RF-5, RF-10): el general (definido en el esquema, no aquí)
+/// y los dos especializados que usan las aulas. «Cancha» no entra en el catálogo: el
+/// conjunto no tiene ninguna.
 const char* const kTipoLaboratorio = "Laboratorio";
 const char* const kTipoTaller = "Taller";
 
@@ -207,10 +208,10 @@ const Perfil& perfilPorDefecto() {
     static const Perfil perfil = [] {
         Perfil p;
 
-        // Catálogo de tipos de aula (009-T7, RF-5/RF-10): 3, en el orden en que las aulas los
-        // usan. El sembrador los inserta antes que las aulas y las materias (T8).
-        p.tiposAula = {QString::fromUtf8(kTipoGenerico),
-                       QString::fromUtf8(kTipoLaboratorio),
+        // Catálogo de tipos de aula (009-T7, RF-5/RF-10; 015 RF-5): 2 especializados, en el
+        // orden en que las aulas los usan. El tipo general lo garantiza la creación de la base
+        // y el perfil ya no lo declara.
+        p.tiposAula = {QString::fromUtf8(kTipoLaboratorio),
                        QString::fromUtf8(kTipoTaller)};
 
         PlanDef general;
@@ -306,37 +307,39 @@ const Perfil& perfilPorDefecto() {
 
         // Aulas (008-T3, RF-5, plan §4.3; 009-T7, RF-10): 16, nombre único, con variedad de
         // capacidad, edificio y piso; Aula 14 es de reserva y hay un laboratorio y un taller,
-        // cada uno con su tipo; las demás son «Aula de estudio».
+        // cada uno con su tipo; las demás son del tipo general.
         {
             const struct {
                 const char* nombre;
                 int capacidad;
                 const char* edificio;
                 const char* piso;
-                const char* tipo;
+                QString tipo;
             } kAulas[] = {
-                {"Aula 01", 40, "A", "Planta baja", kTipoGenerico},
-                {"Aula 02", 40, "A", "Planta baja", kTipoGenerico},
-                {"Aula 03", 38, "A", "Planta baja", kTipoGenerico},
-                {"Aula 04", 38, "A", "Piso 1", kTipoGenerico},
-                {"Aula 05", 36, "A", "Piso 1", kTipoGenerico},
-                {"Aula 06", 36, "A", "Piso 1", kTipoGenerico},
-                {"Aula 07", 34, "B", "Planta baja", kTipoGenerico},
-                {"Aula 08", 34, "B", "Planta baja", kTipoGenerico},
-                {"Aula 09", 36, "B", "Piso 1", kTipoGenerico},
-                {"Aula 10", 38, "B", "Piso 1", kTipoGenerico},
-                {"Aula 11", 40, "B", "Piso 1", kTipoGenerico},
-                {"Aula 12", 40, "B", "Piso 1", kTipoGenerico},
-                {"Aula 13", 34, "A", "Piso 1", kTipoGenerico},
-                {"Aula 14", 32, "B", "Planta baja", kTipoGenerico},            // reserva
-                {"Laboratorio de Ciencias", 36, "C", "Planta baja", kTipoLaboratorio},
-                {"Taller de Informática", 30, "C", "Piso 1", kTipoTaller},
+                {"Aula 01", 40, "A", "Planta baja", tipo_general::nombre()},
+                {"Aula 02", 40, "A", "Planta baja", tipo_general::nombre()},
+                {"Aula 03", 38, "A", "Planta baja", tipo_general::nombre()},
+                {"Aula 04", 38, "A", "Piso 1", tipo_general::nombre()},
+                {"Aula 05", 36, "A", "Piso 1", tipo_general::nombre()},
+                {"Aula 06", 36, "A", "Piso 1", tipo_general::nombre()},
+                {"Aula 07", 34, "B", "Planta baja", tipo_general::nombre()},
+                {"Aula 08", 34, "B", "Planta baja", tipo_general::nombre()},
+                {"Aula 09", 36, "B", "Piso 1", tipo_general::nombre()},
+                {"Aula 10", 38, "B", "Piso 1", tipo_general::nombre()},
+                {"Aula 11", 40, "B", "Piso 1", tipo_general::nombre()},
+                {"Aula 12", 40, "B", "Piso 1", tipo_general::nombre()},
+                {"Aula 13", 34, "A", "Piso 1", tipo_general::nombre()},
+                {"Aula 14", 32, "B", "Planta baja", tipo_general::nombre()},    // reserva
+                {"Laboratorio de Ciencias", 36, "C", "Planta baja",
+                 QString::fromUtf8(kTipoLaboratorio)},
+                {"Taller de Informática", 30, "C", "Piso 1",
+                 QString::fromUtf8(kTipoTaller)},
             };
             for (const auto& a : kAulas) {
                 p.aulas.append(AulaDef{QString::fromUtf8(a.nombre), a.capacidad,
                                        QString::fromUtf8(a.edificio),
                                        QString::fromUtf8(a.piso),
-                                       QString::fromUtf8(a.tipo)});
+                                       a.tipo});
             }
         }
 
@@ -376,13 +379,13 @@ QString tipoEspecializadoDeMateria(const QString& nombre) {
             return QString::fromUtf8(regla.tipo);
         }
     }
-    return QString::fromUtf8(kTipoGenerico);
+    return tipo_general::nombre();
 }
 
 QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas) {
     const QString especializado = tipoEspecializadoDeMateria(nombre);
     return tiposDeAulas.contains(especializado) ? especializado
-                                                : QString::fromUtf8(kTipoGenerico);
+                                                : tipo_general::nombre();
 }
 
 int horasMaximas(const Perfil& perfil, const QString& materia) {
@@ -601,9 +604,10 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
         }
     }
 
-    // 0ter. Tipos de aula (009-T7, RF-5, RF-6, RF-10): catálogo no vacío y sin duplicados, cada
-    //    aula con un tipo del catálogo y cada materia con un tipo requerido que tenga al menos
-    //    un aula sembrada (N1). Así no se siembra una materia imposible de ubicar.
+    // 0ter. Tipos de aula (009-T7, RF-5, RF-6, RF-10; 015 RF-5): el catálogo declarado
+    //    (especializados) no vacío y sin duplicados, cada aula con un tipo del catálogo
+    //    declarado **o el general del esquema** y cada materia con un tipo requerido que tenga
+    //    al menos un aula sembrada (N1). Así no se siembra una materia imposible de ubicar.
     {
         if (perfil.tiposAula.isEmpty()) {
             return falla(QStringLiteral("El perfil no declara tipos de aula."));
@@ -621,6 +625,10 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
             }
             catalogo.insert(nombre);
         }
+
+        // El general lo aporta la creación de la base, no el perfil (015 RF-1/RF-5): sus
+        // aulas pueden referenciarlo aunque no figure en el catálogo declarado.
+        catalogo.insert(tipo_general::nombre());
 
         QSet<QString> tiposDeAulas;
         for (const AulaDef& aula : perfil.aulas) {

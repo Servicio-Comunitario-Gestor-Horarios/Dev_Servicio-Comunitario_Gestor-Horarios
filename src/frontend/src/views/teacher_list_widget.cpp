@@ -396,15 +396,32 @@ void TeacherListWidget::abrirFormularioNuevo() {
                    const QString& email, const QString& telefono,
                    const QString& materias) {
 
+                // 016 RF-2: si hay materias que crear, el tipo general se resuelve antes de
+                // escribir el docente. Si falla, no se guarda nada (ni docente ni materias).
+                int idTipoMateria = -1;
+                if (!materias.isEmpty()) {
+                    const auto tipos = m_nucleo->listarTiposAula();
+                    if (!tipos.ok) {
+                        QMessageBox::warning(this, "Catálogo no disponible",
+                                             "No se pudo leer el catálogo de tipos de aula. "
+                                             + tipos.mensajeError);
+                        return;
+                    }
+                    const auto idGeneral = TiposAulaUI::idTipoGeneral(tipos.valor);
+                    if (!idGeneral.ok) {
+                        QMessageBox::warning(this, "Tipo general no disponible",
+                                             idGeneral.mensajeError);
+                        return;
+                    }
+                    idTipoMateria = idGeneral.valor;
+                }
+
                 auto resultado = m_nucleo->crearDocente(cedula, nombre, email, telefono);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo crear el docente: " + resultado.mensajeError);
                 } else {
                     // Si hay materias, se crean (si no existen) y se asignan al momento
                     if (!materias.isEmpty()) {
-                        int idTipoMateria = -1;
-                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
-                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
                         QStringList listaMaterias = materias.split(",");
                         for (const QString& mat : listaMaterias) {
                             QString materiaLimpia = mat.trimmed();
@@ -455,6 +472,27 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
                            const QString& nEmail, const QString& nTelefono,
                            const QString& nMaterias) {
 
+                // 016 RF-2: si hay materias que crear, el tipo general se resuelve antes de
+                // escribir (actualizar el docente y limpiar sus materias). Si falla, no se
+                // guarda nada.
+                int idTipoMateria = -1;
+                if (!nMaterias.isEmpty()) {
+                    const auto tipos = m_nucleo->listarTiposAula();
+                    if (!tipos.ok) {
+                        QMessageBox::warning(this, "Catálogo no disponible",
+                                             "No se pudo leer el catálogo de tipos de aula. "
+                                             + tipos.mensajeError);
+                        return;
+                    }
+                    const auto idGeneral = TiposAulaUI::idTipoGeneral(tipos.valor);
+                    if (!idGeneral.ok) {
+                        QMessageBox::warning(this, "Tipo general no disponible",
+                                             idGeneral.mensajeError);
+                        return;
+                    }
+                    idTipoMateria = idGeneral.valor;
+                }
+
                 auto resultado = m_nucleo->actualizarDocente(nCedula, nNombre, nEmail, nTelefono);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo actualizar el docente: " + resultado.mensajeError);
@@ -463,9 +501,6 @@ void TeacherListWidget::abrirFormularioEditar(int fila) {
                     m_nucleo->limpiarMaterias(nCedula);
 
                     if (!nMaterias.isEmpty()) {
-                        int idTipoMateria = -1;
-                        if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
-                            idTipoMateria = TiposAulaUI::idTipoGeneral(tipos.valor);
                         QStringList listaMaterias = nMaterias.split(",");
                         for (const QString& mat : listaMaterias) {
                             QString materiaLimpia = mat.trimmed();

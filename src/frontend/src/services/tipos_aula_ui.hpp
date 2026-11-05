@@ -6,22 +6,24 @@
  *
  * Desde la 009 las aulas y las materias referencian el catálogo `TiposAula`
  * por id; la interfaz ya no puede inventarse el tipo. Estas ayudas rellenan
- * los combos y resuelven el tipo general («Aula de estudio») para las altas
- * rápidas que solo piden un nombre.
+ * los combos y resuelven el tipo general para las altas rápidas que solo piden
+ * un nombre.
  */
 
 #include <QComboBox>
 #include <QString>
 #include <QVector>
 
+#include "backend/resultado.hpp"
 #include "backend/services/ServicioTiposAula.hpp"
+#include "common/tipo_general.hpp"
 
 namespace TiposAulaUI {
 
 /// Nombre del tipo general del catálogo (el que exige el aula de referencia).
 inline QString nombreTipoGeneral()
 {
-    return QStringLiteral("Aula de estudio");
+    return tipo_general::nombre();
 }
 
 /// Rellena `combo` con el catálogo; deja seleccionado `idSeleccionado` si existe.
@@ -42,14 +44,18 @@ inline void poblar(QComboBox* combo, const QVector<TipoAulaDTO>& tipos,
     }
 }
 
-/// Id del tipo general; si no está, el primero del catálogo (o -1 si está vacío).
-inline int idTipoGeneral(const QVector<TipoAulaDTO>& tipos)
+/// Id del tipo general del catálogo. Si no está (o el catálogo está vacío), error con el
+/// mensaje de qué falta y qué hacer. NUNCA devuelve otro tipo (016 RF-2).
+inline Resultado<int> idTipoGeneral(const QVector<TipoAulaDTO>& tipos)
 {
-    for (const TipoAulaDTO& tipo : tipos) {
-        if (tipo.nombre.compare(nombreTipoGeneral(), Qt::CaseInsensitive) == 0)
-            return tipo.id;
-    }
-    return tipos.isEmpty() ? -1 : tipos.front().id;
+    for (const TipoAulaDTO& tipo : tipos)
+        if (tipo_general::esNombreCanonico(tipo.nombre))
+            return Resultado<int>::exito(tipo.id);
+
+    return Resultado<int>::error(QStringLiteral(
+        "El catálogo de tipos de aula no contiene el tipo general «%1»: la base no está en el "
+        "estado esperado. Restaure un respaldo de la versión vigente o cree una base nueva "
+        "(con respaldo obligatorio). No se ha guardado ningún dato.").arg(tipo_general::nombre()));
 }
 
 } // namespace TiposAulaUI

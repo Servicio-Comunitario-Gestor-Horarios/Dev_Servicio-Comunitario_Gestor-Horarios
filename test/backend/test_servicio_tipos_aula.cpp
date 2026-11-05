@@ -77,7 +77,25 @@ private slots:
         QVERIFY(!espacios.ok);
         QVERIFY(espacios.mensajeError.contains(QStringLiteral("no puede estar vacío")));
 
-        QCOMPARE(contarTipos(), 0);
+        QCOMPARE(contarTipos(), 1); // solo la fila del tipo general del esquema
+    }
+
+    void crearTipoAula_duplicadoDelGeneral_falla()
+    {
+        // El esquema ya deja el tipo general: el alta con su nombre falla por duplicado
+        // (RF-2) y no inserta una segunda fila.
+        const auto duplicado = m_servicio->crearTipoAula(QStringLiteral("Aula de estudio"));
+
+        QVERIFY(!duplicado.ok);
+        QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
+        QCOMPARE(contarTipos(), 1);
+
+        // La misma prohibición alcanza a otra grafía (clave normalizada idéntica).
+        const auto otraGrafia = m_servicio->crearTipoAula(QStringLiteral("AULA DE ESTUDIO"));
+
+        QVERIFY(!otraGrafia.ok);
+        QVERIFY(otraGrafia.mensajeError.contains(QStringLiteral("Ya existe")));
+        QCOMPARE(contarTipos(), 1);
     }
 
     void crearTipoAula_duplicadoExacto_falla()
@@ -88,7 +106,7 @@ private slots:
 
         QVERIFY(!duplicado.ok);
         QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void crearTipoAula_duplicadoSoloMayusculas_falla()
@@ -99,7 +117,7 @@ private slots:
 
         QVERIFY(!duplicado.ok);
         QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void crearTipoAula_duplicadoAcentuado_falla()
@@ -110,7 +128,7 @@ private slots:
 
         QVERIFY(!duplicado.ok);
         QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void crearTipoAula_duplicadoConEspaciosExtremos_falla()
@@ -121,7 +139,7 @@ private slots:
 
         QVERIFY(!duplicado.ok);
         QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void crearTipoAula_claveDirectaSinNormalizar_frena()
@@ -137,23 +155,24 @@ private slots:
 
         QVERIFY(!duplicado.ok);
         QVERIFY(duplicado.mensajeError.contains(QStringLiteral("Ya existe")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     // ─── listar / obtener ───────────────────────────────────────────────────
 
-    void listarTiposAula_vacio()
+    void listarTiposAula_incluyeElGeneral()
     {
         const auto lista = m_servicio->listarTiposAula();
 
         QVERIFY(lista.ok);
-        QVERIFY(lista.valor.isEmpty());
+        QCOMPARE(lista.valor.size(), 1);
+        QCOMPARE(lista.valor[0].id, idTipoGeneral());
+        QCOMPARE(lista.valor[0].nombre, QStringLiteral("Aula de estudio"));
     }
 
     void listarTiposAula_ordenadoPorNombre()
     {
         QVERIFY(m_servicio->crearTipoAula(QStringLiteral("Taller")).ok);
-        QVERIFY(m_servicio->crearTipoAula(QStringLiteral("Aula de estudio")).ok);
         QVERIFY(m_servicio->crearTipoAula(QStringLiteral("Laboratorio")).ok);
 
         const auto lista = m_servicio->listarTiposAula();
@@ -205,7 +224,7 @@ private slots:
         QCOMPARE(renombrado.valor.id, creado.valor.id);
         QCOMPARE(renombrado.valor.nombre, QStringLiteral("Laboratorio de Física"));
         QCOMPARE(claveGuardada(creado.valor.id), QStringLiteral("laboratorio de física"));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void renombrarTipoAula_soloMayusculas_noDuplica()
@@ -220,7 +239,7 @@ private slots:
         QCOMPARE(renombrado.valor.id, creado.valor.id);
         QCOMPARE(renombrado.valor.nombre, QStringLiteral("LABORATORIO"));
         QCOMPARE(claveGuardada(creado.valor.id), QStringLiteral("laboratorio"));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void renombrarTipoAula_aOtraClaveExistente_falla()
@@ -239,7 +258,7 @@ private slots:
         const auto original = m_servicio->obtenerTipoAula(laboratorio.valor.id);
         QVERIFY(original.ok);
         QCOMPARE(original.valor.nombre, QStringLiteral("Laboratorio"));
-        QCOMPARE(contarTipos(), 2);
+        QCOMPARE(contarTipos(), 3);
     }
 
     void renombrarTipoAula_nombreVacio_falla()
@@ -252,7 +271,7 @@ private slots:
 
         QVERIFY(!renombrado.ok);
         QVERIFY(renombrado.mensajeError.contains(QStringLiteral("no puede estar vacío")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void renombrarTipoAula_inexistente_falla()
@@ -271,7 +290,9 @@ private slots:
 
     void renombrarTipoAula_propagaAAulasYMaterias_sinReescribir()
     {
-        const auto tipo = m_servicio->crearTipoAula(QStringLiteral("Aula de estudio"));
+        // El general no se puede renombrar (T6): la propagación se prueba con un
+        // tipo especializado.
+        const auto tipo = m_servicio->crearTipoAula(QStringLiteral("Laboratorio"));
         QVERIFY(tipo.ok);
 
         ServicioAula aulas(m_dbManager->database());
@@ -287,12 +308,12 @@ private slots:
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->renombrarTipoAula(tipo.valor.id,
-                                              QStringLiteral("Aula común")).ok);
+                                              QStringLiteral("Laboratorio de Física")).ok);
 
         const auto aulaDespues = aulas.obtenerAula(aula.valor.id);
         QVERIFY(aulaDespues.ok);
         QCOMPARE(aulaDespues.valor.idTipoAula, tipo.valor.id);
-        QCOMPARE(aulaDespues.valor.tipoAula, QStringLiteral("Aula común"));
+        QCOMPARE(aulaDespues.valor.tipoAula, QStringLiteral("Laboratorio de Física"));
         // Los datos propios del aula no se reescriben.
         QCOMPARE(aulaDespues.valor.nombre, QStringLiteral("Aula 101"));
         QCOMPARE(aulaDespues.valor.capacidad, 30);
@@ -302,7 +323,7 @@ private slots:
         const auto materiaDespues = materias.obtenerMateria(materia.valor.id);
         QVERIFY(materiaDespues.ok);
         QCOMPARE(materiaDespues.valor.idTipoAula, tipo.valor.id);
-        QCOMPARE(materiaDespues.valor.tipoAula, QStringLiteral("Aula común"));
+        QCOMPARE(materiaDespues.valor.tipoAula, QStringLiteral("Laboratorio de Física"));
         QCOMPARE(materiaDespues.valor.nombre, QStringLiteral("Matemática"));
         QCOMPARE(materiaDespues.valor.requisitos, QStringLiteral("Álgebra"));
 
@@ -322,12 +343,12 @@ private slots:
         QVERIFY(eliminado.ok);
         QVERIFY(eliminado.valor);
         QVERIFY(!m_servicio->obtenerTipoAula(creado.valor.id).ok);
-        QCOMPARE(contarTipos(), 0);
+        QCOMPARE(contarTipos(), 1);
     }
 
     void eliminarTipoAula_enUsoPorAula_falla()
     {
-        const auto creado = m_servicio->crearTipoAula(QStringLiteral("Aula de estudio"));
+        const auto creado = m_servicio->crearTipoAula(QStringLiteral("Laboratorio"));
         QVERIFY(creado.ok);
 
         ServicioAula aulas(m_dbManager->database());
@@ -339,7 +360,7 @@ private slots:
         QVERIFY(!eliminado.ok);
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("en uso")));
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("Aula 101")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
     void eliminarTipoAula_enUsoPorMateria_falla()
@@ -355,12 +376,12 @@ private slots:
         QVERIFY(!eliminado.ok);
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("en uso")));
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("Física")));
-        QCOMPARE(contarTipos(), 1);
+        QCOMPARE(contarTipos(), 2);
     }
 
-    void eliminarTipoAula_enUsoPorAulaYMateria_listaAmbos()
+    void eliminarTipoAula_especializadoEnUso_sigueListandoDependientes()
     {
-        const auto creado = m_servicio->crearTipoAula(QStringLiteral("Aula de estudio"));
+        const auto creado = m_servicio->crearTipoAula(QStringLiteral("Laboratorio"));
         QVERIFY(creado.ok);
 
         ServicioAula aulas(m_dbManager->database());
@@ -377,7 +398,71 @@ private slots:
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("Aula 101")));
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("materias")));
         QVERIFY(eliminado.mensajeError.contains(QStringLiteral("Matemática")));
+        QCOMPARE(contarTipos(), 2);
+    }
+
+    // ─── tipo general: protección del servicio (015 T6) ─────────────────────
+
+    void eliminarTipoAula_general_fallaConPrioridad()
+    {
+        const int idGeneral = idTipoGeneral();
+        QVERIFY(idGeneral > 0);
+
+        // Sin dependientes: el motivo es «es el tipo general», no «en uso».
+        const auto libre = m_servicio->eliminarTipoAula(idGeneral);
+        QVERIFY(!libre.ok);
+        QVERIFY(libre.mensajeError.contains(QStringLiteral("general")));
+        QVERIFY(!libre.mensajeError.contains(QStringLiteral("en uso")));
         QCOMPARE(contarTipos(), 1);
+
+        // Con dependientes: la prioridad se mantiene y no aparece la lista.
+        ServicioAula aulas(m_dbManager->database());
+        ServicioMaterias materias(m_dbManager->database());
+        QVERIFY(aulas.crearAula(QStringLiteral("Aula 101"), 30, QString(), QString(),
+                                idGeneral).ok);
+        QVERIFY(materias.crearMateria(QStringLiteral("Matemática"), QString(),
+                                      idGeneral).ok);
+
+        const auto enUso = m_servicio->eliminarTipoAula(idGeneral);
+        QVERIFY(!enUso.ok);
+        QVERIFY(enUso.mensajeError.contains(QStringLiteral("general")));
+        QVERIFY(!enUso.mensajeError.contains(QStringLiteral("en uso")));
+        QVERIFY(!enUso.mensajeError.contains(QStringLiteral("Aula 101")));
+        QVERIFY(!enUso.mensajeError.contains(QStringLiteral("Matemática")));
+        QCOMPARE(contarTipos(), 1);
+    }
+
+    void renombrarTipoAula_general_fallaAunqueElNombreSeaElMismo()
+    {
+        const int idGeneral = idTipoGeneral();
+        QVERIFY(idGeneral > 0);
+
+        const auto resultado = m_servicio->renombrarTipoAula(
+            idGeneral, QStringLiteral("Aula de estudio"));
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("general")));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("recibido")));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("Aula de estudio")));
+        QCOMPARE(claveGuardada(idGeneral), QStringLiteral("aula de estudio"));
+    }
+
+    void renombrarTipoAula_general_fallaConOtraGrafia()
+    {
+        const int idGeneral = idTipoGeneral();
+        QVERIFY(idGeneral > 0);
+
+        const auto resultado = m_servicio->renombrarTipoAula(
+            idGeneral, QStringLiteral("AULA DE ESTUDIO"));
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("general")));
+        QVERIFY(resultado.mensajeError.contains(QStringLiteral("AULA DE ESTUDIO")));
+
+        // La fila conserva el nombre visible original.
+        const auto actual = m_servicio->obtenerTipoAula(idGeneral);
+        QVERIFY(actual.ok);
+        QCOMPARE(actual.valor.nombre, QStringLiteral("Aula de estudio"));
     }
 
     void eliminarTipoAula_trasBorrarDependientes_exitoso()
@@ -392,7 +477,7 @@ private slots:
         QVERIFY(aulas.eliminarAula(aula.valor.id));
 
         QVERIFY(m_servicio->eliminarTipoAula(creado.valor.id).ok);
-        QCOMPARE(contarTipos(), 0);
+        QCOMPARE(contarTipos(), 1);
     }
 
     void eliminarTipoAula_inexistente_falla()
@@ -407,6 +492,18 @@ private slots:
     }
 
 private:
+    /// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+    int idTipoGeneral() const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral(
+                "SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"))
+            || !query.next()) {
+            return -1;
+        }
+        return query.value(0).toInt();
+    }
+
     QString claveGuardada(int id) const
     {
         QSqlQuery query(m_dbManager->database());

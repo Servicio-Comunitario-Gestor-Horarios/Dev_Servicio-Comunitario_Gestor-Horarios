@@ -68,6 +68,17 @@ private:
         return query.value(0).toInt();
     }
 
+    /// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+    int idTipoGeneral() const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"))
+            || !query.next()) {
+            return -1;
+        }
+        return query.value(0).toInt();
+    }
+
 private slots:
 
     void init()
@@ -77,9 +88,8 @@ private slots:
         m_ruta = m_dir->filePath("nucleo.db");
         abrirBase();
 
-        const auto tipo = m_nucleo->crearTipoAula(QStringLiteral("Aula de estudio"));
-        QVERIFY2(tipo.ok, qPrintable(tipo.mensajeError));
-        m_idTipoAula = tipo.valor.id;
+        m_idTipoAula = idTipoGeneral();
+        QVERIFY2(m_idTipoAula > 0, "La base nueva debe traer el tipo general (RF-1).");
     }
 
     void cleanup()
@@ -101,6 +111,28 @@ private slots:
         QVERIFY(tablaExiste(QStringLiteral("Eventos")));
         QVERIFY(tablaExiste(QStringLiteral("TiposAula")));
         QVERIFY(!tablaExiste(QStringLiteral("Recesos")));       // retirada (RF-9)
+    }
+
+    // ─── Validez de la base (016 RF-1) ─────────────────────────────────────
+
+    void comprobarValidezBase_valida()
+    {
+        const auto comprobacion = m_nucleo->comprobarValidezBase();
+
+        QVERIFY(comprobacion.valida());
+        QVERIFY(comprobacion.mensaje.isEmpty());
+    }
+
+    void comprobarValidezBase_sinUnDisparador_esInvalida()
+    {
+        QSqlQuery query(m_dbManager->database());
+        QVERIFY(query.exec(QStringLiteral("DROP TRIGGER TiposAula_general_no_borrar")));
+
+        const auto comprobacion = m_nucleo->comprobarValidezBase();
+
+        QVERIFY(!comprobacion.valida());
+        QVERIFY2(comprobacion.mensaje.contains(QStringLiteral("TiposAula_general_no_borrar")),
+                 qPrintable(comprobacion.mensaje));
     }
 
     // ─── Contrato de lectura: error vs vacío (RF-3) ─────────────────────────

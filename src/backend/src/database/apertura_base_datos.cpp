@@ -37,7 +37,11 @@ namespace
             {
                 resultado.estado = Estado::FalloApertura;
                 resultado.detalle =
-                    QStringLiteral("No se pudo crear el esquema de la base «%1».").arg(ruta);
+                    QStringLiteral("No se pudo crear el esquema de la base «%1»: no quedó "
+                                   "esquema parcial. El archivo puede descartarse y crearse de "
+                                   "nuevo (con respaldo obligatorio).")
+                        .arg(ruta);
+                qCritical() << resultado.detalle;
                 return resultado;
             }
 
@@ -73,8 +77,9 @@ namespace
             resultado.detalle =
                 QStringLiteral("El esquema de «%1» no corresponde al esperado: declara la versión"
                                " %2, que coincide, pero su contenido no es el esperado%3."
-                               " No se migra ni se modifican los datos; puede crear una base nueva"
-                               " (se respalda la actual) o restaurar un respaldo.")
+                               " No se migra ni se modifican los datos; puede restaurar un respaldo"
+                               " de la versión vigente o crear una base nueva (con respaldo"
+                               " obligatorio).")
                     .arg(ruta)
                     .arg(versionArchivo)
                     .arg(motivo.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(motivo));
@@ -84,8 +89,8 @@ namespace
             resultado.detalle =
                 QStringLiteral("El esquema de «%1» no corresponde al esperado: declara la versión"
                                " %2 y esta aplicación espera la versión %3. No se migra ni se"
-                               " modifican los datos; puede crear una base nueva (se respalda la"
-                               " actual) o restaurar un respaldo.")
+                               " modifican los datos; cree una base nueva (se respalda la actual):"
+                               " restaurar un respaldo de la versión anterior volverá a fallar.")
                     .arg(ruta)
                     .arg(versionArchivo)
                     .arg(versionEsperada);

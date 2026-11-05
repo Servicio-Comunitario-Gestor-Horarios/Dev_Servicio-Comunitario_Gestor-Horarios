@@ -69,6 +69,12 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_configuracion(db),
       m_preferencias(db) {}
 
+// ─── Validez de la base (016 RF-1) ─────────────────────────────────────────
+
+validez_base::Comprobacion NucleoDatos::comprobarValidezBase() const {
+    return validez_base::comprobar(m_db);
+}
+
 // ─── Docentes ──────────────────────────────────────────────────────────────
 
 Resultado<QVector<ProfesorDTO>> NucleoDatos::listarDocentes() const {

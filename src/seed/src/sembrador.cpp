@@ -13,6 +13,7 @@
 #include "backend/database/respaldo.hpp"
 #include "backend/services/NucleoDatos.hpp"
 #include "backend/services/duracion_horaria.hpp"
+#include "common/tipo_general.hpp"
 #include "datos/ContextoBaseDatos.hpp"
 
 namespace seed {
@@ -31,11 +32,12 @@ bool varianteValida(VarianteDocentes variante) {
     return false;
 }
 
-/// Las 12 tablas de dominio del esquema v5 (RF-10, detección de datos). `TiposAula`,
+/// Las 12 tablas de dominio del esquema v6 (RF-10, detección de datos). `TiposAula`,
 /// `Eventos` y `Preferencia_Profesor` son datos de dominio (splits 009 y 012); `Recesos` ya no
 /// existe. La configuración global (`ConfiguracionHoraria`) **no** es dato de dominio (spec 011,
 /// RF-8): no bloquea una base recién creada. Las preferencias son de dominio aunque el conjunto
-/// las deje vacías (spec 012, RF-7).
+/// las deje vacías (spec 012, RF-7). La fila del tipo general que deja el esquema tampoco cuenta
+/// como dato (015 RF-1/RF-5): se excluye del recuento de `TiposAula`.
 const char* const kTablasDominio[] = {
     "TiposAula", "Aulas", "Profesores", "Materias", "PlanEstudio", "PlanEstudio_Materia",
     "Turnos", "Eventos", "Cursos", "Profesor_Materia", "Disponibilidad_Profesor",
@@ -51,11 +53,26 @@ int contarFilas(QSqlDatabase& db, const QString& tabla) {
     return q.next() ? q.value(0).toInt() : -1;
 }
 
+/// Filas de `TiposAula` que no son el tipo general: la fila que garantiza el esquema
+/// (015 RF-1) no convierte una base recién creada en «base con datos». -1 si falla.
+int contarTiposAulaDeDominio(QSqlDatabase& db) {
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT COUNT(*) FROM TiposAula WHERE clave <> :clave"));
+    q.bindValue(QStringLiteral(":clave"), tipo_general::clave());
+    if (!q.exec() || !q.next()) {
+        return -1;
+    }
+    return q.value(0).toInt();
+}
+
 /// Suma de filas de dominio; > 0 si la base ya tiene datos. -1 si no es legible.
 int contarFilasDeDominio(QSqlDatabase& db) {
     int total = 0;
     for (const char* tabla : kTablasDominio) {
-        const int n = contarFilas(db, QString::fromLatin1(tabla));
+        const QString nombre = QString::fromLatin1(tabla);
+        const int n = nombre == QStringLiteral("TiposAula")
+                          ? contarTiposAulaDeDominio(db)
+                          : contarFilas(db, nombre);
         if (n < 0) {
             return -1;
         }
@@ -434,15 +451,30 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
                  {"Eventos", "Preferencia_Profesor", "Disponibilidad_Profesor",
                   "Profesor_Materia", "Cursos", "PlanEstudio_Materia", "PlanEstudio",
                   "Materias", "Turnos", "Aulas", "TiposAula", "Profesores"}) {
-                if (!borrarTabla(QString::fromLatin1(tabla))) {
+                const QString nombre = QString::fromLatin1(tabla);
+                bool borrado = false;
+                if (nombre == QStringLiteral("TiposAula")) {
+                    // El tipo general está protegido contra el borrado (015 RF-3, disparador
+                    // del esquema): el reemplazo borra los especializados y lo conserva.
+                    QSqlQuery borrarTipos(db);
+                    borrarTipos.prepare(QStringLiteral(
+                        "DELETE FROM TiposAula WHERE clave <> :clave"));
+                    borrarTipos.bindValue(QStringLiteral(":clave"), tipo_general::clave());
+                    borrado = borrarTipos.exec();
+                } else {
+                    borrado = borrarTabla(nombre);
+                }
+                if (!borrado) {
                     return abortar(QStringLiteral(
                         "No se pudieron borrar los datos previos para el reemplazo total."));
                 }
             }
         }
 
-        // Tipos de aula (RF-5/RF-10): el catálogo va antes que las aulas y las materias,
-        // que lo referencian. Se guarda nombre → id para resolver el tipo de cada fila.
+        // Tipos de aula (RF-5/RF-10): el catálogo se inserta antes que las aulas y las
+        // materias, que lo referencian. Se guarda nombre → id para resolver el tipo de cada
+        // fila. El perfil declara solo los especializados; el tipo general lo garantiza el
+        // esquema (015 RF-1/RF-5) y aquí solo se resuelve su id.
         QHash<QString, int> idTipoAula;
         for (const QString& tipo : perfil.tiposAula) {
             const auto creado = nucleo.crearTipoAula(tipo);
@@ -450,6 +482,16 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
                 return abortar(creado.mensajeError);
             }
             idTipoAula.insert(tipo, creado.valor.id);
+        }
+        {
+            QSqlQuery general(db);
+            general.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = :clave"));
+            general.bindValue(QStringLiteral(":clave"), tipo_general::clave());
+            if (!general.exec() || !general.next()) {
+                return abortar(QStringLiteral(
+                    "La base no tiene el tipo de aula general; no se puede sembrar el centro."));
+            }
+            idTipoAula.insert(tipo_general::nombre(), general.value(0).toInt());
         }
 
         // Turnos y sus eventos (RF-1/RF-4): 2 turnos, cada uno con su evento «Receso» de

@@ -166,6 +166,46 @@ private slots:
         QCOMPARE(puerto.llamadas, 0);
     }
 
+    void baseInvalida_noEnvia()
+    {
+        PuertoFalso puerto;
+        const QString mensajeBase = QStringLiteral(
+            "La base de datos no cumple el esquema esperado: falta el disparador "
+            "«TiposAula_general_no_borrar». Restaure un respaldo de la versión vigente o cree "
+            "una base nueva (con respaldo obligatorio).");
+        ServicioGeneracion servicio(puerto, 0, {}, {}, [mensajeBase]() { return mensajeBase; });
+        QSignalSpy spy(&servicio, &ServicioGeneracion::finalizada);
+
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::BaseInvalida);
+        QCOMPARE(puerto.llamadas, 0);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(!servicio.enCurso());
+        QCOMPARE(servicio.ultimoResultado().mensaje, mensajeBase);
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("esquema esperado")));
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("base nueva")));
+    }
+
+    void baseInvalidaTienePrioridadSobreLaEntrada()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0, {}, {}, []() {
+            return QStringLiteral("La base de datos no cumple el esquema esperado: falta el tipo "
+                                  "general. Restaure un respaldo de la versión vigente o cree "
+                                  "una base nueva.");
+        });
+        QSignalSpy spy(&servicio, &ServicioGeneracion::finalizada);
+
+        // La entrada también es inválida: el diagnóstico de la base tiene prioridad.
+        servicio.generar(QJsonObject{}, QStringLiteral("h"));
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::BaseInvalida);
+        QCOMPARE(puerto.llamadas, 0);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("tipo general")));
+    }
+
     void segundaGeneracion_noAdmitida()
     {
         PuertoFalso puerto;
@@ -283,6 +323,28 @@ private slots:
         DatosDominio otraMateria = dominio();
         otraMateria.materias[0].idTipoAula = 7;
         QVERIFY(huellaDatos(otraMateria, 35) != h1);
+    }
+
+    void huellaDatos_noIncluyeElTipoGeneralNiSuNombreVisible()
+    {
+        // El nombre visible del tipo no entra en la huella (solo su identidad, `idTipoAula`).
+        // Dos dominios que solo difieren en `tipoAula` dan la misma huella; el control
+        // `huellaDatos_cambiaConElTipoDeAula` fija que el id sí entra.
+        const QString h1 = huellaDatos(dominio(), 35);
+
+        DatosDominio otroNombre = dominio();
+        otroNombre.aulas[0].tipoAula = QStringLiteral("Otro nombre visible");
+        otroNombre.materias[0].tipoAula = QStringLiteral("Otro nombre visible");
+        QCOMPARE(huellaDatos(otroNombre, 35), h1);
+
+        // Tampoco entra el nombre por separado en cada colección.
+        DatosDominio soloAula = dominio();
+        soloAula.aulas[0].tipoAula = QStringLiteral("Aula común");
+        QCOMPARE(huellaDatos(soloAula, 35), h1);
+
+        DatosDominio soloMateria = dominio();
+        soloMateria.materias[0].tipoAula = QStringLiteral("Aula común");
+        QCOMPARE(huellaDatos(soloMateria, 35), h1);
     }
 
     void huellaDatos_cambiaConLosEventos()

@@ -42,10 +42,12 @@ public:
     Resultado<ConfiguracionHoraria> consultar() const;
 
     /**
-     * @brief Valida el rango y hace *upsert* de la fila `id = 1` (RF-1, RF-2).
+     * @brief Valida la base y el rango y hace *upsert* de la fila `id = 1` (RF-1, RF-2).
      *
-     * Una duración fuera de 30–90 devuelve el mensaje de
-     * `duracion_horaria::errorDeRango` **sin escribir**; el valor anterior se
+     * Comprueba primero la validez de la base (016 RF-1): si no es válida, devuelve el
+     * mensaje de la causa más «No se guardó la configuración de la hora académica.» y
+     * **no escribe**. Después valida el rango; una duración fuera de 30–90 devuelve el
+     * mensaje de `duracion_horaria::errorDeRango` **sin escribir**; el valor anterior se
      * conserva. Es una sola sentencia: participa de la transacción del llamador.
      */
     Resultado<ConfiguracionHoraria> guardar(int duracionMinutos);

@@ -50,6 +50,28 @@ int contar(QSqlDatabase& db, const QString& tabla)
     return q.next() ? q.value(0).toInt() : -1;
 }
 
+/// Id de la fila del tipo general que deja el esquema en una base nueva (015 RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!q.exec() || !q.next()) {
+        return -1;
+    }
+    return q.value(0).toInt();
+}
+
+/// Número de filas del catálogo cuya clave es la del tipo general.
+int contarTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT COUNT(*) FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!q.exec() || !q.next()) {
+        return -1;
+    }
+    return q.value(0).toInt();
+}
+
 /// Vuelca una consulta como texto estable (una cadena por fila, columnas unidas por «|»),
 /// ordenada alfabéticamente, para comparar dos bases ignorando ids y marcas de auditoría.
 /// Si la consulta falla, devuelve una única entrada «__ERROR__ …» para que la comparación
@@ -234,6 +256,230 @@ private slots:
         cerrarInspeccion(db);
     }
 
+    void aplicar_sobreBaseNueva_noInformaBaseConDatos()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        // La base recién creada solo trae esquema, configuración y la fila del general: no es
+        // «base con datos» (015 RF-5).
+        QCOMPARE(AperturaBaseDatos::abrir(ruta).estado, AperturaBaseDatos::Estado::OkCreada);
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion resultado = aplicar(opciones);
+
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
+    }
+
+    void aplicar_reutilizaElTipoGeneral()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        QCOMPARE(AperturaBaseDatos::abrir(ruta).estado, AperturaBaseDatos::Estado::OkCreada);
+
+        int idAntes = -1;
+        {
+            QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+            QVERIFY(db.isOpen());
+            idAntes = idTipoGeneral(db);
+            cerrarInspeccion(db);
+        }
+        QVERIFY(idAntes > 0);
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+
+        // Misma fila, mismo id: la siembra no crea un segundo tipo general.
+        QCOMPARE(idTipoGeneral(db), idAntes);
+        QCOMPARE(contarTipoGeneral(db), 1);
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3); // general + Laboratorio + Taller
+
+        const QStringList catalogo =
+            filasDe(db, QStringLiteral("SELECT nombre, clave FROM TiposAula"));
+        QCOMPARE(catalogo.size(), 3);
+        QVERIFY(catalogo.contains(QStringLiteral("Laboratorio|laboratorio")));
+        QVERIFY(catalogo.contains(QStringLiteral("Taller|taller")));
+
+        cerrarInspeccion(db);
+    }
+
+    void reemplazar_conservaElTipoGeneral()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        QVERIFY2(aplicar(opciones).ok(), "siembra inicial");
+
+        int idAntes = -1;
+        {
+            QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+            QVERIFY(db.isOpen());
+            idAntes = idTipoGeneral(db);
+            cerrarInspeccion(db);
+        }
+        QVERIFY(idAntes > 0);
+
+        OpcionesAplicacion reemplazo;
+        reemplazo.rutaDb = ruta;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 11, 5), QTime(12, 0, 0));
+        const ResultadoAplicacion resultado = aplicar(reemplazo);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+
+        // El reemplazo conserva la identidad (id) del general y no lo duplica.
+        QCOMPARE(idTipoGeneral(db), idAntes);
+        QCOMPARE(contarTipoGeneral(db), 1);
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3);
+
+        cerrarInspeccion(db);
+    }
+
+    void aplicar_dosVeces_mismosDatosYRecuentos()
+    {
+        // Comparaciones por clave natural: no dependen de ids ni de fechas.
+        const struct {
+            const char* consulta;
+            const char* sql;
+        } kComparaciones[] = {
+            {"TiposAula", "SELECT nombre, clave FROM TiposAula"},
+            {"Turnos", "SELECT nombre, inicio, fin, slots FROM Turnos"},
+            {"Eventos",
+             "SELECT turno, nombre, despues_de_slot, orden, duracion, inicio, fin FROM Eventos"},
+            {"Aulas",
+             "SELECT a.nombre, a.capacidad, a.edificio, a.piso, t.nombre "
+             "FROM Aulas a JOIN TiposAula t ON t.id = a.id_tipo_aula"},
+            {"Materias",
+             "SELECT m.nombre, m.requisitos, t.nombre "
+             "FROM Materias m JOIN TiposAula t ON t.id = m.id_tipo_aula"},
+            {"PlanEstudio", "SELECT codigo, nombre, descripcion FROM PlanEstudio"},
+            {"PlanEstudio_Materia",
+             "SELECT p.codigo_PlanEstudio, m.nombre, p.curso, p.horas "
+             "FROM PlanEstudio_Materia p JOIN Materias m ON m.id = p.id_Materia"},
+            {"Cursos",
+             "SELECT c.anio, c.seccion, c.turno, a.nombre "
+             "FROM Cursos c LEFT JOIN Aulas a ON a.id = c.aula"},
+            {"Profesores", "SELECT id, nombre, email, telefono FROM Profesores"},
+            {"Profesor_Materia",
+             "SELECT pm.id_Profesor, m.nombre "
+             "FROM Profesor_Materia pm JOIN Materias m ON m.id = pm.id_Materia"},
+            {"Disponibilidad_Profesor",
+             "SELECT id_Profesor, dia, hora_inicio, hora_fin FROM Disponibilidad_Profesor"},
+            {"Preferencia_Profesor",
+             "SELECT id_Profesor, dia, hora_inicio, hora_fin, sentido FROM Preferencia_Profesor"},
+        };
+        const auto exigirMismosDatos = [&](QSqlDatabase& a, QSqlDatabase& b) {
+            for (const auto& c : kComparaciones) {
+                QVERIFY2(filasDe(a, QString::fromLatin1(c.sql))
+                             == filasDe(b, QString::fromLatin1(c.sql)),
+                         qPrintable(QStringLiteral("La tabla %1 difiere entre bases.")
+                                        .arg(QString::fromLatin1(c.consulta))));
+            }
+        };
+        const auto exigirMismosRecuentos = [](const Recuentos& a, const Recuentos& b) {
+            QCOMPARE(a.turnos, b.turnos);
+            QCOMPARE(a.eventos, b.eventos);
+            QCOMPARE(a.tiposAula, b.tiposAula);
+            QCOMPARE(a.aulas, b.aulas);
+            QCOMPARE(a.materias, b.materias);
+            QCOMPARE(a.planes, b.planes);
+            QCOMPARE(a.planMaterias, b.planMaterias);
+            QCOMPARE(a.cursos, b.cursos);
+            QCOMPARE(a.docentes, b.docentes);
+            QCOMPARE(a.asignaciones, b.asignaciones);
+            QCOMPARE(a.disponibilidades, b.disponibilidades);
+            QCOMPARE(a.preferencias, b.preferencias);
+        };
+
+        // 1) Dos bases vacías: mismos datos y recuentos.
+        QTemporaryDir dirA;
+        QTemporaryDir dirB;
+        QVERIFY(dirA.isValid());
+        QVERIFY(dirB.isValid());
+
+        OpcionesAplicacion opcionesA;
+        opcionesA.rutaDb = dirA.filePath(QStringLiteral("centro.db"));
+        OpcionesAplicacion opcionesB;
+        opcionesB.rutaDb = dirB.filePath(QStringLiteral("centro.db"));
+
+        const ResultadoAplicacion primera = aplicar(opcionesA);
+        const ResultadoAplicacion segunda = aplicar(opcionesB);
+        QVERIFY2(primera.ok(), qPrintable(primera.detalle));
+        QVERIFY2(segunda.ok(), qPrintable(segunda.detalle));
+        exigirMismosRecuentos(primera.recuentos, segunda.recuentos);
+
+        QSqlDatabase a = abrirInspeccion(opcionesA.rutaDb, m_contador);
+        QSqlDatabase b = abrirInspeccion(opcionesB.rutaDb, m_contador);
+        QVERIFY(a.isOpen());
+        QVERIFY(b.isOpen());
+        exigirMismosDatos(a, b);
+        cerrarInspeccion(a);
+        cerrarInspeccion(b);
+
+        // 2) Reemplazo total sobre una base ya sembrada: mismos datos y recuentos que una
+        //    siembra nueva.
+        OpcionesAplicacion reemplazo = opcionesA;
+        reemplazo.reemplazarTodo = true;
+        reemplazo.confirmado = true;
+        reemplazo.ahora = QDateTime(QDate(2026, 11, 5), QTime(12, 0, 0));
+        const ResultadoAplicacion trasReemplazo = aplicar(reemplazo);
+        QVERIFY2(trasReemplazo.ok(), qPrintable(trasReemplazo.detalle));
+        exigirMismosRecuentos(trasReemplazo.recuentos, segunda.recuentos);
+
+        QSqlDatabase aReemplazada = abrirInspeccion(opcionesA.rutaDb, m_contador);
+        QSqlDatabase bNueva = abrirInspeccion(opcionesB.rutaDb, m_contador);
+        QVERIFY(aReemplazada.isOpen());
+        QVERIFY(bNueva.isOpen());
+        exigirMismosDatos(aReemplazada, bNueva);
+        cerrarInspeccion(aReemplazada);
+        cerrarInspeccion(bNueva);
+    }
+
+    void aplicar_recuentoTiposEsTres()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("centro.db"));
+
+        OpcionesAplicacion opciones;
+        opciones.rutaDb = ruta;
+        const ResultadoAplicacion resultado = aplicar(opciones);
+        QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
+
+        QCOMPARE(resultado.recuentos.tiposAula, 3);
+
+        QSqlDatabase db = abrirInspeccion(ruta, m_contador);
+        QVERIFY(db.isOpen());
+        QCOMPARE(contar(db, QStringLiteral("TiposAula")), 3);
+        QCOMPARE(contarTipoGeneral(db), 1);
+
+        const QStringList catalogo =
+            filasDe(db, QStringLiteral("SELECT nombre, clave FROM TiposAula"));
+        QVERIFY(catalogo.contains(QStringLiteral("Aula de estudio|aula de estudio")));
+        QVERIFY(catalogo.contains(QStringLiteral("Laboratorio|laboratorio")));
+        QVERIFY(catalogo.contains(QStringLiteral("Taller|taller")));
+
+        cerrarInspeccion(db);
+    }
+
     void baseConDatosFallaSinEscribir()
     {
         QTemporaryDir dir;
@@ -372,8 +618,8 @@ private slots:
         QVERIFY(!resultado.ok());
         QVERIFY(!resultado.detalle.isEmpty());
 
-        // Nada a medias (RF-10/RNF-6): la base nueva queda con 0 filas en las 12 tablas de
-        // dominio del esquema v5.
+        // Nada a medias (RF-10/RNF-6): la base nueva queda sin datos de dominio. La única fila
+        // que sobrevive es el tipo general que deja la creación del esquema (015 RF-1).
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
         const char* const kTablas[] = {
@@ -382,7 +628,9 @@ private slots:
             "Preferencia_Profesor",
         };
         for (const char* tabla : kTablas) {
-            QCOMPARE(contar(db, QString::fromLatin1(tabla)), 0);
+            const QString nombre = QString::fromLatin1(tabla);
+            const int esperado = nombre == QStringLiteral("TiposAula") ? 1 : 0;
+            QCOMPARE(contar(db, nombre), esperado);
         }
         // La fila de configuración la deja la creación del esquema (fuera de la transacción)
         // y el rollback no la duplica: sigue habiendo una con 35 (RF-2, RF-8).

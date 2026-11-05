@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QTime>
@@ -11,6 +12,20 @@
 
 #include <backend/services/ServicioMaterias.hpp>
 #include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioProfesor : public QObject {
     Q_OBJECT
@@ -29,9 +44,8 @@ private slots:
         m_servicioMaterias.reset(new ServicioMaterias(m_dbManager->database()));
 
         m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
-        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
-        QVERIFY(tipo.ok);
-        m_idTipoAula = tipo.valor.id;
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
