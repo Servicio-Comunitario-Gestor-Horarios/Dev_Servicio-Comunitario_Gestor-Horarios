@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** **012 (preferencias horarias del docente)** **cerrada e implementada**; las 009, 010 y 011 también. **Interfaz migrada al contrato 2.0 y al esquema v5**: la rama de frontend integró `feat/Base-datos` por *merge* y ya compila con `BUILD_FRONTEND=ON`. Suite **53/53** en verde con el preset `full` (backend + interfaz, host).
-- **Fecha:** 2026-11-01
-- **Rama:** `feat/frontend-generacion` (merge de `origin/feat/Base-datos`; sin push). El trabajo de backend de la 012 sigue en `feat/Base-datos` (`0946600`, 83 commits por delante de `develop` = `5d6b1da`).
-- **Specs en curso:** ninguna. **Ya no queda ninguna spec sin plan ni tareas**, y la 005 cerró su **T10** el 2026-10-29. El resto, implementadas (ver tabla).
-- **Siguiente paso:** no hay specs pendientes de abrir. Ver «Siguiente paso» (deudas del frontend, `release/1.0` y PR a `develop`).
+- **Fase:** **015 y 016 (tipo general de aula) cerradas e implementadas (2026-11-05)**; **esquema vigente v6**. Suites **56/56** (`backend`) y **61/61** (`full-release`) en el host; la interfaz compila con el contrato 2.0 y el esquema v6.
+- **Fecha:** 2026-11-05
+- **Rama:** `feat/Motor`. La 015 y la 016 están **commiteadas** (`4f39fac` código+tests, `a2cfe11` docs de API, `9eff1cb` specs). `HEAD` de partida de ambas: `bb1767a`.
+- **Specs en curso:** ninguna. **013** aprobada y **re-baseada a v6**, **sin implementar**; **014** planificada y sin escribir.
+- **Siguiente paso:** implementar la **013** sobre v6 (10 tareas); después, escribir la **014**; y **recrear la base real del usuario** (estaba en v5 y se recrea en v6 con el seed) con respaldo.
 
 ## Specs activas
 
@@ -24,8 +24,12 @@
 | 010-solver-tipos-y-eventos | aprobada (2026-10-23; cambio de requisitos 2026-10-26) | **implementada (2026-10-27)** (T1–T10 + T11–T16; APROBADO de la 2.ª entrega 2026-10-27) |
 | 011-horas-academicas | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T10; **T8 adelantada**; APROBADO 2026-10-29) |
 | 012-preferencias-docente | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T9; APROBADO 2026-10-29) |
+| 013-preferencias-docente-solver | aprobada (2026-11-04) | **re-baseada a v6 (2026-11-05)**; **sin implementar** (plan y tareas aprobados; 10 tareas) |
+| (014) materias en bloques de dos horas | — | **planificada, sin escribir**; número reservado |
+| 015-tipo-general-en-el-esquema | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T8; APROBADO 2026-11-05; esquema **v6**) |
+| 016-tipo-general-comprobacion-y-cierre | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T9; APROBADO; T8 del planner) |
 
-> Épico **solver** (numeración real del trabajo): **004 (persistencia de campos) → 005 (núcleo) → 008 (datos de prueba) → 009 (tipos de aula y eventos) → 010 (tipos en el solver) → 011 (horas académicas, **cerrada el 2026-10-29**) → 012 (preferencias del docente, **cerrada el 2026-10-29**)**. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado** y no existen en `specs/`; si se retoman, se numerarán al abrirlas.
+> Épico **solver** (numeración real del trabajo): **004 → 005 → 008 → 009 → 010 → 011 → 012 (cerradas)** → **015 (tipo general en el esquema, cerrada el 2026-11-05, esquema v6)** → **016 (comprobación y cierre, cerrada el 2026-11-05)**; **013** (preferencias en el solver) aprobada y **re-baseada a v6**, sin implementar; **014** (materias en bloques de dos horas) planificada y sin escribir. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado**; la 007 queda además **descartada/diferida** por decisión del usuario (2026-11-04).
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
 > (superaba las 10 tareas) y se renumeró desde 001.
@@ -150,13 +154,15 @@
   - **Cierre sin avisos**: `GestorProcesoBackend` marca la parada intencional (`m_deteniendo`) y no emite `backendColapsado` al detener el proceso; además el frontend ignora la señal durante `aboutToQuit`/`closingDown`. Ya no aparece «El proceso de cálculo dejó de responder» (ni su código) al cerrar la aplicación con normalidad.
   - El test de la vista de generación aísla `QSettings` en un INI temporal para no depender de las preferencias de la máquina.
 
+- **Tipo general de aula: 015 (garantía estructural) y 016 (comprobación y cierre), cerradas el 2026-11-05.** Esquema **v6**: toda base nace con el tipo general («Aula de estudio», clave normalizada `aula de estudio`) en la creación, con índice único y **dos disparadores** que prohíben borrarlo y renombrarlo (también por escritura directa); la guardia exige tablas, columnas, índice, disparadores y **exactamente una** fila (nombre normalizado + clave), y las tablas retiradas siguen invalidando. El literal vive en `common/tipo_general.hpp` y solver, servicio, seed y frontend delegan. El seed **reutiliza** el tipo, la base nueva **cuenta como vacía**, el reemplazo total **lo conserva** y el recuento es 3 leído de la base. La 016 exige la validez **al abrir, antes de generar y antes de guardar la configuración** con **una sola** comprobación de solo lectura (`validez_base::comprobar`); el frontend **no sustituye** el tipo general (`idTipoGeneral` → `Resultado<int>`), V18 explica la convención y la acción y el tipo general queda **fuera de la huella de datos**. **Sin cambios de API del catálogo ni del contrato 2.0.** Deudas aceptadas: `Causa::Version` cubre también un fallo de lectura (interno); `revisarBase` con valor por defecto; el mensaje de versión **posterior** (v7) sin matizar; `cerrar()` no propaga el fallo de `commit()`; faltan tests de conexión cerrada y de base rota tras abrir; `docs/solver/Informe-Motor-Solver.md` sigue citando «V1–V13»; coste ≈1,03 ms por comprobación. La **013** quedó **re-baseada a v6** sin cambiar sus requisitos.
+
 ## Siguiente paso
 
-1. **No hay specs pendientes de abrir**: la 012 se cerró el 2026-10-29 y ninguna queda sin plan ni tareas.
+1. **Implementar la 013** (preferencias del docente, 10 tareas) sobre el esquema v6; después, **escribir la 014** (materias en bloques de dos horas).
 2. **Deudas del frontend:** **resueltas en `feat/frontend-generacion` (2026-11-01)** — builder con D, `huellaActual` cableado, selector de duración retirado, eventos en lugar de recesos, `test_generacion_seed` reescrito (35 min, rejilla del seed). Queda solo la **pantalla de gestión del catálogo de tipos de aula** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) y, de la 012, la **UI de preferencias** (solo API): ambas son funcionalidad nueva, no bloquean la compilación.
 3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; `feat/frontend-generacion` **sí la tiene** (viene de `develop`) y la conservó al integrar la rama de datos: la agrupación S3 del solver convive con la ocupación por `ClaveOcupacion` de la 010. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
 4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-5. **MEMORY actualizado** (2026-10-29) con el cierre de la 012 y de la T10 de la 005.
+5. **MEMORY actualizado** (2026-11-05) con el cierre de la 015 y la 016 (esquema v6, 56/56 y 61/61).
 6. **DistribuciÃ³n:** el **ZIP portable** ya se genera con `cmake --build build-rel --target package` (`cmake/Packaging.cmake`; ver `docs/guias/desarrollo/CMAKE_GUIDE.md` Â§Empaquetado). Falta lo que venga despuÃ©s: un instalador (Inno Setup o NSIS) que envuelva ese ZIP y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
@@ -192,6 +198,8 @@
 - 012: **implementada y cerrada (2026-10-29)** ✅ (APROBADO 2026-10-29 contra `3007c54`; suite **54/54**).
   - T1 `4993be0` · T2 `3871488` · T3 `7405351` · T4 `d2f2147` · T5 `8acce25` · T6 `3b8ba90` · T7 `43c222c` · T8 `94647ef` · T9 `98c9dbc` · notas de la validación (M1–M6) `e12641b`.
   - **Alcance:** persistencia, validación, servicios, cascada, seed y documentación. **No se tocó** el solver, el contrato ni la interfaz; las preferencias **no alteran la generación** y quedan **fuera de la huella** hasta que el solver las consuma.
+- 015: **T1–T8 completas** ✅ (APROBADO 2026-11-05; esquema **v6**: fila + dos disparadores + guardia ampliada; seed reutiliza y conserva el general).
+- 016: **T1–T9 completas** ✅ (APROBADO 2026-11-05; comprobación en tres momentos, ayuda estricta, V18, huella; T8 del planner re-baseó la 013).
 - Tests ajenos que fallan: **ninguno**. El antiguo **flaky `test_middleware_transport`** estaba **mal atribuido**: no era ajeno al solver, sino una **colisión del nombre fijo del socket IPC** entre los tests que levantan `InternalServer` (`health_check`, `transport`, `ipc_aislamiento_bd`) al correr en paralelo; **corregido el 2026-10-29** con `RESOURCE_LOCK` de CTest (`fd7ac33`). La suite es estable hoy en serie y en paralelo (`-j4`/`-j8`). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`, dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004 cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distinguía una base vieja de una nueva. Medidas:
   - `VersionEsquema::esquemaEsperado(db, QString* motivo)` explica exactamente lo que no cuadra (tablas/columnas faltantes y tablas retiradas presentes).
