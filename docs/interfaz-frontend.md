@@ -86,8 +86,12 @@ Resultado abrir(const QString& ruta, const Opciones& opciones);
 No hay migración por versión: si la base existe, su marca (`PRAGMA user_version`) **y** su catálogo
 deben coincidir con el esquema esperado. `detalle` identifica la causa con precisión: si la versión no
 coincide nombra la versión del archivo y la esperada; si la versión coincide pero el catálogo no,
-nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. «faltan las columnas
-«anio», «seccion», «aula» de la tabla «Cursos»; existe la tabla retirada «Curso_Materia»»).
+nombra las tablas/columnas que faltan, los **objetos exigidos** que faltan (el índice único y los dos
+disparadores del tipo general), la **fila** del tipo general cuando no cumple el predicado (sin tipo,
+varias filas o clave almacenada distinta) y las tablas retiradas que sobran (p. ej. «faltan las
+columnas «anio», «seccion», «aula» de la tabla «Cursos»; existe la tabla retirada «Curso_Materia»»).
+Si la creación de la base falla, el detalle dice que **no quedó esquema parcial** y que el archivo
+puede descartarse y crearse de nuevo (con respaldo obligatorio).
 
 **Cómo lo trata el frontend:**
 - `ok() == true` → continuar el arranque.
@@ -103,33 +107,59 @@ nombra las tablas/columnas que faltan y las tablas retiradas que sobran (p. ej. 
 
 ```cpp
 namespace VersionEsquema {
-constexpr int VERSION_ESQUEMA_ACTUAL = 5;   // v5: preferencias horarias del docente
+constexpr int VERSION_ESQUEMA_ACTUAL = 6;   // v6: tipo general de aula garantizado y protegido
 enum class EstadoApertura { Crear, Abrir, FalloEsquema };
 EstadoApertura decidirApertura(bool existe, int versionArchivo, int versionEsperada); // pura
 int  leerVersionEsquema(QSqlDatabase& db);          // -1 si no es legible
 bool fijarVersionEsquema(QSqlDatabase& db, int version);
 bool crearEsquema(QSqlDatabase& db);                // catálogo entero en una transacción
-bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // catálogo y tablas retiradas
+bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr); // tablas, objetos, fila y retiradas
 }
 ```
 
 `decidirApertura` es pura (sin E/S): `versionArchivo <= 0` representa versión ausente. `crearEsquema`
 aplica el catálogo completo (`Migracion::aplicarPaso`) y fija `user_version` en una sola transacción;
-si algo falla, revierte. La versión **5** añade las preferencias (`Preferencia_Profesor`) al catálogo
-de la **v4**. La **v4** añadió la configuración global de la hora académica (`ConfiguracionHoraria`, una
-fila con `duracion_minutos` entre 30 y 90) al catálogo `TiposAula` (con su `clave` normalizada) y
-`Eventos` (identidad y orden) de la **v3**; el catálogo esperado incluye las tablas y sus columnas. Una
-base con la versión anterior (**4**) **no se migra**: se rechaza al abrir.
+si algo falla, revierte. La versión **6** añade el **tipo general de aula** —la fila, el índice único
+`TiposAula_clave` y los dos disparadores que impiden su borrado y su renombrado— al catálogo de la
+**v5**. El catálogo esperado incluye, **por nombre**, las tablas y sus columnas, el índice y los dos
+disparadores, **exactamente una** fila del tipo general (nombre visible normalizado «aula de estudio»
+y su clave almacenada «aula de estudio») y la ausencia de las tablas retiradas. La **v5** había
+añadido las preferencias (`Preferencia_Profesor`) al catálogo de la **v4**. Una base con la versión
+anterior (**5**) **no se migra**: se rechaza al abrir.
 
 > **Guardia anti-regresión.** `test/backend/test_version_esquema.cpp` congela la **huella SHA-256**
-> del catálogo real (`HUELLAS_CONOCIDAS`, por versión). Si se cambia el DDL hay que **subir
-> `VERSION_ESQUEMA_ACTUAL`** y registrar la huella nueva en el mismo cambio; de lo contrario el test
-> falla. Así una base creada por una compilación intermedia no queda con la marca actual y un catálogo
-> viejo (incidente del 2026-10-17: `Cursos` pasó de `nombre`/`aula_fija` a `anio`/`seccion`/`turno`/
-> `aula` sin subir la versión, y las bases existentes dejaron de abrir).
+> del catálogo real (`HUELLAS_CONOCIDAS`, por versión) resumiendo **tablas, índices y disparadores**.
+> Si se cambia el DDL hay que **subir `VERSION_ESQUEMA_ACTUAL`** y registrar la huella nueva en el
+> mismo cambio; de lo contrario el test falla. Así una base creada por una compilación intermedia no
+> queda con la marca actual y un catálogo viejo (incidente del 2026-10-17: `Cursos` pasó de
+> `nombre`/`aula_fija` a `anio`/`seccion`/`turno`/`aula` sin subir la versión, y las bases existentes
+> dejaron de abrir). La huella incluye el **cuerpo** del disparador como guardia de release; la
+> validez de la base comprueba su **presencia por nombre**, no el cuerpo.
 
 **Cómo lo trata el frontend:** normalmente no lo usa directamente; `AperturaBaseDatos` ya envuelve
 la decisión y la verificación del catálogo.
+
+**Comprobación en sesión (`validez_base`).** `src/backend/include/backend/database/comprobacion_validez.hpp`
+envuelve el **predicado único** de la 015 (`VersionEsquema::esquemaEsperado`) sin duplicarlo:
+
+```cpp
+namespace validez_base {
+    enum class Causa { Valida, Version, Esquema };   // diagnóstico interno
+    struct Comprobacion { Causa causa; QString mensaje; bool valida() const; };
+    Comprobacion comprobar(QSqlDatabase& db,
+                           int versionEsperada = VersionEsquema::VERSION_ESQUEMA_ACTUAL);
+}
+```
+
+- **Valida:** la base sirve; `mensaje` vacío.
+- **Version:** la marca no coincide (o no se puede leer); el mensaje propone crear una base nueva y
+  advierte de que un respaldo de la versión anterior volverá a fallar.
+- **Esquema:** la versión coincide pero falta la fila del general, el índice, un disparador o sobra
+  una tabla retirada; el mensaje lleva la causa concreta y la acción (respaldo de la versión vigente
+  o base nueva con respaldo obligatorio).
+
+La validez se comprueba **al abrir**, **antes de generar** y **antes de guardar la configuración**;
+es la misma comprobación, de solo lectura: **no migra, no repara y no escribe**.
 
 ### 2.3 `Respaldo` — crear, validar y restaurar (implementado)
 
@@ -379,11 +409,24 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
   (`trimmed().toCaseFolded()`) con índice único en la base: «Laboratorio» y «laboratorio», o
   «Física» y «FÍSICA», son el mismo tipo aunque se escriba directo en la base. El nombre visible
   conserva mayúsculas y acentos.
+- **Tipo general.** Toda base nace con el tipo general («Aula de estudio»): el catálogo nunca está
+  vacío. Su alta por el servicio falla por duplicado; **no** se puede eliminar (el mensaje prioriza
+  «es el tipo general» sobre la lista de dependientes) ni renombrar, ni siquiera con el mismo nombre
+  o solo cambiando la grafía. El rechazo llega en español, también si una escritura directa lo
+  provoca en el almacenamiento.
+- **Ayuda estricta del tipo general (016).** `TiposAulaUI::idTipoGeneral`
+  (`src/frontend/src/services/tipos_aula_ui.hpp`) devuelve `Resultado<int>`: **solo** el tipo general
+  (comparado con `tipo_general::esNombreCanonico`, recorte + plegado) o un fallo; **nunca** otro tipo
+  del catálogo. Si el catálogo está vacío o no tiene el general, el mensaje dice qué falta y qué
+  hacer (restaurar un respaldo de la versión vigente o crear una base nueva), sin errores técnicos.
+  Se rechazan las altas que usan la ayuda —aula, materia y materia rápida desde docente, en alta y
+  edición— sin abrir el formulario o sin escribir nada. Una base nueva ya trae el tipo general, y el
+  catálogo **no gana campos ni firmas nuevas**. Con esto queda **atendida la deuda de la 009 sobre
+  esta ayuda**; la **pantalla** de gestión del catálogo sigue pendiente (§5).
 - **Tipo obligatorio.** `crearAula`/`actualizarAula`/`crearMateria`/`actualizarMateria` exigen
-  `idTipoAula > 0` y existente; si el catálogo está vacío se rechaza el alta. Actualizar **sin**
-  tipo no conserva el anterior: se rechaza.
-- **Borrado en uso.** `eliminarTipoAula` devuelve error con la lista de aulas y materias que lo usan
-  y **no borra nada**; no hay cascada ni `SET NULL`.
+  `idTipoAula > 0` y existente. Actualizar **sin** tipo no conserva el anterior: se rechaza.
+- **Borrado en uso.** `eliminarTipoAula` de un tipo especializado devuelve error con la lista de
+  aulas y materias que lo usan y **no borra nada**; no hay cascada ni `SET NULL`.
 - **Cómo lo trata el frontend:** cargar el catálogo con `listarTiposAula()` en los formularios de
   aula y materia (desplegable obligatorio), ofrecer «gestionar tipos» con el CRUD y, antes de
   eliminar, mostrar `mensajeError` con los dependientes (no se confirma).
@@ -396,9 +439,13 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
 - **DTO.** `ConfiguracionHoraria{int duracionMinutos; bool porDefecto;}`: el valor efectivo y si
   proviene del defecto (35) porque no hay fila.
 - **Consulta.** `consultar()` devuelve el valor efectivo; sin fila devuelve `{35, porDefecto = true}`
-  y **no** es error. Solo falla si la lectura de la base falla.
-- **Edición.** `guardar(int)` valida el rango 30–90 con `duracion_horaria::errorDeRango` (punto único,
-  el mismo que V2 del contrato) y hace *upsert* de la fila. Una duración inválida devuelve el mensaje
+  y **no** es error. Solo falla si la lectura de la base falla. **No** comprueba la validez de la
+  base (016): la pantalla sigue leyendo el valor aunque la base esté rota; solo se rechaza el
+  guardado.
+- **Edición.** `guardar(int)` comprueba **primero la validez de la base** (016): si no es válida,
+  devuelve el mensaje de la causa más «No se guardó la configuración de la hora académica.» y **no
+  escribe**. Después valida el rango 30–90 con `duracion_horaria::errorDeRango` (punto único, el
+  mismo que V2 del contrato) y hace *upsert* de la fila. Una duración inválida devuelve el mensaje
   (campo, valor, rango y acción) y **no cambia** el valor anterior.
 - **Fachada.** `NucleoDatos::configuracionHoraria()` y `guardarConfiguracionHoraria(int)` son la vía
   del frontend.
@@ -599,7 +646,8 @@ doble) y un plazo (60 s por defecto).
 ```cpp
 struct ResultadoGeneracion {
     enum class Estado { Inactivo, Calculando, Listo, DatosAnteriores, NoFactible,
-                        ContratoInvalido, CalculoFallido, TiempoAgotado, EntradaInvalida };
+                        ContratoInvalido, CalculoFallido, TiempoAgotado, EntradaInvalida,
+                        BaseInvalida };
     Estado        estado = Estado::Inactivo;
     QString       mensaje;
     bool          datosAnteriores = false;
@@ -613,7 +661,8 @@ class ServicioGeneracion : public QObject {
 public:
     ServicioGeneracion(PuertoSolver& puerto, int plazoMs = 60000,
                        std::function<QString()> huellaActual = {},
-                       std::function<QDateTime()> reloj = {}, QObject* padre = nullptr);
+                       std::function<QDateTime()> reloj = {},
+                       std::function<QString()> revisarBase = {}, QObject* padre = nullptr);
     void generar(const QJsonObject& entrada, const QString& huella);
     bool enCurso() const;
     const ResultadoGeneracion& ultimoResultado() const;
@@ -630,10 +679,15 @@ signals:
 - `NoFactible` / `ContratoInvalido` / `CalculoFallido` → informar; **no** ofrecer guardar.
 - `TiempoAgotado` → informar; la app sigue operando (la respuesta tardía se ignora).
 - `EntradaInvalida` → mostrar `mensaje` (motivo de la validación previa); no se envió nada.
+- `BaseInvalida` → `revisarBase()` devolvió un mensaje con causa y acción: **no** se valida la entrada
+  ni se envía nada al puerto; mostrar ese `mensaje`. Tiene prioridad sobre `EntradaInvalida`.
 
 La entrada la construye `ConstructorEntradaSolver` (`construirJsonEntrada`, `src/backend`) a partir
-de `DatosDominio` (dominios) + preset; se valida con `validarEntradaSolver` (V1–V13). La huella
-(`huellaDatos`) detecta «datos anteriores».
+de `DatosDominio` (dominios) + preset; se valida con `validarEntradaSolver` (V1–V18). La huella
+(`huellaDatos`) detecta «datos anteriores» y **no incluye el catálogo de tipos de aula**: solo la
+identidad que referencia cada aula o materia (`idTipoAula`), no el nombre visible del tipo. La vista
+comprueba la validez de la base **antes de componer** la entrada y cablea `revisarBase` en el
+servicio.
 
 ### 3.2 `CargadorConfiguracionSolver` — config y presets en JSON (implementado)
 
@@ -873,15 +927,20 @@ sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo po
 > `feat/Base-datos` (merge): los formularios de aula y materia piden el tipo del catálogo
 > (`listarTiposAula()`), el resumen de aulas clasifica por `AulaDTO.tipoAula`, la ocupación de
 > asignaturas cruza `MateriaDTO.tipoAula` con el de las aulas y la vista de generación recorre
-> `turno.eventos`. Queda sin pantalla la **gestión del catálogo**
-> (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`).
+> `turno.eventos`.
+>
+> **Actualización 2026-11-05 (016).** La **ayuda del tipo general** (`TiposAulaUI::idTipoGeneral`)
+> queda **atendida**: es estricta, devuelve el general o un fallo y nunca sustituye el tipo; las
+> altas que la usan no abren el formulario ni escriben si falta. La **pantalla** de gestión del
+> catálogo (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) sigue siendo **deuda viva** del
+> equipo de frontend.
 
 ---
 
 ## 6. Deuda del frontend y alcance (spec 011)
 
 > **Guía de migración paso a paso:** `docs/guias/migracion-frontend.md` (qué rompe la compilación,
-> qué cambió en las specs 009–012 y cómo verificarlo).
+> qué cambió en las specs 009–012, 015 y 016 y cómo verificarlo).
 
 La 011 cambia `src/backend` y `src/seed`; `src/frontend` **no se toca** y **no compila** contra las
 firmas nuevas. El equipo de interfaz debe migrar:

@@ -197,6 +197,11 @@ menos una materia en él (**V10**).
   **convención por nombre**: el de clave normalizada `aula de estudio` (`claveTipo` = `trim` + plegado
   de caja). Un laboratorio, un taller o una cancha **no** pueden ser referencia. El contrato **no lleva
   ningún dato adicional** para distinguir tipos generales: no hay campo ni sección nuevos (sigue 2.0).
+  El mensaje de **V18** indica la convención (el tipo general es el de nombre `Aula de estudio`), que
+  el aula recibida es de otro tipo y la **acción doble**: asignar al curso un aula del tipo general y
+  comprobar que la base es válida. Si el catálogo no tiene el tipo general, la base **no es válida**
+  (016) y se arregla restaurando un respaldo de la versión vigente o creando una base nueva, no
+  editando el preset.
 - `capacidad` ≤ 0 significa «sin capacidad declarada»: es un dato informativo del aula y no origina
   ningún aviso (el **P3** está **retirado por la 005, decisión I2**).
 
@@ -267,7 +272,8 @@ Con `aula_fija: true`:
 
 1. **Referencia.** Cada curso declara `aula` (índice a `aulas`); esa es su aula de referencia y **debe
    ser del tipo general/ordinario** (convención por nombre: clave normalizada `aula de estudio`;
-   **V18**). Una referencia de laboratorio, taller o cancha es entrada inválida.
+   **V18**). Una referencia de laboratorio, taller o cancha es entrada inválida; el mensaje pide
+   asignar un aula del tipo general y comprobar que la base es válida.
 2. **Coincidencia de tipo.** Si la materia de una clase requiere el tipo del aula de referencia, la
    clase se imparte **en el aula de referencia** (no en otra aula del mismo tipo).
 3. **Desplazamiento.** Si la materia requiere **otro** tipo, esa clase se imparte en un **aula del

@@ -1,8 +1,8 @@
-# Migración del frontend tras las specs 009–012
+# Migración del frontend tras las specs 009–012, 015 y 016
 
 > **Para:** equipo de `src/frontend`.
-> **Fecha:** 2026-10-29 · **Rama:** `feat/Base-datos` · **Suite del backend:** 54/54.
-> **Contrato vigente:** `2.0` (`docs/contrato-solver-2.0.md`). **Esquema de base:** `v5`.
+> **Fecha:** 2026-10-29 · **Rama:** `feat/Base-datos` · **Suite del backend:** 56/56.
+> **Contrato vigente:** `2.0` (`docs/contrato-solver-2.0.md`). **Esquema de base:** `v6`.
 >
 > **Estado (2026-11-01): completada.** La interfaz se migró en `feat/frontend-generacion` al
 > integrar `feat/Base-datos` por merge; `cmake --preset full && cmake --build build` compila y
@@ -10,7 +10,7 @@
 > de tipos de aula (funcionalidad nueva, no bloqueante).
 
 Este documento dice **qué hay que cambiar en la interfaz para que vuelva a compilar** y
-**qué cambió en el backend** en las specs 009, 010, 011 y 012 más las correcciones del
+**qué cambió en el backend** en las specs 009, 010, 011, 012, 015 y 016 más las correcciones del
 2026-10-29. El contrato detallado sigue en `docs/interfaz-frontend.md` y
 `docs/contrato-solver-2.0.md`; aquí está solo la guía de migración.
 
@@ -24,6 +24,8 @@ Este documento dice **qué hay que cambiar en la interfaz para que vuelva a comp
 | **010** (2026-10-27) | **Contrato 2.0**, regla de **tipo de aula**, **aula de referencia** con desplazamiento y vuelta, salida con el **aula real**, V16–V18 | Presets 1.0 se rechazan; la salida trae el **aula real por clase** (índice); el aula del curso debe ser del **tipo general** |
 | **011** (2026-10-29) | **Duración global** de la hora académica (35 min por defecto, 30–90), **franja = D**, constructor y huella **con D**, esquema v4 | `construirJsonEntrada` **exige D**; el preset ya no manda la duración; «datos anteriores» depende de D |
 | **012** (2026-10-29) | **Preferencias horarias** del docente (persistencia y API; **sin UI**) | Solo aditivo: `ProfesorDTO.preferencias` y métodos nuevos en `NucleoDatos`; esquema v5 |
+| **015** (2026-11-05) | **Tipo general de aula** garantizado y protegido por el esquema: fila, índice y dos disparadores; esquema v6 | **Sin cambios de API**: el catálogo incluye el general, su alta falla por duplicado y no se puede eliminar ni renombrar |
+| **016** (2026-11-05) | **Comprobación en tres momentos** (abrir, antes de generar y antes de guardar), **ayuda estricta** del tipo general, mensaje de V18 y huella sin el catálogo | **Sin cambios de API**: `idTipoGeneral` devuelve `Resultado<int>` y falla en vez de sustituir; `ServicioGeneracion` gana `revisarBase` y `Estado::BaseInvalida` |
 | **Correcciones** (2026-10-29) | Avisos P1/P3 retirados, `metadata` real, reinicio del solver, test del middleware | `AnalisisSalida.avisos` ya solo trae **P2**; `metadata` con cifras reales |
 
 ---
@@ -100,8 +102,8 @@ ventana queda al final. Derivarla del turno da otro número.
    `{ duracionMinutos, porDefecto }` y se edita con `guardarConfiguracionHoraria(int)`
    (rango **30–90**). El **selector de duración** del editor de presets y de la vista de generación
    **deja de ofrecerse**.
-2. **Bases anteriores no abren.** El esquema pasó a **v5**; una base v4 o anterior se rechaza al abrir
-   (política sin migración, spec 009). El arranque ya tiene el diálogo de recuperación
+2. **Bases anteriores no abren.** El esquema pasó a **v6**; una base **v5 o anterior** se rechaza al
+   abrir (política sin migración, spec 009). El arranque ya tiene el diálogo de recuperación
    (reintentar / restaurar respaldo / crear base nueva): no hay que programar nada, pero hay que
    **crear base nueva con respaldo** para probar.
 3. **Avisos de la validación posterior.** `AnalisisSalida.avisos` trae **solo P2** (exceso de horas del
@@ -136,6 +138,13 @@ ventana queda al final. Derivarla del turno da otro número.
       *(Sigue pendiente; no bloquea.)*
 - [x] **Formularios y listas con el catálogo** (deuda de la 009): `idTipoAula` en aulas y materias,
       clasificación y ocupación por `tipoAula`. *(La gestión del catálogo sigue sin pantalla.)*
+- [x] **Ayuda del tipo general estricta (016)**: `TiposAulaUI::idTipoGeneral` devuelve
+      `Resultado<int>` y **nunca** sustituye el tipo por el primero del catálogo; los tres call
+      sites (aula, materia y materia rápida desde docente, alta y edición) fallan antes de abrir el
+      formulario o de escribir si no hay general. La base nueva ya trae el general.
+- [x] **Comprobación de validez en los tres momentos (016)**: al abrir
+      (`AperturaBaseDatos`), antes de generar (`revisarBase`/`Estado::BaseInvalida`) y antes de
+      guardar la configuración horaria (rechazo sin escribir).
 
 ---
 
@@ -149,7 +158,7 @@ cmake --preset dev-frontend && cmake --build build-fe
 cmake --preset full && cmake --build build
 
 # backend
-cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend   # 54/54
+cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend   # 56/56
 ```
 
 Datos de prueba del seed vigente: turnos **Mañana 07:00–11:50** y **Tarde 12:40–17:30**, 8 franjas de
@@ -170,6 +179,13 @@ clases va de 07:00 a **11:40** y de 12:40 a **17:20**; el `fin` del turno añade
 - **012 · Preferencias del docente** (2026-10-29): modelo que replica la disponibilidad con **sentido**,
   validación de solapes opuestos, servicios y `ProfesorDTO.preferencias`, cascada y seed sin
   preferencias; esquema **v5**.
+- **015 · Tipo general de aula** (2026-11-05): toda base nueva nace con el tipo general y no se puede
+  eliminar ni renombrar; la guardia v6 exige el índice, los dos disparadores y **exactamente una**
+  fila del general; el seed lo reutiliza y lo conserva en el reemplazo. **Sin cambios de API.**
+- **016 · Comprobación y cierre** (2026-11-05): la validez se comprueba al abrir, antes de generar y
+  antes de guardar; la ayuda del tipo general es estricta (falla, no sustituye); V18 explica la
+  convención y la acción; la huella de datos no incluye el catálogo. **Sin cambios de API del
+  catálogo.**
 - **Correcciones** (2026-10-29): avisos P1/P3 retirados, `metadata` real, el solver reinicia su estado
   en cada resolución y el test del middleware dejó de ser intermitente.
 
