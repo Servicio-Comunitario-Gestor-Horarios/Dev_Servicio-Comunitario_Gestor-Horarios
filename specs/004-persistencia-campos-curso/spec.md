@@ -2,6 +2,9 @@
 
 Estado: implementada
 
+> **Anotado por la 015 (2026-11-05).** Se añaden a la comprobación el índice, los dos disparadores y la
+> fila del tipo general (015, RF-6). Se mantiene la exigencia de ausencia de las tablas retiradas.
+
 > **Cambio de requisito (modelo de dominio, 2026-10-15).** Tras aprobar las specs 004 y 005, el
 > modelo del curso cambió: se **retiran de la base** el nombre, el número de estudiantes, el código
 > del plan y el indicador de aula fija por curso; se **elimina la relación persistida curso–materia**

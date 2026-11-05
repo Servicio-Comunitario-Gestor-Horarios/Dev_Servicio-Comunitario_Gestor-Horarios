@@ -2,6 +2,9 @@
 
 Estado: implementada (2026-10-29)
 
+> **Anotado por la 015 (2026-11-05).** Su marca de esquema (v5) y la descripción del catálogo esperado
+> pasan a la v6 y al predicado de la 015 (RF-6); se mantiene la política sin migración.
+
 > **Alcance.** Esta spec cubre **persistencia, servicios y exposición** de las preferencias horarias de
 > los docentes. **No** toca el solver, ni el contrato de configuración, ni la generación: las
 > preferencias se guardan y se exponen para que una spec futura decida cómo usarlas. La interfaz de

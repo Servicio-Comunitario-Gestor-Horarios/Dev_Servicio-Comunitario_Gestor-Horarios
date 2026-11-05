@@ -2,6 +2,9 @@
 
 Estado: implementada
 
+> **Anotado por la 015 (2026-11-05).** El esquema esperado ya no se describe solo como tablas y
+> columnas: incluye el índice único, los dos disparadores y la fila del tipo general (015, RF-6).
+
 > **Nota de supersesión (2026-10-15).** El modelo de **cursos** de esta spec (estructura persistida
 > `Cursos` y relación `Curso_Materia`) queda **superseded** por las specs **004** (aprobada) y **005**
 > (borrador) tras el cambio de modelo de dominio: el curso se persiste con `anio`/`seccion`/`turno`/

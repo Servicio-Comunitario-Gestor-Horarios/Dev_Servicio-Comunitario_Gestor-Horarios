@@ -2,6 +2,10 @@
 
 Estado: implementada (2026-10-27)
 
+> **Anotado por la 015 (2026-11-05).** Quedan supersedidas la parte de «sin cambio de esquema» y la de «el
+> nombre que debe usar la semilla»: la existencia y el nombre los garantiza la base y la siembra los
+> reutiliza. Se mantienen la convención, la regla del aula de referencia y el contrato 2.0 (015).
+
 > **Cambio de requisitos aprobado (2026-10-26).** El alcance de esta spec se aprobó el 2026-10-23 y se
 > implementó y validó salvo RF-6. Este cambio reescribe **solo** el aula de referencia (del tipo
 > general/ordinario por convención de nombre), la validación que la protege (V18), las causas de un

@@ -2,6 +2,9 @@
 
 Estado: implementada (2026-10-17)
 
+> **Anotado por la 015 (2026-11-05).** La fila del tipo general no cuenta como dato de dominio; el
+> recuento de tipos es 3 y se lee de la base; el perfil no declara «Aula de estudio» (015, RF-5).
+
 > **Cambio de requisitos (2026-10-17): 40 horas académicas por año.** La hora del 31059 es una **hora
 > académica** (= un bloque), **no** una hora de reloj; la spec 005 se rectificó (1 hora = 1 bloque,
 > `duracion_minutos` solo fija la duración real de la franja). Por eso el plan General **no** se adapta a

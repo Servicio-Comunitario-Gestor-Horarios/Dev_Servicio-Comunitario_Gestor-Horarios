@@ -2,6 +2,9 @@
 
 Estado: implementada (2026-10-29)
 
+> **Anotado por la 015 (2026-11-05).** Su marca de esquema (v4) y la descripción del catálogo esperado
+> pasan a la v6 y al predicado de la 015 (RF-6); se mantiene la política sin migración.
+
 > **Alcance y reparto.** Esta spec cubre la **persistencia y el backend** de la duración de la hora
 > académica: la configuración global, su validación centralizada, los servicios, la franja de clase, el
 > encaje del turno, la alimentación del contrato, la huella, el esquema y su versión, el seed y la

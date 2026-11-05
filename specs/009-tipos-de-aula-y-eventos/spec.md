@@ -2,6 +2,10 @@
 
 Estado: implementada (2026-10-24)
 
+> **Anotado por la 015 (2026-11-05).** El tipo general no se renombra ni se elimina, y el alta con su
+> nombre falla por duplicado; el esquema esperado incluye índice, disparadores y la fila; la siembra
+> reutiliza el tipo general (015).
+
 > **Decisión del usuario (2026-10-23): la clave normalizada se almacena.** El catálogo de tipos de
 > aula guarda la **clave normalizada** (recorte de espacios extremos + plegado de mayúsculas/minúsculas
 > en Unicode con `toCaseFolded()`), **calculada por el servicio**, y el **índice único va sobre esa
