@@ -20,6 +20,12 @@ public:
     /** @brief Precarga el catálogo de tipos de aula y el tipo de la materia. */
     void cargarTiposAula(const QVector<TipoAulaDTO>& tipos, int idSeleccionado = -1);
 
+    /**
+     * @brief Precarga los datos de una asignatura existente.
+     *
+     * `requisitos` se conserva en el modelo y en la base de datos (el solver lo
+     * usa para las precedencias), pero ya no se edita desde este formulario.
+     */
     void cargarDatos(const QString& nombre, const QString& requisitos, int idTipoAula);
 
 signals:
@@ -32,10 +38,10 @@ private:
     bool validarCampos();
 
     QLineEdit   *m_campoNombre;
-    QLineEdit   *m_campoRequisitos;
     QComboBox   *m_comboTipoAula;
     QPushButton *m_botonGuardar;
     QPushButton *m_botonCancelar;
+    QString      m_requisitos; ///< Se preserva al editar; vacío en altas nuevas.
 };
 
 } // namespace gestor::frontend::forms
