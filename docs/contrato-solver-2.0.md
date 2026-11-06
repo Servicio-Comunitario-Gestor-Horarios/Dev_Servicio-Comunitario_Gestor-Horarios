@@ -12,8 +12,9 @@
 > [`specs/010-solver-tipos-y-eventos/spec.md`](../specs/010-solver-tipos-y-eventos/spec.md). Este
 > documento describe el contrato **2.0**, que es el único que el código acepta hoy.
 
-Versión documentada: **2.0**. Responsable del comportamiento: las specs 005 (núcleo) y 010 (tipos de
-aula y eventos). Modelo de datos persistido: [`Diagrama-MER.md`](Diagrama-MER.md).
+Versión documentada: **2.0**. Responsable del comportamiento: las specs 005 (núcleo), 010 (tipos de
+aula y eventos) y 013 (preferencias del docente en la generación). Modelo de datos persistido:
+[`Diagrama-MER.md`](Diagrama-MER.md).
 
 ---
 
@@ -24,7 +25,7 @@ antes que las secciones**: un 1.0 se rechaza por versión, no por «le falta `ev
 
 | Qué declara el archivo | Resultado | Mensaje (resumen) |
 |---|---|---|
-| `"version": "2.0"` | se acepta y se valida el resto (V1–V18) | — |
+| `"version": "2.0"` | se acepta y se valida el resto (V1–V19) | — |
 | `"version": "1.0"` | **entrada inválida** | «V1: versión de configuración no reconocida ('1.0'); se espera '2.0'.» |
 | Versión ausente (o vacía) | **entrada inválida** | «V1: la configuración no declara versión; se espera '2.0'.» |
 | Cualquier otra (`"9.9"`, `"2"`, …) | **entrada inválida** | el mismo mensaje, nombrando la versión encontrada |
@@ -50,8 +51,9 @@ Reglas asociadas:
 
 ## 2. Forma del contrato
 
-Diez secciones obligatorias y una opcional. El orden no importa; los **campos desconocidos se
-toleran** (se ignoran), pero una sección obligatoria ausente es «V1: falta la seccion '‹clave›'».
+El contrato tiene **diez secciones obligatorias y dos opcionales** (`aula_fija` y `preferencias`). El
+orden no importa; los **campos desconocidos se toleran** (se ignoran), pero una sección obligatoria
+ausente es «V1: falta la seccion '‹clave›'».
 
 | Sección | Tipo | Contenido | Validaciones que la miran |
 |---|---|---|---|
@@ -64,8 +66,13 @@ toleran** (se ignoran), pero una sección obligatoria ausente es «V1: falta la 
 | `planes` | arreglo | planes embebidos con materias y horas | **V4**, V10, V11, V13, V14 |
 | `cursos` | arreglo | año, sección, turno, plan, aula de referencia | **V6**, V7, V8, V9, V10, V11, V14, **V17**, **V18** |
 | `profesores` | arreglo | materias, turno/plan/años y disponibilidad | **V4**, **V12**, V13, V2 |
+| `preferencias` | arreglo, opcional | preferencias ya proyectadas (docente, día, franjas y sentido) | **V19** |
 | `materias` | arreglo | nombre y **tipo de aula requerido** | **V4**, **V16**, **V17** |
 | `aulas` | arreglo | nombre, **tipo** y capacidad | **V6**, **V16**, **V17** |
+
+El objeto **`meta` no es una sección del contrato**: es un objeto tolerado que añade el constructor de
+la entrada (descripción y fecha de modificación) y que cualquier lector ignora. Las secciones son las
+de la tabla.
 
 ### 2.1 `dimensiones`
 
@@ -204,6 +211,41 @@ menos una materia en él (**V10**).
   editando el preset.
 - `capacidad` ≤ 0 significa «sin capacidad declarada»: es un dato informativo del aula y no origina
   ningún aviso (el **P3** está **retirado por la 005, decisión I2**).
+
+### 2.8 `preferencias` (opcional, spec 013)
+
+```json
+"preferencias": [
+  { "docente": 0, "dia": 1, "slot": [2, 3], "sentido": "evitada" },
+  { "docente": 0, "dia": 4, "slot": [5],    "sentido": "preferida" }
+]
+```
+
+- **Forma ya PROYECTADA.** Cada preferencia lleva su `docente` por **índice** en `profesores` (como
+  las aulas y las materias), el `dia` de la **generación** (`0 = lunes … num_dias − 1`), las `slot`
+  alcanzadas (slots absolutos del día, la misma forma que la `disponibilidad`) y el `sentido`
+  (`"preferida"` o `"evitada"`). **La configuración no transporta rangos de reloj** (`inicio`/`fin` no
+  existen aquí): proyectarlos es de la construcción de la entrada, no del contrato.
+- **Proyección (reloj → franja).** Una franja queda alcanzada **solo si cabe entera** dentro del
+  rango; se recorren **todos los turnos** del día con su propia rejilla y los **eventos no cortan** el
+  rango. El **filtro de día** lleva el día de dominio de la 012 (0 = domingo … 6 = sábado) al de la
+  generación: **domingo no aplica nunca** y el **sábado solo si la semana declarada (`num_dias`) lo
+  incluye**. No es una conversión de horas a bloques: es situar un intervalo de reloj sobre una
+  rejilla ya definida.
+- **Solo viajan las intervinientes.** La construcción emite únicamente las preferencias cuyo docente
+  participa, cuyo día está en la semana declarada y cuya proyección alcanza al menos una franja del
+  turno de un curso donde es candidato elegible. Las que no intervienen **no llegan al contrato** y el
+  resultado de la generación las informa como **no aplicadas** con un motivo (spec 013, RF-8).
+- **El preset no las aporta.** Un preset **no persiste** esta sección: al guardarlo se **omite**. Si
+  un preset la declara, **se ignora** y las preferencias se releen de los datos, igual que ocurre con
+  la duración de la hora académica (spec 011). La equivalencia de ida y vuelta se cumple en la
+  **configuración**, no en el preset: serializar la configuración conserva las preferencias y, con
+  **0 preferencias**, la sección se omite del JSON.
+- **V19** comprueba **forma y referencias**: índice de docente en rango, día en `0 … num_dias − 1`,
+  franja en `0 … num_slots_dia − 1` y sentido `"preferida"`/`"evitada"`, informando el primer defecto
+  en ese orden y citando el valor recibido y el rango admitido. **V19 no valida rangos de reloj, ni
+  coherencia con el turno, el plan o los años, ni solapes**: la sección llega ya proyectada y esas
+  reglas son de la proyección y de la validación al persistir (spec 012).
 
 ---
 
@@ -373,6 +415,8 @@ verdad**, también en modo de aula fija (fragmento; la raíz del archivo lleva a
   `conflictos` (no presentable). Los avisos **P1 horas no cubiertas** y **P3 capacidad de aula** están
   **retirados por la 005 (decisión I2) hasta nuevo aviso**; la `capacidad` sigue siendo un dato del
   aula, pero ya no produce aviso.
+- El contrato de salida **no** incluye el estado de las preferencias: el backend lo calcula sobre el
+  horario y la proyección ya calculada y lo expone en el resultado de la generación (spec 013, RF-8).
 
 ---
 
@@ -472,12 +516,15 @@ este rechazo y que sus bytes no cambian.
 
 ## 9. Referencias
 
-- Núcleo del solver, restricciones y validaciones V1–V15:
+- Núcleo del solver, restricciones y validaciones V1–V19:
   [`specs/005-nucleo-solver/spec.md`](../specs/005-nucleo-solver/spec.md).
 - Tipos de aula, eventos, contrato 2.0, V16–V18, capacidad del tipo, causa no atribuible y salida con
   aula real:
   [`specs/010-solver-tipos-y-eventos/spec.md`](../specs/010-solver-tipos-y-eventos/spec.md) y su
   [`plan.md`](../specs/010-solver-tipos-y-eventos/plan.md) (§2).
+- Preferencias del docente en la generación: sección opcional, proyección reloj → franja, filtro de
+  día, objetivo y V19:
+  [`specs/013-preferencias-docente-solver/spec.md`](../specs/013-preferencias-docente-solver/spec.md).
 - Persistencia de tipos y eventos (catálogo, `id_tipo_aula`, identidad y orden):
   [`specs/009-tipos-de-aula-y-eventos/spec.md`](../specs/009-tipos-de-aula-y-eventos/spec.md).
 - Servicios que consume el frontend y **deuda del frontend** (migración a `Resultado`, tipos en los

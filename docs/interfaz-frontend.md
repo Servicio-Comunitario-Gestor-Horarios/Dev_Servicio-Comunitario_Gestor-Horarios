@@ -480,10 +480,11 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
   que identifican campo, valor, causa y **acción**. `limpiar` no toca la disponibilidad.
 - **Baja y cascada.** `eliminarDocente` y `eliminarConCascada` borran preferencias y disponibilidad en
   una transacción; `dependientesDe("profesor", id)` las muestra antes de confirmar.
-- **Sin efecto en la generación.** La huella de datos **no** las incluye mientras el solver no las
-  consuma; `ProfesorDTO::toProfesor()` las ignora. Cambiar preferencias no marca «datos anteriores».
-  **Condición futura:** cuando una spec del solver las use, deberán entrar en `DatosDominio` y en
-  `huellaDatos`.
+- **Efecto en la generación (013).** Desde la 013 las preferencias **sí** intervienen: las que
+  **intervienen** entran en la huella (`huellaDatos(datos, D, intervinientes)`) y un cambio suyo marca
+  el horario como «datos anteriores»; las que **no intervienen** no la cambian.
+  `ProfesorDTO::toProfesor()` sigue ignorándolas (el modelo del solver no cambia), y el resultado de la
+  generación informa el estado de cada preferencia y el **cumplimiento** agregado.
 - **Cómo lo trata el frontend:** cargar `ProfesorDTO.preferencias` desde `listarDocentes`, usar las
   cinco operaciones de `NucleoDatos`, separar preferencias de disponibilidad y mostrar el día con su
   nombre. Los cambios de firma son **aditivos**: el DTO gana el campo y `NucleoDatos` gana
@@ -654,6 +655,7 @@ struct ResultadoGeneracion {
     HorarioSalida horario;      // válido si presentable
     AnalisisSalida analisis;    // aviso P2 y conflictos P4
     bool          presentable = false;
+    CumplimientoPreferencias cumplimiento;  // 013: estado por preferencia y agregado
 };
 
 class ServicioGeneracion : public QObject {
@@ -663,7 +665,8 @@ public:
                        std::function<QString()> huellaActual = {},
                        std::function<QDateTime()> reloj = {},
                        std::function<QString()> revisarBase = {}, QObject* padre = nullptr);
-    void generar(const QJsonObject& entrada, const QString& huella);
+    void generar(const QJsonObject& entrada, const QString& huella,
+                 const QVector<PreferenciaNoAplicada>& noAplicadas = {});  // 013
     bool enCurso() const;
     const ResultadoGeneracion& ultimoResultado() const;
 signals:
@@ -682,11 +685,20 @@ signals:
 - `BaseInvalida` → `revisarBase()` devolvió un mensaje con causa y acción: **no** se valida la entrada
   ni se envía nada al puerto; mostrar ese `mensaje`. Tiene prioridad sobre `EntradaInvalida`.
 
-La entrada la construye `ConstructorEntradaSolver` (`construirJsonEntrada`, `src/backend`) a partir
-de `DatosDominio` (dominios) + preset; se valida con `validarEntradaSolver` (V1–V18). La huella
-(`huellaDatos`) detecta «datos anteriores» y **no incluye el catálogo de tipos de aula**: solo la
-identidad que referencia cada aula o materia (`idTipoAula`), no el nombre visible del tipo. La vista
-comprueba la validez de la base **antes de componer** la entrada y cablea `revisarBase` en el
+La entrada la construye `construirEntradaCompleta` (013, `src/backend`) a partir de `DatosDominio`
+(dominios) + preset; devuelve `EntradaConstruida{json, intervinientes, noAplicadas}` y se valida con
+`validarEntradaSolver` (**V1–V19**). `construirJsonEntrada` se mantiene como **envoltorio** que
+devuelve solo el JSON (la firma de la 011), y la fachada `ConstructorEntradaSolver::construir` no
+cambia. La huella (`huellaDatos(datos, D, intervinientes)`) detecta «datos anteriores» y **no incluye
+el catálogo de tipos de aula**: solo la identidad que referencia cada aula o materia (`idTipoAula`), no
+el nombre visible del tipo.
+
+**Preferencias en la generación (013).** El frontend pasa a `generar` el **diagnóstico** de
+preferencias no aplicadas (`Composicion::preferenciasNoAplicadas`, con su motivo) y lee
+`ResultadoGeneracion::cumplimiento` (`respetadas`, `incumplidas`, `noAplicadas`, más el estado de cada
+preferencia con su día de dominio y, en las evitadas incumplidas, las clases que la incumplen). Es un
+campo **aditivo**: el **contrato de salida del solver no cambia** ni el estado viaja en su JSON. La
+vista comprueba la validez de la base **antes de componer** la entrada y cablea `revisarBase` en el
 servicio.
 
 ### 3.2 `CargadorConfiguracionSolver` — config y presets en JSON (implementado)
@@ -703,7 +715,9 @@ public:
 };
 ```
 
-Un «preset» es un archivo JSON con el mismo formato (las 13 secciones) que la configuración.
+Un «preset» es un archivo JSON con el mismo formato que la configuración, salvo que **omite** la
+sección opcional `preferencias` (013). El contrato tiene **diez secciones obligatorias y dos
+opcionales** (`aula_fija` y `preferencias`); `meta` no es una sección.
 **Frontend:** cargar/guardar presets como archivos; ante fallo (`!ok`), mostrar `mensajeError`
 (causa + acciones) y permitir reintentar.
 
@@ -752,8 +766,9 @@ eso la composición vive en el frontend, en `src/frontend/src/services/` (se com
   `turno` y `num_estudiantes`, y `ParametrosDocente` horas, turno, plan, años y suplencias—;
   `ContextoHorario` con los nombres índice→texto de la última entrada).
 - **`entrada_solver_builder.{hpp,cpp}`** — `GeneracionSolver::`:
-  - `construirEntrada(nucleo, opciones)` → `Composicion{entrada, contexto, avisos}`. Reutiliza
-    `construirJsonEntrada` (backend) y **después inyecta por curso** el `plan`, el `turno` y el
+  - `construirEntrada(nucleo, opciones)` → `Composicion{entrada, contexto, avisos, huella,
+    preferenciasNoAplicadas}`. Reutiliza `construirEntradaCompleta` (backend, 013) y **después inyecta
+    por curso** el `plan`, el `turno` y el
     `num_estudiantes` (las `materias` se derivan del plan embebido y el año del curso vía
     `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. El `turno` del
     preset tiene prioridad sobre el de la base (que suele venir vacío en los datos sembrados); el
@@ -775,7 +790,8 @@ es la vista «Generación de horario» (índice 4 del `MainWindow`). Con `GESTOR
 parámetros generales (franja, dimensiones, planificación, penalizaciones, aulas fijas), la tabla de
 **cursos** (turno + plan + nº de estudiantes), la tabla de **docentes** (horas requeridas/en aula,
 turno, plan, años y materias suplentes) y botones de **preset** (`CargadorConfiguracionSolver`; el
-preset es la propia entrada de 13 secciones). Al pulsar «Generar horarios»: valida, compone la
+preset es la propia entrada —diez secciones obligatorias y dos opcionales—, que **omite**
+`preferencias`). Al pulsar «Generar horarios»: valida, compone la
 entrada, la envía con `ServicioGeneracion` y, si `presentable`, guarda el JSON en la carpeta de
 horarios y emite `horarioGenerado(datosVisualizacion, rutaArchivo)`. Sin backend muestra un aviso
 informativo.
@@ -784,7 +800,8 @@ Al cargar la base por primera vez, la vista **deriva de los turnos** el nº de s
 los slots de todos los turnos) y la **duración del bloque** (franja del turno menos la **suma de las
 duraciones de sus eventos**, sobre sus slots; 35 min en los datos de prueba del centro), ambos
 editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). El campo `duracion_minutos` del
-preset es **derivado**: `construirJsonEntrada` lo sobrescribe siempre con el de la configuración
+preset es **derivado**: la construcción (`construirEntradaCompleta`; el envoltorio
+`construirJsonEntrada`) lo sobrescribe siempre con el de la configuración
 global y su valor nunca se usa; un cambio de configuración desde que se guardó el preset no es error
 ni aviso. La columna **Turno** de cada curso
 es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún sin asignar
@@ -872,11 +889,12 @@ Release de OR-Tools).
 | `TipoAulaDTO` / CRUD del catálogo | Desplegable obligatorio en aulas y materias; gestión del catálogo | RF-5 |
 | `ConfiguracionHoraria` / `ServicioConfiguracionHoraria` | Valor efectivo y origen; editar 30–90 (inválida no cambia el valor) | RF-1, RF-2 |
 | `duracion_horaria::errorDeRango` / `errorDeEncaje` | Mensajes del rango y del encaje del turno (turno, D, déficit) | RF-1, RF-4 |
-| `construirJsonEntrada(datos, preset, D, ahora)` | Pasar la D efectiva; el preset nunca manda la duración | RF-5 |
+| `construirEntradaCompleta(datos, preset, D, ahora)` (013; `construirJsonEntrada` es el envoltorio) | Pasar la D efectiva; el preset nunca manda la duración | RF-5, RF-2 (013) |
 | `estadoPendienteDe` / `GestorPendientes` | Marca por fila + «Reintentar»; aviso al cerrar | RF-3, RF-6, RNF-3/4 |
 | `InstanciaUnica` | Enfocar la instancia existente; salir si no hay acuse | RF-5 |
 | `ServicioGeneracion` | Vista de generación (estados, «Generar», «datos anteriores») | RF-1, RF-3 |
 | `GeneracionSolver::construirEntrada` / `aFormatoVisualizacion` (frontend) | Componer la entrada desde la config y traducir la salida al formato de visualización | RF-1 |
+| `Composicion::huella` / `GeneracionSolver::huellaActual(nucleo, opciones)` | Enviar a `generar` la huella con las preferencias intervinientes | RF-6 (013) |
 | `PuertoSolverIpc` (frontend) | Enviar `solver_resolve` por IPC y mapear la respuesta | RF-1 |
 | `AnalisisSalida` | Rejilla + panel de avisos | RF-3 |
 | `HorarioSalida` + `ServicioHorarioSalida` | Visualización y guardado como archivo JSON | RF-1, RF-4 |
@@ -940,19 +958,24 @@ sección de descansos de los eventos; la spec 010 es la dueña de sustituirlo po
 ## 6. Deuda del frontend y alcance (spec 011)
 
 > **Guía de migración paso a paso:** `docs/guias/migracion-frontend.md` (qué rompe la compilación,
-> qué cambió en las specs 009–012, 015 y 016 y cómo verificarlo).
+> qué cambió en las specs 009–013, 015 y 016 y cómo verificarlo).
 
 La 011 cambia `src/backend` y `src/seed`; `src/frontend` **no se toca** y **no compila** contra las
 firmas nuevas. El equipo de interfaz debe migrar:
 
-1. **`construirJsonEntrada` exige D.** La firma es `construirJsonEntrada(datos, preset,
-   duracionMinutos, ahora)` (y la fachada `ConstructorEntradaSolver::construir`). El builder debe leer
-   la D efectiva con `NucleoDatos::configuracionHoraria()` y pasarla; el campo `duracion_minutos` del
-   preset es derivado y la construcción lo sobrescribe siempre.
-2. **`huellaDatos(datos, duracionMinutos)` incluye D.** El callback `huellaActual` de
-   `ServicioGeneracion` debe construir la huella con la D efectiva. **Hoy la vista pasa `{}`**
-   (`schedule_generation_widget.cpp`), así que «datos anteriores» no se marca aunque D cambie: sin ese
-   cableado, el mecanismo del backend no se ve en la interfaz.
+1. **La construcción exige D.** El camino vigente es
+   `construirEntradaCompleta(datos, preset, duracionMinutos, ahora)` (013), que devuelve
+   `EntradaConstruida{json, intervinientes, noAplicadas}`; `construirJsonEntrada(...)` se mantiene como
+   **envoltorio** con la firma de la 011 (solo el JSON) y la fachada
+   `ConstructorEntradaSolver::construir` no cambia. El builder debe leer la D efectiva con
+   `NucleoDatos::configuracionHoraria()` y pasarla; el campo `duracion_minutos` del preset es derivado
+   y la construcción lo sobrescribe siempre.
+2. **La huella incluye D y las preferencias intervinientes (013).** La firma es
+   `huellaDatos(datos, duracionMinutos, intervinientes)`; el frontend no la llama a mano: compone la
+   entrada y usa `GeneracionSolver::huellaActual(nucleo, opciones)` (`Composicion::huella`, el mismo
+   camino que la generación). El callback `huellaActual` de `ServicioGeneracion` ya está cableado en la
+   vista, así que «datos anteriores» se marca si cambia la instantánea, la D o una preferencia
+   interviniente.
 3. **Selector de duración.** El selector de duración del editor de presets y de la vista de generación
    **deja de ofrecerse**: la duración es global y se edita con `guardarConfiguracionHoraria()`.
 4. **Aritmética en minutos.** `schedule_generation_widget.cpp` sigue derivando la duración del turno y
@@ -962,6 +985,13 @@ firmas nuevas. El equipo de interfaz debe migrar:
    queda fuera del preset `backend`; se reescribe al migrar el builder con D.
 
 > **Actualización 2026-11-01.** Resuelto en `feat/frontend-generacion`: el builder pasa la D global,
-> `huellaActual` usa `huellaDatos(datos, D)`, el selector de duración ya no se ofrece y
+> `huellaActual` construye la huella con la D efectiva, el selector de duración ya no se ofrece y
 > `test_generacion_seed` se reescribió a 35 min con la rejilla y los eventos del seed. Verificado con
 > `cmake --preset full && cmake --build build` y `ctest` (**53/53** en el host).
+>
+> **Actualización 2026-11-06 (spec 013).** El builder usa `construirEntradaCompleta` y compone
+> `Composicion{entrada, contexto, avisos, huella, preferenciasNoAplicadas}`; la huella es
+> `huellaDatos(datos, D, intervinientes)` y se obtiene con `huellaActual(nucleo, opciones)`;
+> `ServicioGeneracion::generar` recibe el diagnóstico de no aplicadas y `ResultadoGeneracion` expone
+> `cumplimiento` (aditivo; el contrato de salida del solver no cambia). Verificado con
+> `ctest --preset backend` (**58/58**) y `ctest --preset full-release` (**63/63**).

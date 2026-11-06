@@ -1,4 +1,4 @@
-# Migración del frontend tras las specs 009–012, 015 y 016
+# Migración del frontend tras las specs 009–013, 015 y 016
 
 > **Para:** equipo de `src/frontend`.
 > **Fecha:** 2026-10-29 · **Rama:** `feat/Base-datos` · **Suite del backend:** 56/56.
@@ -10,7 +10,7 @@
 > de tipos de aula (funcionalidad nueva, no bloqueante).
 
 Este documento dice **qué hay que cambiar en la interfaz para que vuelva a compilar** y
-**qué cambió en el backend** en las specs 009, 010, 011, 012, 015 y 016 más las correcciones del
+**qué cambió en el backend** en las specs 009, 010, 011, 012, 013, 015 y 016 más las correcciones del
 2026-10-29. El contrato detallado sigue en `docs/interfaz-frontend.md` y
 `docs/contrato-solver-2.0.md`; aquí está solo la guía de migración.
 
@@ -24,6 +24,7 @@ Este documento dice **qué hay que cambiar en la interfaz para que vuelva a comp
 | **010** (2026-10-27) | **Contrato 2.0**, regla de **tipo de aula**, **aula de referencia** con desplazamiento y vuelta, salida con el **aula real**, V16–V18 | Presets 1.0 se rechazan; la salida trae el **aula real por clase** (índice); el aula del curso debe ser del **tipo general** |
 | **011** (2026-10-29) | **Duración global** de la hora académica (35 min por defecto, 30–90), **franja = D**, constructor y huella **con D**, esquema v4 | `construirJsonEntrada` **exige D**; el preset ya no manda la duración; «datos anteriores» depende de D |
 | **012** (2026-10-29) | **Preferencias horarias** del docente (persistencia y API; **sin UI**) | Solo aditivo: `ProfesorDTO.preferencias` y métodos nuevos en `NucleoDatos`; esquema v5 |
+| **013** (2026-11-06) | **Preferencias en la generación**: sección opcional del contrato, proyección reloj → franja, objetivo por fases, huella con intervinientes y cumplimiento en el resultado | `construirEntradaCompleta` y `Composicion{huella, preferenciasNoAplicadas}`; `huellaDatos(datos, D, intervinientes)` y `huellaActual(nucleo, opciones)`; `generar(..., noAplicadas)` y `ResultadoGeneracion::cumplimiento`. El contrato de salida no cambia |
 | **015** (2026-11-05) | **Tipo general de aula** garantizado y protegido por el esquema: fila, índice y dos disparadores; esquema v6 | **Sin cambios de API**: el catálogo incluye el general, su alta falla por duplicado y no se puede eliminar ni renombrar |
 | **016** (2026-11-05) | **Comprobación en tres momentos** (abrir, antes de generar y antes de guardar), **ayuda estricta** del tipo general, mensaje de V18 y huella sin el catálogo | **Sin cambios de API**: `idTipoGeneral` devuelve `Resultado<int>` y falla en vez de sustituir; `ServicioGeneracion` gana `revisarBase` y `Estado::BaseInvalida` |
 | **Correcciones** (2026-10-29) | Avisos P1/P3 retirados, `metadata` real, reinicio del solver, test del middleware | `AnalisisSalida.avisos` ya solo trae **P2**; `metadata` con cifras reales |
@@ -40,22 +41,29 @@ de «sin backend». Para reproducir los fallos hay que compilar con backend:
 cmake --preset full && cmake --build build    # requiere OR-Tools
 ```
 
-### 2.1 `construirJsonEntrada` exige la duración efectiva (spec 011)
+### 2.1 La construcción exige la duración efectiva (spec 011; camino vigente desde la 013)
 
-`src/frontend/src/services/entrada_solver_builder.cpp:165`
+`src/frontend/src/services/entrada_solver_builder.cpp`
 
 ```cpp
 // ANTES
 comp.entrada = construirJsonEntrada(datos, preset, QDateTime::currentDateTime());
 
-// DESPUÉS
+// DESPUÉS (013): la construcción devuelve también el diagnóstico de preferencias
 const int D = m_nucleo->configuracionHoraria().valor.duracionMinutos;  // 35 por defecto
-comp.entrada = construirJsonEntrada(datos, preset, D, QDateTime::currentDateTime());
+const auto construida = construirEntradaCompleta(datos, preset, D, QDateTime::currentDateTime());
+comp.entrada = construida.valor.json;
+comp.huella = huellaDatos(datos, D, construida.valor.intervinientes);
+comp.preferenciasNoAplicadas = construida.valor.noAplicadas;
 ```
 
-- Firma nueva: `construirJsonEntrada(const DatosDominio&, const SolverConfig&, int duracionMinutos, const QDateTime&)`.
-  Sin sobrecarga antigua.
-- La fachada equivalente, `ConstructorEntradaSolver::construir`, recibe también `duracionMinutos`.
+- Firma vigente: `construirEntradaCompleta(const DatosDominio&, const SolverConfig&, int duracionMinutos, const QDateTime&)`
+  → `EntradaConstruida{json, intervinientes, noAplicadas}`. `construirJsonEntrada(...)` sigue existiendo
+  como **envoltorio** con la firma de la 011 (solo el JSON) y la fachada
+  `ConstructorEntradaSolver::construir` no cambia.
+- La huella es `huellaDatos(datos, D, intervinientes)`; el frontend la obtiene de
+  `Composicion::huella` / `GeneracionSolver::huellaActual(nucleo, opciones)` (mismo camino que la
+  generación).
 - **El valor del preset se ignora**: la construcción **sobrescribe siempre** `franja_horaria.duracion_minutos`
   con D antes de validar. Un preset con 0, 5 o 45 no bloquea la construcción.
 - Si D está fuera de **30–90**, la construcción devuelve `Resultado` con error y **no emite JSON**.
@@ -115,9 +123,10 @@ ventana queda al final. Derivarla del turno da otro número.
 5. **Salida con el aula real** por clase (`asignacion.aula` = índice de aula), también en modo de aula
    fija (spec 010). El aula de referencia **no** es el aula de todas las clases.
 6. **Presets 1.0 no se cargan**: hay que regenerarlos como 2.0 desde los datos.
-7. **«Datos anteriores».** La huella incluye D desde la 011. La vista construye el servicio con los
-   callbacks vacíos (`schedule_generation_widget.cpp:111`) y llama a `generar(..., QString())`
-   (`:769`), así que el mecanismo **no se ve**: hay que cablearlo con `huellaDatos(datos, D)`.
+7. **«Datos anteriores».** La huella incluye D desde la 011 y, desde la 013, las **preferencias
+   intervinientes**. La vista ya cablea el callback `huellaActual` con
+   `GeneracionSolver::huellaActual(nucleo, opciones)` (que compone con
+   `huellaDatos(datos, D, intervinientes)`) y `generar` recibe además el diagnóstico de no aplicadas.
 
 ---
 
@@ -128,7 +137,9 @@ ventana queda al final. Derivarla del turno da otro número.
       `preset.franja_horaria.duracion_minutos` para el cálculo.
 - [x] **Recesos → eventos** (§2.2): sustituir `RecesoDTO`/`turno.recesos`; dejar de derivar la duración
       de la franja del turno.
-- [x] **Cablear `huellaActual`** con D para que «datos anteriores» funcione.
+- [x] **Cablear `huellaActual`** con D y, desde la 013, con las preferencias intervinientes
+      (`huellaDatos(datos, D, intervinientes)` vía `huellaActual(nucleo, opciones)`) para que «datos
+      anteriores» funcione.
 - [x] **Retirar el selector de duración**; si se quiere ofrecer, que edite la configuración global
       (`consultar`/`guardar`), no el preset.
 - [x] **Panel de avisos**: dejar solo P2.
