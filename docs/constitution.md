@@ -65,12 +65,18 @@ El solver es la única pieza que decide el horario. Esta sección fija su contra
 
 ### 7.2. Qué prioriza (función objetivo)
 
+> **Enmienda (2026-11-06).** §7.2 solo recogía **S1** y **S2** y no mencionaba la agrupación de
+> bloques (**S3**). La entrega de la 013 añade la **preferencia horaria del docente** entre S2 y S3 y
+> deja la lista completa: **S1 / S2 / preferencia / S3**. Las decisiones anteriores no cambian.
+
 El solver minimiza una penalización entera y **nunca** viola una restricción dura para reducirla. Prioridades, de mayor a menor peso:
 
 1. **No exceder las horas de aula de un profesor** (`PESO_HORAS`): cada profesor respeta el tope de su contrato; si la demanda lo obliga, el exceso se paga y se minimiza.
 2. **Preferir titulares antes que suplentes.** Cada asignación a un suplente se penaliza con un coste entero positivo **fijo** (`COSTE_SUPLENTE`). Como asignar a un suplente cuesta más que dar clase a un titular con **capacidad de horas libre**, un suplente solo cubre una materia-curso cuando los titulares **elegibles** ya **no tienen horas libres** (no son **preferidos**) o no tienen disponibilidad. La **elegibilidad** es factibilidad previa (plan, turno, año, disponibilidad); la **capacidad de horas** es preferencia del objetivo, **no** una compuerta. Esta regla **emerge** de la optimización y no se impone a mano.
+3. **Preferencia horaria del docente** (`PESO_PREFERENCIA`): una prioridad **blanda**. Penaliza las franjas que el docente **evita** y premia las que **prefiere** con el mismo peso y por franja de clase; nunca altera la factibilidad ni añade causas de no factibilidad, y **no** elige qué docente dicta una materia-curso. Con las mismas preferencias, la **asignación de docente por materia-curso** y el **exceso de horas** por docente son los de la generación de referencia (la misma entrada sin preferencias): la preferencia solo decide **dónde** caen las clases. La garantía es **sobre el resultado** y se impone de forma estructural (resolución por fases), no por la magnitud del peso.
+4. **Agrupación de bloques** (`PESO_AGRUPACION`, **S3**): penaliza la fragmentación de cada materia-curso dentro del día (grupos de 1 y, en su caso, de 4 o más franjas consecutivas). La preferencia horaria pesa **más** que esta prioridad.
 
-`PESO_HORAS` y `COSTE_SUPLENTE` son constantes enteras del motor, con `PESO_HORAS > COSTE_SUPLENTE > 0`. El `peso` de cada par (docente, materia-suplente) es dato de la entrada (hoy **sin uso** en el objetivo; ver spec 005).
+`PESO_HORAS`, `COSTE_SUPLENTE`, `PESO_PREFERENCIA` y `PESO_AGRUPACION` son constantes enteras del motor, con `PESO_HORAS > COSTE_SUPLENTE > PESO_PREFERENCIA > PESO_AGRUPACION` (hoy `1000 > 100 > 25 > 10`). El orden por unidad expresa la importancia relativa, pero **no basta** para garantizar la igualdad de S1/S2 (el objetivo es aditivo); esa igualdad la da la jerarquía por fases. La preferencia no se declara por rango ni por docente y **no viaja** en la configuración. El `peso` de cada par (docente, materia-suplente) es dato de la entrada (hoy **sin uso** en el objetivo; ver spec 005).
 
 ### 7.3. Contrato de configuración
 
@@ -86,8 +92,10 @@ El solver minimiza una penalización entera y **nunca** viola una restricción d
 
 ### 7.4. Validación previa
 
-Antes de construir el modelo se ejecutan las validaciones V1–V18; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas. **V1** espera la sección de **eventos** (no la de recesos); el contenido de V1, V2, V16, V17 y V18 vive en la spec 005 y en la 010.
+Antes de construir el modelo se ejecutan las validaciones V1–V19; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas. **V1** espera la sección de **eventos** (no la de recesos). **V19** valida la forma y las referencias de la sección **opcional** `preferencias` —índice de docente, día de la generación, franja y sentido— y **no** comprueba rangos de reloj, coherencia con el turno, el plan o los años, ni solapes: la sección llega ya proyectada. El contenido de V1, V2, V16, V17 y V18 vive en la spec 005 y en la 010, y el de V19 en la 013.
 
 ### 7.5. Fuera de alcance de este contrato
 
 Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. Los avisos de **capacidad de aula** y de **horas no cubiertas** están **retirados por la decisión I2 de la spec 005** (el único aviso vigente del validador de salida es el **exceso de horas del docente**); podrían volver **como avisos posteriores** al solver (ver spec 002). El **evento** de turno es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.
+
+Las **preferencias del docente que no intervienen** —docente que no participa en la generación, día fuera de la semana declarada o rango que no alcanza ninguna franja del turno de un curso donde el docente es candidato— **no viajan** en la configuración, **no entran** en la huella de datos y **no son causa de no factibilidad**: el resultado de la generación las informa como **no aplicadas**, con su motivo. Las preferencias **nunca** convierten en elegible a un docente, no cambian el reparto de docentes ni el exceso de horas y no intervienen fuera de la semana declarada.
