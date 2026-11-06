@@ -75,7 +75,8 @@ set(FRONTEND_INCLUDE_DIRS
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Sql)
 
 # === LIBRERÍA (modo integrado) ===
-add_library(frontend STATIC)
+add_library(frontend STATIC
+				src/forms/plan_form_dialog.hpp src/forms/plan_form_dialog.cpp)
 target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS} resources/resources.qrc)
 
 # AQUÍ ESTÁ LA CLAVE: Hacemos PUBLIC la ruta del backend

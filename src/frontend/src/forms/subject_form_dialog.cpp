@@ -40,7 +40,8 @@ SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     m_campoNombre->setPlaceholderText("Nombre de la asignatura");
 
     m_comboTipoAula = new QComboBox(this);
-    m_comboTipoAula->addItems({"Aula de estudio", "Cancha", "Laboratorio"});
+    // Agregamos una opción por defecto para forzar la selección manual
+    m_comboTipoAula->addItems({"-- Seleccione --", "Aula de estudio", "Cancha", "Laboratorio"});
     m_comboTipoAula->setStyleSheet(QString(
                                        "QComboBox {"
                                        "    border: 1px solid %1;"
@@ -109,14 +110,25 @@ bool SubjectFormDialog::validarCampos() {
 
     bool isDark = qApp->property("isDarkMode").toBool();
     QString baseInputStyle = QString(
-                                 "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
-                                 "background-color: %2; color: %3; font-size: 13px; }"
+                                 "border: 1px solid %1; border-radius: 6px; padding: 8px; "
+                                 "background-color: %2; color: %3; font-size: 13px; "
                                  ).arg(isDark ? "#444444" : "#d1d5db", isDark ? "#2a2a2a" : "white", isDark ? "#ffffff" : "#374151");
 
-    m_campoNombre->setStyleSheet(baseInputStyle);
+    // Limpiar estilos de error
+    m_campoNombre->setStyleSheet(QString("QLineEdit { %1 }").arg(baseInputStyle));
+    m_comboTipoAula->setStyleSheet(QString("QComboBox { %1 } QComboBox::drop-down { border: none; width: 20px; }").arg(baseInputStyle));
+
+    // Validar nombre
     if (m_campoNombre->text().trimmed().isEmpty()) {
         errores += "• El nombre de la asignatura es obligatorio.\n";
-        m_campoNombre->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
+        m_campoNombre->setStyleSheet(QString("QLineEdit { %1 border: 2px solid #dc2626; }").arg(baseInputStyle));
+        ok = false;
+    }
+
+    // Validar Tipo de Aula: Se exige que no sea la opción "-- Seleccione --"
+    if (m_comboTipoAula->currentIndex() == 0 || m_comboTipoAula->currentText() == "-- Seleccione --") {
+        errores += "• Debe seleccionar un tipo de aula válido.\n";
+        m_comboTipoAula->setStyleSheet(QString("QComboBox { %1 border: 2px solid #dc2626; } QComboBox::drop-down { border: none; width: 20px; }").arg(baseInputStyle));
         ok = false;
     }
 
@@ -136,8 +148,21 @@ void SubjectFormDialog::guardarMateria() {
 
 void SubjectFormDialog::cargarDatos(const QString& nombre, const QString& tipoAula) {
     m_campoNombre->setText(nombre);
+
+    // Si la cadena está vacía, forzamos a seleccionar el placeholder para que valide
+    if (tipoAula.isEmpty()) {
+        m_comboTipoAula->setCurrentIndex(0);
+        return;
+    }
+
     int index = m_comboTipoAula->findText(tipoAula);
-    if (index >= 0) m_comboTipoAula->setCurrentIndex(index);
+    if (index >= 0) {
+        m_comboTipoAula->setCurrentIndex(index);
+    } else {
+        // Si por alguna razón llega un tipo de aula no reconocido, lo añadimos a la lista
+        m_comboTipoAula->addItem(tipoAula);
+        m_comboTipoAula->setCurrentIndex(m_comboTipoAula->count() - 1);
+    }
 }
 
 } // namespace gestor::frontend::forms

@@ -5,6 +5,7 @@
 
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
+#include "../forms/plan_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
 #include "../../../middleware/include/middleware/internalclient.h"
 #include "../../../middleware/include/middleware/messages.h"
@@ -84,7 +85,7 @@ void SubjectListWidget::setupUi() {
     headerLayout->addWidget(m_registerButton);
     leftContentLayout->addLayout(headerLayout);
 
-    // Tabla de Asignaturas (Columna "Tipo de aula" estricta)
+    // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
     m_table->setObjectName("SubjectTable");
     m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
@@ -110,7 +111,7 @@ void SubjectListWidget::setupUi() {
     leftContentLayout->addWidget(m_table);
     tabWidget->addTab(tabAsignaturas, "📚 Asignaturas");
 
-    // --- Pestaña 2: Planes de Estudio (Parte B) ---
+    // --- Pestaña 2: Planes de Estudio ---
     QWidget *tabPlanes = new QWidget();
     QVBoxLayout *planesLayout = new QVBoxLayout(tabPlanes);
     planesLayout->setContentsMargins(20, 20, 20, 20);
@@ -155,7 +156,7 @@ void SubjectListWidget::setupUi() {
 
     tablePlanes->setColumnWidth(0, 110);
     tablePlanes->setColumnWidth(2, 110);
-    tablePlanes->setColumnWidth(3, 140); // Espacio holgado para "Horas Totales"
+    tablePlanes->setColumnWidth(3, 140);
     tablePlanes->setColumnWidth(4, 220);
 
     tablePlanes->verticalHeader()->setVisible(false);
@@ -232,8 +233,133 @@ void SubjectListWidget::setupUi() {
 
     connect(m_registerButton, &QPushButton::clicked, this, &SubjectListWidget::abrirFormularioNuevo);
 
-    connect(btnNuevoPlan, &QPushButton::clicked, this, [this]() {
-        QMessageBox::information(this, "Planes de Estudio", "Módulo de creación de planes de estudio global (sin años) listo para conectarse con el núcleo de datos.");
+    // --- CONEXIÓN COMPLETA PARA PLANES DE ESTUDIO (ISSUE #97) ---
+    connect(btnNuevoPlan, &QPushButton::clicked, this, [this, tablePlanes]() {
+        if (!m_nucleo) return;
+
+        auto res = m_nucleo->listarMaterias();
+        QStringList nombresMaterias;
+        if (res.ok) {
+            for (const auto& materia : res.valor) {
+                nombresMaterias << materia.nombre;
+            }
+        }
+
+        gestor::frontend::forms::PlanFormDialog dialogo(nombresMaterias, this);
+        dialogo.setWindowTitle("Nuevo Plan de Estudio");
+
+        connect(&dialogo, &gestor::frontend::forms::PlanFormDialog::planGuardado,
+                this, [this, tablePlanes, nombresMaterias](const QString& codigo, const QString& nombre, const QString& desc, const QStringList& materias) {
+
+                    int fila = tablePlanes->rowCount();
+                    tablePlanes->insertRow(fila);
+
+                    QTableWidgetItem *itemCod = new QTableWidgetItem(codigo);
+                    QTableWidgetItem *itemNom = new QTableWidgetItem(nombre);
+                    QTableWidgetItem *itemMat = new QTableWidgetItem(QString::number(materias.size()));
+                    QTableWidgetItem *itemHoras = new QTableWidgetItem("0");
+
+                    itemCod->setTextAlignment(Qt::AlignCenter);
+                    itemNom->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+                    itemMat->setTextAlignment(Qt::AlignCenter);
+                    itemHoras->setTextAlignment(Qt::AlignCenter);
+
+                    tablePlanes->setItem(fila, 0, itemCod);
+                    tablePlanes->setItem(fila, 1, itemNom);
+                    tablePlanes->setItem(fila, 2, itemMat);
+                    tablePlanes->setItem(fila, 3, itemHoras);
+
+                    // Función auxiliar robusta para inyectar y conectar acciones a cualquier fila
+                    auto configurarAccionesFila = [this, tablePlanes, nombresMaterias](auto self, int f, const QString& nPlan) -> void {
+                        QWidget *panelAcciones = new QWidget();
+                        QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
+                        layoutAcciones->setContentsMargins(0,0,0,0); layoutAcciones->setSpacing(6); layoutAcciones->setAlignment(Qt::AlignCenter);
+
+                        QPushButton *btnEd = new QPushButton("✏️"); btnEd->setToolTip("Editar Plan"); btnEd->setFixedSize(36, 32);
+                        btnEd->setStyleSheet("QPushButton { color: #2563eb; background: #eff6ff; border: none; font-weight: 700; font-size: 11px; border-radius: 6px; } QPushButton:hover { background-color: #dbeafe; }");
+                        btnEd->setCursor(Qt::PointingHandCursor);
+
+                        QPushButton *btnDup = new QPushButton("📋"); btnDup->setToolTip("Duplicar Plan"); btnDup->setFixedSize(36, 32);
+                        btnDup->setStyleSheet("QPushButton { color: #059669; background: #ecfdf5; border: none; font-weight: 700; font-size: 11px; border-radius: 6px; } QPushButton:hover { background-color: #d1fae5; }");
+                        btnDup->setCursor(Qt::PointingHandCursor);
+
+                        QPushButton *btnEl = new QPushButton("🗑️"); btnEl->setToolTip("Eliminar Plan"); btnEl->setFixedSize(36, 32);
+                        btnEl->setStyleSheet("QPushButton { color: #dc2626; background: #ffeeec; border: none; font-weight: 700; font-size: 11px; border-radius: 6px; } QPushButton:hover { background-color: #fee2e2; }");
+                        btnEl->setCursor(Qt::PointingHandCursor);
+
+                        layoutAcciones->addWidget(btnEd);
+                        layoutAcciones->addWidget(btnDup);
+                        layoutAcciones->addWidget(btnEl);
+                        tablePlanes->setCellWidget(f, 4, panelAcciones);
+
+                        // Eliminar
+                        connect(btnEl, &QPushButton::clicked, this, [this, tablePlanes, nPlan, f]() {
+                            if (QMessageBox::question(this, "Confirmar impacto de eliminación",
+                                                      "¿Está seguro de eliminar el plan '" + nPlan + "'?\n\nEsta acción desvinculará el plan de las asignaturas asociadas.",
+                                                      QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+                                tablePlanes->removeRow(f);
+                            }
+                        });
+
+                        // Editar
+                        connect(btnEd, &QPushButton::clicked, this, [this, tablePlanes, f, nombresMaterias]() {
+                            QString codActual = tablePlanes->item(f, 0)->text();
+                            QString nomActual = tablePlanes->item(f, 1)->text();
+
+                            gestor::frontend::forms::PlanFormDialog dialogoEdicion(nombresMaterias, this);
+                            dialogoEdicion.setWindowTitle("Editar Plan de Estudio");
+                            dialogoEdicion.cargarDatos(codActual, nomActual, "", {});
+
+                            connect(&dialogoEdicion, &gestor::frontend::forms::PlanFormDialog::planGuardado,
+                                    this, [tablePlanes, f](const QString& nc, const QString& nn, const QString&, const QStringList& mat) {
+                                        tablePlanes->item(f, 0)->setText(nc);
+                                        tablePlanes->item(f, 1)->setText(nn);
+                                        tablePlanes->item(f, 2)->setText(QString::number(mat.size()));
+                                        QMessageBox::information(nullptr, "Éxito", "Plan actualizado correctamente.");
+                                    });
+                            dialogoEdicion.exec();
+                        });
+
+                        // Duplicar
+                        connect(btnDup, &QPushButton::clicked, this, [this, tablePlanes, f, nombresMaterias, self]() {
+                            QString codActual = tablePlanes->item(f, 0)->text();
+                            QString nomActual = tablePlanes->item(f, 1)->text();
+
+                            gestor::frontend::forms::PlanFormDialog dialogoDup(nombresMaterias, this);
+                            dialogoDup.setWindowTitle("Duplicar Plan de Estudio");
+                            dialogoDup.cargarDatos(codActual + "-COPY", nomActual + " (Copia)", "Copia de plan existente", {});
+
+                            connect(&dialogoDup, &gestor::frontend::forms::PlanFormDialog::planGuardado,
+                                    this, [this, tablePlanes, self](const QString& codigo, const QString& nombre, const QString&, const QStringList& materias) {
+                                        int nuevaFila = tablePlanes->rowCount();
+                                        tablePlanes->insertRow(nuevaFila);
+
+                                        QTableWidgetItem *iC = new QTableWidgetItem(codigo);
+                                        QTableWidgetItem *iN = new QTableWidgetItem(nombre);
+                                        QTableWidgetItem *iM = new QTableWidgetItem(QString::number(materias.size()));
+                                        QTableWidgetItem *iH = new QTableWidgetItem("0");
+
+                                        iC->setTextAlignment(Qt::AlignCenter);
+                                        iN->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+                                        iM->setTextAlignment(Qt::AlignCenter);
+                                        iH->setTextAlignment(Qt::AlignCenter);
+
+                                        tablePlanes->setItem(nuevaFila, 0, iC);
+                                        tablePlanes->setItem(nuevaFila, 1, iN);
+                                        tablePlanes->setItem(nuevaFila, 2, iM);
+                                        tablePlanes->setItem(nuevaFila, 3, iH);
+
+                                        self(self, nuevaFila, nombre);
+                                        QMessageBox::information(this, "Éxito", "Plan duplicado con éxito.");
+                                    });
+                            dialogoDup.exec();
+                        });
+                    };
+
+                    configurarAccionesFila(configurarAccionesFila, fila, nombre);
+                    QMessageBox::information(this, "Éxito", "Plan guardado correctamente en la interfaz.");
+                });
+        dialogo.exec();
     });
 }
 
@@ -325,7 +451,10 @@ void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, co
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
-    QString tipoAulaValido = (requisitos.isEmpty() || requisitos.toLower() == "ninguno") ? "Aula de estudio" : requisitos;
+    QString tipoAulaValido = requisitos;
+    if (tipoAulaValido.isEmpty()) {
+        tipoAulaValido = "-- Seleccione --";
+    }
 
     QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
     QTableWidgetItem *itemReq = new QTableWidgetItem(tipoAulaValido);
