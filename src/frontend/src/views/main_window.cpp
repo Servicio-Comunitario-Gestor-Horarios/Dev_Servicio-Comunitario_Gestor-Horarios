@@ -293,6 +293,11 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             // Cajas de texto y selects en los formularios
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; border-radius: 6px; padding: 6px; }"
             "QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }"
+            // Lista emergente de los desplegables (es una ventana aparte y, sin
+            // esto, puede conservar la paleta oscura del sistema con texto oscuro)
+            "QComboBox QAbstractItemView { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; selection-background-color: #3b82f6; selection-color: #ffffff; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: #2a2a2a; color: #ffffff; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #3b82f6; color: #ffffff; }"
 
             // Excepciones estructurales
             "#FondoPrincipal { background-color: #121212; border: none; }"
@@ -323,6 +328,11 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
 
             "QFrame, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }"
+            // Lista emergente de los desplegables: fondo blanco y texto oscuro
+            // en modo claro, para que la selección siempre sea legible.
+            "QComboBox QAbstractItemView { background-color: white; color: #334155; border: 1px solid #cbd5e1; selection-background-color: #dbeafe; selection-color: #0f172a; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: white; color: #334155; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #dbeafe; color: #0f172a; }"
 
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"
             "#Sidebar { background-color: white; border: none; border-right: 1px solid #e0e0e0; border-radius: 0px; }"
