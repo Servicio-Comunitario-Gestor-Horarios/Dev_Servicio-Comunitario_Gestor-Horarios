@@ -20,6 +20,8 @@ set(FRONTEND_SOURCES
 				src/dialogs/student_schedule_dialog.cpp
 				src/forms/settings_dialog.cpp
 				src/views/schedule_generation_widget.cpp
+				src/widgets/combo_multiple.cpp
+				src/widgets/selector_materias.cpp
 )
 
 # === CABECERAS DEL FRONTEND ===
@@ -43,6 +45,8 @@ set(FRONTEND_HEADERS
 				src/dialogs/schedule_theme.hpp
 				src/forms/settings_dialog.hpp
 				src/views/schedule_generation_widget.hpp
+				src/widgets/combo_multiple.hpp
+				src/widgets/selector_materias.hpp
 				src/services/generacion_tipos.hpp
 )
 
@@ -71,7 +75,8 @@ set(FRONTEND_INCLUDE_DIRS
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network Sql)
 
 # === LIBRERÍA (modo integrado) ===
-add_library(frontend STATIC)
+add_library(frontend STATIC
+				src/forms/plan_form_dialog.hpp src/forms/plan_form_dialog.cpp)
 target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS} resources/resources.qrc)
 
 # AQUÍ ESTÁ LA CLAVE: Hacemos PUBLIC la ruta del backend
