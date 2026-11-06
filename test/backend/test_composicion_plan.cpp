@@ -182,6 +182,46 @@ private slots:
         QVERIFY(materias.isEmpty());
     }
 
+    // Los planes nuevos de la interfaz guardan una única lista de materias en
+    // el año 1; la composición debe replicarlas en los años 1–5 (Issue #97).
+    void obtenerMateriasConCarga_planGlobal_replicaCincoAnios() {
+        QVector<PlanMateriaDTO> materias;
+        materias.append(PlanMateriaDTO{m_mateId, 1, 4});
+        materias.append(PlanMateriaDTO{m_fisicaId, 1, 3});
+
+        const auto creado = m_servicioPlanes->crearPlanCompleto(
+            "9001", "Plan Global", "Lista única", materias);
+        QVERIFY(creado.ok);
+
+        const auto resultado = m_servicioComposicion->obtenerMateriasConCarga("9001");
+        QCOMPARE(resultado.size(), 10);
+
+        int porAnio[6] = {0, 0, 0, 0, 0, 0};
+        for (const MateriaEnPlan& item : resultado) {
+            QVERIFY(item.curso >= 1 && item.curso <= 5);
+            ++porAnio[item.curso];
+            QVERIFY(item.materia.nombre == "Matemática"
+                    || item.materia.nombre == "Física");
+        }
+        for (int anio = 1; anio <= 5; ++anio) {
+            QCOMPARE(porAnio[anio], 2);
+        }
+    }
+
+    void componerPlanCompleto_planGlobal_expandeMaterias() {
+        QVector<PlanMateriaDTO> materias;
+        materias.append(PlanMateriaDTO{m_quimicaId, 1, 2});
+
+        QVERIFY(m_servicioPlanes->crearPlanCompleto(
+            "9002", "Plan Global Simple", QString(), materias).ok);
+
+        const auto resultado = m_servicioComposicion->componerPlanCompleto("9002");
+        QVERIFY(resultado.ok);
+        QCOMPARE(resultado.valor.materias.size(), 5);
+        QCOMPARE(resultado.valor.materias[0].curso, 1);
+        QCOMPARE(resultado.valor.materias[4].curso, 5);
+    }
+
 private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;

@@ -10,6 +10,7 @@
 
 #include <QDateTime>
 #include <QJsonArray>
+#include <QSet>
 
 namespace GeneracionSolver {
 namespace {
@@ -316,8 +317,18 @@ QMap<QString, int> horasSugeridasPorDocente(
             continue;
 
         QVector<QPair<int, int>> materiasDelAnio; // (idMateria, horas)
+        QSet<int> cursosPlan;
         for (const CargaHorariaDTO& ch : cargaR.valor)
-            if (ch.curso == c.anio)
+            cursosPlan.insert(ch.curso);
+
+        // Plan global: todas las materias se guardan en un único curso y se
+        // replican en los años 1–5 al componer la entrada del solver.
+        const bool planGlobal = cursosPlan.size() == 1
+                                && *cursosPlan.constBegin() >= 1
+                                && *cursosPlan.constBegin() <= 5;
+
+        for (const CargaHorariaDTO& ch : cargaR.valor)
+            if (planGlobal || ch.curso == c.anio)
                 materiasDelAnio.append(qMakePair(ch.idMateria, ch.horas));
         if (materiasDelAnio.isEmpty())
             continue;

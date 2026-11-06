@@ -87,6 +87,18 @@ public:
                                  const QString& descripcion = QString());
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
                                       const QString& descripcion = QString());
+    Resultado<PlanDTO> obtenerPlan(const QString& codigo) const;
+
+    /// Alta atómica de un plan con sus materias, años y horas semanales.
+    Resultado<PlanDTO> crearPlanCompleto(const QString& codigo, const QString& nombre,
+                                         const QString& descripcion,
+                                         const QVector<PlanMateriaDTO>& materias);
+
+    /// Edición atómica del plan y reemplazo de sus materias (el código no cambia).
+    Resultado<PlanDTO> actualizarPlanCompleto(const QString& codigo, const QString& nombre,
+                                              const QString& descripcion,
+                                              const QVector<PlanMateriaDTO>& materias);
+
     bool eliminarPlan(const QString& codigo);
 
     /// Carga horaria (materias con sus horas y año) de un plan de estudio.

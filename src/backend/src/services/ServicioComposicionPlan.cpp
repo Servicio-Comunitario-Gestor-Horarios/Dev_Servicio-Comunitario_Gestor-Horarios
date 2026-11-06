@@ -3,6 +3,7 @@
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QDebug>
+#include <QSet>
 
 ServicioComposicionPlan::ServicioComposicionPlan(QSqlDatabase& db) : m_db(db) {}
 
@@ -99,6 +100,31 @@ QVector<MateriaEnPlan> ServicioComposicionPlan::obtenerMateriasConCarga(const QS
 
         item.materia = materia;
         resultado.append(item);
+    }
+
+    // Los planes nuevos creados desde la interfaz son «globales»: el usuario
+    // elige una lista única de materias sin años y se guardan con curso = 1.
+    // Para que el solver los use en todos los años, replicamos cada materia en
+    // los años 1–5. Los planes existentes con más de un curso conservan su
+    // distribución real.
+    QSet<int> cursos;
+    for (const MateriaEnPlan& item : resultado) {
+        cursos.insert(item.curso);
+    }
+
+    const bool esPlanGlobal =
+        cursos.size() == 1 && *cursos.constBegin() >= 1 && *cursos.constBegin() <= 5;
+
+    if (esPlanGlobal) {
+        const QVector<MateriaEnPlan> base = resultado;
+        resultado.clear();
+        for (int anio = 1; anio <= 5; ++anio) {
+            for (const MateriaEnPlan& item : base) {
+                MateriaEnPlan copia = item;
+                copia.curso = anio;
+                resultado.append(copia);
+            }
+        }
     }
 
     return resultado;

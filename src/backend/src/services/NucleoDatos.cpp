@@ -251,6 +251,32 @@ Resultado<PlanDTO> NucleoDatos::actualizarPlan(const QString& codigo,
         });
 }
 
+Resultado<PlanDTO> NucleoDatos::obtenerPlan(const QString& codigo) const {
+    return m_planes.obtenerPlan(codigo);
+}
+
+Resultado<PlanDTO> NucleoDatos::crearPlanCompleto(
+    const QString& codigo, const QString& nombre, const QString& descripcion,
+    const QVector<PlanMateriaDTO>& materias) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("plan"), codigo, TipoOperacion::Alta,
+        QStringLiteral("Pendiente de guardar: plan %1").arg(codigo),
+        [this, codigo, nombre, descripcion, materias]() {
+            return m_planes.crearPlanCompleto(codigo, nombre, descripcion, materias);
+        });
+}
+
+Resultado<PlanDTO> NucleoDatos::actualizarPlanCompleto(
+    const QString& codigo, const QString& nombre, const QString& descripcion,
+    const QVector<PlanMateriaDTO>& materias) {
+    return conPendiente(
+        m_pendientes, QStringLiteral("plan"), codigo, TipoOperacion::Modificacion,
+        QStringLiteral("Pendiente de guardar: plan %1").arg(codigo),
+        [this, codigo, nombre, descripcion, materias]() {
+            return m_planes.actualizarPlanCompleto(codigo, nombre, descripcion, materias);
+        });
+}
+
 bool NucleoDatos::eliminarPlan(const QString& codigo) {
     return conPendienteBool(
         m_pendientes, QStringLiteral("plan"), codigo, TipoOperacion::Baja,
