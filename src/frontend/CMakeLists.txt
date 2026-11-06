@@ -13,6 +13,7 @@ set(FRONTEND_SOURCES
 				src/forms/classroom_form_dialog.cpp
 				src/views/classroom_list_widget.cpp
 				src/forms/subject_form_dialog.cpp
+				src/forms/plan_form_dialog.cpp
 				src/views/subject_list_widget.cpp
 				src/views/schedule_visualization_widget.cpp
 				src/dialogs/schedule_grid_dialog.cpp
@@ -20,6 +21,8 @@ set(FRONTEND_SOURCES
 				src/dialogs/student_schedule_dialog.cpp
 				src/forms/settings_dialog.cpp
 				src/views/schedule_generation_widget.cpp
+				src/widgets/combo_multiple.cpp
+				src/widgets/selector_materias.cpp
 )
 
 # === CABECERAS DEL FRONTEND ===
@@ -34,6 +37,7 @@ set(FRONTEND_HEADERS
 				src/forms/classroom_form_dialog.hpp
 				src/views/classroom_list_widget.hpp
 				src/forms/subject_form_dialog.hpp
+				src/forms/plan_form_dialog.hpp
 				src/views/subject_list_widget.hpp
 				src/views/schedule_visualization_widget.hpp
 				src/dialogs/teacher_schedule_dialog.hpp
@@ -43,6 +47,8 @@ set(FRONTEND_HEADERS
 				src/dialogs/schedule_theme.hpp
 				src/forms/settings_dialog.hpp
 				src/views/schedule_generation_widget.hpp
+				src/widgets/combo_multiple.hpp
+				src/widgets/selector_materias.hpp
 				src/services/generacion_tipos.hpp
 )
 

@@ -4,11 +4,13 @@
 
 #include "backend/services/ConstructorEntradaSolver.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "backend/services/ServicioGeneracion.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
 #include <QDateTime>
 #include <QJsonArray>
+#include <QSet>
 
 namespace GeneracionSolver {
 namespace {
@@ -89,10 +91,16 @@ CuadriculaVisual leerCuadricula(const QJsonObject& entrada, const QVector<TurnoD
         c.turnos.append(t);
     }
 
-    const QJsonArray recesosJson = entrada.value(QStringLiteral("recesos")).toArray();
-    for (const QJsonValue& v : recesosJson) {
+    // Contrato 2.0: los eventos del turno (los antiguos recesos) viven en la
+    // sección `eventos` de la entrada; la visualización los dibuja como cortes
+    // y conserva su nombre (Receso, Acto cívico…).
+    const QJsonArray eventosJson = entrada.value(QStringLiteral("eventos")).toArray();
+    for (const QJsonValue& v : eventosJson) {
         const QJsonObject o = v.toObject();
         RecesoVisual r;
+        r.nombre = o.value(QStringLiteral("nombre")).toString();
+        if (r.nombre.isEmpty())
+            r.nombre = QStringLiteral("Receso");
         r.turno = o.value(QStringLiteral("turno")).toString();
         r.despuesDeSlot = o.value(QStringLiteral("despues_de_slot")).toInt(0);
         r.duracion = o.value(QStringLiteral("duracion")).toInt(0);
@@ -129,6 +137,7 @@ QJsonObject cuadriculaAJson(const CuadriculaVisual& c)
     QJsonArray recesos;
     for (const RecesoVisual& r : c.recesos) {
         QJsonObject obj;
+        obj.insert(QStringLiteral("nombre"), r.nombre);
         obj.insert(QStringLiteral("turno"), r.turno);
         obj.insert(QStringLiteral("despues_de_slot"), r.despuesDeSlot);
         obj.insert(QStringLiteral("duracion"), r.duracion);
@@ -186,7 +195,6 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     SolverConfig preset;
     preset.version = opciones.version;
     preset.aula_fija = opciones.usarAulasFijas;
-    preset.franja_horaria.duracion_minutos = opciones.duracionMinutos;
     preset.dimensiones.num_dias = opciones.numDias;
     preset.dimensiones.num_slots_dia = opciones.numSlotsDia;
 
@@ -242,8 +250,23 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     // ── Entrada (dominio + preset) ────────────────────────────────────────
     // `construirJsonEntrada` embebe los planes referenciados, casa los cursos
     // por año/sección, aplica el modo global de aulas y deriva dimensiones,
-    // turnos/recesos y disponibilidad.
-    comp.entrada = construirJsonEntrada(datos, preset, QDateTime::currentDateTime());
+    // turnos/eventos y disponibilidad.
+    // La duración de la franja (D) se lee de la configuración global del núcleo
+    // (spec 011): 35 min por defecto, rango 30–90. Sobrescribe siempre la del preset.
+    const auto configuracion = nucleo.configuracionHoraria();
+    if (!configuracion.ok) {
+        comp.avisos << QStringLiteral("No se pudo leer la duración de la hora académica: %1")
+                           .arg(configuracion.mensajeError);
+        return comp;
+    }
+    const int duracionEfectiva = configuracion.valor.duracionMinutos;
+    const auto entrada = construirJsonEntrada(datos, preset, duracionEfectiva,
+                                              QDateTime::currentDateTime());
+    if (!entrada.ok) {
+        comp.avisos << entrada.mensajeError;
+        return comp;
+    }
+    comp.entrada = entrada.valor;
 
     // ── Contexto para traducir índices a nombres al visualizar ────────────
     for (const MateriaDTO& m : datos.materias)
@@ -261,6 +284,15 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     comp.contexto.cuadricula = leerCuadricula(comp.entrada, datos.turnos);
 
     return comp;
+}
+
+QString huellaActual(const NucleoDatos& nucleo)
+{
+    Composicion descartada;  // los avisos no intervienen en la huella
+    const DatosDominio datos = leerDominio(nucleo, descartada);
+    const auto configuracion = nucleo.configuracionHoraria();
+    const int duracion = configuracion.ok ? configuracion.valor.duracionMinutos : 35;
+    return huellaDatos(datos, duracion);
 }
 
 QMap<QString, int> horasSugeridasPorDocente(
@@ -285,8 +317,18 @@ QMap<QString, int> horasSugeridasPorDocente(
             continue;
 
         QVector<QPair<int, int>> materiasDelAnio; // (idMateria, horas)
+        QSet<int> cursosPlan;
         for (const CargaHorariaDTO& ch : cargaR.valor)
-            if (ch.curso == c.anio)
+            cursosPlan.insert(ch.curso);
+
+        // Plan global: todas las materias se guardan en un único curso y se
+        // replican en los años 1–5 al componer la entrada del solver.
+        const bool planGlobal = cursosPlan.size() == 1
+                                && *cursosPlan.constBegin() >= 1
+                                && *cursosPlan.constBegin() <= 5;
+
+        for (const CargaHorariaDTO& ch : cargaR.valor)
+            if (planGlobal || ch.curso == c.anio)
                 materiasDelAnio.append(qMakePair(ch.idMateria, ch.horas));
         if (materiasDelAnio.isEmpty())
             continue;

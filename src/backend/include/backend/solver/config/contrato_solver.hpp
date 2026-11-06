@@ -7,6 +7,8 @@
  * Puras y deterministas: sin E/S, sin reloj y sin OR-Tools
  */
 
+#include <QHashFunctions>
+#include <QSet>
 #include <QString>
 #include <QVector>
 
@@ -27,6 +29,59 @@ int bloquesAula(int horas_aula, int duracion_minutos);
 
 QString claveCurso(int anio, const QString& seccion);
 
+/// Clave normalizada del nombre de un tipo de aula: `trimmed().toCaseFolded()`.
+///
+/// Es la misma noción que usa el catálogo (`ServicioTiposAula::claveTipo`), pero pura: el
+/// parser/validador del contrato y el modelo del solver comparan tipos por esta clave. Solo
+/// sirve para comparar; el nombre visible se conserva tal cual (RF-5).
+QString claveTipo(const QString& nombre);
+
+/// Una franja de la semana: día y slot dentro del día.
+///
+/// La unidad de las cuentas de capacidad es el par (día, slot), no el slot repetido por día. Con
+/// `==`, `<` y `qHash` sirve en `QSet` y `QHash` sin ambigüedad de unidades (RF-6).
+struct FranjaSemana {
+    int dia = 0;
+    int slot = 0;
+};
+
+inline bool operator==(const FranjaSemana& a, const FranjaSemana& b) {
+    return a.dia == b.dia && a.slot == b.slot;
+}
+
+/// Orden lexicográfico: primero el día y después la franja (determinismo de los recorridos).
+inline bool operator<(const FranjaSemana& a, const FranjaSemana& b) {
+    return a.dia != b.dia ? a.dia < b.dia : a.slot < b.slot;
+}
+
+inline size_t qHash(const FranjaSemana& franja, size_t seed = 0) noexcept {
+    return qHashMulti(seed, franja.dia, franja.slot);
+}
+
+/// Slots declarados por el turno `turno`, o vacío si no existe.
+QVector<int> slotsTurno(const SolverConfig& config, const QString& turno);
+
+/// Franjas semanales del curso: `{ (d, s) : d < num_dias ∧ s ∈ slotsTurno(curso.turno) }`.
+QSet<FranjaSemana> franjasDelCurso(const SolverConfig& config, const CursoSolverConfig& curso);
+
+/// Nº de franjas semanales del curso: `|franjasDelCurso|` (días × franjas de su turno).
+int franjasSemanales(const SolverConfig& config, const CursoSolverConfig& curso);
+
+/// Unión de `franjasDelCurso` de los cursos con al menos una materia del tipo `clave`.
+QSet<FranjaSemana> franjasDelTipo(const SolverConfig& config, const QString& clave);
+
+/// Bloques de las materias de todos los cursos cuyo tipo de aula tiene la clave `clave`.
+int demandaDelTipo(const SolverConfig& config, const QString& clave);
+
+/// Nº de aulas del centro del tipo `clave`.
+int aulasDelTipo(const SolverConfig& config, const QString& clave);
+
+/// Capacidad del tipo `clave`: `aulasDelTipo × |franjasDelTipo|`.
+int capacidadDelTipo(const SolverConfig& config, const QString& clave);
+
+/// Tipo de aula general/ordinario del centro, por convención de nombre: «Aula de estudio».
+QString tipoGeneralAula();
+
 QVector<PlanMateriaConfig> materiasDelCurso(const SolverConfig& config, const CursoSolverConfig& curso);
 
 /// ¿El docente `prof` opta por la materia `materiaIDx` (titular o suplente declarado)?
@@ -45,9 +100,9 @@ QVector<int> slotsDisponibles(const SolverConfig& config, const CursoSolverConfi
 bool docenteCandidatoElegible(const SolverConfig& config, const CursoSolverConfig& curso,
                               const ProfesorSolverConfig& prof, int materiaIDx);
 
-/// Devuelve los segmentos contiguos de un turno, cortados por los recesos.
+/// Devuelve los segmentos contiguos de un turno, cortados por los eventos.
 /// Cada segmento es un vector de slots consecutivos.
-QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<RecesoConfig>& recesos);
+QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<EventoConfig>& eventos);
 
 /// true si `slot` es la primera franja de su segmento (incluye primera del turno
 /// y la inmediatamente posterior al receso).

@@ -2,6 +2,7 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFormLayout>
+#include <QLabel>
 #include <QMessageBox>
 #include <QApplication>
 
@@ -9,7 +10,7 @@ namespace gestor::frontend::forms {
 
 TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Docente");
-    resize(450, 350);
+    resize(450, 430);
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -24,7 +25,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     setStyleSheet(QString("QDialog { background-color: %1; color: %2; }").arg(bgColor, textColor));
 
     QString inputStyle = QString(
-                             "QLineEdit { border: 1px solid %1; border-radius: 6px; padding: 8px; "
+                             "QLineEdit, QComboBox { border: 1px solid %1; border-radius: 6px; padding: 8px; "
                              "background-color: %2; color: %3; font-size: 13px; }"
                              "QLineEdit::placeholder { color: %4; }"
                              "QLineEdit.error { border: 2px solid #dc2626; }"
@@ -32,7 +33,7 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
 
     campoCedula = new QLineEdit(this);
     campoCedula->setStyleSheet(inputStyle);
-    campoCedula->setPlaceholderText("Ej. 12345678");
+    campoCedula->setPlaceholderText("Ej. 12345678 (Solo números)");
 
     campoNombre = new QLineEdit(this);
     campoNombre->setStyleSheet(inputStyle);
@@ -46,10 +47,18 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoTelefono->setStyleSheet(inputStyle);
     campoTelefono->setPlaceholderText("Opcional: 0412-1234567");
 
-    // NUEVO: Campo de Materias
-    campoMaterias = new QLineEdit(this);
-    campoMaterias->setStyleSheet(inputStyle);
-    campoMaterias->setPlaceholderText("Ej. Física, Matemáticas");
+    // Configuración opcional del generador (no se muestra en la tabla).
+    comboTurno = new QComboBox(this);
+    comboTurno->setStyleSheet(inputStyle);
+    comboTurno->addItem(QStringLiteral("— Sin preferencia —"), QString());
+
+    comboPlan = new QComboBox(this);
+    comboPlan->setStyleSheet(inputStyle);
+    comboPlan->addItem(QStringLiteral("— Sin preferencia —"), QString());
+
+    comboAnio = new QComboBox(this);
+    comboAnio->setStyleSheet(inputStyle);
+    comboAnio->addItem(QStringLiteral("Todos"), 0);
 
     botonCancelar = new QPushButton("Cancelar", this);
     botonCancelar->setStyleSheet(isDark ?
@@ -70,17 +79,29 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     campoEmail->setValidator(new QRegularExpressionValidator(regexEmail, this));
     QRegularExpression regexTelefono("^[0-9+()\\- ]+$");
     campoTelefono->setValidator(new QRegularExpressionValidator(regexTelefono, this));
-    campoCedula->setValidator(new QRegularExpressionValidator(regexTelefono, this));
+
+    // Cédula: solo números, sin puntos, espacios ni símbolos.
+    QRegularExpression regexCedula("^[0-9]*$");
+    campoCedula->setValidator(new QRegularExpressionValidator(regexCedula, this));
 
     QFormLayout *formLayout = new QFormLayout();
     formLayout->setSpacing(15);
 
     QString labelStyle = QString("<span style='font-weight:bold; color:%1; font-size: 13px;'>").arg(labelColor);
-    formLayout->addRow(labelStyle + "Cédula / ID:</span>", campoCedula);
+    formLayout->addRow(labelStyle + "Cédula:</span>", campoCedula);
     formLayout->addRow(labelStyle + "Nombre:</span>", campoNombre);
     formLayout->addRow(labelStyle + "Email:</span>", campoEmail);
     formLayout->addRow(labelStyle + "Teléfono:</span>", campoTelefono);
-    formLayout->addRow(labelStyle + "Materias:</span>", campoMaterias);
+    formLayout->addRow(labelStyle + "Turno (opcional):</span>", comboTurno);
+    formLayout->addRow(labelStyle + "Plan de estudio (opcional):</span>", comboPlan);
+    formLayout->addRow(labelStyle + "Año preferencial (opcional):</span>", comboAnio);
+
+    QLabel *ayuda = new QLabel(
+        "Turno, plan y año solo se usan como valores iniciales de la "
+        "configuración del generador de horarios.", this);
+    ayuda->setWordWrap(true);
+    ayuda->setStyleSheet(QString("color: %1; font-size: 11px;")
+                             .arg(isDark ? "#9ca3af" : "#6b7280"));
 
     QHBoxLayout *botonesLayout = new QHBoxLayout();
     botonesLayout->addStretch();
@@ -90,11 +111,18 @@ TeacherFormDialog::TeacherFormDialog(QWidget *parent) : QDialog(parent) {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(25, 25, 25, 25);
     mainLayout->addLayout(formLayout);
+    mainLayout->addWidget(ayuda);
     mainLayout->addStretch();
     mainLayout->addLayout(botonesLayout);
 
     connect(botonGuardar, &QPushButton::clicked, this, &TeacherFormDialog::guardarProfesor);
     connect(botonCancelar, &QPushButton::clicked, this, &QDialog::reject);
+}
+
+void TeacherFormDialog::setDocentesExistentes(const QMap<QString, QString>& cedulaANombre,
+                                              const QString& cedulaActual) {
+    m_docentesExistentes = cedulaANombre;
+    m_cedulaOriginal = cedulaActual;
 }
 
 bool TeacherFormDialog::validarCampos() {
@@ -112,12 +140,26 @@ bool TeacherFormDialog::validarCampos() {
     campoNombre->setStyleSheet(baseInputStyle);
     campoEmail->setStyleSheet(baseInputStyle);
     campoTelefono->setStyleSheet(baseInputStyle);
-    campoMaterias->setStyleSheet(baseInputStyle);
 
-    if (campoCedula->text().trimmed().isEmpty()) {
+    const QString cedula = campoCedula->text().trimmed();
+    if (cedula.isEmpty()) {
         errores += "• Cédula es obligatoria.\n";
         campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
         ok = false;
+    } else {
+        // La cédula debe ser estrictamente numérica.
+        QRegularExpression regexNumeros("^[0-9]+$");
+        if (!regexNumeros.match(cedula).hasMatch()) {
+            errores += "• La cédula debe contener únicamente números (sin puntos, espacios ni símbolos).\n";
+            campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
+            ok = false;
+        } else if ((m_cedulaOriginal.isEmpty() || cedula != m_cedulaOriginal)
+                   && m_docentesExistentes.contains(cedula)) {
+            errores += QString("• La cédula %1 ya pertenece al docente: %2.\n")
+                           .arg(cedula, m_docentesExistentes.value(cedula));
+            campoCedula->setStyleSheet(baseInputStyle + " QLineEdit { border: 2px solid #dc2626; }");
+            ok = false;
+        }
     }
     if (campoNombre->text().trimmed().isEmpty()) {
         errores += "• Nombre es obligatorio.\n";
@@ -154,20 +196,76 @@ void TeacherFormDialog::guardarProfesor() {
         campoCedula->text().trimmed(),
         campoNombre->text().trimmed(),
         campoEmail->text().trimmed(),
-        campoTelefono->text().trimmed(),
-        campoMaterias->text().trimmed()
+        campoTelefono->text().trimmed()
         );
     accept();
 }
 
 void TeacherFormDialog::cargarDatos(const QString& cedula, const QString& nombre,
-                                    const QString& email, const QString& telefono,
-                                    const QString& materias) {
+                                    const QString& email, const QString& telefono) {
     campoCedula->setText(cedula);
+    m_cedulaOriginal = cedula;
     campoNombre->setText(nombre);
     campoEmail->setText(email);
     campoTelefono->setText(telefono);
-    campoMaterias->setText(materias);
+}
+
+void TeacherFormDialog::cargarOpcionesGeneracion(const QStringList& turnos,
+                                                 const QStringList& planes,
+                                                 const QVector<int>& anios)
+{
+    const QString sinPreferencia = QStringLiteral("— Sin preferencia —");
+
+    comboTurno->clear();
+    comboTurno->addItem(sinPreferencia, QString());
+    for (const QString& turno : turnos)
+        comboTurno->addItem(turno, turno);
+
+    comboPlan->clear();
+    comboPlan->addItem(sinPreferencia, QString());
+    for (const QString& plan : planes)
+        comboPlan->addItem(plan, plan);
+
+    comboAnio->clear();
+    comboAnio->addItem(QStringLiteral("Todos"), 0);
+    for (int anio : anios)
+        comboAnio->addItem(QString::number(anio), anio);
+}
+
+void TeacherFormDialog::cargarPreferencias(const QString& turno, const QString& plan,
+                                           int anio)
+{
+    if (!turno.isEmpty()) {
+        const int indice = comboTurno->findData(turno);
+        if (indice >= 0)
+            comboTurno->setCurrentIndex(indice);
+    }
+    if (!plan.isEmpty()) {
+        const int indice = comboPlan->findData(plan);
+        if (indice >= 0)
+            comboPlan->setCurrentIndex(indice);
+    }
+    if (anio > 0) {
+        const int indice = comboAnio->findData(anio);
+        if (indice >= 0)
+            comboAnio->setCurrentIndex(indice);
+    }
+}
+
+QString TeacherFormDialog::cedula() const {
+    return campoCedula->text().trimmed();
+}
+
+QString TeacherFormDialog::turnoSeleccionado() const {
+    return comboTurno->currentData().toString();
+}
+
+QString TeacherFormDialog::planSeleccionado() const {
+    return comboPlan->currentData().toString();
+}
+
+int TeacherFormDialog::anioSeleccionado() const {
+    return comboAnio->currentData().toInt();
 }
 
 } // namespace gestor::frontend::forms

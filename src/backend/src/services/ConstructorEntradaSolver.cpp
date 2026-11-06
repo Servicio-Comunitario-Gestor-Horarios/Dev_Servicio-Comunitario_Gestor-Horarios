@@ -1,6 +1,7 @@
 #include "backend/services/ConstructorEntradaSolver.hpp"
 
 #include "backend/services/ServicioCursos.hpp"
+#include "backend/services/duracion_horaria.hpp"
 
 #include <QJsonArray>
 #include <QTime>
@@ -138,55 +139,91 @@ namespace
     }
 } // namespace
 
-QJsonObject construirJsonEntrada(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora)
+Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            int duracionMinutos,
+                                            const QDateTime& ahora)
 {
+    // 1. Tipos obligatorios (RF-1). Orden determinista: aulas y luego materias, en el orden de la
+    //    instantánea; el primer defecto detiene la construcción y no se emite JSON.
+    for (const AulaDTO& a : datos.aulas)
+        if (a.tipoAula.trimmed().isEmpty())
+            return Resultado<QJsonObject>::error(
+                QStringLiteral("El aula «%1» no tiene tipo de aula. Asígnelo en el catálogo de "
+                               "tipos antes de generar el horario.")
+                    .arg(a.nombre));
+
+    for (const MateriaDTO& m : datos.materias)
+        if (m.tipoAula.trimmed().isEmpty())
+            return Resultado<QJsonObject>::error(
+                QStringLiteral("La materia «%1» no tiene tipo de aula requerido. Asígnelo antes "
+                               "de generar el horario.")
+                    .arg(m.nombre));
+
     const QVector<TurnoOrdenado> turnosOrdenados = ordenarTurnos(datos.turnos);
 
     SolverConfig salida;
 
-    // Parametros del solver que no son entidad.
-    salida.version        = parametros.version;
+    // Parametros del solver que no son entidad. La entrada es SIEMPRE del contrato 2.0: la
+    // version no se copia del preset (RF-1).
+    salida.version        = QStringLiteral("2.0");
     salida.aula_fija      = parametros.aula_fija;      // modo GLOBAL (del preset)
     salida.franja_horaria = parametros.franja_horaria;
 
-    // Materias: pool global en el orden de la instantánea.
-    for (const MateriaDTO& m : datos.materias)
-        salida.materias.append(MateriaSolverConfig{m.nombre});
+    // La duración de la hora académica manda: el campo del preset es derivado y se
+    // sobrescribe SIEMPRE, antes de validar (RF-3, RF-5).
+    salida.franja_horaria.duracion_minutos = duracionMinutos;
 
-    // Aulas.
+    // Se valida DESPUÉS de la sobrescritura: un preset con 0, 5 o 45 no bloquea, pero una D
+    // recibida fuera de 30–90 falla sin emitir JSON (mismo punto único que el contrato).
+    const QString errorDuracion = duracion_horaria::errorDeRango(duracionMinutos);
+    if (!errorDuracion.isEmpty())
+        return Resultado<QJsonObject>::error(errorDuracion);
+
+    // Materias: pool global en el orden de la instantánea; el tipo viaja por su nombre.
+    for (const MateriaDTO& m : datos.materias)
+        salida.materias.append(MateriaSolverConfig{m.nombre, m.tipoAula});
+
+    // Aulas: el tipo de aula sale de los datos, sin valor por defecto.
     for (const AulaDTO& a : datos.aulas)
     {
         AulaSolverConfig aula;
         aula.nombre    = a.nombre;
-        aula.tipo      = QStringLiteral("regular");   // el dominio no distingue tipo aún
+        aula.tipo      = a.tipoAula;
         aula.capacidad = a.capacidad;
         salida.aulas.append(aula);
     }
 
-    // Turnos: slots absolutos por orden de inicio.
+    // Turnos: slots absolutos por orden de inicio + ventana del turno para V2.
     for (const TurnoOrdenado& t : turnosOrdenados)
     {
         TurnoConfig turno;
         turno.nombre = t.nombre;
         for (int k = 0; k < t.numSlots; ++k)
             turno.slot.append(t.offset + k);
+        turno.inicio = t.inicio.isValid() ? t.inicio.toString(QStringLiteral("HH:mm")) : QString();
+        turno.fin    = t.fin.isValid() ? t.fin.toString(QStringLiteral("HH:mm")) : QString();
         salida.turnos.turnos.append(turno);
     }
 
-    // Recesos: se aplanan desde los turnos del dominio.
+    // Eventos del turno (contrato 2.0): una entrada por evento, sin identidad.
     for (const TurnoDTO& t : datos.turnos)
     {
-        for (const RecesoDTO& r : t.recesos)
+        for (const EventoDTO& evento : t.eventos)
         {
-            RecesoConfig receso;
-            receso.turno           = t.nombre;
-            receso.despues_de_slot = r.despuesDeSlot;
-            receso.duracion        = r.duracion;
-            receso.inicio          = r.inicio.isValid() ? r.inicio.toString(QStringLiteral("HH:mm")) : QString();
-            receso.fin             = r.fin.isValid() ? r.fin.toString(QStringLiteral("HH:mm")) : QString();
-            salida.recesos.append(receso);
+            EventoConfig config;
+            config.nombre          = evento.nombre;
+            config.turno           = t.nombre;
+            config.despues_de_slot = evento.despuesDeSlot;
+            config.orden           = evento.orden;
+            config.duracion        = evento.duracion;
+            config.inicio          = evento.inicio.isValid()
+                                         ? evento.inicio.toString(QStringLiteral("HH:mm"))
+                                         : QString();
+            config.fin             = evento.fin.isValid()
+                                         ? evento.fin.toString(QStringLiteral("HH:mm"))
+                                         : QString();
+            salida.eventos.append(config);
         }
     }
 
@@ -210,28 +247,6 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         // Aula: indice en modo fijo; -1 en modo movil (la decide el solver).
         curso.aula = salida.aula_fija ? indiceAula(datos.aulas, c.aula) : -1;
         salida.cursos.append(curso);
-    }
-
-    // Planes EMBEBIDOS: solo los referenciados por los cursos.
-    for (const CursoSolverConfig& c : salida.cursos)
-    {
-        bool ya = false;
-        for (const PlanSolverConfig& p : salida.planes)
-            if (p.codigo == c.plan) { ya = true; break; }
-        if (ya) continue;
-
-        const PlanEstudio* plan = planPorCodigo(datos.planes, c.plan);
-        if (!plan) continue;   // V10/V11 lo rechazaran
-
-        PlanSolverConfig embebido;
-        embebido.codigo = plan->codigo;
-        for (const MateriaEnPlan& m : plan->materias)
-        {
-            const int idx = indiceMateriaPorNombre(datos.materias, m.materia.nombre);
-            if (idx >= 0)
-                embebido.materias.append(PlanMateriaConfig{idx, m.curso, m.horas});
-        }
-        salida.planes.append(embebido);
     }
 
     // Profesores: entidad del dominio + parámetros del solver casados por nombre.
@@ -262,13 +277,45 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
             Disponibilidad sol;
             sol.dia  = disp.franja.dia - 1;   // dominio: 0=domingo; solver: 0=lunes
             sol.slot = slotsDeFranja(disp.franja, turnosOrdenados,
-                                     parametros.franja_horaria.duracion_minutos);
+                                     salida.franja_horaria.duracion_minutos);
             if (sol.dia >= 0)
                 prof.disponibilidad.append(sol);
         }
 
         salida.profesores.append(prof);
     }
+
+    // Planes EMBEBIDOS (RF-13): los referenciados por los cursos de la generación **más los
+    // que usan los docentes**. Criterio determinista: primero los de los cursos en su orden y
+    // después los de los docentes en el suyo; sin duplicados. Un docente sin plan (vacío =
+    // cualquiera, D11) no añade nada; un plan inexistente no se embebe y el filtro D7 del
+    // docente lo juzga en V13.
+    const auto embeberPlan = [&datos, &salida](const QString& codigo) {
+        if (codigo.isEmpty())
+            return;
+        for (const PlanSolverConfig& p : salida.planes)
+            if (p.codigo == codigo)
+                return;
+
+        const PlanEstudio* plan = planPorCodigo(datos.planes, codigo);
+        if (!plan)
+            return;
+
+        PlanSolverConfig embebido;
+        embebido.codigo = plan->codigo;
+        for (const MateriaEnPlan& m : plan->materias)
+        {
+            const int idx = indiceMateriaPorNombre(datos.materias, m.materia.nombre);
+            if (idx >= 0)
+                embebido.materias.append(PlanMateriaConfig{idx, m.curso, m.horas});
+        }
+        salida.planes.append(embebido);
+    };
+
+    for (const CursoSolverConfig& c : salida.cursos)
+        embeberPlan(c.plan);
+    for (const ProfesorSolverConfig& p : salida.profesores)
+        embeberPlan(p.plan);
 
     // Dimensiones derivadas (conteos) + días/slots desde el preset.
     salida.dimensiones.num_profesores = salida.profesores.size();
@@ -293,12 +340,13 @@ QJsonObject construirJsonEntrada(const DatosDominio& datos,
         ahora.isValid() ? ahora.toString(Qt::ISODate) : QString();
     json["meta"] = meta;
 
-    return json;
+    return Resultado<QJsonObject>::exito(json);
 }
 
-QJsonObject ConstructorEntradaSolver::construir(const DatosDominio& datos,
-                                                const SolverConfig& parametros,
-                                                const QDateTime& ahora)
+Resultado<QJsonObject> ConstructorEntradaSolver::construir(const DatosDominio& datos,
+                                                           const SolverConfig& parametros,
+                                                           int duracionMinutos,
+                                                           const QDateTime& ahora)
 {
-    return construirJsonEntrada(datos, parametros, ahora);
+    return construirJsonEntrada(datos, parametros, duracionMinutos, ahora);
 }

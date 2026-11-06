@@ -29,6 +29,8 @@ class QLabel;
 class QFrame;
 class QScrollArea;
 class QGridLayout;
+class QVBoxLayout;
+class QTimer;
 class QWidget;
 class QMouseEvent;
 
@@ -61,6 +63,8 @@ protected:
     // Utilidades para las subclases
     QWidget* buildGridCard(QWidget* parent);
     QWidget* buildLegendCard(QWidget* parent);
+    /** Vuelve a pintar la leyenda con las materias del horario que se está viendo. */
+    void     rebuildLegend();
     void     applyStyles();
     void     rebuildGrid();
     void     resetGridScroll();
@@ -86,9 +90,29 @@ private:
                             int span, const QString& rangoHoras);
     void    startDrag(QFrame* cell, const QPoint& pos);
 
+    /** Programa un recálculo de la rejilla cuando cambia el tamaño visible. */
+    void scheduleSizeRebuild();
+    /** Reconstruye la rejilla solo si el tamaño de las celdas debe cambiar. */
+    void rebuildForViewportIfNeeded();
+    /** Tamaño de celda que llena el área visible; false si aún no hay tamaño. */
+    bool computeCellSizes(int& dayW, int& rowH) const;
+
     QScrollArea* m_gridScroll = nullptr;
     QWidget*     m_gridHost = nullptr;
     QGridLayout* m_scheduleGrid = nullptr;
+
+    QScrollArea* m_legendScroll = nullptr;
+    QWidget*     m_legendHost = nullptr;
+    QVBoxLayout* m_legendLayout = nullptr;
+
+    QTimer* m_sizeTimer = nullptr;
+    int m_dayColW = 150;
+    int m_rowH = 74;
+    int m_numDias = 5;
+    int m_teachingRows = 0;
+    int m_recessRows = 0;
+    int m_lastViewportW = -1;
+    int m_lastViewportH = -1;
 
     QPoint  m_pressPos;
     QFrame* m_pressCell = nullptr;

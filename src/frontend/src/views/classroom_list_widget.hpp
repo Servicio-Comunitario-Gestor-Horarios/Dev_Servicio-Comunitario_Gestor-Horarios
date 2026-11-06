@@ -22,12 +22,14 @@ public slots:
 
 private slots:
     void abrirFormularioNuevo();
+    void abrirFormularioNuevoTipo();
 
 private:
     void setupUi();
 
     QTableWidget* m_table = nullptr;
     QPushButton* m_registerButton = nullptr;
+    QPushButton* m_typesButton = nullptr;
 
     NucleoDatos* m_nucleo = nullptr;
 

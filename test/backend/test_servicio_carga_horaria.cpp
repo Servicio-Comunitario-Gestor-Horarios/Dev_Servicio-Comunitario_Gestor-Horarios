@@ -7,6 +7,7 @@
 #include <backend/services/ServicioCargaHoraria.hpp>
 #include <backend/services/ServicioPlanesEstudio.hpp>
 #include <backend/services/ServicioMaterias.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
 
 class TestServicioCargaHoraria : public QObject {
     Q_OBJECT
@@ -28,14 +29,19 @@ private slots:
         m_servicioPlanes->crearPlan("PLAN-TEST", "Plan de Prueba");
 
         m_servicioMaterias.reset(new ServicioMaterias(m_dbManager->database()));
-        m_servicioMaterias->crearMateria("Matemática");
-        m_servicioMaterias->crearMateria("Física");
-        m_servicioMaterias->crearMateria("Química");
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        const auto tipo = m_tipos->crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        m_idTipoAula = tipo.valor.id;
+        m_servicioMaterias->crearMateria("Matemática", QString(), m_idTipoAula);
+        m_servicioMaterias->crearMateria("Física", QString(), m_idTipoAula);
+        m_servicioMaterias->crearMateria("Química", QString(), m_idTipoAula);
     }
 
     void cleanup() {
         m_servicioCarga.reset();
         m_servicioMaterias.reset();
+        m_tipos.reset();
         m_servicioPlanes.reset();
         m_dbManager->close();
         m_dbManager.reset();
@@ -234,6 +240,8 @@ private:
     std::unique_ptr<ServicioPlanesEstudio> m_servicioPlanes;
     std::unique_ptr<ServicioMaterias> m_servicioMaterias;
     std::unique_ptr<ServicioCargaHoraria> m_servicioCarga;
+    std::unique_ptr<ServicioTiposAula> m_tipos;
+    int m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioCargaHoraria)

@@ -43,10 +43,7 @@ struct ParametrosDocente {
  * a partir de los turnos definidos en la base (no se configuran aparte).
  */
 struct OpcionesUI {
-    QString version = QStringLiteral("1.0");
-
-    // Franja horaria.
-    int duracionMinutos = 45;   ///< Duración de cada slot (min).
+    QString version = QStringLiteral("2.0");
 
     // Dimensiones.
     int numDias = 5;            ///< Días de la semana a planificar.
@@ -74,12 +71,14 @@ struct TurnoVisual {
 };
 
 /**
- * @brief Receso declarado para un turno.
+ * @brief Evento declarado para un turno (receso, acto cívico, etc.).
  *
- * La duración no es fija (los datos de prueba usan 10 min, pero puede ser otra):
- * la visualización lee de aquí cuándo va y cuánto dura.
+ * El nombre viaja desde el contrato (`eventos`) para que la visualización
+ * distinga unos eventos de otros. La duración no es fija (los datos de prueba
+ * usan 10 min, pero puede ser otra).
  */
 struct RecesoVisual {
+    QString nombre;            ///< Nombre del evento ("Receso", "Acto cívico"…).
     QString turno;             ///< Turno al que pertenece.
     int despuesDeSlot = 0;     ///< Se inserta tras esa cantidad de franjas del turno.
     int duracion = 0;          ///< Minutos.

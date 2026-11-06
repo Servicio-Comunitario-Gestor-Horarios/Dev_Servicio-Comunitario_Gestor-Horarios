@@ -6,8 +6,8 @@
  *
  * Envuelve los servicios de dominio sobre una misma conexión `QSqlDatabase` y
  * expone el CRUD que consume la interfaz (docentes, aulas, materias, planes de
- * estudio, cursos y turnos/recesos). No reimplementa la lógica de los servicios:
- * los delega.
+ * estudio, cursos y turnos con sus eventos, y el catálogo de tipos de aula). No
+ * reimplementa la lógica de los servicios: los delega.
  */
 
 #include <QSqlDatabase>
@@ -20,11 +20,14 @@
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCargaHoraria.hpp"
 #include "backend/services/ServicioComposicionPlan.hpp"
+#include "backend/services/ServicioConfiguracionHoraria.hpp"
+#include "backend/services/ServicioPreferencias.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTiposAula.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/services/cascada.hpp"
 
 class NucleoDatos {
@@ -50,21 +53,32 @@ public:
 
     Resultado<QVector<AulaDTO>> listarAulas() const;
     Resultado<AulaDTO> crearAula(const QString& nombre, int capacidad,
-                                 const QString& edificio = QString(),
-                                 const QString& piso = QString());
+                                 const QString& edificio, const QString& piso,
+                                 int idTipoAula);
     Resultado<AulaDTO> actualizarAula(int id, const QString& nombre, int capacidad,
-                                      const QString& edificio = QString(),
-                                      const QString& piso = QString());
+                                      const QString& edificio, const QString& piso,
+                                      int idTipoAula);
     bool eliminarAula(int id);
 
     // ─── Materias ─────────────────────────────────────────────────────────
 
     Resultado<QVector<MateriaDTO>> listarMaterias() const;
     Resultado<MateriaDTO> crearMateria(const QString& nombre,
-                                       const QString& requisitos = QString());
+                                       const QString& requisitos,
+                                       int idTipoAula);
     Resultado<MateriaDTO> actualizarMateria(int id, const QString& nombre,
-                                            const QString& requisitos = QString());
+                                            const QString& requisitos,
+                                            int idTipoAula);
     bool eliminarMateria(int id);
+
+    // ─── Tipos de aula ────────────────────────────────────────────────────
+
+    Resultado<QVector<TipoAulaDTO>> listarTiposAula() const;
+    Resultado<TipoAulaDTO> obtenerTipoAula(int id) const;
+    Resultado<TipoAulaDTO> crearTipoAula(const QString& nombre);
+    Resultado<TipoAulaDTO> renombrarTipoAula(int id, const QString& nombre);
+    /// Error con los dependientes si el tipo está en uso (RF-5).
+    Resultado<bool> eliminarTipoAula(int id);
 
     // ─── Planes de estudio ────────────────────────────────────────────────
 
@@ -73,6 +87,18 @@ public:
                                  const QString& descripcion = QString());
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
                                       const QString& descripcion = QString());
+    Resultado<PlanDTO> obtenerPlan(const QString& codigo) const;
+
+    /// Alta atómica de un plan con sus materias, años y horas semanales.
+    Resultado<PlanDTO> crearPlanCompleto(const QString& codigo, const QString& nombre,
+                                         const QString& descripcion,
+                                         const QVector<PlanMateriaDTO>& materias);
+
+    /// Edición atómica del plan y reemplazo de sus materias (el código no cambia).
+    Resultado<PlanDTO> actualizarPlanCompleto(const QString& codigo, const QString& nombre,
+                                              const QString& descripcion,
+                                              const QVector<PlanMateriaDTO>& materias);
+
     bool eliminarPlan(const QString& codigo);
 
     /// Carga horaria (materias con sus horas y año) de un plan de estudio.
@@ -97,18 +123,55 @@ public:
                                         const QString& turno = QString(), int aula = -1);
     bool eliminarCurso(int id);
 
-    // ─── Turnos y recesos ─────────────────────────────────────────────────
+    // ─── Turnos y eventos ─────────────────────────────────────────────────
 
     Resultado<QVector<TurnoDTO>> listarTurnos() const;
+    Resultado<TurnoDTO> obtenerTurno(const QString& nombre) const;
     Resultado<TurnoDTO> crearTurno(const QString& nombre, const QTime& inicio,
                                    const QTime& fin, int numSlots);
+    /// Si se reducen franjas, sin `eliminarEventosFueraDeRango` devuelve el
+    /// error con los eventos afectados (RF-4).
     Resultado<TurnoDTO> actualizarTurno(const QString& nombre, const QTime& inicio,
-                                        const QTime& fin, int numSlots);
+                                        const QTime& fin, int numSlots,
+                                        bool eliminarEventosFueraDeRango = false);
     bool eliminarTurno(const QString& nombre);
-    Resultado<RecesoDTO> agregarReceso(const QString& turno, int despuesDeSlot,
-                                       int duracion, const QTime& inicio = QTime(),
-                                       const QTime& fin = QTime());
-    bool eliminarReceso(const QString& turno, int despuesDeSlot);
+
+    /// Alta de un evento; `orden == 0` pide el automático (máximo + 1).
+    Resultado<EventoDTO> agregarEvento(const QString& turno, const QString& nombre,
+                                       int despuesDeSlot, int duracion,
+                                       const QTime& inicio = QTime(),
+                                       const QTime& fin = QTime(), int orden = 0);
+    /// Edición por identidad; el turno del evento no cambia.
+    Resultado<EventoDTO> actualizarEvento(int id, const QString& nombre, int despuesDeSlot,
+                                          int duracion, const QTime& inicio, const QTime& fin,
+                                          int orden);
+    bool eliminarEvento(int id);
+    /// Eventos que quedarían fuera si el turno se redujera a `numSlots` (RF-4).
+    Resultado<QVector<EventoDTO>> eventosFueraDeRango(const QString& turno,
+                                                      int numSlots) const;
+
+    // ─── Configuración global de la hora académica (RF-1, RF-2) ───────────
+
+    /// Valor efectivo de la duración y si proviene del defecto (35 sin fila).
+    Resultado<ConfiguracionHoraria> configuracionHoraria() const;
+    /// Valida 30–90 y guarda la configuración; inválida no cambia el anterior.
+    Resultado<ConfiguracionHoraria> guardarConfiguracionHoraria(int duracionMinutos);
+
+    // ─── Preferencias horarias del docente (RF-3) ─────────────────────────
+
+    /// Alta de una preferencia; si falla queda pendiente y se puede reintentar.
+    Resultado<PreferenciaDTO> agregarPreferencia(const QString& idProfesor,
+                                                 const FranjaHoraria& franja,
+                                                 SentidoPreferencia sentido);
+    /// Preferencias del docente por día, inicio, fin e id; vacío no es error.
+    Resultado<QVector<PreferenciaDTO>> listarPreferencias(const QString& idProfesor) const;
+    /// Edición por identidad; si falla queda pendiente y se puede reintentar.
+    Resultado<PreferenciaDTO> actualizarPreferencia(int id, const FranjaHoraria& franja,
+                                                    SentidoPreferencia sentido);
+    /// Baja por identidad; distingue «no existe».
+    Resultado<bool> eliminarPreferencia(int id);
+    /// Borra solo las preferencias del docente y devuelve cuántas borró.
+    Resultado<int> limpiarPreferencias(const QString& idProfesor);
 
     // ─── Eliminación en cascada (RF-2) ────────────────────────────────────
 
@@ -157,11 +220,14 @@ private:
     ServicioProfesor m_profesor;
     ServicioAula m_aula;
     ServicioMaterias m_materias;
+    ServicioTiposAula m_tipos;
     ServicioPlanesEstudio m_planes;
     ServicioCargaHoraria m_carga;
     ServicioComposicionPlan m_composicion;
     ServicioCursos m_cursos;
-    ServicioTurnosRecesos m_turnos;
+    ServicioTurnosEventos m_turnos;
+    ServicioConfiguracionHoraria m_configuracion;
+    ServicioPreferencias m_preferencias;
 
     /// Estado en memoria de las escrituras fallidas pendientes de reintento.
     GestorPendientes m_pendientes;

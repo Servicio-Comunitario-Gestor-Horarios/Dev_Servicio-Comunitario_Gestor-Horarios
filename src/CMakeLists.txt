@@ -16,6 +16,9 @@
 # solver). `datos` encapsula el ciclo de vida de la base y depende de `backend`;
 # `app` depende de `frontend` y `datos`.
 #
+# `frontend` solo existe con BUILD_FRONTEND=ON; `app` se añade siempre porque
+# `app_core` (instancia única) no depende de la UI (ver src/app/CMakeLists.txt).
+#
 # ¿Cómo agregar un nuevo módulo?
 #   1. Crear directorio en src/
 #   2. Crear src/<modulo>/CMakeLists.txt
@@ -29,7 +32,9 @@ if(BUILD_BACKEND)
     add_subdirectory(backend)
 endif()
 
-add_subdirectory(frontend)
+if(BUILD_FRONTEND)
+    add_subdirectory(frontend)
+endif()
 
 if(BUILD_BACKEND)
     # `datos` encapsula el ciclo de vida de la base del lado cliente y depende

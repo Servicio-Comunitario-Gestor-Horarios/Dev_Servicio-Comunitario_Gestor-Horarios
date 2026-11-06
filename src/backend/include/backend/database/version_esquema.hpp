@@ -11,7 +11,16 @@
 namespace VersionEsquema
 {
     /// Versión de esquema que espera esta compilación de la aplicación (marca única).
-    constexpr int VERSION_ESQUEMA_ACTUAL = 2;
+    ///
+    /// v5: preferencias horarias del docente (`Preferencia_Profesor`: día 0–6, rango e
+    /// inicio anterior al fin, sentido «preferida»/«evitada» y duplicado exacto único)
+    /// (spec 012).
+    /// v4: configuración global de la hora académica (`ConfiguracionHoraria`, una
+    /// sola fila, 35 minutos por defecto y rango 30–90) (spec 011).
+    /// v3: catálogo de tipos de aula con clave normalizada, referencia de tipo
+    /// obligatoria en aulas y materias, y eventos del turno con identidad y orden
+    /// (se retira el registro de recesos).
+    constexpr int VERSION_ESQUEMA_ACTUAL = 5;
 
     /// Resultado de decidir qué hacer al abrir una base de datos.
     enum class EstadoApertura
@@ -36,7 +45,8 @@ namespace VersionEsquema
     bool crearEsquema(QSqlDatabase& db);
 
     /// Comprueba que la base tenga el catálogo del esquema único (tablas y columnas
-    /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia`).
+    /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia` o el
+    /// registro de recesos `Recesos`, sustituido por `Eventos`).
     /// Si se pasa `motivo`, recibe una explicación legible de lo que no cuadra
     /// (vacía si el catálogo corresponde al esquema esperado).
     bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr);

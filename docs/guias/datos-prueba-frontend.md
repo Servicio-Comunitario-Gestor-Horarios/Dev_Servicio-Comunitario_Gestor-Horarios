@@ -20,18 +20,20 @@ académicas**, y **1 hora académica = 1 bloque**. Ya **no** existe la conversi�
 | Dato | Significado para el frontend |
 |---|---|
 | `PlanEstudio_Materia.horas` | **Horas académicas semanales = bloques.** El número que ves ya es el número de bloques. |
-| `duracion_minutos` (40 en el conjunto) | **Solo la duración real de la franja** (rejilla horaria, receso y disponibilidad). **No** es factor de conversión. |
+| `duracion_minutos` (35 en el conjunto) | **Solo la duración real de la franja** (rejilla horaria, eventos y disponibilidad). **No** es factor de conversión. |
 | Conversión | **No multiplicar por 60** ni **dividir por `duracion_minutos`**. `bloques(horas) = horas`. |
 
 **Cómo mostrarlo:**
 
 - Un año suma **40 horas académicas/semana** → muéstralo tal cual: «40 h académicas/semana».
 - Si se quiere el **tiempo real**, la conversión es **para presentación, no para el solver**:
-  40 bloques × 40 min = 1600 min = **26 h 40 min**.
+  40 bloques × 35 min = 1400 min = **23 h 20 min**, con
+  `duracion_horaria::minutosDeHorasAcademicas`.
 
-> `duracion_minutos` **no es una columna de la base**: es un campo de la configuración del solver
-> (el preset). La base solo guarda `Turnos.slots` (= 8), `Turnos.inicio` y `Turnos.fin`. El valor
-> de 40 min lo declara el preset que acompañe al conjunto (ver §4).
+> `duracion_minutos` **vive en la base**, en la configuración global `ConfiguracionHoraria` (una fila,
+> 35 por defecto, rango 30–90; se edita con `NucleoDatos::guardarConfiguracionHoraria()`); `Turnos`
+> sigue guardando `slots` (= 8), `inicio` y `fin`. El campo del preset es **derivado**: la construcción
+> lo sobrescribe siempre con el valor de la configuración y nunca lo usa.
 
 Referencias: `docs/interfaz-frontend.md` (contrato) · `specs/005-nucleo-solver/spec.md` (D3, S1,
 V14 y definiciones de «hora académica», «bloque» y `duracion_minutos`) · `docs/constitution.md` §7.
@@ -40,6 +42,12 @@ V14 y definiciones de «hora académica», «bloque» y `duracion_minutos`) · `
 
 ## 2. Qué hay en la base sembrada (recuentos exactos)
 
+> **Nota (spec 009):** la base sembrada ya trae **eventos** (nombre, posición, orden y duración) y el
+> catálogo de **tipos de aula**. La interfaz **aún no ha migrado** a ese contrato
+> (`docs/interfaz-frontend.md` §5): sus formularios no envían `idTipoAula` y sus vistas todavía no
+> consumen eventos ni tipos de aula. Los recuentos de esta sección describen **los datos de la base**,
+> no las firmas que la interfaz compila hoy.
+
 | Entidad | Cantidad | Detalle |
 |---|---|---|
 | Planes de estudio | 4 | `GEN` General · `EXA` Ciencias Exactas · `NAT` Ciencias Naturales · `SOC` Ciencias Sociales |
@@ -47,8 +55,9 @@ V14 y definiciones de «hora académica», «bloque» y `duracion_minutos`) · `
 | Cargas plan-materia | 210 | tabla `PlanEstudio_Materia` (`codigo_PlanEstudio`, `id_Materia`, `curso`, `horas`) |
 | Cursos | 13 | 3 secciones en 1.º–3.º (A/B/C) y 2 en 4.º–5.º (A/B); **todos con `turno` NULL** |
 | Aulas | 16 | 13 para cursos (Aula 01…13) + reserva + laboratorio + taller |
-| Turnos | 2 | Mañana 07:00–12:30 · Tarde 12:40–18:10, **8 franjas de 40 min** |
-| Recesos | 2 | 10 min tras la 2.ª franja: 08:20–08:30 (Mañana) y 14:00–14:10 (Tarde) |
+| Turnos | 2 | Mañana 07:00–11:50 · Tarde 12:40–17:30, **8 franjas de 35 min** |
+| Eventos | 2 | evento «Receso» de 10 min tras la 2.ª franja: 08:10–08:20 (Mañana) y 13:50–14:00 (Tarde) |
+| Tipos de aula | 3 | catálogo `Aula de estudio` · `Laboratorio` · `Taller`; toda aula y materia referencia uno |
 
 **Planes (materias por año y carga):**
 
@@ -60,9 +69,10 @@ V14 y definiciones de «hora académica», «bloque» y `duracion_minutos`) · `
 | `SOC` | 9 / 9 / 10 / 12 / 13 | 40/40/40/40/40 h académicas |
 
 **Turnos (rejilla aritmética, spec 005):** los bloques se anclan en el `inicio` del turno y
-avanzan en pasos de 40 min; **el receso no desplaza bloques**. La rejilla termina en **12:20**
-(Mañana) y **18:00** (Tarde), mientras que `Turnos.fin` guardado es 12:30/18:10 porque incluye el
-receso (desfase de 10 min asumido y documentado en la spec 008).
+avanzan en pasos de 35 min; **el evento «Receso» no desplaza bloques**. La rejilla de clases termina
+en **11:40** (Mañana) y **17:20** (Tarde) (`8 × 35 = 280`), mientras que `Turnos.fin` guardado es
+**11:50/17:30** porque añade los 10 min del evento «Receso»: el desfase de 10 min sigue existiendo y
+es el tiempo del evento, el mismo que documenta la spec 008.
 
 **Las 4 variantes de docentes** (el resto de los datos es idéntico entre variantes):
 
@@ -187,19 +197,21 @@ horario. Ver `docs/interfaz-frontend.md` §3.1 («EntradaInvalida», «ContratoI
 ## 6. Checklist de integración
 
 - [ ] **No reconvertir horas.** `PlanEstudio_Materia.horas` ya son bloques; no multiplicar por 60 ni
-      dividir por `duracion_minutos`. Mostrar «40 h académicas/semana» (y 26 h 40 min solo como dato
+      dividir por `duracion_minutos`. Mostrar «40 h académicas/semana» (y 23 h 20 min solo como dato
       de tiempo real).
 - [ ] **Mostrar «sin turno»** para los 13 cursos mientras no exista preset (no asumir mañana/tarde).
-- [ ] **Respetar `duracion_minutos` al pintar la rejilla** (40 min por bloque, anclada en el `inicio`
-      del turno) y recordar que el **receso no desplaza los bloques**.
-- [ ] **Receso como metadata:** el receso (`despues_de_slot = 2`, 10 min) es metadata del turno; el
-      solver lo ignora (constitución §7.5). No descuentes el receso de las franjas útiles.
+- [ ] **Respetar `duracion_minutos` al pintar la rejilla** (35 min por bloque, o el valor efectivo de
+      la configuración, anclada en el `inicio` del turno) y recordar que el **evento «Receso» no
+      desplaza los bloques**.
+- [ ] **Eventos como metadata:** los eventos del turno (`despues_de_slot`, `orden`, `duracion`) son
+      metadata del turno; el solver los ignora (constitución §7.5). Para el **encaje** del turno sí
+      cuentan: `nº franjas × D + Σ eventos ≤ ventana`; el sobrante queda al final sin repartirse.
 - [ ] **No asumir que los cursos tienen turno ni plan en la base:** ambos los aporta el preset al
       generar; sin ellos, el solver rechaza (V7, V10/V11).
 - [ ] **Aula fija global:** el aula ya viene de la base (cada curso con aula distinta) y el modo de
       aula fija es global (activo por defecto); no pedir aula por curso al usuario del preset.
 - [ ] **Usar los recuentos para las pruebas:** 4 planes, 57 materias, 210 cargas, 13 cursos, 16
-      aulas, 2 turnos/2 recesos y las variantes 65/43/64/65.
+      aulas, 2 turnos/2 eventos, 3 tipos de aula y las variantes 65/43/64/65.
 - [ ] **Enlazar la documentación:** remitir a `docs/guias/datos-prueba.md` (uso del seed) y a
       `specs/005-nucleo-solver/spec.md` (contrato del solver).
 

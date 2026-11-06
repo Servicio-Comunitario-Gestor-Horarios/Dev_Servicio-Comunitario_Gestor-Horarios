@@ -71,8 +71,15 @@ if(TARGET backend)
 	add_qtest(test_validador_salida backend/test_validador_salida.cpp backend)
 	add_qtest(test_servicio_generacion backend/test_servicio_generacion.cpp backend)
 
+	# Eventos del turno (los antiguos recesos): CRUD por identidad y derivación.
+	add_qtest(test_servicio_turnos_eventos backend/test_servicio_turnos_eventos.cpp backend Qt6::Sql)
+
+	# Funciones puras de eventos: ventana de posición, reparto y solapes.
+	add_qtest(test_calculo_eventos backend/test_calculo_eventos.cpp backend)
+
 	add_qtest(test_servicio_aula backend/test_servicio_aula.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_materias backend/test_servicio_materias.cpp backend Qt6::Sql)
+	add_qtest(test_servicio_tipos_aula backend/test_servicio_tipos_aula.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_planes_estudio backend/test_servicio_planes_estudio.cpp backend Qt6::Sql)
 	add_qtest(test_servicio_carga_horaria backend/test_servicio_carga_horaria.cpp backend Qt6::Sql)
 	add_qtest(test_composicion_plan backend/test_composicion_plan.cpp backend Qt6::Sql)
@@ -87,6 +94,27 @@ if(TARGET backend)
 	add_gtest(test_servicio_exportacion backend/test_servicio_exportacion.cpp backend)
 
 	add_qtest(test_contrato_solver backend/test_contrato_solver.cpp backend)
+
+	# Funciones puras de demanda y capacidad por tipo (FranjaSemana, T11).
+	add_gtest(test_capacidad_tipo backend/test_capacidad_tipo.cpp backend)
+
+	# Punto único de duración de la hora académica (rango, minutos y encaje, 011 T1).
+	add_gtest(test_duracion_horaria backend/test_duracion_horaria.cpp backend)
+
+	# Configuración global de la hora académica: valor efectivo y edición (011 T3).
+	add_qtest(test_servicio_configuracion_horaria
+				backend/test_servicio_configuracion_horaria.cpp
+				backend Qt6::Sql
+	)
+
+	# Modelo puro de preferencias y validación compartida de franjas (012 T1).
+	add_gtest(test_preferencias backend/test_preferencias.cpp backend)
+
+	# Servicio de preferencias horarias del docente (012 T3).
+	add_qtest(test_servicio_preferencias
+				backend/test_servicio_preferencias.cpp
+				backend Qt6::Sql
+	)
 endif()
 
 # ============================================================
@@ -130,6 +158,15 @@ if(TARGET frontend AND TARGET backend)
 	target_include_directories(test_cuadricula_horario PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
 
+	# Selectores de la vista de generación (años como desplegable múltiple y
+	# materias suplentes en rejilla) y los ajustes visuales de sus tablas.
+	if(TARGET seed)
+		add_qtest(test_selector_generacion frontend/test_selector_generacion.cpp
+						frontend seed Qt6::Sql Qt6::Widgets)
+		target_include_directories(test_selector_generacion PRIVATE
+						${CMAKE_SOURCE_DIR}/src/frontend/src)
+	endif()
+
 	# Integración: composición de la entrada + solver con los datos sembrados.
 	if(TARGET backend_solver AND TARGET seed)
 		add_qtest(test_generacion_seed frontend/test_generacion_seed.cpp
@@ -138,3 +175,17 @@ if(TARGET frontend AND TARGET backend)
 						${CMAKE_SOURCE_DIR}/src/frontend/src)
 	endif()
 endif()
+
+# ============================================================
+# Serialización de los tests del socket IPC
+# ============================================================
+# Los tests que levantan `InternalServer` comparten el nombre fijo del socket IPC
+# (middleware/messages.h): no pueden correr a la vez o uno borra el socket del otro
+# (`QLocalServer::removeServer` antes de `listen`). Se serializan con un RESOURCE_LOCK
+# de CTest; `test_instancia_unica` no entra porque usa un nombre único (nombreUnico()).
+set_tests_properties(
+	test_middleware_health_check
+	test_middleware_transport
+	test_ipc_aislamiento_bd
+	PROPERTIES RESOURCE_LOCK servidor_ipc_middleware
+)

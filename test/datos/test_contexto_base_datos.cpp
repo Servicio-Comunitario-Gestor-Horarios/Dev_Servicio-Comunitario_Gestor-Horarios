@@ -85,7 +85,10 @@ private slots:
         QVERIFY(contexto.abrir(ruta).ok());
 
         const int antes = contexto.nucleo().listarMaterias().valor.size();
-        const auto alta = contexto.nucleo().crearMateria(QStringLiteral("Matemáticas"));
+        const auto tipo = contexto.nucleo().crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        const auto alta = contexto.nucleo().crearMateria(QStringLiteral("Matemáticas"),
+                                                         QString(), tipo.valor.id);
         QVERIFY(alta.ok);
         QCOMPARE(contexto.nucleo().listarMaterias().valor.size(), antes + 1);
     }
@@ -151,7 +154,10 @@ private slots:
         QVERIFY(uno.conexion().connectionName() != otro.conexion().connectionName());
 
         // Cada contexto opera sobre su propia base.
-        QVERIFY(uno.nucleo().crearMateria(QStringLiteral("SoloUno")).ok);
+        const auto tipo = uno.nucleo().crearTipoAula(QStringLiteral("Aula de estudio"));
+        QVERIFY(tipo.ok);
+        QVERIFY(uno.nucleo().crearMateria(QStringLiteral("SoloUno"), QString(),
+                                          tipo.valor.id).ok);
         QCOMPARE(otro.nucleo().listarMaterias().valor.size(), 0);
     }
 
@@ -183,7 +189,10 @@ private slots:
         {
             ContextoBaseDatos contexto;
             QVERIFY(contexto.abrir(ruta).ok());
-            QVERIFY(contexto.nucleo().crearMateria(QStringLiteral("Persistente")).ok);
+            const auto tipo = contexto.nucleo().crearTipoAula(QStringLiteral("Aula de estudio"));
+            QVERIFY(tipo.ok);
+            QVERIFY(contexto.nucleo().crearMateria(QStringLiteral("Persistente"), QString(),
+                                                   tipo.valor.id).ok);
         } // RAII: cierra y libera la conexión
 
         ContextoBaseDatos reabierto;

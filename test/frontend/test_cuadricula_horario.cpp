@@ -178,6 +178,60 @@ private slots:
         QCOMPARE(rows.at(8).label, QStringLiteral("17:30 - 18:10"));
     }
 
+    void losEventosConservanSuNombre()
+    {
+        // Un acto cívico tras el receso de la mañana: dos eventos en la misma
+        // posición, cada uno con su nombre y sus horas.
+        QJsonObject doc = documentoBase();
+        QJsonObject rejilla = doc.value(QStringLiteral("_cuadricula")).toObject();
+        QJsonArray recesos = rejilla.value(QStringLiteral("recesos")).toArray();
+        QJsonObject civico;
+        civico.insert(QStringLiteral("nombre"), QStringLiteral("Acto cívico"));
+        civico.insert(QStringLiteral("turno"), QStringLiteral("Mañana"));
+        civico.insert(QStringLiteral("despues_de_slot"), 2);
+        civico.insert(QStringLiteral("duracion"), 10);
+        civico.insert(QStringLiteral("inicio"), QStringLiteral("08:30"));
+        civico.insert(QStringLiteral("fin"), QStringLiteral("08:40"));
+        recesos.append(civico);
+        rejilla.insert(QStringLiteral("recesos"), recesos);
+        doc.insert(QStringLiteral("_cuadricula"), rejilla);
+        doc = conSeccion(doc, QStringLiteral("Mañana"), QJsonObject());
+
+        const QVector<ScheduleModel::RowDef> rows = ScheduleModel::rowsFor(doc, refSeccion());
+        QCOMPARE(rows.size(), 10);
+
+        QVERIFY(rows.at(2).recess);
+        QCOMPARE(rows.at(2).nombre, QStringLiteral("Receso"));
+        QCOMPARE(rows.at(2).label, QStringLiteral("RECESO"));
+        QVERIFY(rows.at(2).detalle.contains(QStringLiteral("08:20")));
+
+        QVERIFY(rows.at(3).recess);
+        QCOMPARE(rows.at(3).nombre, QStringLiteral("Acto cívico"));
+        QCOMPARE(rows.at(3).label, QStringLiteral("ACTO CÍVICO"));
+        QVERIFY(rows.at(3).detalle.contains(QStringLiteral("08:30")));
+        QVERIFY(rows.at(3).detalle.contains(QStringLiteral("10 min")));
+
+        // La primera clase después de ambos eventos empieza a las 08:40.
+        QCOMPARE(rows.at(4).label, QStringLiteral("08:40 - 09:20"));
+    }
+
+    void unEventoSinNombreSeTrataComoReceso()
+    {
+        QJsonObject doc = documentoBase();
+        QJsonObject rejilla = doc.value(QStringLiteral("_cuadricula")).toObject();
+        QJsonArray recesos = rejilla.value(QStringLiteral("recesos")).toArray();
+        QJsonObject evento = recesos.at(0).toObject();   // receso de la mañana
+        evento.remove(QStringLiteral("nombre"));
+        recesos.replace(0, evento);
+        rejilla.insert(QStringLiteral("recesos"), recesos);
+        doc.insert(QStringLiteral("_cuadricula"), rejilla);
+        doc = conSeccion(doc, QStringLiteral("Mañana"), QJsonObject());
+
+        const QVector<ScheduleModel::RowDef> rows = ScheduleModel::rowsFor(doc, refSeccion());
+        QVERIFY(rows.at(2).recess);
+        QCOMPARE(rows.at(2).nombre, QStringLiteral("Receso"));
+    }
+
     void lasFilasDelDocenteIncluyenTodosLosTurnos()
     {
         const QJsonObject doc =

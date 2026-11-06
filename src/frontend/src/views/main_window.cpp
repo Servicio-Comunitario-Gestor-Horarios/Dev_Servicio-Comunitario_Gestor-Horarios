@@ -176,49 +176,16 @@ void MainWindow::setupCentralArea() {
     btnMenuRayas->setStyleSheet("QPushButton { font-size: 20px; border: none; background: transparent; padding-left: 15px; }"
                                 "QPushButton::menu-indicator { image: none; }");
 
+    // El programa no usa cuentas: el menú solo ofrece Configuración (#98).
     QMenu *menuOpciones = new QMenu(this);
-
-    QWidget *headerWidget = new QWidget(this);
-    headerWidget->setObjectName("WidgetMenuCorreo");
-    QVBoxLayout *menuHeaderLayout = new QVBoxLayout(headerWidget);
-    menuHeaderLayout->setContentsMargins(20, 10, 20, 10);
-    menuHeaderLayout->setSpacing(2);
-
-    QLabel *lblRole = new QLabel("Administrador", headerWidget);
-    lblRole->setObjectName("LblRoleMenu");
-    lblRole->setStyleSheet("font-weight: bold; font-size: 15px; background: transparent;");
-
-    QLabel *lblEmail = new QLabel("admin@liceorobertserra.com", headerWidget);
-    lblEmail->setObjectName("LblEmailMenu");
-    lblEmail->setStyleSheet("font-size: 13px; background: transparent;");
-
-    menuHeaderLayout->addWidget(lblRole);
-    menuHeaderLayout->addWidget(lblEmail);
-
-    QWidgetAction *headerAction = new QWidgetAction(menuOpciones);
-    headerAction->setDefaultWidget(headerWidget);
-
-    QAction *accionPerfil = new QAction("👤  Mi Perfil", this);
     QAction *accionConfig = new QAction("⚙️  Configuración", this);
-    QAction *accionCerrarSesion = new QAction("🚪  Cerrar Sesión", this);
-
-    menuOpciones->addAction(headerAction);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionPerfil);
     menuOpciones->addAction(accionConfig);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionCerrarSesion);
 
     btnMenuRayas->setMenu(menuOpciones);
     connect(accionConfig, &QAction::triggered, this, &MainWindow::abrirConfiguracion);
 
-    QLabel *userProfile = new QLabel("A  Header Subhead", topHeader);
-    userProfile->setObjectName("UserProfileText");
-    userProfile->setStyleSheet("border: none; background: transparent; padding-right: 15px;");
-
     headerLayout->addWidget(btnMenuRayas);
     headerLayout->addStretch();
-    headerLayout->addWidget(userProfile);
 
     m_contenedorVistas = new QStackedWidget(this);
     m_contenedorVistas->setObjectName("ContenedorVistas");
@@ -298,6 +265,10 @@ void MainWindow::mostrarAsignaturas() {
 }
 
 void MainWindow::mostrarGeneracion() {
+    // Si se dieron de alta o se borraron docentes, la tabla se pone al día al
+    // entrar (sin exigir reiniciar la aplicación ni recargar todo).
+    if (m_generationWidget)
+        m_generationWidget->sincronizarDocentes();
     m_contenedorVistas->setCurrentIndex(4);
     activarBoton(m_btnGeneracion);
 }
@@ -322,12 +293,17 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             // Cajas de texto y selects en los formularios
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; border-radius: 6px; padding: 6px; }"
             "QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }"
+            // Lista emergente de los desplegables (es una ventana aparte y, sin
+            // esto, puede conservar la paleta oscura del sistema con texto oscuro)
+            "QComboBox QAbstractItemView { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; selection-background-color: #3b82f6; selection-color: #ffffff; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: #2a2a2a; color: #ffffff; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #3b82f6; color: #ffffff; }"
 
             // Excepciones estructurales
             "#FondoPrincipal { background-color: #121212; border: none; }"
             "#Sidebar { background-color: #121212; border-right: 1px solid #333333; border-radius: 0px; }"
             "#TopHeader { background-color: #121212; border-bottom: 1px solid #333333; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             // Textos
             "QLabel { background: transparent; color: #ffffff; border: none; }"
@@ -352,11 +328,16 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
 
             "QFrame, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }"
+            // Lista emergente de los desplegables: fondo blanco y texto oscuro
+            // en modo claro, para que la selección siempre sea legible.
+            "QComboBox QAbstractItemView { background-color: white; color: #334155; border: 1px solid #cbd5e1; selection-background-color: #dbeafe; selection-color: #0f172a; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: white; color: #334155; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #dbeafe; color: #0f172a; }"
 
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"
             "#Sidebar { background-color: white; border: none; border-right: 1px solid #e0e0e0; border-radius: 0px; }"
             "#TopHeader { background-color: white; border: none; border-bottom: 1px solid #e0e0e0; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             "QLabel { background: transparent; color: #334155; border: none; }"
             "QHeaderView::section { background-color: white; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
@@ -400,8 +381,15 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
 
 void MainWindow::abrirConfiguracion() {
     SettingsDialog dialog(this);
+    dialog.setNucleoDatos(m_nucleo);
 
     connect(&dialog, &SettingsDialog::themeChanged, this, &MainWindow::aplicarTemaGlobal);
 
-    dialog.exec();
+    if (dialog.exec() == QDialog::Accepted) {
+        // Días / aula fija se guardan en QSettings: la vista de generación los
+        // relee para no quedar con los valores anteriores.
+        if (auto generacion =
+                qobject_cast<ScheduleGenerationWidget*>(m_contenedorVistas->widget(4)))
+            generacion->recargarConfiguracionAvanzada();
+    }
 }

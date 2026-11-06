@@ -2,7 +2,7 @@
 
 /**
  * @file solver_config.hpp
- * @brief Estructuras de configuración del solver CP-SAT (contrato nuevo, spec 005).
+ * @brief Estructuras de configuración del solver CP-SAT (contrato 2.0; specs 005 y 010).
  *
  * El curso se identifica por `anio`+`seccion`; su `plan` (obligatorio) es la fuente de
  * sus materias y horas; los planes van EMBEBIDOS; el modo `aula_fija` es GLOBAL; el
@@ -48,25 +48,45 @@ struct ProfesorSolverConfig {
     QVector<Disponibilidad> disponibilidad;
 };
 
-struct MateriaSolverConfig { QString nombre; };
+struct MateriaSolverConfig {
+    QString nombre;
+    QString tipo;                  ///< tipo de aula requerido (obligatorio, V16)
+};
 struct AulaSolverConfig    { QString nombre; QString tipo; int capacidad = 0; };
 
 /* Configuracion */
 struct DimensionesConfig   { int num_profesores = 0, num_materias = 0, num_aulas = 0,
                                  num_cursos = 0, num_dias = 0, num_slots_dia = 0; };
 struct FranjaHorariaConfig { int duracion_minutos = 0, slots_por_turno = 0; };
-struct TurnoConfig         { QString nombre; QVector<int> slot; };
+struct TurnoConfig {
+    QString nombre;
+    QVector<int> slot;             ///< slots absolutos del día
+    QString inicio;                ///< HH:mm, ventana del turno (V2); vacío = ausente
+    QString fin;
+};
 struct TurnosConfig        { QVector<TurnoConfig> turnos; };
-struct RecesoConfig        { QString turno; int despues_de_slot = 0, duracion = 0;
-                             QString inicio; QString fin; };
+
+/// Evento del turno: sucede después de una franja y dura un tiempo (contrato 2.0).
+///
+/// Sin identidad: la identidad del evento no viaja en el contrato. Los eventos se
+/// distinguen por `nombre`, `turno`, `despues_de_slot` y `orden`.
+struct EventoConfig {
+    QString nombre;                ///< No vacío
+    QString turno;                 ///< Turno existente
+    int despues_de_slot = 0;       ///< Posición dentro del turno (1..slots)
+    int orden = 0;                 ///< Orden dentro de la posición (>= 1)
+    int duracion = 0;              ///< Duración en minutos (> 0)
+    QString inicio;                ///< HH:mm; vacío = ausente
+    QString fin;
+};
 
 struct SolverConfig {
-    QString version = QStringLiteral("1.0");   ///< version de formato producida y aceptada (RF-10)
+    QString version = QStringLiteral("2.0");   ///< version de formato producida y aceptada (RF-1)
     bool aula_fija = true;                     ///< modo GLOBAL
     DimensionesConfig dimensiones;
     FranjaHorariaConfig franja_horaria;
     TurnosConfig turnos;
-    QVector<RecesoConfig> recesos;
+    QVector<EventoConfig> eventos;             ///< eventos del turno (sustituyen a `recesos`)
     QVector<PlanSolverConfig> planes;          ///< embebidos (solo los referenciados)
     QVector<CursoSolverConfig> cursos;
     QVector<ProfesorSolverConfig> profesores;

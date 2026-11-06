@@ -13,13 +13,15 @@
 
 | Entidad | Cantidad |
 |---|---|
-| Turnos (Mañana 07:00–12:30 · Tarde 12:40–18:10, 8 franjas de 40 min) | 2 |
-| Recesos (10 min tras la 2.ª franja: 08:20–08:30 y 14:00–14:10) | 2 |
+| Turnos (Mañana 07:00–11:50 · Tarde 12:40–17:30, 8 franjas de 35 min) | 2 |
+| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:10–08:20 y 13:50–14:00) | 2 |
+| Tipos de aula (`Aula de estudio`, `Laboratorio`, `Taller`) | 3 |
 | Aulas (13 para cursos + reserva + laboratorio + taller) | 16 |
 | Materias-año del catálogo (51 del 31059 + 6 nuevas de los derivados) | 57 |
 | Planes de estudio (General + 3 áreas de desarrollo) | 4 |
 | Cargas plan-materia | 210 |
 | Cursos (3 secciones en 1.º–3.º, 2 en 4.º–5.º; **sin turno**) | 13 |
+| Preferencias (no se siembran) | 0 |
 
 - **Escala de carga:** cada año de cada plan suma **40 horas académicas** (la hora del 31059 es una
   **hora académica = un bloque**; la escala 44/44/46/46/46 del plan oficial se reduce al techo semanal
@@ -80,8 +82,10 @@ gestor-horarios-seed --db <ruta> [--variante <v>] [--reemplazar | --solo-docente
 ```
 Base: /tmp/centro.db
 Variante: holgada
-Turnos: 2   Recesos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
-Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325
+Hora académica: 35 min (configuraciones: 1)
+Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
+Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
+Preferencias: 0
 Materias por año: GEN 9/9/10/11/12 · EXA 9/9/10/12/13 · NAT 9/9/10/12/13 · SOC 9/9/10/12/13
 GEN  General            40/40/40/40/40 h académicas
 EXA  Ciencias Exactas   40/40/40/40/40 h académicas
@@ -137,9 +141,21 @@ variante inexistente sale con código **6** y **no toca ningún dato**.
   docente** (turno, plan, años, horas de aula) y las **suplencias con su `peso`** viven en el preset
   (spec 005), que este conjunto **no** genera. Solo garantiza que los datos persistidos permiten
   construir presets coherentes y ejercitar las cuatro variantes.
+- **El conjunto sembrado no es generable con la regla de tipo (spec 010).** Desde la 010 toda clase se
+  imparte en un aula cuyo **tipo** coincide con el tipo de aula que exige su materia, y el conjunto
+  siembra **un solo laboratorio** (8 franjas × 5 días = **40 franjas**). La demanda de las materias que
+  piden laboratorio ronda los **≈104 bloques** de ciencias por semana, así que **no existe horario
+  factible** para este centro con esa regla: el conjunto es un fixture de persistencia, no un caso
+  resoluble del solver. La **009 ya retiró la promesa de generabilidad** del seed y la 010 no la
+  recupera; por eso **no se intenta generar** el horario del seed y `test_generacion_seed` queda fuera
+  del preset `backend`. La generabilidad se recuperará con los **datos reales del liceo** (decisión del
+  usuario), no con este conjunto ficticio.
 - **La duración de la franja no cambia la carga:** 1 hora académica = 1 bloque, y cada año suma 40
-  horas académicas (= 40 bloques). Los **40 minutos** son la duración **real** de la franja (rejilla
-  horaria, receso y disponibilidad), no un factor de conversión.
+  horas académicas (= 40 bloques). Los **35 minutos** son la duración **real** de la franja (rejilla
+  horaria, eventos y disponibilidad), no un factor de conversión; 40 h × 35 = **1400 min** (23 h 20).
+  El evento «Receso» de 10 minutos tras la 2.ª franja encaja por la invariante
+  `8 × 35 + 10 = 290` min = ventana del turno. La siembra asegura la configuración global en 35 (una
+  fila, no es dato de dominio).
 - **Semana de referencia:** 5 días (lunes a viernes); es una propiedad de la configuración que acompaña
   al conjunto y **no se persiste**.
 - **Determinismo:** aplicar el mismo perfil dos veces sobre bases vacías deja los mismos datos

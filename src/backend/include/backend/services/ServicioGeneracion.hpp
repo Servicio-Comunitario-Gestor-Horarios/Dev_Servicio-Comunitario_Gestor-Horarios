@@ -22,9 +22,9 @@
 #include "backend/services/ConstructorEntradaSolver.hpp"
 #include "backend/services/ValidadorSalidaSolver.hpp"
 
-/// Huella determinista de una instantánea de dominio (para detectar «datos
-/// anteriores»). Pura.
-QString huellaDatos(const DatosDominio& datos);
+/// Huella determinista de una instantánea de dominio y de la duración efectiva de la
+/// hora académica (para detectar «datos anteriores»). Pura.
+QString huellaDatos(const DatosDominio& datos, int duracionMinutos);
 
 /// Devuelve una copia del horario con `metadata.fecha_generacion` estampada con
 /// `ahora` (inyectado). Pura.
