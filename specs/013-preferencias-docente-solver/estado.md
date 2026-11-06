@@ -1,13 +1,69 @@
 # Estado 013
 
-Fase: implementacion (plan aprobado; implementación **no iniciada** por indicación del usuario)
-Aprobaciones: spec **2026-11-04** · plan/tareas **2026-11-04** (10 tareas; exceso de T1/T5/T6 sobre la guía aceptado por el usuario)
-Base: **`bb1767af343c108b20de2b2b4de7ebe1d7658c2f` + la 015 y la 016 aplicadas en el árbol de trabajo (sin commits)**. HEAD sigue en `bb1767a`; el árbol incluye la **015 cerrada** (esquema **v6**, fila del tipo general, disparadores y seed adaptado) y la **016** (comprobación en tres momentos, ayuda estricta, V18, huella y docs). **Si la 015/016 se commitean antes de empezar la 013, el `Base` pasa a ser ese sha de cierre.** Dependencias **cerradas e implementadas**: 009-tipos-de-aula-y-eventos, 010-solver-tipos-y-eventos, 011-horas-academicas, 012-preferencias-docente, `009-agrupacion-bloques-materias` (S3) y **015**; esquema vigente **v6**, contrato vigente **2.0**.
+Fase: cerrada
+Aprobaciones: spec **2026-11-04** · plan/tareas **2026-11-04** (10 tareas; exceso de T1/T5/T6 sobre la guía aceptado por el usuario) · **implementación 2026-11-06** · **validación 2026-11-06**
+Base: **`c7b9427`** (HEAD tras committear la **015** y la **016**: esquema **v6**, fila del tipo general, disparadores, comprobación en tres momentos, ayuda estricta, V18, huella y docs) **+ la 013 en el árbol de trabajo** (la implementación de la 013 no se ha commiteado todavía). El `Base` original era `bb1767af343c108b20de2b2b4de7ebe1d7658c2f`; la re-base del 2026-11-05 lo sustituye por `c7b9427`, y **el ancla de RNF-4/criterio 11 es el escenario posterior a la 015/016** (seed sin «Aula de estudio», base **v6** con el tipo general garantizado), no el escenario de `bb1767a`. Dependencias **cerradas e implementadas**: 009-tipos-de-aula-y-eventos, 010-solver-tipos-y-eventos, 011-horas-academicas, 012-preferencias-docente, `009-agrupacion-bloques-materias` (S3) y **015**; esquema vigente **v6**, contrato vigente **2.0**.
 Dudas abiertas: ninguna
-Siguiente paso: implementar **T1–T10 en orden, una tarea por llamada, cuando el usuario lo indique**. **No se ha empezado**: no hay código escrito ni casillas marcadas. El valor definitivo de `PESO_PREFERENCIA` (**25** en el plan) se valida con la medición de T6/T10.
-Veredicto: **re-base documental sobre la 015/016 (2026-11-05), sin cambios de comportamiento.** QA de la spec: CAMBIOS NECESARIOS (2026-11-04) → H1–H17 incorporados; re-QA: **B1–B3 incorporados**; **spec aprobada (2026-11-04)**. QA del plan: CAMBIOS NECESARIOS (2026-11-04) → **P1–P15 incorporados**; **plan y tareas aprobados (2026-11-04)**. El **veredicto de implementación sigue pendiente**: no hay código entregado.
-Notas: ver «Respuesta al QA», «Decisiones cerradas (2026-11-04)», «Plan y tareas (2026-11-04)» y «Riesgos declarados».
+Siguiente paso: **nada pendiente en esta spec**. Fuera de ella: la **corrección H2** (guía de la API, misma entrega), las **deudas** de «Deudas y notas», la **014** (materias en bloques de dos horas) y la decisión de **commits** de la 013.
+Veredicto: **APROBADO (2026-11-06)** por el reviewer contra `Base: c7b9427` + la 013 en el árbol. QA de la spec: CAMBIOS NECESARIOS (2026-11-04) → H1–H17 incorporados; re-QA: **B1–B3 incorporados**; spec aprobada (2026-11-04). QA del plan: CAMBIOS NECESARIOS (2026-11-04) → **P1–P15 incorporados**; plan y tareas aprobados (2026-11-04). Re-base documental sobre la 015/016 (2026-11-05). **Suite 58/58 (`backend`) y 63/63 (`full-release`).**
+Notas: ver «Implementado», «Deudas y notas», «Respuesta al QA», «Decisiones cerradas (2026-11-04)», «Plan y tareas (2026-11-04)» y «Riesgos declarados».
 
+
+## Implementado (2026-11-06)
+
+Diez tareas, una por sesión y con tests en rojo antes del código; evidencia completa en `journal.md`.
+**Suite 58/58 (`backend`) y 63/63 (`full-release`).**
+
+- **T1 — contrato y V19.** `PreferenciaSolverConfig{docente, dia, slot[], sentido}` (ya proyectada) en
+  `solver_config.hpp`, parser y serialización en `solver_config.cpp` con la sección **omitida si está
+  vacía**, **V19** tras V18 (docente → día → franja → sentido; catálogo **V1–V19**) y `guardar` de presets
+  que **elimina** la clave (el preset no persiste preferencias).
+- **T2 — rejilla y proyección.** `proyeccion_preferencias` con `ordenarTurnos`/`slotsDeFranja`
+  **compartidos con la disponibilidad**, `proyectarPreferencias` puro (bloque entero, todos los turnos,
+  evento que no corta), filtro de día dominio → generación y motivos **(c) > (a) > (b)**; 17 casos.
+- **T3 — construcción.** `EntradaConstruida{json, intervinientes, noAplicadas}` con
+  `construirJsonEntrada` de envoltorio, preferencias **siempre de los datos** (el preset se ignora) y
+  validación **después**; golden `sinPreferencias_jsonIdenticoAlDeHoy`.
+- **T4 — huella y frontend.** `huellaDatos(datos, D, intervinientes)` con bloque `pref:` solo si hay
+  intervinientes y orden canónico; `Composicion.huella`/`preferenciasNoAplicadas`,
+  `huellaActual(nucleo, opciones)` con `leerOpciones()` y el diagnóstico pasado a `generar`.
+- **T5 — dos fases.** Fase 1 = modelo de hoy (referencia) y fase 2 con `z*` y `e*` **fijados por igualdad**;
+  objetivo `PESO_PREFERENCIA` (25) con **deduplicación por (docente, día, slot)** y fallback
+  `INFEASIBLE`/`UNKNOWN` → referencia, `MODEL_INVALID` propagado; 11 casos.
+- **T6 — jerarquía y medición.** Fase **2b** lexicográfica: fija el valor de preferencia de la 2a y
+  minimiza S3; escalera 2b → 2a → referencia; benchmark con techo de 60 s asertado.
+- **T7 — cumplimiento.** `preferencias_cumplimiento` puro (día de **dominio**, `MotivoPreferencia::Ninguno`,
+  **clases incumplidas** `{curso, materia, slot}`, precedencia no aplicada → incumplida → respetada) y
+  `ResultadoGeneracion.cumplimiento` con los tres totales; el contrato de salida **no** cambia.
+- **T8 — documentación.** `docs/contrato-solver-2.0.md` (diez secciones obligatorias y **dos opcionales**,
+  sección `preferencias`, `meta` como objeto tolerado, **V1–V19**) y `docs/constitution.md` **§7.2**
+  (S1/S2/preferencia/S3 con su orden de pesos), **§7.4** (V1–V19) y **§7.5**.
+- **T9 — supersesiones.** Notas de acotación de la equivalencia en la **005** y la **010**, supersesión del
+  RF-5 y el «Fuera de alcance» de la **012**, nota en `009-agrupacion-bloques-materias`, citas de rango
+  corregidas y riesgo documental de las dos «009» y del doble uso de «S3».
+- **T10 — regresión.** Tres goldens (JSON de la entrada, huella `3c50f3ab…` y horario del solver)
+  capturados antes de consumir preferencias, más el escenario del seed (0 preferencias, sin sección) y las
+  dos suites en verde.
+
+**Medición (RNF-3):** escenario grande del benchmark, referencia **3937 ms** → con preferencias
+**4676 ms** (**+18,8 %**); techo de 60 s asertado y +50 % documentado. `PESO_PREFERENCIA = 25`.
+
+## Deudas y notas
+
+- **Cobertura pendiente** (no bloquea el veredicto): preferencias de **sentidos opuestos solapadas**, un
+  **cambio de preset que altere el conjunto de intervinientes**, **turnos con franjas solapadas** y una
+  mejora **estricta** de la fase 2b (hoy el test solo exige `≤` en la agrupación).
+- **Aristas de RF-2:** un preset **con preferencias inválidas** se **rechaza al cargar** en vez de
+  ignorarse (la sección se ignora como fuente, pero se valida si está), y una sección de **tipo
+  incorrecto** se tolera como vacía.
+- **Arista de RF-8:** en `NoFactible`/`ContratoInvalido` el `cumplimiento` queda **vacío**; el diagnóstico
+  de no aplicadas es **argumento opcional** de `generar` (si no se pasa, no se informan las no aplicadas).
+- **Deuda pre-existente del motor:** el objetivo solo suma **`isolated`** (no `longGroup`); la fase 2b
+  minimiza el S3 vigente para no cambiar la fase 1 ni la referencia.
+- **Documentación histórica:** `docs/solver/Informe-Motor-Solver.md` sigue diciendo «V1–V13» (histórico, no
+  se toca).
+- **Rendimiento medido:** 3937 ms → 4676 ms (**+18,8 %**), con el techo de 60 s asertado (ver arriba).
+- **Guía de la API:** se alinea en la **corrección H2** de la misma entrega, no en esta 013.
 
 ## Plan y tareas (2026-11-04, corregidos tras el QA del plan)
 
@@ -32,7 +88,7 @@ Notas: ver «Respuesta al QA», «Decisiones cerradas (2026-11-04)», «Plan y t
     `Composicion::huella` en el frontend por el mismo camino.
   - **Resultado**: `analizarPreferencias(config, horario, noAplicadas)` puro y
     `ResultadoGeneracion::cumplimiento`; el contrato de salida **no** cambia.
-- **`tasks.md`** (**pendiente de aprobación**): **T1–T10** (contrato+V19+preset · rejilla+proyección · construcción · huella · dos fases
+- **`tasks.md`** (aprobadas 2026-11-04; **T1–T10 ejecutadas**): **T1–T10** (contrato+V19+preset · rejilla+proyección · construcción · huella · dos fases
   · estado por preferencia · cableado del frontend · contrato+constitución · supersesiones · medición y
   suite). Cabe en el límite de 10.
 - **Presupuesto** (RNF-3): fase 1 con 6.0 de tiempo determinista (como hoy) y fase 2 con 2.0; umbral de
@@ -81,6 +137,14 @@ Notas: ver «Respuesta al QA», «Decisiones cerradas (2026-11-04)», «Plan y t
   criterio 11): pasa al escenario **posterior a la 015/016** —seed sin «Aula de estudio», base v6 con el
   tipo general garantizado—, con nota de supersesión. **No cambian RF, RNF ni criterios de
   comportamiento** y no se toca código. Sigue **sin implementar**: ninguna casilla marcada.
+- **2026-11-06 — T1–T10 implementadas, validación APROBADA y spec cerrada.** Las diez tareas se ejecutaron
+  con tests en rojo antes del código; `journal.md` recoge la evidencia de cada una. **Veredicto:
+  APROBADO (2026-11-06)** contra `Base: c7b9427` + la 013 en el árbol; **58/58** (`backend`) y
+  **63/63** (`full-release`). `spec.md` pasa a `implementada (2026-11-06)`. Quedan anotadas las
+  **deudas y notas** de la validación, sin bloquear el cierre: cobertura de aristas (sentidos
+  opuestos solapados, cambio de preset que altere los intervinientes, turnos solapados, mejora
+  estricta de la 2b), aristas de RF-2 y RF-8, `longGroup` fuera del objetivo (deuda del motor),
+  el informe histórico en «V1–V13» y la guía de la API, que se alinea en la corrección H2.
 
 ## Respuesta al QA (hallazgo → resolución)
 
@@ -175,19 +239,18 @@ Notas: ver «Respuesta al QA», «Decisiones cerradas (2026-11-04)», «Plan y t
 - **Desalineación normativa previa.** §7.2 sin S3 y §7.4 sin V19, más las citas contradictorias del
   documento del contrato: la corrección debe entrar en esta entrega o quedará una segunda verdad.
 
-## Tamaño previsto
+## Tamaño
 
-**Diez tareas** (`tasks.md`, T1–T10), justo en el límite y en orden de dependencia: contrato+V19+preset ·
+**Diez tareas** (`tasks.md`, T1–T10), justo en el límite y en orden de dependencia, **ejecutadas y cerradas**: contrato+V19+preset ·
 rejilla compartida y proyección · construcción de la entrada · huella · objetivo en dos fases · estado
 por preferencia y resultado · cableado mínimo del frontend · documentación del contrato y de la
 constitución · supersesiones, citas y riesgo documental · medición de desempeño, determinismo y suite
-completa. **No se divide.** El reparto que se aplicaría si el QA del plan añadiera trabajo sería separar
-la documentación (T8/T9) del resto.
+completa. **No se dividió** (decisión del usuario, 2026-11-04).
 
 ## Notas
 
-- `plan.md` y `tasks.md` están escritos (2026-11-04) y aprobados con la spec; la implementación
-  empieza por T1.
+- `plan.md` y `tasks.md` están escritos (2026-11-04), aprobados con la spec e **implementados**
+  (2026-11-06); `spec.md` queda en `implementada (2026-11-06)`.
 - El planner no escribe fuera de `specs/`: el parche de `MEMORY.md` (fase actual, specs activas, 013 en
-  borrador, 014 planificada, generación parcial descartada) se entrega al coordinator. **Intentado en
-  dos ocasiones el 2026-11-04: sigue sin permiso de escritura; no está aplicado.**
+  013 **implementada y cerrada**, 014 planificada, generación parcial descartada) se entrega al
+  coordinator. **Sin permiso de escritura en `MEMORY.md`; no está aplicado.**

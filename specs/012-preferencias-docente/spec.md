@@ -147,6 +147,13 @@ calendario de excepciones.
 - **CUANDO una spec del solver incorpore las preferencias a la generación, deberán incluirse en la
   huella**; esta spec deja anotada esa condición y no la implementa.
 
+> **Superado por la 013 (2026-11-06).** Las preferencias **ya intervienen** en la generación: entran en
+> la **huella de datos** cuando son **intervinientes** (solo esas, ya proyectadas sobre la semana
+> declarada) y un cambio de una de ellas marca el horario guardado como «datos anteriores» (spec 013,
+> RF-6). La condición que este RF dejaba anotada queda **cumplida**, y el caso límite «Cambio de
+> preferencias durante una generación» deja de valer tal como está escrito: si la preferencia es
+> interviniente, el cambio **sí** cambia la huella; si no interviene, no la cambia.
+
 ### RF-6. Esquema, versión y apertura
 
 - **EL SISTEMA incluirá el registro de preferencias en el esquema esperado**, con la referencia al
@@ -228,10 +235,17 @@ calendario de excepciones.
 - **Siembra del conjunto:** cero preferencias y recuento 0 (RF-7).
 - **Cambio de preferencias durante una generación:** no cambia la huella ni marca el horario como «datos
   anteriores», porque el solver no las consume (RF-5).
+  > **Superado por la 013 (2026-11-06).** Si la preferencia es **interviniente**, el cambio **sí**
+  > cambia la huella y marca el horario como «datos anteriores»; si no interviene, no la cambia.
 - **Preferencia que coincide con una franja de disponibilidad:** se aceptan; son datos distintos
   (RF-3).
 
 ## Fuera de alcance
+
+> **Superado en parte por la 013 (2026-11-06).** Los dos primeros puntos dejan de estar fuera de
+> alcance: la 013 hace que el solver **consuma** las preferencias (sección opcional del contrato,
+> objetivo con jerarquía, huella y estado por preferencia). Siguen siendo de esta spec el **modelo
+> persistido, sus validaciones y sus servicios**; la interfaz de usuario sigue fuera de alcance.
 
 - **El uso de las preferencias por el solver, su peso y su prioridad:** será una spec del solver; esta
   spec solo las persiste y expone.

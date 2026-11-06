@@ -61,7 +61,8 @@ Estado: implementada (2026-10-27)
 > **Enmienda de la constitución.** `docs/constitution.md` §7 se enmienda **en esta entrega** como
 > requisito y **tarea propia** del plan, y solo en lo que este cambio añade: **§7.1.5** y **§7.3** para
 > fijar que el **aula de referencia es del tipo general/ordinario** (clave normalizada `aula de
-> estudio`); **§7.4**, donde el rango **V1–V17** pasa a **V1–V18** y se anota V18; y **§7
+> estudio`); **§7.4**, donde el rango **V1–V17** pasa a **V1 a V18** y se anota V18 (hoy **V1–V19**:
+> la 013 añade V19); y **§7
 > «Comportamiento»**, donde «declara el problema no factible con la causa» pasa a admitir la **causa no
 > atribuible**. **No se reescribe lo que la T7 del 2026-10-25 ya aplicó** (aula de referencia con
 > desplazamiento, vuelta y bloqueo; V1 de eventos; eventos en §7.5 y §5). La 009 no modifica la
@@ -218,6 +219,11 @@ tipo de aula, ni una reforma del frontend, ni una decisión sobre compartir la c
   configuración reproduce los tipos de aulas y materias y los eventos sin pérdida; la comparación de
   tipos se hace sobre la clave y el nombre visible se conserva tal cual. Los campos desconocidos se
   siguen tolerando (spec 005).
+  > **Acotación por la 013 (2026-11-06).** Para la sección **opcional `preferencias`** esta equivalencia
+  > se cumple en la **configuración**, **no** en el **preset**: el preset la **omite al guardarse** y,
+  > si un archivo la declara, la **ignora al cargarse** (las preferencias se releen de los datos; spec
+  > 013, RF-2). La regla general de ida y vuelta no cambia para el resto de secciones, y sin
+  > preferencias el contrato es idéntico al anterior.
 - **EL SISTEMA construirá la configuración sin consultar la base de datos** desde el solver (spec
   005): los tipos y los eventos viajan en la entrada.
 
@@ -289,8 +295,9 @@ tipo de aula, ni una reforma del frontend, ni una decisión sobre compartir la c
 ### RF-5. Validación previa (V16, V17 y V18)
 
 - **MIENTRAS se prepare una generación, EL SISTEMA ejecutará las validaciones de tipo y de referencia
-  junto con las V1–V15 de la spec 005, antes de invocar al solver; si alguna falla, no invocará al
-  solver.** Las nuevas se comprueban a continuación de V15 y se informan en el orden V16, V17, V18.
+  junto con las validaciones previas de la spec 005 (V1 a V15 entonces; hoy el catálogo es **V1–V19**),
+  antes de invocar al solver; si alguna falla, no invocará al solver.** Las nuevas se comprueban a
+  continuación de V15 y se informan en el orden V16, V17, V18.
 - **V1 (actualizada):** el JSON es parseable y contiene las secciones requeridas, **incluida la de
   eventos**; la sección de recesos ya no es la esperada.
 - **V2 (ampliada y alineada con la 009):** cada sección y campo tiene el tipo esperado; los eventos
@@ -384,8 +391,8 @@ Esta spec **supersede** los siguientes puntos de la 005; el resto de la 005 sigu
   informa con las categorías … en su orden»): sustituido por el orden y las condiciones de RF-6 y por la
   **causa no atribuible** cuando ninguna categoría aplica; las cuatro categorías y su orden no cambian.
 - **Actualización del texto de la 005:** su V1 pasa a exigir la sección de **eventos** y su catálogo de
-  validaciones pasa a **V1–V18**; esta actualización acompaña a la supersesión y es la referencia que
-  cita RF-8. La anotación la hace el planner en la fase de plan.
+  validaciones pasa a **V1–V19** (la 013 añade V19); esta actualización acompaña a la supersesión y es
+  la referencia que cita RF-8. La anotación la hace el planner en la fase de plan.
 - **D9 se generaliza:** **todas** las clases —fijas y móviles— ocupan exactamente un aula, del tipo
   requerido por su materia.
 - **D8 se extiende:** la exclusividad de aula cubre también las clases desplazadas.
@@ -404,10 +411,11 @@ Esta spec **supersede** los siguientes puntos de la 005; el resto de la 005 sigu
   curso **debe ser del tipo general/ordinario**, y que **no se añade ningún dato de tipo general** a la
   configuración. No se repite que el aula del curso es su **aula de referencia**: eso ya lo dice la
   línea 78 desde T7. El resto del apartado no cambia.
-- **§7.4 (línea 89, validación previa):** el rango **V1–V17** pasa a **V1–V18** y la remisión final
+- **§7.4 (línea 89, validación previa):** el rango **V1–V17** pasa a **V1 a V18** y la remisión final
   (hoy «el contenido de V1, V2, V16 y V17») incorpora **V18**. El resto del apartado —incluida la
   constancia de que **V1 espera eventos**, que ya está— no se reescribe; el contenido de V18 vive en la
-  005 y en esta spec.
+  005 y en esta spec. Hoy el catálogo es **V1–V19**: la 013 añade **V19** (forma y referencias de la
+  sección opcional `preferencias`) y la constitución ya lo recoge.
 - **§7 «Comportamiento» (línea 56):** «declara el problema no factible **con la causa**» pasa a
   «declara el problema no factible **con la causa cuando una categoría la explica y sin atribuirla
   cuando ninguna aplica**», coherente con RF-6.
@@ -458,7 +466,7 @@ Esta spec **supersede** los siguientes puntos de la 005; el resto de la 005 sigu
   aplicable, el mensaje dirá que la causa **no es atribuible** y no inventará una; el rechazo por versión
   identifica la versión declarada y, cuando la configuración provenga de un preset en disco, el archivo.
 - **RNF-4. Sin regresión fuera de la regla de tipo:** las invariantes, la función objetivo y las
-  validaciones V1–V15 de la 005 se mantienen **salvo** la redefinición del aula fija, la ampliación de
+  validaciones V1 a V15 de la 005 se mantienen **salvo** la redefinición del aula fija, la ampliación de
   D9/D8, la versión 2.0, V1, V2 y las validaciones nuevas V16–V18; el solver sigue ignorando los eventos.
 - **RNF-5. Verificación sin la interfaz:** la construcción debe poder excluir la interfaz de usuario y
   sus pruebas (requisito de la 009, RNF-6); con esa configuración, **backend, datos, seed, consola y
@@ -586,8 +594,8 @@ Esta spec **supersede** los siguientes puntos de la 005; el resto de la 005 sigu
    RF-7, la versión 1.0, V1, RF-6 y la definición de causa (categoría (2) por conteo de capacidad del
    tipo y causa no atribuible); D9 se generaliza, D8 se extiende y V8 se mantiene (RF-7).
 8. La constitución queda enmendada en §7.1.5 y §7.3 (referencia del tipo general), §7.4 (V1–V17 →
-   V1–V18) y §7 «Comportamiento» (causa no atribuible), como tarea propia y sin reescribir lo ya
-   aplicado (RF-8).
+   V1 a V18; hoy **V1–V19** por la 013) y §7 «Comportamiento» (causa no atribuible), como tarea propia
+   y sin reescribir lo ya aplicado (RF-8).
 9. El diagrama entidad-relación refleja turnos, cursos, catálogo de tipos y eventos, además del resto
    del modelo (RF-9).
 10. La documentación viva del contrato describe la forma 2.0, los tipos, los eventos, la salida con aula

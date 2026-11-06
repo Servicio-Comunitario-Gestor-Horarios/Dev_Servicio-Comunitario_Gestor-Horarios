@@ -1,6 +1,6 @@
 # Spec 013 - Preferencias del docente en la generación
 
-Estado: aprobada (2026-11-04)
+Estado: implementada (2026-11-06)
 
 > **Alcance.** Esta spec hace que la generación **consuma** las preferencias horarias del docente que
 > la **012** ya persiste, valida y expone. Cubre el **efecto en el modelo de generación**, la

@@ -125,14 +125,15 @@ construir después.
 
 Esta spec cubre el **solver y todo lo suyo**: su **núcleo**, el **contrato de configuración** (forma
 del JSON y su serialización), el **modelo** (invariantes duras y función objetivo), las
-**validaciones previas** (V1–V18) y la **construcción de la entrada del solver** desde los datos
+**validaciones previas** (V1–V19) y la **construcción de la entrada del solver** desde los datos
 persistidos más el preset (RF-13). La **persistencia** de los datos del curso (año, sección, turno y
 aula) y sus **servicios** son de la **spec 004**, que **precede** a esta spec y le aporta los datos ya
 persistidos; esta spec (005) los **lee y arma** la entrada. La **gestión de los presets** como
 archivos **no** entra aquí.
 
-> **Superado en el rango por la 010 (2026-10-25).** Este alcance decía **V1–V15**; el catálogo vigente
-> de validaciones previas es **V1–V18** (la 010 añade V16, V17 y V18). El resto del alcance no cambia.
+> **Superado en el rango por la 010 (2026-10-25) y por la 013 (2026-11-06).** Este alcance decía
+> **V1 a V15**; el catálogo vigente de validaciones previas es **V1–V19** (la 010 añadió V16, V17 y V18
+> y la 013 añade V19). El resto del alcance no cambia.
 
 Una decisión de modelado clave guía esta spec: minimizar el «déficit de horas» es **inerte** (la suma
 de horas asignadas es constante, porque las horas totales de cada materia-curso están fijadas por una
@@ -304,6 +305,11 @@ y no obligan.
   (serializar y volver a cargar) reproduce **los mismos campos del contrato sin pérdida**; los **campos
   desconocidos** presentes en un archivo se **toleran** (se ignoran al cargar) y no se consideran
   pérdida ni error.
+  > **Acotación por la 013 (2026-11-06).** Para la sección **opcional `preferencias`** la equivalencia
+  > es de la **configuración** y **no del preset**: la configuración serializada la conserva sin
+  > pérdida, pero un **preset la omite al guardarse** y, si un archivo la declara, la **ignora al
+  > cargarse** (las preferencias se releen de los datos; spec 013, RF-2). Sin preferencias la sección
+  > no se emite y el JSON es el de siempre.
 - **Versión del JSON de configuración:** la configuración declara una **versión de formato**; esta
   spec produce y acepta la **versión `1.0`**. Una configuración con una versión **ausente o no
   reconocida** (por ejemplo, posterior) se **rechaza** indicando la causa, que pertenece a la categoría
@@ -315,14 +321,15 @@ y no obligan.
 - **Causa de un resultado no factible:** la categoría —y la entidad afectada, cuando sea identificable—
   que explica por qué no existe solución que respete todas las invariantes duras. Categorías, en el
   **orden** en que se comprueban e informan: **(1) entrada inválida** (falla una validación previa
-  V1–V18, incluida la versión/parseo del contrato); **(2) conflicto de aula** (capacidad de los tipos de
+  V1–V19, incluida la versión/parseo del contrato); **(2) conflicto de aula** (capacidad de los tipos de
   aula); **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de
   asignación de docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría
   aplicable. Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
-  > **Superada por la 010 (2026-10-25; revisada el 2026-10-26).** Esta definición decía **V1–V15**, la
+  > **Superada por la 010 (2026-10-25; revisada el 2026-10-26).** Esta definición decía **V1 a V15**, la
   > categoría (2) eran las «invariantes D8/D9/D10» y el orden no tenía excepciones. La 010 fija:
-  > - **V1–V18** (añade V16, V17 y V18; **V18** exige que el aula de referencia sea del **tipo
-  >   general/ordinario**, el de clave normalizada `aula de estudio`, con el modo de aula fija activo).
+  > - **V1–V19** (la 010 añadió V16, V17 y V18 y la 013 añade V19; **V18** exige que el aula de
+  >   referencia sea del **tipo general/ordinario**, el de clave normalizada `aula de estudio`, con el
+  >   modo de aula fija activo).
   > - **(2) conflicto de aula por conteo de capacidad del tipo:** `demanda(t) > nº de aulas del tipo × nº
   >   de días × nº de franjas distintas de la unión de los turnos de los cursos que requieren t`, **sin
   >   descontar bloqueos**. Es un conteo **necesario**: si falla, prueba la infactibilidad; si no falla,
@@ -589,17 +596,22 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   sección) como clave**, sin escribir un nombre (ni almacenado ni derivado) por curso (coherente con
   el contrato de salida de la spec 002).
 
-### RF-11. Validación previa (V1–V18)
+### RF-11. Validación previa (V1–V19)
 
-> **Título superado por la 010 (2026-10-25).** Este título decía **V1–V15**; el catálogo vigente es
-> **V1–V18**.
+> **Título superado por la 010 (2026-10-25) y por la 013 (2026-11-06).** Este título decía **V1 a V15**;
+> el catálogo vigente es **V1–V19**.
 >
 > **Ampliado por la 010 (2026-10-25 y 2026-10-26).** El catálogo de validaciones previas pasa a
-> **V1–V18**: la 010 añade **V16** (toda aula y toda materia declara tipo), **V17** (cada tipo requerido
-> tiene al menos un aula del centro, en los dos modos) y **V18** (con aula fija activa, el aula de
-> referencia debe ser del **tipo general/ordinario**, el de clave normalizada `aula de estudio`), y
-> cambia **V1** (sección de eventos y versión 2.0). El detalle normativo de V1, V2, V16, V17 y V18 vive
-> en la spec 010; la constitución solo fija el rango y la remisión.
+> **V1–V19**: la 010 añadió **V16** (toda aula y toda materia declara tipo), **V17** (cada tipo
+> requerido tiene al menos un aula del centro, en los dos modos) y **V18** (con aula fija activa, el
+> aula de referencia debe ser del **tipo general/ordinario**, el de clave normalizada `aula de
+> estudio`), y cambia **V1** (sección de eventos y versión 2.0). El detalle normativo de V1, V2, V16,
+> V17 y V18 vive en la spec 010; la constitución solo fija el rango y la remisión.
+>
+> **Ampliado por la 013 (2026-11-06).** El catálogo pasa a **V1–V19**: **V19** valida la forma y las
+> referencias de la sección opcional `preferencias` (índice de docente, día de la generación, franja y
+> sentido) y **no** comprueba rangos de reloj, coherencia con el turno, el plan o los años, ni solapes.
+> El detalle vive en la spec 013; `docs/constitution.md` §7.4 ya cita **V1–V19**.
 
 - **MIENTRAS se prepara una generación, EL SISTEMA ejecutará la validación previa antes de invocar al
   solver; si alguna regla falla, no invocará al solver.** Las comprobaciones se ejecutan y se informan
@@ -792,6 +804,12 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
 - **Diferido: la capacidad de aula** (antigua S2) y la **cobertura de emergencia** (antigua S3). La
   capacidad de aula podría **reintroducirse más adelante como aviso post-solver** (fuera del solver),
   no como invariante.
+  > **Riesgo documental anotado por la 013 (2026-11-06); sin resolver.** Conviven **dos specs con el
+  > número 009** —`009-tipos-de-aula-y-eventos` y `009-agrupacion-bloques-materias`— y la etiqueta
+  > **«S3»** se ha usado para **dos cosas distintas**: la **cobertura de emergencia** (antigua S3 de
+  > esta spec, aquí diferida) y la **agrupación de bloques** (S3 de `009-agrupacion-bloques-materias`,
+  > hoy en el motor con `PESO_AGRUPACION`). Toda cita de «S3» debe leerse por su contexto; en la 013
+  > **S3 es la agrupación**. No se renumera ni se renombra en esta entrega.
 - **El receso.** Es metadata que el solver **ignora**: no reduce las franjas útiles ni interviene en
   la traducción de disponibilidad (constitución §7.5).
 - **El horario del profesor derivado.** Se deriva por **post-proceso** fuera del solver (constitución
@@ -839,12 +857,13 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
    > **Superado en la versión por la 010 (2026-10-25).** Este criterio decía `1.0`; la versión vigente
    > del contrato es **`2.0`** y `1.0`, ausente o desconocida se rechaza como entrada inválida. El
    > resto del criterio sigue vigente.
-4. La validación previa incluye V1–V18, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
+4. La validación previa incluye V1–V19, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
    `peso` no negativo y el de `duracion_minutos > 0`) (RF-11).
-   > **Superado en el rango por la 010 (2026-10-25 y 2026-10-26).** Este criterio decía V1–V15; la 010
-   > añade **V16** (aula y materia declaran tipo), **V17** (cada tipo requerido tiene aulas, en ambos
-   > modos) y **V18** (el aula de referencia es del tipo general/ordinario). V1–V12 siguen enumeradas
-   > aquí; el detalle de V1, V2, V16, V17 y V18 vive en la 010.
+   > **Superado en el rango por la 010 (2026-10-25 y 2026-10-26) y por la 013 (2026-11-06).** Este
+   > criterio decía V1 a V15; la 010 añade **V16** (aula y materia declaran tipo), **V17** (cada tipo
+   > requerido tiene aulas, en ambos modos) y **V18** (el aula de referencia es del tipo
+   > general/ordinario), y la 013 añade **V19** (forma y referencias de `preferencias`). V1–V12 siguen
+   > enumeradas aquí; el detalle de V1, V2, V16, V17 y V18 vive en la 010, y el de V19 en la 013.
 5. La entrada del solver se construye desde los datos persistidos más el preset, embebe solo los planes
    referenciados y traduce el aula del curso a su índice; el solver no consulta la base de datos
    (RF-13).

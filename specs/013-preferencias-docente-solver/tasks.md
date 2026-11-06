@@ -1,19 +1,20 @@
 # Tareas 013 - Preferencias del docente en la generación
 
-> Base: `bb1767af343c108b20de2b2b4de7ebe1d7658c2f` **+ la 015 y la 016 aplicadas en el árbol de trabajo
-> (sin commits)** · Plan: `plan.md` · Spec: `spec.md`
-> Si la 015/016 se commitean antes de empezar, el `Base` pasa a ser ese sha de cierre (ver `plan.md`,
-> «Re-base sobre la 015/016»). Esquema vigente **v6**; la 013 no lo cambia.
-> **Aprobadas 2026-11-04** (spec, plan y estas tareas). Diez tareas, **sin dividir la spec**: el exceso de
+> Base: **`c7b9427`** (HEAD tras committear la **015** y la **016**) **+ la 013 en el árbol de trabajo**
+> · Plan: `plan.md` · Spec: `spec.md`
+> El `Base` original era `bb1767af343c108b20de2b2b4de7ebe1d7658c2f`; la re-base del 2026-11-05 lo sustituye
+> por `c7b9427`. **El ancla de RNF-4 y del criterio 11 es el escenario posterior a la 015/016** (seed sin
+> «Aula de estudio», base **v6** con el tipo general garantizado). Esquema vigente **v6**; la 013 no lo cambia.
+> **Aprobadas 2026-11-04**; **implementadas y validadas el 2026-11-06** (T1–T10, ver `journal.md`). Diez tareas, **sin dividir la spec**: el exceso de
 > duración de **T1, T5 y T6** sobre la guía de 20–30 min fue **aceptado por el usuario** y RF-8 se queda en
-> la 013. **La implementación no ha comenzado**: no hay casillas marcadas.
+> la 013. **T1–T10 hechas (2026-11-06); implementación completa, pendiente del APROBADO del revisor.**
 > Una tarea cada vez: **test en rojo → código → verde → marcar y parar**. La evidencia (comandos, salidas,
 > hallazgos, commits) va en `journal.md`.
 > Cada tarea empieza con el **build** y ninguna cierra con el árbol sin compilar ni con tests en rojo.
 > Diez tareas en orden de dependencia. **T1, T5 y T6 se estiman por encima de 30 min** (ver la nota final
 > sobre el tamaño).
 
-- [ ] **T1. Preferencia proyectada en el contrato, V19 y preset sin la sección.** RF-2, RF-7, RNF-1
+- [x] **T1. Preferencia proyectada en el contrato, V19 y preset sin la sección.** RF-2, RF-7, RNF-1
       · ~35 min ⚠️
     - Hecho cuando: `test_contrato_solver` hace ida y vuelta de **la configuración en memoria** con
       preferencias y comprueba que con 0 preferencias la clave **no aparece** en el JSON
@@ -27,7 +28,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_contrato_solver|test_cargador_configuracion|test_validador_entrada)$'`.
 
-- [ ] **T2. Rejilla compartida, proyección reloj → franja y filtro de día (puro).** RF-3, RNF-1 · ~30 min
+- [x] **T2. Rejilla compartida, proyección reloj → franja y filtro de día (puro).** RF-3, RNF-1 · ~30 min
     - Hecho cuando: existe `proyeccion_preferencias` con `ordenarTurnos`/`slotsDeFranja` y el constructor
       usa **esa** implementación (la suya desaparece); `test_proyeccion_preferencias` pasa contención
       completa, bordes de franja, turnos múltiples, cruce entre turnos, rango sobre un evento, domingo,
@@ -38,7 +39,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_proyeccion_preferencias|test_constructor_entrada)$'`.
 
-- [ ] **T3. Construcción de la entrada: preferencias desde los datos, preset ignorado y orden con V19.**
+- [x] **T3. Construcción de la entrada: preferencias desde los datos, preset ignorado y orden con V19.**
       RF-2, RF-3, RF-7, RNF-4 · ~30 min
     - Hecho cuando: `construirEntradaCompleta` devuelve `json`, `intervinientes` y `noAplicadas`, y
       `construirJsonEntrada` mantiene su firma devolviendo solo el JSON; la configuración lleva día de la
@@ -50,7 +51,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_constructor_entrada|test_validador_entrada)$'`.
 
-- [ ] **T4. Huella con intervinientes y cableado mínimo del frontend.** RF-6, RNF-6 · ~30 min
+- [x] **T4. Huella con intervinientes y cableado mínimo del frontend.** RF-6, RNF-6 · ~30 min
     - Hecho cuando: `huellaDatos(datos, duracion, intervinientes)` sustituye a la firma de dos argumentos y
       **todos** los call sites están actualizados, pasando la lista **explícitamente** (`{}` donde no hay
       preferencias, una preferencia de domingo con `{}`); una preferencia interviniente cambia la huella y
@@ -63,7 +64,7 @@
       `cmake --preset full-release && cmake --build build-rel --parallel && ctest --test-dir build-rel
       --output-on-failure -R '^test_generacion_seed$'`.
 
-- [ ] **T5. Objetivo: fase 1 de referencia y fase 2 con anclaje, deduplicación y fallback.** RF-1, RF-4,
+- [x] **T5. Objetivo: fase 1 de referencia y fase 2 con anclaje, deduplicación y fallback.** RF-1, RF-4,
       RF-5 · ~45–60 min ⚠️
     - Hecho cuando: `PESO_PREFERENCIA = 25` (con `PESO_AGRUPACION < PESO_PREFERENCIA < COSTE_SUPLENTE`
       comprobado); el solver ejecuta la fase 1 (modelo de hoy = referencia) y, si hay preferencias, la fase
@@ -79,7 +80,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_solver_preferencias|test_solver_horarios|test_contrato_solver)$'`.
 
-- [ ] **T6. Jerarquía preferencia > S3 (fase 2b), presupuesto y medición.** RF-5, RNF-2, RNF-3 · ~35 min ⚠️
+- [x] **T6. Jerarquía preferencia > S3 (fase 2b), presupuesto y medición.** RF-5, RNF-2, RNF-3 · ~35 min ⚠️
     - Hecho cuando: la fase 2b fija el valor óptimo de la preferencia con una igualdad y minimiza solo S3;
       `preferenciaGanaALaAgrupacion` pasa (en conflicto directo gana la preferencia); si la 2a o la 2b no
       caben en su presupuesto, se devuelve la solución anterior de la escalera (2a→1, 2b→2a) y **solo**
@@ -91,7 +92,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_solver_preferencias|test_solver_benchmark)$'`.
 
-- [ ] **T7. Estado por preferencia y cumplimiento en el resultado del backend.** RF-8, RNF-1 · ~30 min
+- [x] **T7. Estado por preferencia y cumplimiento en el resultado del backend.** RF-8, RNF-1 · ~30 min
     - Hecho cuando: `analizarPreferencias(config, horario, noAplicadas)` (pura) devuelve el estado por
       preferencia con precedencia **no aplicada (con motivo) → incumplida → respetada**, con el **día de
       dominio** de la 012 en el resultado (0=domingo … 6=sábado), `MotivoPreferencia::Ninguno` para
@@ -102,7 +103,7 @@
       --test-dir build-backend --output-on-failure -R
       '^(test_servicio_generacion|test_proyeccion_preferencias)$'`.
 
-- [ ] **T8. Documentación del contrato y de la constitución.** RF-9 · ~30 min
+- [x] **T8. Documentación del contrato y de la constitución.** RF-9 · ~30 min
     - Hecho cuando: `docs/contrato-solver-2.0.md` declara **diez secciones obligatorias y dos opcionales**
       (`aula_fija` y `preferencias`), describe la sección con su forma, la proyección, que solo viajan las
       intervinientes, que el preset no las aporta, que `meta` **no** es sección y que V19 no valida rangos
@@ -114,7 +115,7 @@
       docs/constitution.md`, `grep -n "PESO_PREFERENCIA" docs/constitution.md`, `grep -n "meta" 
       docs/contrato-solver-2.0.md`.
 
-- [ ] **T9. Supersesiones, acotación de la equivalencia y riesgo documental.** RF-9, RNF-4 · ~20 min
+- [x] **T9. Supersesiones, acotación de la equivalencia y riesgo documental.** RF-9, RNF-4 · ~20 min
     - Hecho cuando: la 005 («Configuración equivalente», `:303-306`) y la 010 (ida y vuelta, `:213-216`)
       llevan la nota de que, para las preferencias, la equivalencia es de la configuración y no del preset;
       la 012 anota que su RF-5 y su «Fuera de alcance» quedan superados; la 009-agrupacion anota que la
@@ -125,7 +126,7 @@
       specs/012-preferencias-docente/spec.md specs/009-agrupacion-bloques-materias/spec.md`;
       `git diff --stat` acotado a `docs/` y `specs/`.
 
-- [ ] **T10. Regresión global y suite completa.** RNF-4, RNF-5, RNF-7 · ~30 min
+- [x] **T10. Regresión global y suite completa.** RNF-4, RNF-5, RNF-7 · ~30 min
     - Hecho cuando: sin preferencias, el JSON de la entrada y el horario son idénticos a los que produce el
       mismo árbol sin la 013 (escenario posterior a la 015/016: seed sin «Aula de estudio», base v6 con el
       tipo general garantizado);

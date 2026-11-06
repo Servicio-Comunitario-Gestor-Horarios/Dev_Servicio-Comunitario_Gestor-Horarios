@@ -1,22 +1,23 @@
 # Plan 013 - Preferencias del docente en la generación
 
-Base: `bb1767af343c108b20de2b2b4de7ebe1d7658c2f` **+ la 015 y la 016 aplicadas en el árbol de trabajo
-(sin commits)**. HEAD sigue en `bb1767a`, pero el árbol ya incluye la **015** cerrada (esquema **v6**, fila
-del tipo general, sus disparadores y seed adaptado) y la **016** (comprobación en tres momentos, ayuda
-estricta, V18, huella y docs). **Si la 015/016 se commitean antes de empezar la 013, el `Base` pasa a ser
-ese sha de cierre** y esta línea se actualiza.
+Base: **`c7b9427`** (HEAD tras committear la **015** y la **016**: esquema **v6**, fila del tipo general,
+disparadores, comprobación en tres momentos, ayuda estricta, V18, huella y docs) **+ la 013 en el árbol de
+trabajo** (la implementación no se ha commiteado todavía). El `Base` original del plan era
+`bb1767af343c108b20de2b2b4de7ebe1d7658c2f`; la re-base del 2026-11-05 lo sustituye por `c7b9427`.
+**El ancla de RNF-4 y del criterio 11 es el escenario posterior a la 015/016** —seed sin «Aula de
+estudio», base **v6** con el tipo general garantizado—, no el escenario de `bb1767a`.
 
-> **Alcance.** Implementa la **spec 013 aprobada** (9 RF) sobre la base de arriba (HEAD `bb1767a` **más la
-> 015 y la 016 aplicadas en el árbol**). Toca **backend** (contrato, construcción de la entrada,
+> **Alcance.** Implementa la **spec 013** (9 RF) sobre la base de arriba (`c7b9427` **más la 013 en el
+> árbol**). Toca **backend** (contrato, construcción de la entrada,
 > objetivo, huella y resultado), un **acoplamiento mínimo del frontend** (huella y diagnóstico, sin vistas
 > nuevas) y **documentación**. No cambia el esquema, no migra datos y no toca el contrato de salida.
 >
 > **Decisiones del usuario (D-1…D-8) y correcciones B1–B3** están fijadas en la spec y no se reinterpretan.
 > Este plan incorpora además los hallazgos **P1–P15** del QA del plan.
 >
-> **Re-base sobre la 015/016 (2026-11-05).** La 013 se planificó contra `bb1767a` y se implementa **después**
+> **Re-base sobre la 015/016 (2026-11-05).** La 013 se planificó contra `bb1767a` y se implementó **después**
 > de la 015 (esquema **v6** con el tipo general garantizado y protegido) y de la 016 (comprobación y
-> cierre). Consecuencias **documentales**, sin cambios de comportamiento:
+> cierre), ya committeadas en `c7b9427`. Consecuencias **documentales**, sin cambios de comportamiento:
 > - **Esquema:** el vigente es **v6**; la 013 **no** lo cambia ni migra nada (§7).
 > - **Ancla de la no regresión (RNF-4 y criterio 11):** deja de ser «el escenario de `bb1767a`» y pasa a ser
 >   el **escenario posterior a la 015/016** — perfil del seed **sin** «Aula de estudio» y base **v6** con el
@@ -24,7 +25,7 @@ ese sha de cierre** y esta línea se actualiza.
 > - **Golden del JSON sin preferencias (T3):** se compara contra el que produce **el mismo árbol sin la
 >   013**, no contra un archivo de `bb1767a`.
 >
-> **Punto de partida verificado (HEAD `bb1767a` + 015/016 en el árbol):**
+> **Punto de partida verificado (`c7b9427`, con la 015/016 committeadas):**
 > - `SolverConfig` en `src/backend/include/backend/solver/config/solver_config.hpp`; parser y **V1–V18** en
 >   `src/backend/src/solver/config/solver_config.cpp`. El contrato tiene **diez secciones obligatorias y
 >   dos opcionales** (`aula_fija` y la nueva `preferencias`); **`meta` no es una sección**: es un objeto
