@@ -247,9 +247,9 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     }
 
     // ── Entrada (dominio + preset) ────────────────────────────────────────
-    // `construirJsonEntrada` embebe los planes referenciados, casa los cursos
+    // `construirEntradaCompleta` embebe los planes referenciados, casa los cursos
     // por año/sección, aplica el modo global de aulas y deriva dimensiones,
-    // turnos/eventos y disponibilidad.
+    // turnos/eventos, disponibilidad y las preferencias ya proyectadas (013).
     // La duración de la franja (D) se lee de la configuración global del núcleo
     // (spec 011): 35 min por defecto, rango 30–90. Sobrescribe siempre la del preset.
     const auto configuracion = nucleo.configuracionHoraria();
@@ -259,13 +259,17 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
         return comp;
     }
     const int duracionEfectiva = configuracion.valor.duracionMinutos;
-    const auto entrada = construirJsonEntrada(datos, preset, duracionEfectiva,
-                                              QDateTime::currentDateTime());
+    const auto entrada = construirEntradaCompleta(datos, preset, duracionEfectiva,
+                                                  QDateTime::currentDateTime());
     if (!entrada.ok) {
         comp.avisos << entrada.mensajeError;
         return comp;
     }
-    comp.entrada = entrada.valor;
+    comp.entrada = entrada.valor.json;
+    // La huella se compone en el MISMO camino que la generación: solo las preferencias
+    // intervinientes, ya proyectadas (013, RF-6).
+    comp.huella = huellaDatos(datos, duracionEfectiva, entrada.valor.intervinientes);
+    comp.preferenciasNoAplicadas = entrada.valor.noAplicadas;
 
     // ── Contexto para traducir índices a nombres al visualizar ────────────
     for (const MateriaDTO& m : datos.materias)
@@ -285,13 +289,20 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
     return comp;
 }
 
-QString huellaActual(const NucleoDatos& nucleo)
+QString huellaActual(const NucleoDatos& nucleo, const OpcionesUI& opciones)
 {
+    // Se compone la entrada (mismo camino que la generación) y se devuelve su huella: así
+    // incluye exactamente las preferencias que intervienen, ya proyectadas (013, RF-6).
+    const Composicion comp = construirEntrada(nucleo, opciones);
+    if (!comp.entrada.isEmpty())
+        return comp.huella;
+
+    // Composición fallida: se mantiene el respaldo de hoy, sin preferencias.
     Composicion descartada;  // los avisos no intervienen en la huella
     const DatosDominio datos = leerDominio(nucleo, descartada);
     const auto configuracion = nucleo.configuracionHoraria();
     const int duracion = configuracion.ok ? configuracion.valor.duracionMinutos : 35;
-    return huellaDatos(datos, duracion);
+    return huellaDatos(datos, duracion, {});
 }
 
 QMap<QString, int> horasSugeridasPorDocente(

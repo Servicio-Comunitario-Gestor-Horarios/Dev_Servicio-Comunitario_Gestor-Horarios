@@ -21,6 +21,18 @@ struct MateriaCurso    { int materiaIDx = 0; int horasSemanales = 0; };
 struct MateriaSuplente { int materiaIDx = 0; int peso = 0; };
 struct Disponibilidad  { int dia = 0; QVector<int> slot; };
 
+/// Preferencia horaria del docente ya PROYECTADA sobre la rejilla (spec 013, RF-2).
+///
+/// Simétrica de `Disponibilidad{dia, slot}`: el docente va por índice (como las aulas y las
+/// materias) y el día es el de la GENERACIÓN (0 = lunes … num_dias-1). La configuración no
+/// transporta rangos de reloj: la proyección es de la construcción de la entrada.
+struct PreferenciaSolverConfig {
+    int          docente = -1;  ///< índice en `profesores` (V19)
+    int          dia = -1;      ///< día de la GENERACIÓN (0 = lunes … num_dias-1)
+    QVector<int> slot;          ///< slots absolutos del día
+    QString      sentido;       ///< "preferida" | "evitada"
+};
+
 /* Planes embebidos */
 struct PlanMateriaConfig { int materiaIDx = 0; int curso = 0; int horasSemanales = 0; };
 struct PlanSolverConfig  { QString codigo; QVector<PlanMateriaConfig> materias; };
@@ -90,6 +102,8 @@ struct SolverConfig {
     QVector<PlanSolverConfig> planes;          ///< embebidos (solo los referenciados)
     QVector<CursoSolverConfig> cursos;
     QVector<ProfesorSolverConfig> profesores;
+    /// Sección OPCIONAL `preferencias` (013): ausente = sin preferencias. Ya proyectada.
+    QVector<PreferenciaSolverConfig> preferencias;
     QVector<MateriaSolverConfig> materias;
     QVector<AulaSolverConfig> aulas;
 

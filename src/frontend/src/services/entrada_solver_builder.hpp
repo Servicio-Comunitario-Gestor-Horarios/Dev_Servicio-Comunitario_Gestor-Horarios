@@ -18,8 +18,10 @@
 #include <QMap>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 
 #include "backend/data/horario_salida.hpp"
+#include "backend/services/proyeccion_preferencias.hpp"
 #include "services/generacion_tipos.hpp"
 
 class NucleoDatos;
@@ -31,6 +33,8 @@ struct Composicion {
     QJsonObject entrada;    ///< JSON de entrada listo para validar/enviar.
     ContextoHorario contexto; ///< Nombres/índices para traducir la salida.
     QStringList avisos;     ///< Advertencias no bloqueantes (datos incompletos).
+    QString huella;         ///< Huella con las preferencias intervinientes (013, RF-6).
+    QVector<PreferenciaNoAplicada> preferenciasNoAplicadas; ///< Sin emitir, con su motivo.
 };
 
 /**
@@ -38,20 +42,23 @@ struct Composicion {
  *
  * Lee del núcleo (docentes, aulas, materias, cursos, turnos) y compone los
  * planes que referencian los cursos; con eso y la configuración del usuario
- * arma el `DatosDominio` + `SolverConfig` que consume `construirJsonEntrada`
- * (que embebe los planes, casa los cursos por año/sección y aplica el modo
- * global de aulas fijas). No modifica la base.
+ * arma el `DatosDominio` + `SolverConfig` que consume `construirEntradaCompleta`
+ * (que embebe los planes, casa los cursos por año/sección, aplica el modo
+ * global de aulas fijas y proyecta las preferencias de los datos). No modifica
+ * la base.
  */
 Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opciones);
 
 /**
- * @brief Huella de la instantánea actual del dominio (spec 011, RF-6).
+ * @brief Huella de la instantánea actual del dominio con las preferencias que intervienen.
  *
- * Lee el dominio del núcleo y la duración efectiva de la hora académica y
- * devuelve la misma huella que `ServicioGeneracion` compara para marcar
- * «datos anteriores». Si la configuración horaria no se puede leer, usa 35.
+ * Compone la entrada —el mismo camino que la generación— y devuelve su huella
+ * (spec 011 RF-6; spec 013 RF-6: solo las preferencias intervinientes, ya
+ * proyectadas). Así la huella que se envía y la que se compara al recibir no
+ * pueden divergir. Si la composición falla, cae al respaldo sin preferencias
+ * con 35 min de duración.
  */
-QString huellaActual(const NucleoDatos& nucleo);
+QString huellaActual(const NucleoDatos& nucleo, const OpcionesUI& opciones);
 
 /**
  * @brief Carga horaria semanal sugerida por docente.

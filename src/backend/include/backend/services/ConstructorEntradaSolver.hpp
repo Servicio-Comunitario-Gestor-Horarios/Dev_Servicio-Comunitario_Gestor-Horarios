@@ -30,6 +30,7 @@
 #include "backend/data/plan_estudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
 #include "backend/services/ServicioTurnosEventos.hpp"
+#include "backend/services/proyeccion_preferencias.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
 /// Instantánea de los dominios del cliente que forman la entrada del solver.
@@ -43,7 +44,34 @@ struct DatosDominio
     QVector<TurnoDTO>    turnos;   ///< incluye sus eventos
 };
 
-/// Construye la entrada del solver (13 secciones) de forma pura (RF-1).
+/// Resultado completo de la construcción (013): la entrada y el diagnóstico de preferencias.
+///
+/// `intervinientes` son las preferencias que viajan ya proyectadas en `json`; `noAplicadas` las
+/// que no intervienen, con su ÚNICO motivo. El estado por preferencia sobre el horario y el
+/// agregado de cumplimiento se calculan más tarde (spec 013, RF-8).
+struct EntradaConstruida
+{
+    QJsonObject                    json;
+    QVector<PreferenciaProyectada> intervinientes;
+    QVector<PreferenciaNoAplicada> noAplicadas;
+};
+
+/// Construye la entrada del solver y el diagnóstico de preferencias, de forma pura (RF-1, RF-3).
+///
+/// Misma construcción que `construirJsonEntrada` más la proyección de las preferencias de los
+/// datos: la sección `preferencias` sale SIEMPRE de los datos (la del preset se ignora y se
+/// sobrescribe) y va ya proyectada —docente por índice, día de la generación, franjas
+/// alcanzables y sentido—. Con 0 preferencias intervinientes el arreglo queda vacío y `toJson`
+/// omite la sección, de modo que el JSON es el de siempre. La validación (V19 incluida) la hace
+/// el flujo de generación con `validarEntradaSolver`, después de construir.
+Resultado<EntradaConstruida> construirEntradaCompleta(const DatosDominio& datos,
+                                                      const SolverConfig& parametros,
+                                                      int duracionMinutos,
+                                                      const QDateTime& ahora);
+
+/// Construye la entrada del solver (12 secciones del contrato 2.0 + `meta`) de forma pura (RF-1).
+///
+/// Envoltorio de `construirEntradaCompleta` que conserva la firma de hoy y devuelve solo el JSON.
 ///
 /// `parametros` aporta lo que no es entidad: `franja_horaria`, `aula_fija` y, por
 /// docente (casado por nombre), `horas_requeridas`, `horas_aula`, `turno`, `plan` y

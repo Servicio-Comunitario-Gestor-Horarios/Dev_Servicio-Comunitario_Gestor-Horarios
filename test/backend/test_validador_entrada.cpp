@@ -217,6 +217,36 @@ private:
         return j;
     }
 
+    /// Una preferencia ya proyectada (013): docente por índice, día de la generación,
+    /// franjas y sentido.
+    QJsonObject preferencia(int docente, int dia, const QJsonArray& slot,
+                            const QString& sentido) const
+    {
+        QJsonObject p;
+        p[QStringLiteral("docente")] = docente;
+        p[QStringLiteral("dia")]     = dia;
+        p[QStringLiteral("slot")]    = slot;
+        p[QStringLiteral("sentido")] = sentido;
+        return p;
+    }
+
+    /// Devuelve el JSON con la sección opcional `preferencias` sustituida.
+    QJsonObject conPreferencias(QJsonObject j, const QJsonArray& preferencias) const
+    {
+        j[QStringLiteral("preferencias")] = preferencias;
+        return j;
+    }
+
+    /// Exige que la entrada se rechace por V19 y que el mensaje contenga `fragmento`.
+    void exigeRechazoV19(const QJsonObject& j, const QString& fragmento) const
+    {
+        const auto resultado = validarEntradaSolver(j);
+        QVERIFY2(!resultado.ok, qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.startsWith(QStringLiteral("V19:")),
+                 qPrintable(resultado.mensajeError));
+        QVERIFY2(resultado.mensajeError.contains(fragmento), qPrintable(resultado.mensajeError));
+    }
+
     /// Evento del turno de la mañana (`dominio()`: 07:00–12:00, 6 franjas).
     ///
     /// Las horas son opcionales: si se omiten, el evento no declara horario (par ausente).
@@ -1040,6 +1070,151 @@ private slots:
 
         exigeRechazoV17(j, QStringLiteral("Aula de estudio"), QStringLiteral("Matemática"),
                         QStringLiteral("1A"));
+    }
+
+    // ─── V19: preferencias ya proyectadas (013) ────────────────────────────
+
+    /// V19: el docente de una preferencia se referencia por índice y debe existir en la
+    /// configuración; el mensaje cita el valor recibido y el rango admitido.
+    void v19_indiceDeDocenteFueraDeRango_falla()
+    {
+        // La entrada válida declara 1 docente: el rango es (0–0).
+        for (int docente : {1, -1}) {
+            const QJsonObject j =
+                conPreferencias(jsonValido(),
+                                QJsonArray{preferencia(docente, 0, QJsonArray{0},
+                                                       QStringLiteral("preferida"))});
+            const auto resultado = validarEntradaSolver(j);
+            const QString mensaje = resultado.mensajeError;
+            QVERIFY2(!resultado.ok, qPrintable(QString::number(docente)));
+            QVERIFY2(mensaje.startsWith(QStringLiteral("V19:")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("docente")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QString::number(docente)), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("(0–0)")), qPrintable(mensaje));
+        }
+    }
+
+    /// V19: el día es el de la GENERACIÓN y debe estar declarado (0 … num_dias − 1).
+    void v19_diaFueraDeRango_falla()
+    {
+        // num_dias = 5: el rango es (0–4).
+        for (int dia : {5, -1}) {
+            const QJsonObject j =
+                conPreferencias(jsonValido(),
+                                QJsonArray{preferencia(0, dia, QJsonArray{0},
+                                                       QStringLiteral("evitada"))});
+            const auto resultado = validarEntradaSolver(j);
+            const QString mensaje = resultado.mensajeError;
+            QVERIFY2(!resultado.ok, qPrintable(QString::number(dia)));
+            QVERIFY2(mensaje.startsWith(QStringLiteral("V19:")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("día")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QString::number(dia)), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("(0–4)")), qPrintable(mensaje));
+        }
+    }
+
+    /// V19: toda franja alcanzada debe ser un slot declarado del día (0 … num_slots_dia − 1).
+    void v19_franjaFueraDeRango_falla()
+    {
+        // num_slots_dia = 6: el rango es (0–5); basta que una franja esté fuera.
+        for (int slot : {6, -1}) {
+            const QJsonObject j =
+                conPreferencias(jsonValido(),
+                                QJsonArray{preferencia(0, 0, QJsonArray{0, slot},
+                                                       QStringLiteral("preferida"))});
+            const auto resultado = validarEntradaSolver(j);
+            const QString mensaje = resultado.mensajeError;
+            QVERIFY2(!resultado.ok, qPrintable(QString::number(slot)));
+            QVERIFY2(mensaje.startsWith(QStringLiteral("V19:")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("franja")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QString::number(slot)), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("(0–5)")), qPrintable(mensaje));
+        }
+    }
+
+    /// V19: el sentido solo admite «preferida» o «evitada», citando el valor recibido.
+    void v19_sentidoInvalido_falla()
+    {
+        for (const QString& sentido :
+             {QStringLiteral("quizá"), QString(), QStringLiteral("Preferida")}) {
+            const QJsonObject j =
+                conPreferencias(jsonValido(),
+                                QJsonArray{preferencia(0, 0, QJsonArray{0}, sentido)});
+            const auto resultado = validarEntradaSolver(j);
+            const QString mensaje = resultado.mensajeError;
+            QVERIFY2(!resultado.ok, qPrintable(sentido));
+            QVERIFY2(mensaje.startsWith(QStringLiteral("V19:")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("sentido")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("preferida/evitada")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("«%1»").arg(sentido)), qPrintable(mensaje));
+        }
+    }
+
+    /// V19 informa el PRIMER defecto en el orden docente → día → franja → sentido: con los
+    /// cuatro defectos a la vez solo se nombra el docente, y cada corrección destapa el siguiente.
+    void v19_primerDefectoEnOrdenDocenteDiaFranjaSentido()
+    {
+        QJsonArray preferencias{preferencia(1, 9, QJsonArray{-1}, QStringLiteral("x"))};
+
+        {
+            const auto r = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+            QVERIFY(!r.ok);
+            QVERIFY2(r.mensajeError.contains(QStringLiteral("docente")),
+                     qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("día")),
+                     qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("franja")),
+                     qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("sentido")),
+                     qPrintable(r.mensajeError));
+        }
+
+        preferencias[0] = preferencia(0, 9, QJsonArray{-1}, QStringLiteral("x"));
+        {
+            const auto r = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+            QVERIFY(!r.ok);
+            QVERIFY2(r.mensajeError.contains(QStringLiteral("día")), qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("franja")),
+                     qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("sentido")),
+                     qPrintable(r.mensajeError));
+        }
+
+        preferencias[0] = preferencia(0, 0, QJsonArray{-1}, QStringLiteral("x"));
+        {
+            const auto r = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+            QVERIFY(!r.ok);
+            QVERIFY2(r.mensajeError.contains(QStringLiteral("franja")),
+                     qPrintable(r.mensajeError));
+            QVERIFY2(!r.mensajeError.contains(QStringLiteral("sentido")),
+                     qPrintable(r.mensajeError));
+        }
+
+        preferencias[0] = preferencia(0, 0, QJsonArray{0}, QStringLiteral("x"));
+        {
+            const auto r = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+            QVERIFY(!r.ok);
+            QVERIFY2(r.mensajeError.contains(QStringLiteral("sentido")),
+                     qPrintable(r.mensajeError));
+        }
+
+        preferencias[0] = preferencia(0, 0, QJsonArray{0}, QStringLiteral("evitada"));
+        const auto valida = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+        QVERIFY2(valida.ok, qPrintable(valida.mensajeError));
+    }
+
+    /// V19 no rechaza por coherencia con el turno (no la comprueba): una franja en rango
+    /// pasa; y la sección vacía equivale a no declararla (RF-2).
+    void v19_preferenciasEnRangoYseccionVacia_pasan()
+    {
+        const QJsonArray preferencias{
+            preferencia(0, 0, QJsonArray{0, 5}, QStringLiteral("preferida")),
+            preferencia(0, 4, QJsonArray{2, 3}, QStringLiteral("evitada"))};
+        const auto conSeccion = validarEntradaSolver(conPreferencias(jsonValido(), preferencias));
+        QVERIFY2(conSeccion.ok, qPrintable(conSeccion.mensajeError));
+
+        const auto vacia = validarEntradaSolver(conPreferencias(jsonValido(), QJsonArray{}));
+        QVERIFY2(vacia.ok, qPrintable(vacia.mensajeError));
     }
 
     void jsonVacio_falla()

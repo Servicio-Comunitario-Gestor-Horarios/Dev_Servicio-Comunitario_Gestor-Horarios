@@ -27,6 +27,8 @@
 
 #include "services/generacion_tipos.hpp"
 
+#include "backend/services/proyeccion_preferencias.hpp"
+
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -137,6 +139,9 @@ private:
     PuertoSolverIpc* m_puerto = nullptr;
     GeneracionSolver::ContextoHorario m_contexto;
     QJsonObject m_entradaActual;
+    /// Preferencias que no intervinieron en la última composición (013, RF-8): viajan al
+    /// servicio para informar el cumplimiento del resultado.
+    QVector<PreferenciaNoAplicada> m_preferenciasNoAplicadas;
 
     // ── Datos auxiliares (por fila) ───────────────────────────────────────
     QStringList m_planesCodigos;

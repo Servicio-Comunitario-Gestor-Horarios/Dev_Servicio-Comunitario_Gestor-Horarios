@@ -8,6 +8,7 @@
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ConstructorEntradaSolver.hpp>
 #include <backend/services/ValidadorEntradaSolver.hpp>
+#include <backend/services/preferencias.hpp>
 #include <backend/solver/config/solver_config.hpp>
 
 /// Tests del constructor del JSON de entrada del solver (RF-1, contrato 2.0).
@@ -108,6 +109,37 @@ private:
                                        qPrintable(resultado.mensajeError), __FILE__, __LINE__);
         Q_UNUSED(ok);
         return resultado.valor;
+    }
+
+    /// Preferencia del docente sobre una franja de reloj (día de DOMINIO: 0 = domingo).
+    static PreferenciaDTO preferencia(int dia, const QTime& inicio, const QTime& fin,
+                                      SentidoPreferencia sentido, int id = 1)
+    {
+        PreferenciaDTO p;
+        p.id = id;
+        p.franja = FranjaHoraria{dia, inicio, fin};
+        p.sentido = sentido;
+        return p;
+    }
+
+    /// Añade un segundo docente elegible (Beto) al dominio y al preset, para probar que el
+    /// índice de docente de la sección es el de la configuración.
+    static void agregarBeto(DatosDominio& datos, SolverConfig& parametros)
+    {
+        ProfesorDTO beto;
+        beto.id = QStringLiteral("P2");
+        beto.nombre = QStringLiteral("Beto");
+        beto.materias = {MateriaAsignadaDTO{1, QStringLiteral("Matemática")}};
+        DisponibilidadDTO disp;
+        disp.franja = FranjaHoraria{1, QTime(7, 0), QTime(9, 0)};
+        beto.disponibilidad = {disp};
+        datos.docentes.append(beto);
+
+        ProfesorSolverConfig prof;
+        prof.nombre = QStringLiteral("Beto");
+        prof.horas_requeridas = 10;
+        prof.horas_aula = 8;
+        parametros.profesores.append(prof);
     }
 
 private slots:
@@ -478,6 +510,157 @@ private slots:
 
         QVERIFY(a.ok && b.ok);
         QCOMPARE(a.valor, b.valor);
+    }
+
+    // ─── Preferencias en la entrada (013: RF-2, RF-3, RF-7) ────────────────
+
+    /// RF-2/RF-3: la sección se construye desde los datos, ya proyectada —docente por índice,
+    /// día de la GENERACIÓN, franjas alcanzables y sentido—; nunca viaja el rango de reloj.
+    void preferenciasSeConstruyenDesdeLosDatos()
+    {
+        DatosDominio datos = dominioCompleto();
+        datos.docentes[0].preferencias = {
+            preferencia(1, QTime(7, 0), QTime(8, 10), SentidoPreferencia::Evitada)};
+
+        const auto resultado = construirEntradaCompleta(datos, parametros(), 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+        QCOMPARE(resultado.valor.intervinientes.size(), 1);
+        QCOMPARE(resultado.valor.intervinientes[0].docente, 0);
+        QCOMPARE(resultado.valor.intervinientes[0].dia, 0);   // lunes (dominio 1) → generación 0
+        QCOMPARE(resultado.valor.intervinientes[0].slot, (QVector<int>{0, 1}));
+        QCOMPARE(resultado.valor.intervinientes[0].sentido, SentidoPreferencia::Evitada);
+        QVERIFY(resultado.valor.noAplicadas.isEmpty());
+
+        const QJsonArray seccion = resultado.valor.json["preferencias"].toArray();
+        QCOMPARE(seccion.size(), 1);
+        const QJsonObject p = seccion[0].toObject();
+        QCOMPARE(p["docente"].toInt(), 0);
+        QCOMPARE(p["dia"].toInt(), 0);
+        QCOMPARE(p["slot"].toArray(), (QJsonArray{0, 1}));
+        QCOMPARE(p["sentido"].toString(), QStringLiteral("evitada"));
+        QVERIFY(!p.contains(QStringLiteral("inicio")));
+        QVERIFY(!p.contains(QStringLiteral("fin")));
+
+        // RF-7: la entrada construida valida con V19 (y con el resto del catálogo).
+        const auto validada = validarEntradaSolver(resultado.valor.json);
+        QVERIFY2(validada.ok, qPrintable(validada.mensajeError));
+    }
+
+    /// RF-2: la sección del preset NO es fuente de preferencias: se ignora y se sobrescribe con
+    /// la proyección de los datos (con o sin preferencias en los datos).
+    void seccionDelPreset_seIgnoraYseSobrescribe()
+    {
+        SolverConfig conPreset = parametros();
+        PreferenciaSolverConfig delPreset;
+        delPreset.docente = 0;
+        delPreset.dia     = 4;
+        delPreset.slot    = {5};
+        delPreset.sentido = QStringLiteral("preferida");
+        conPreset.preferencias = {delPreset};
+
+        // (a) Sin preferencias en los datos: la del preset no se copia.
+        {
+            const auto resultado =
+                construirEntradaCompleta(dominioCompleto(), conPreset, 35, ahoraFijo());
+            QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+            QVERIFY(resultado.valor.intervinientes.isEmpty());
+            QVERIFY(!resultado.valor.json.contains(QStringLiteral("preferencias")));
+        }
+
+        // (b) Con preferencias en los datos: viaja SOLO la proyectada de los datos.
+        {
+            DatosDominio datos = dominioCompleto();
+            datos.docentes[0].preferencias = {
+                preferencia(1, QTime(7, 0), QTime(8, 10), SentidoPreferencia::Preferida)};
+
+            const auto resultado =
+                construirEntradaCompleta(datos, conPreset, 35, ahoraFijo());
+            QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+            const QJsonArray seccion = resultado.valor.json["preferencias"].toArray();
+            QCOMPARE(seccion.size(), 1);
+            const QJsonObject p = seccion[0].toObject();
+            QCOMPARE(p["dia"].toInt(), 0);                          // no el 4 del preset
+            QCOMPARE(p["slot"].toArray(), (QJsonArray{0, 1}));      // no el {5} del preset
+            QCOMPARE(p["sentido"].toString(), QStringLiteral("preferida"));
+        }
+    }
+
+    /// RF-1: un docente sin preferencias no emite nada; el índice es el de la configuración.
+    void docenteSinPreferenciasNoEmiteYelIndiceEsElDeLaConfiguracion()
+    {
+        DatosDominio datos = dominioCompleto();
+        SolverConfig p = parametros();
+        agregarBeto(datos, p);
+
+        // Ana (índice 0) no declara preferencias; Beto (índice 1) sí.
+        datos.docentes[1].preferencias = {
+            preferencia(1, QTime(7, 0), QTime(8, 10), SentidoPreferencia::Preferida)};
+
+        const auto resultado = construirEntradaCompleta(datos, p, 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+        QCOMPARE(resultado.valor.intervinientes.size(), 1);
+        QCOMPARE(resultado.valor.intervinientes[0].docente, 1);
+
+        const QJsonArray seccion = resultado.valor.json["preferencias"].toArray();
+        QCOMPARE(seccion.size(), 1);
+        QCOMPARE(seccion[0].toObject()["docente"].toInt(), 1);
+
+        const auto validada = validarEntradaSolver(resultado.valor.json);
+        QVERIFY2(validada.ok, qPrintable(validada.mensajeError));
+    }
+
+    /// RF-3/RF-8: una preferencia que no interviene no viaja en la configuración y su motivo se
+    /// informa en el diagnóstico (aquí: domingo, fuera de la semana declarada).
+    void preferenciaNoAplicada_noViajaYseInformaConSuMotivo()
+    {
+        DatosDominio datos = dominioCompleto();
+        datos.docentes[0].preferencias = {
+            preferencia(0, QTime(7, 0), QTime(8, 10), SentidoPreferencia::Evitada)};
+
+        const auto resultado = construirEntradaCompleta(datos, parametros(), 35, ahoraFijo());
+        QVERIFY2(resultado.ok, qPrintable(resultado.mensajeError));
+
+        QVERIFY(resultado.valor.intervinientes.isEmpty());
+        QCOMPARE(resultado.valor.noAplicadas.size(), 1);
+        QCOMPARE(resultado.valor.noAplicadas[0].docente, 0);
+        QCOMPARE(resultado.valor.noAplicadas[0].franja.dia, 0);
+        QCOMPARE(resultado.valor.noAplicadas[0].motivo, MotivoPreferencia::DiaFueraDeSemana);
+        QVERIFY(!resultado.valor.json.contains(QStringLiteral("preferencias")));
+    }
+
+    /// RNF-4: con 0 preferencias el JSON es el de hoy —las mismas doce claves, sin una sección
+    /// `preferencias` vacía— y el envoltorio devuelve exactamente esa entrada.
+    void sinPreferencias_jsonIdenticoAlDeHoy()
+    {
+        const auto completa =
+            construirEntradaCompleta(dominioCompleto(), parametros(), 35, ahoraFijo());
+        const auto soloJson =
+            construirJsonEntrada(dominioCompleto(), parametros(), 35, ahoraFijo());
+
+        QVERIFY2(completa.ok, qPrintable(completa.mensajeError));
+        QVERIFY2(soloJson.ok, qPrintable(soloJson.mensajeError));
+        QCOMPARE(completa.valor.json, soloJson.valor);
+        QVERIFY(completa.valor.intervinientes.isEmpty());
+        QVERIFY(completa.valor.noAplicadas.isEmpty());
+
+        QStringList claves = soloJson.valor.keys();
+        claves.sort();
+        const QStringList esperadas = {
+            QStringLiteral("aula_fija"),     QStringLiteral("aulas"),
+            QStringLiteral("cursos"),        QStringLiteral("dimensiones"),
+            QStringLiteral("eventos"),       QStringLiteral("franja_horaria"),
+            QStringLiteral("materias"),      QStringLiteral("meta"),
+            QStringLiteral("planes"),        QStringLiteral("profesores"),
+            QStringLiteral("turnos"),        QStringLiteral("version")};
+        QCOMPARE(claves, esperadas);
+        QVERIFY(!soloJson.valor.contains(QStringLiteral("preferencias")));
+
+        const auto config = SolverConfig::fromJson(soloJson.valor);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+        QVERIFY(config.valor.preferencias.isEmpty());
     }
 
     // ─── Duración de la hora académica recibida (RF-3, RF-5) ────────────────

@@ -319,6 +319,35 @@ QJsonArray aJson(const QVector<ProfesorSolverConfig>& profesores)
     return arr;
 }
 
+/* ── Preferencias (013): sección OPCIONAL, ya proyectada ── */
+QVector<PreferenciaSolverConfig> parsearPreferencias(const QJsonArray& arr)
+{
+    QVector<PreferenciaSolverConfig> preferencias;
+    for (const QJsonValue& valor : arr) {
+        const QJsonObject o = valor.toObject();
+        PreferenciaSolverConfig p;
+        p.docente = leerEntero(o, "docente", -1);
+        p.dia     = leerEntero(o, "dia", -1);
+        p.slot    = leerEnteros(o["slot"].toArray());
+        p.sentido = leerTexto(o, "sentido");
+        preferencias.append(p);
+    }
+    return preferencias;
+}
+QJsonArray aJson(const QVector<PreferenciaSolverConfig>& preferencias)
+{
+    QJsonArray arr;
+    for (const PreferenciaSolverConfig& p : preferencias) {
+        QJsonObject obj;
+        obj["docente"] = p.docente;
+        obj["dia"]     = p.dia;
+        obj["slot"]    = aJson(p.slot);
+        obj["sentido"] = p.sentido;
+        arr.append(obj);
+    }
+    return arr;
+}
+
 /* ── Materias / Aulas ── */
 QVector<MateriaSolverConfig> parsearMaterias(const QJsonArray& arr)
 {
@@ -369,7 +398,7 @@ QJsonArray aJson(const QVector<AulaSolverConfig>& aulas)
     return arr;
 }
 
-/* ── Validaciones V1-V15 (RF-11). Devuelven "" si OK. ── */
+/* ── Validaciones V1–V19 (RF-11 de la 005, RF-5 de la 010, RF-7 de la 013). Devuelven "" si OK. ── */
 
 /// V4/V6/V12: indice dentro de [0, tamano).
 QString validarIndice(int indice, int tamano, const QString& campo)
@@ -830,6 +859,60 @@ QString validarReferenciaGeneral(const SolverConfig& c)
     return {};
 }
 
+/// V19. Preferencias ya proyectadas: forma y referencias (RF-7 de la 013).
+///
+/// Informa el PRIMER defecto en el orden docente → día → franja → sentido, citando el valor
+/// recibido y el rango admitido. No comprueba rangos de reloj, coherencia con el turno, el plan
+/// o los años, ni solapes: la sección llega ya proyectada y esas reglas son de la proyección y
+/// de la validación de la 012 al persistir.
+QString validarPreferencias(const SolverConfig& c)
+{
+    const int numProfesores = c.profesores.size();
+    const int numDias       = c.dimensiones.num_dias;
+    const int numSlotsDia   = c.dimensiones.num_slots_dia;
+
+    for (int i = 0; i < c.preferencias.size(); ++i) {
+        const PreferenciaSolverConfig& p = c.preferencias[i];
+        const int numero = i + 1;
+
+        if (p.docente < 0 || p.docente >= numProfesores)
+            return QStringLiteral(
+                       "V19: la preferencia %1 declara el docente %2, fuera del rango de docentes "
+                       "(0–%3); use el índice de un docente de la configuración.")
+                .arg(numero)
+                .arg(p.docente)
+                .arg(numProfesores - 1);
+
+        if (p.dia < 0 || p.dia >= numDias)
+            return QStringLiteral(
+                       "V19: la preferencia %1 del docente %2 declara el día %3, fuera del rango "
+                       "de la generación (0–%4); use un día de la semana declarada.")
+                .arg(numero)
+                .arg(p.docente)
+                .arg(p.dia)
+                .arg(numDias - 1);
+
+        for (int slot : p.slot)
+            if (slot < 0 || slot >= numSlotsDia)
+                return QStringLiteral(
+                           "V19: la preferencia %1 del docente %2 declara la franja %3, fuera del "
+                           "rango del día (0–%4); use una franja declarada.")
+                    .arg(numero)
+                    .arg(p.docente)
+                    .arg(slot)
+                    .arg(numSlotsDia - 1);
+
+        if (p.sentido != QLatin1String("preferida") && p.sentido != QLatin1String("evitada"))
+            return QStringLiteral(
+                       "V19: la preferencia %1 del docente %2 declara el sentido «%3», no válido "
+                       "(preferida/evitada); use «preferida» o «evitada».")
+                .arg(numero)
+                .arg(p.docente)
+                .arg(p.sentido);
+    }
+    return {};
+}
+
 } // namespace
 
 Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
@@ -846,6 +929,7 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
     config.planes         = parsearPlanes(obj["planes"].toArray());
     config.cursos         = parsearCursos(obj["cursos"].toArray());
     config.profesores     = parsearProfesores(obj["profesores"].toArray());
+    config.preferencias   = parsearPreferencias(obj["preferencias"].toArray());
     config.materias       = parsearMaterias(obj["materias"].toArray());
     config.aulas          = parsearAulas(obj["aulas"].toArray());
 
@@ -861,7 +945,7 @@ Resultado<SolverConfig> SolverConfig::fromJson(const QJsonObject& obj)
         validarUnPlanPorCurso(config),     validarDisponibilidad(config),    validarCoherenciaHoras(config),
         validarCandidatosElegibles(config), validarFranjasUtiles(config),    validarAulasMoviles(config),
         validarTiposDeclarados(config),    validarTiposConAulas(config),
-        validarReferenciaGeneral(config)};
+        validarReferenciaGeneral(config),  validarPreferencias(config)};
     for (const QString& error : errores)
         if (!error.isEmpty())
             return Resultado<SolverConfig>::error(error);
@@ -883,6 +967,10 @@ QJsonObject SolverConfig::toJson() const
     obj["planes"]         = aJson(planes);
     obj["cursos"]         = aJson(cursos);
     obj["profesores"]     = aJson(profesores);
+    // La sección es OPCIONAL y se OMITE vacía (013, RF-2): sin preferencias el JSON es el
+    // mismo que producía el contrato antes de la 013 y el preset no gana una sección hueca.
+    if (!preferencias.isEmpty())
+        obj["preferencias"] = aJson(preferencias);
     obj["materias"]       = aJson(materias);
     obj["aulas"]          = aJson(aulas);
     return obj;

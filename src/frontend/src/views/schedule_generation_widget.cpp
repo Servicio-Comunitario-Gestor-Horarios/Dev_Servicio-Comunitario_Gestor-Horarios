@@ -129,7 +129,8 @@ void ScheduleGenerationWidget::setClient(InternalClient* client)
         m_servicio = new ServicioGeneracion(
             *m_puerto, 60000,
             [this]() {
-                return m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo) : QString();
+                return m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo, leerOpciones())
+                                : QString();
             },
             {},
             [this]() {
@@ -980,15 +981,19 @@ void ScheduleGenerationWidget::onGenerarClicked()
 
     m_contexto = composicion.contexto;
     m_entradaActual = composicion.entrada;
+    // Diagnóstico de la construcción (013, RF-8): el servicio lo usa para informar el estado
+    // de cada preferencia y el cumplimiento agregado del resultado.
+    m_preferenciasNoAplicadas = composicion.preferenciasNoAplicadas;
 
     m_btnGenerar->setEnabled(false);
     m_progreso->setVisible(true);
     establecerEstado(QStringLiteral("Generando horarios… puede tardar unos segundos."));
     // Huella de la instantánea que se envía: el servicio la compara al recibir la
-    // respuesta para decidir si los datos quedaron obsoletos (spec 011, RF-6).
+    // respuesta para decidir si los datos quedaron obsoletos (spec 011, RF-6; la 013 añade
+    // las preferencias intervinientes). Mismo camino de composición y mismas opciones.
     const QString huella =
-        m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo) : QString();
-    m_servicio->generar(m_entradaActual, huella);
+        m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo, opciones) : QString();
+    m_servicio->generar(m_entradaActual, huella, m_preferenciasNoAplicadas);
 }
 
 void ScheduleGenerationWidget::onGeneracionFinalizada()

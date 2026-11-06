@@ -116,6 +116,21 @@ private:
         return o;
     }
 
+    /// Configuración válida con la sección opcional `preferencias` ya proyectada (013).
+    ///
+    /// `configValida()` declara 1 docente, 5 días y 6 franjas: la preferencia está en rango.
+    QJsonObject configValidaConPreferencias() const
+    {
+        QJsonObject o = configValida();
+        QJsonObject p;
+        p["docente"] = 0;
+        p["dia"]     = 1;
+        p["slot"]    = QJsonArray{0, 1};
+        p["sentido"] = QStringLiteral("preferida");
+        o["preferencias"] = QJsonArray{p};
+        return o;
+    }
+
     /// Escribe `contenido` en `ruta` (para probar el cargador contra disco).
     static void escribir(const QString& ruta, const QByteArray& contenido)
     {
@@ -429,6 +444,63 @@ private slots:
 
         QVERIFY(!resultado.ok);
         QVERIFY(!resultado.mensajeError.isEmpty());
+    }
+
+    /// RF-2 (013): guardar un preset NO persiste preferencias; la configuración en memoria
+    /// sí las conserva (la equivalencia de ida y vuelta es de la configuración, no del preset).
+    void guardarPreset_omiteLaSeccionDePreferencias()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("preset.json");
+
+        const auto parseada = SolverConfig::fromJson(configValidaConPreferencias());
+        QVERIFY2(parseada.ok, qPrintable(parseada.mensajeError));
+        QCOMPARE(parseada.valor.preferencias.size(), 1);
+
+        const auto guardado = CargadorConfiguracionSolver::guardar(ruta, parseada.valor);
+        QVERIFY2(guardado.ok, qPrintable(guardado.mensajeError));
+        QVERIFY(QFile::exists(ruta));
+
+        // El archivo no contiene la clave, ni como texto.
+        const QByteArray bytes = leerBytes(ruta);
+        QVERIFY(!bytes.isEmpty());
+        QVERIFY(!bytes.contains("preferencias"));
+
+        const QJsonObject archivo = QJsonDocument::fromJson(bytes).object();
+        QVERIFY(!archivo.contains(QStringLiteral("preferencias")));
+
+        // La configuración en memoria no se toca: `guardar` la recibe constante.
+        QCOMPARE(parseada.valor.preferencias.size(), 1);
+        QCOMPARE(parseada.valor.preferencias[0].docente, 0);
+        QCOMPARE(parseada.valor.preferencias[0].dia, 1);
+        QCOMPARE(parseada.valor.preferencias[0].slot, (QVector<int>{0, 1}));
+        QCOMPARE(parseada.valor.preferencias[0].sentido, QStringLiteral("preferida"));
+    }
+
+    /// RF-2 (013): un preset que declara la sección se carga sin usarla —se tolera tal cual,
+    /// sin reproyectar ni completar— y al volver a guardarlo el preset no la conserva.
+    void presetConPreferencias_seCargaSinUsarse()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("preset-con-preferencias.json");
+        escribir(ruta, QJsonDocument(configValidaConPreferencias()).toJson());
+
+        const auto leido = CargadorConfiguracionSolver::cargar(ruta);
+        QVERIFY2(leido.ok, qPrintable(leido.mensajeError));
+
+        // Lo declarado se conserva en la configuración en memoria, sin proyectar ni ampliar.
+        QCOMPARE(leido.valor.preferencias.size(), 1);
+        QCOMPARE(leido.valor.preferencias[0].docente, 0);
+        QCOMPARE(leido.valor.preferencias[0].dia, 1);
+        QCOMPARE(leido.valor.preferencias[0].slot, (QVector<int>{0, 1}));
+        QCOMPARE(leido.valor.preferencias[0].sentido, QStringLiteral("preferida"));
+
+        // Pero el preset no es fuente de preferencias: no se propaga a uno nuevo.
+        const QString otro = dir.filePath("preset-nuevo.json");
+        QVERIFY(CargadorConfiguracionSolver::guardar(otro, leido.valor).ok);
+        QVERIFY(!leerBytes(otro).contains("preferencias"));
     }
 };
 

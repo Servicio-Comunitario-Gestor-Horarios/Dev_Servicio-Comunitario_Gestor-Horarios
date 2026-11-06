@@ -105,6 +105,30 @@ private:
         return o;
     }
 
+    /// Devuelve `config2_0()` con la sección opcional `preferencias` ya proyectada (013).
+    ///
+    /// La configuración declara 1 docente, 5 días y 6 franjas al día, así que las dos
+    /// preferencias de abajo están en rango.
+    QJsonObject config2_0ConPreferencias() const
+    {
+        QJsonObject o = config2_0();
+
+        QJsonObject evitada;
+        evitada["docente"] = 0;
+        evitada["dia"]     = 1;
+        evitada["slot"]    = QJsonArray{2, 3};
+        evitada["sentido"] = QStringLiteral("evitada");
+
+        QJsonObject preferida;
+        preferida["docente"] = 0;
+        preferida["dia"]     = 4;
+        preferida["slot"]    = QJsonArray{5};
+        preferida["sentido"] = QStringLiteral("preferida");
+
+        o["preferencias"] = QJsonArray{evitada, preferida};
+        return o;
+    }
+
 private slots:
 
     void bloques_esIdentidad()
@@ -155,6 +179,17 @@ private slots:
         QVERIFY(COSTE_SUPLENTE > PESO_AGRUPACION);
         QVERIFY(PESO_AGRUPACION > 0);
         QCOMPARE(PESO_AGRUPACION, 10);
+    }
+
+    /// RF-5 (013): la preferencia pesa más que la agrupación y menos que un suplente, con 25
+    /// como constante del motor (no viaja en la configuración).
+    void constantes_jerarquiaConPreferencia()
+    {
+        using namespace ContratoSolver;
+        QCOMPARE(PESO_PREFERENCIA, 25);
+        QVERIFY(PESO_AGRUPACION < PESO_PREFERENCIA);
+        QVERIFY(PESO_PREFERENCIA < COSTE_SUPLENTE);
+        QVERIFY(COSTE_SUPLENTE < PESO_HORAS);
     }
 
     // Helper: config de prueba con turnos y eventos reales
@@ -478,6 +513,99 @@ private slots:
         QCOMPARE(config.valor.toJson()[QStringLiteral("materias")].toArray()[0].toObject()
                      [QStringLiteral("tipo")].toString(),
                  QStringLiteral("  Laboratorio  "));
+    }
+
+    // ─── Sección opcional de preferencias (013, RF-2) ───
+
+    /// RF-2: sin la sección y con la sección vacía la configuración es la misma, y `toJson`
+    /// omite la clave vacía (sin preferencias el JSON es el de hoy, sin una sección hueca).
+    void preferencias_sinSeccionYseccionVacia_sonEquivalentesYnoSeSerializan()
+    {
+        const auto sinSeccion = SolverConfig::fromJson(config2_0());
+        QVERIFY2(sinSeccion.ok, qPrintable(sinSeccion.mensajeError));
+        QVERIFY(sinSeccion.valor.preferencias.isEmpty());
+
+        QJsonObject conSeccionVacia = config2_0();
+        conSeccionVacia[QStringLiteral("preferencias")] = QJsonArray{};
+        const auto vacia = SolverConfig::fromJson(conSeccionVacia);
+        QVERIFY2(vacia.ok, qPrintable(vacia.mensajeError));
+        QVERIFY(vacia.valor.preferencias.isEmpty());
+
+        QCOMPARE(vacia.valor.toJson(), sinSeccion.valor.toJson());
+        QVERIFY(!sinSeccion.valor.toJson().contains(QStringLiteral("preferencias")));
+        QVERIFY(!vacia.valor.toJson().contains(QStringLiteral("preferencias")));
+
+        // Una configuración recién construida en C++ tampoco gana la sección.
+        const SolverConfig porDefecto;
+        QVERIFY(!porDefecto.toJson().contains(QStringLiteral("preferencias")));
+    }
+
+    /// RF-2: la sección viaja ya proyectada —docente por índice, día de la generación,
+    /// franjas y sentido— y no transporta rangos de reloj.
+    void preferencias_formaProyectada_seParsean()
+    {
+        const auto config = SolverConfig::fromJson(config2_0ConPreferencias());
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+
+        QCOMPARE(config.valor.preferencias.size(), 2);
+        QCOMPARE(config.valor.preferencias[0].docente, 0);
+        QCOMPARE(config.valor.preferencias[0].dia, 1);
+        QCOMPARE(config.valor.preferencias[0].slot, (QVector<int>{2, 3}));
+        QCOMPARE(config.valor.preferencias[0].sentido, QStringLiteral("evitada"));
+        QCOMPARE(config.valor.preferencias[1].docente, 0);
+        QCOMPARE(config.valor.preferencias[1].dia, 4);
+        QCOMPARE(config.valor.preferencias[1].slot, (QVector<int>{5}));
+        QCOMPARE(config.valor.preferencias[1].sentido, QStringLiteral("preferida"));
+
+        const QJsonObject json = config.valor.toJson();
+        QVERIFY(json.contains(QStringLiteral("preferencias")));
+        const QJsonObject p = json[QStringLiteral("preferencias")].toArray()[0].toObject();
+        QCOMPARE(p[QStringLiteral("docente")].toInt(), 0);
+        QCOMPARE(p[QStringLiteral("dia")].toInt(), 1);
+        QCOMPARE(p[QStringLiteral("slot")].toArray(), (QJsonArray{2, 3}));
+        QCOMPARE(p[QStringLiteral("sentido")].toString(), QStringLiteral("evitada"));
+        QVERIFY(!p.contains(QStringLiteral("inicio")));
+        QVERIFY(!p.contains(QStringLiteral("fin")));
+    }
+
+    /// RF-2: la equivalencia de ida y vuelta se cumple en la configuración EN MEMORIA:
+    /// serializar y volver a leer reproduce las preferencias campo a campo.
+    void preferencias_idaYVueltaEnMemoria_sinPerdida()
+    {
+        const auto primera = SolverConfig::fromJson(config2_0ConPreferencias());
+        QVERIFY2(primera.ok, qPrintable(primera.mensajeError));
+
+        const QJsonObject serializado = primera.valor.toJson();
+        const auto segunda = SolverConfig::fromJson(serializado);
+        QVERIFY2(segunda.ok, qPrintable(segunda.mensajeError));
+
+        QCOMPARE(segunda.valor.preferencias.size(), primera.valor.preferencias.size());
+        for (int i = 0; i < primera.valor.preferencias.size(); ++i) {
+            QCOMPARE(segunda.valor.preferencias[i].docente, primera.valor.preferencias[i].docente);
+            QCOMPARE(segunda.valor.preferencias[i].dia, primera.valor.preferencias[i].dia);
+            QCOMPARE(segunda.valor.preferencias[i].slot, primera.valor.preferencias[i].slot);
+            QCOMPARE(segunda.valor.preferencias[i].sentido, primera.valor.preferencias[i].sentido);
+        }
+        QCOMPARE(segunda.valor.toJson(), serializado);
+    }
+
+    /// RF-2: un campo extra dentro de una preferencia se tolera y no reaparece al serializar.
+    void preferencias_camposDesconocidos_seToleran()
+    {
+        QJsonObject o = config2_0ConPreferencias();
+        QJsonArray preferencias = o[QStringLiteral("preferencias")].toArray();
+        QJsonObject p = preferencias[0].toObject();
+        p[QStringLiteral("comentario")] = QStringLiteral("se ignora");
+        preferencias[0] = p;
+        o[QStringLiteral("preferencias")] = preferencias;
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+
+        const QJsonObject serializado = config.valor.toJson();
+        const QJsonObject primera =
+            serializado[QStringLiteral("preferencias")].toArray()[0].toObject();
+        QVERIFY(!primera.contains(QStringLiteral("comentario")));
     }
 };
 

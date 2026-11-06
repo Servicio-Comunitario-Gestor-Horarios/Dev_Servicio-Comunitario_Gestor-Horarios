@@ -129,6 +129,12 @@ private slots:
                 GeneracionSolver::construirEntrada(nucleo, ui);
             QVERIFY2(comp.avisos.isEmpty(), qPrintable(comp.avisos.join(QStringLiteral("; "))));
 
+            // Regresión sin preferencias (013, T10): el seed siembra 0 preferencias, así que la
+            // entrada conserva la forma de siempre y NO gana la sección opcional.
+            QVERIFY2(!comp.entrada.contains(QStringLiteral("preferencias")),
+                     "con 0 preferencias la entrada no debe declarar la sección");
+            QVERIFY(comp.preferenciasNoAplicadas.isEmpty());
+
             const Resultado<SolverConfig> validacion = validarEntradaSolver(comp.entrada);
             QVERIFY2(validacion.ok, qPrintable(validacion.mensajeError));
 

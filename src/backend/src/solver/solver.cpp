@@ -12,11 +12,14 @@
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/model.h"
 #include "qvariant.h"
+#include <cmath>
 #include <cstdio>
 #include <QElapsedTimer>
 #include <QMap>
 #include <QSet>
 #include <QStringList>
+
+#include <tuple>
 
 using namespace operations_research::sat;
 
@@ -54,7 +57,7 @@ QString claveMateria(const SolverConfig& config, int m) {
 }
 
 /// Categoría (1) entrada inválida: la configuración no es consistente como entrada del solver.
-/// En el flujo real, V1–V18 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
+/// En el flujo real, V1–V19 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
 /// y las llamadas directas al solver con una configuración inconsistente.
 QString causaEntradaInvalida(const SolverConfig& config) {
     const DimensionesConfig& d = config.dimensiones;
@@ -186,55 +189,207 @@ QString primeraCausaNoFactible(const SolverConfig& config) {
     return causaConflictoDeAsignacion(config);
 }
 
+/// ¿La respuesta contiene una solución utilizable? (OPTIMAL o FEASIBLE)
+bool esFactible(CpSolverStatus status) {
+    return status == CpSolverStatus::OPTIMAL || status == CpSolverStatus::FEASIBLE;
+}
+
+/// Clave de deduplicación del objetivo: (docente, día de la generación, slot).
+///
+/// Es la misma unidad que `FranjaSemana` de la 005, pero con el docente: Qt no ofrece `qHash`
+/// para `std::tuple`, así que el proyecto usa una clave con `qHash` propia (como `FranjaSemana`).
+struct FranjaPreferencia {
+    int docente = 0;
+    int dia = 0;
+    int slot = 0;
+};
+
+inline bool operator==(const FranjaPreferencia& a, const FranjaPreferencia& b) {
+    return a.docente == b.docente && a.dia == b.dia && a.slot == b.slot;
+}
+
+inline size_t qHash(const FranjaPreferencia& franja, size_t seed = 0) noexcept {
+    return qHashMulti(seed, franja.docente, franja.dia, franja.slot);
+}
+
 } // namespace
 
 
 Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
+    return resolver(config, PresupuestoFases{});
+}
+
+Solver::ResultadoSolver Solver::resolver(const SolverConfig& config,
+                                         const PresupuestoFases& presupuesto) {
     QElapsedTimer timer;
     timer.start();
 
+    ResultadoSolver resultado;
+    resultado.exito = false;
+
+    // FASE 1 — referencia (013, RF-1): el modelo de HOY, S1 + S2 + S3. Es la generación de
+    // referencia contra la que se exige la igualdad de reparto y de exceso.
+    prepararModelo(config);
+    construirObjetivo(config);
+    const CpSolverResponse referencia = ejecutar(presupuesto.referencia);
+
+    if (!esFactible(referencia.status())) {
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.errores = analizarFallo(referencia, config);
+        return resultado;
+    }
+
+    // Se extrae AHORA: `vars` corresponde todavía a esta respuesta (con otro modelo, los
+    // índices de variable no valdrían para leerla).
+    HorarioSalida horario = extraerSolucion(referencia, config);
+
+    // Sin preferencias no se ejecuta la fase 2: se devuelve exactamente la referencia (RF-4).
+    if (config.preferencias.isEmpty()) {
+        resultado.exito = true;
+        resultado.tiempo_ms = timer.elapsed();
+        horario.metadata.tiempo_ejecucion_ms = static_cast<int>(resultado.tiempo_ms);
+        resultado.resultado = horario;
+        return resultado;
+    }
+
+    // FASE 2 — cumplimiento de preferencias con z* y e* FIJADOS por igualdad (RF-1). La
+    // garantía estructural es por construcción, no por magnitudes: la preferencia solo elige
+    // dónde caen las clases.
+    const AnclajeEstructural anclaje = extraerAnclaje(referencia);
+    prepararModelo(config);
+    fijarAnclaje(anclaje);
+    model.Minimize(expresionPreferencias(config));
+    const CpSolverResponse fase2 = ejecutar(presupuesto.preferencias);
+
+    if (esFactible(fase2.status())) {
+        // Se extrae AHORA, antes de reconstruir el modelo para la 2b.
+        horario = extraerSolucion(fase2, config);
+
+        // FASE 2b — S3 como desempate con la preferencia FIJADA a su valor de la 2a (RF-5).
+        // Así la preferencia gana a la agrupación en agregado: no depende de 25 frente a 10.
+        // `objective_value()` es la suma entera de la expresión de preferencias; se redondea
+        // para pasarla como término independiente de la igualdad.
+        const int64_t valorPreferencia =
+            static_cast<int64_t>(std::llround(fase2.objective_value()));
+
+        prepararModelo(config);
+        fijarAnclaje(anclaje);
+        model.AddEquality(expresionPreferencias(config), valorPreferencia);
+        construirObjetivoSoloS3();
+        const CpSolverResponse fase2b = ejecutar(presupuesto.agrupacion);
+
+        if (esFactible(fase2b.status())) {
+            horario = extraerSolucion(fase2b, config);
+        } else if (fase2b.status() == CpSolverStatus::INFEASIBLE ||
+                   fase2b.status() == CpSolverStatus::UNKNOWN) {
+            // 2b→2a: el cumplimiento ya estaba garantizado; S3 solo desempataba. Se queda la
+            // solución de la 2a (P7).
+        } else {
+            // MODEL_INVALID y otros errores internos se propagan como fallo.
+            resultado.tiempo_ms = timer.elapsed();
+            resultado.errores = analizarFallo(fase2b, config);
+            return resultado;
+        }
+    } else if (fase2.status() == CpSolverStatus::INFEASIBLE ||
+               fase2.status() == CpSolverStatus::UNKNOWN) {
+        // P6/P7: 2a→1, se devuelve la referencia. La preferencia se incumple antes que cambiar
+        // el reparto de docentes o el exceso de horas; nunca se declara infactible por preferir.
+    } else {
+        // MODEL_INVALID y otros errores internos sí se propagan como fallo.
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.errores = analizarFallo(fase2, config);
+        return resultado;
+    }
+
+    resultado.exito = true;
+    resultado.tiempo_ms = timer.elapsed();
+    horario.metadata.tiempo_ejecucion_ms = static_cast<int>(resultado.tiempo_ms);
+    resultado.resultado = horario;
+    return resultado;
+}
+
+void Solver::prepararModelo(const SolverConfig& config) {
     // No arrastrar estado entre resoluciones: `model` y `vars` son miembros y una segunda
     // llamada acumularía variables y restricciones. Se reinician al inicio (F3), de modo que
     // dos llamadas a la misma instancia equivalen a dos instancias nuevas.
     model = CpModelBuilder();
     vars = VariablesSolver();
 
-    ResultadoSolver resultado;
-    resultado.exito = false;
-    
-    // Crear variables de decision
     vars = crearVariables(model, config);
-
-    // Agregar restricciones
     agregarRestricciones(config);
+}
 
-    // Objetivo
-    construirObjetivo(config);
-
-    // Resolver CP-SAT (parametros deterministas: RNF-1)
+CpSolverResponse Solver::ejecutar(double presupuesto) {
+    // Parámetros deterministas: un worker, seed 0 y presupuesto determinista (RNF-1).
     SatParameters params;
     params.set_num_search_workers(1);
     params.set_random_seed(0);
-    params.set_max_deterministic_time(6.0);
+    params.set_max_deterministic_time(presupuesto);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
-    const CpSolverResponse response = SolveCpModel(model.Build(), &sat_model);
-    resultado.tiempo_ms = timer.elapsed();
+    return SolveCpModel(model.Build(), &sat_model);
+}
 
-    // Verificar status
-    if (response.status() == CpSolverStatus::OPTIMAL ||
-        response.status() == CpSolverStatus::FEASIBLE) {
-        resultado.exito = true;
-        resultado.resultado = extraerSolucion(response, config);
-        // La metadata publica el tiempo medido por el propio solver (F2).
-        resultado.resultado.metadata.tiempo_ejecucion_ms =
-            static_cast<int>(resultado.tiempo_ms);
-    } else {
-        resultado.errores = analizarFallo(response, config);
+Solver::AnclajeEstructural Solver::extraerAnclaje(const CpSolverResponse& response) const {
+    AnclajeEstructural anclaje;
+    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd();
+         ++it) {
+        anclaje.docentePorMateria.insert(it.key(),
+                                         SolutionBooleanValue(response, it.value()) ? 1 : 0);
+    }
+    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
+        anclaje.excesoPorDocente.insert(
+            it.key(), static_cast<int>(SolutionIntegerValue(response, it.value())));
+    }
+    return anclaje;
+}
+
+void Solver::fijarAnclaje(const AnclajeEstructural& anclaje) {
+    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd();
+         ++it) {
+        model.AddEquality(it.value(), anclaje.docentePorMateria.value(it.key(), 0));
+    }
+    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
+        model.AddEquality(it.value(), anclaje.excesoPorDocente.value(it.key(), 0));
+    }
+}
+
+LinearExpr Solver::expresionPreferencias(const SolverConfig& config) const {
+    // Deduplicación por (docente, día, slot) y sentido: una franja alcanzada por dos
+    // preferencias del MISMO sentido se cuenta una sola vez (P1). Dos sentidos opuestos sobre
+    // la misma franja se aplican los dos y se compensan (V19 no comprueba solapes).
+    QSet<FranjaPreferencia> evitadas;
+    QSet<FranjaPreferencia> preferidas;
+    for (const PreferenciaSolverConfig& preferencia : config.preferencias) {
+        QSet<FranjaPreferencia>* destino = nullptr;
+        if (preferencia.sentido == QLatin1String("evitada"))
+            destino = &evitadas;
+        else if (preferencia.sentido == QLatin1String("preferida"))
+            destino = &preferidas;
+        if (!destino)
+            continue;   // sentido desconocido: V19 lo rechaza; aquí no se inventa un término
+
+        for (int slot : preferencia.slot)
+            destino->insert(FranjaPreferencia{preferencia.docente, preferencia.dia, slot});
     }
 
-    return resultado;
+    // Penaliza lo evitado y premia lo preferido con el mismo peso y la misma unidad (por franja
+    // de clase). El premio es un coste negativo equivalente (RF-4).
+    LinearExpr expresion = LinearExpr(0);
+    for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
+        const auto [p, m, c, d, s] = it.key();
+        const FranjaPreferencia franja{p, d, s};
+        if (evitadas.contains(franja)) {
+            expresion =
+                expresion + LinearExpr::Term(it.value(), ContratoSolver::PESO_PREFERENCIA);
+        }
+        if (preferidas.contains(franja)) {
+            expresion =
+                expresion + LinearExpr::Term(it.value(), -ContratoSolver::PESO_PREFERENCIA);
+        }
+    }
+    return expresion;
 }
 
 void Solver::construirObjetivo(const SolverConfig& config) {
@@ -266,6 +421,15 @@ void Solver::construirObjetivo(const SolverConfig& config) {
     for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
         objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
 
+    model.Minimize(objetivo);
+}
+
+void Solver::construirObjetivoSoloS3() {
+    // S3 tal cual lo define hoy el motor: PESO_AGRUPACION por cada clase AISLADA (grupo de 1).
+    // Es el mismo término que la fase 1, sin S1 ni S2 (ya fijados por igualdad).
+    LinearExpr objetivo = LinearExpr(0);
+    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
+        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
     model.Minimize(objetivo);
 }
 

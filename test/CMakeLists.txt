@@ -116,6 +116,9 @@ if(TARGET backend)
 	# Modelo puro de preferencias y validación compartida de franjas (012 T1).
 	add_gtest(test_preferencias backend/test_preferencias.cpp backend)
 
+	# Rejilla compartida y proyección reloj → franja de las preferencias (013 T2).
+	add_gtest(test_proyeccion_preferencias backend/test_proyeccion_preferencias.cpp backend)
+
 	# Servicio de preferencias horarias del docente (012 T3).
 	add_qtest(test_servicio_preferencias
 				backend/test_servicio_preferencias.cpp
@@ -145,6 +148,8 @@ if(TARGET backend_solver)
 	add_gtest(test_backend_variables_cp_sat backend/test_variables_cp_sat.cpp backend_solver)
 	add_qtest(test_solver_horarios backend/test_solver_horarios.cpp backend_solver)
 	add_qtest(test_solver_benchmark backend/test_solver_benchmark.cpp backend_solver)
+	# Objetivo con preferencias: referencia, anclaje estructural y deduplicación (013 T5).
+	add_gtest(test_solver_preferencias backend/test_solver_preferencias.cpp backend_solver)
 	add_qtest(test_ipc_aislamiento_bd test_ipc_aislamiento_bd.cpp backend_solver middleware Qt6::Sql)
 endif()
 

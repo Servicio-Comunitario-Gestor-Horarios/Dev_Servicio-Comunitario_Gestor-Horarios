@@ -95,7 +95,13 @@ Resultado<bool> CargadorConfiguracionSolver::guardar(const QString& ruta, const 
                 .arg(ruta));
     }
 
-    const QJsonDocument doc(config.toJson());
+    // Un preset NO persiste preferencias (013, RF-2): se elimina la clave aunque la
+    // configuración en memoria las conserve. La ida y vuelta sin pérdida es de la
+    // configuración, no del preset.
+    QJsonObject objeto = config.toJson();
+    objeto.remove(QStringLiteral("preferencias"));
+
+    const QJsonDocument doc(objeto);
     if (archivo.write(doc.toJson(QJsonDocument::Indented)) == -1)
     {
         archivo.close();

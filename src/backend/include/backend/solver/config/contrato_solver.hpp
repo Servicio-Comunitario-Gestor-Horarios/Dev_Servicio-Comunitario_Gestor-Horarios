@@ -21,6 +21,18 @@ namespace ContratoSolver {
     constexpr int COSTE_SUPLENTE = 100;
     constexpr int COSTE_MAX_SUPLENTE = 100;
     constexpr int PESO_AGRUPACION = 10;
+    /// Preferencia horaria del docente (013, RF-5): por encima de S3 y por debajo de S2.
+    /// No viaja en la configuración: es una constante del motor.
+    constexpr int PESO_PREFERENCIA = 25;
+
+    // Jerarquía por unidad: S1 > S2 > preferencia > S3 (RF-5). La igualdad de S1/S2 la
+    // garantiza la fase 2 por anclaje (el orden por unidad no basta con un objetivo aditivo).
+    static_assert(PESO_HORAS > COSTE_SUPLENTE,
+                  "S1 (PESO_HORAS) debe pesar más que S2 (COSTE_SUPLENTE)");
+    static_assert(COSTE_SUPLENTE > PESO_PREFERENCIA,
+                  "la preferencia (PESO_PREFERENCIA) debe quedar por debajo de S2 (COSTE_SUPLENTE)");
+    static_assert(PESO_PREFERENCIA > PESO_AGRUPACION,
+                  "la preferencia (PESO_PREFERENCIA) debe pesar más que S3 (PESO_AGRUPACION)");
 }
 
 int bloques(int horas, int duracion_minutos);

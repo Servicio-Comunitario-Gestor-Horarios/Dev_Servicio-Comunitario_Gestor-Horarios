@@ -2,48 +2,13 @@
 
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/duracion_horaria.hpp"
+#include "backend/services/proyeccion_preferencias.hpp"
 
-#include <QJsonArray>
 #include <QTime>
 #include <QVector>
 
-#include <algorithm>
-
 namespace
 {
-    /// Turno del dominio con su offset absoluto de slots dentro del día.
-    struct TurnoOrdenado
-    {
-        QString nombre;
-        QTime   inicio;
-        QTime   fin;
-        int     numSlots = 0;
-        int     offset = 0;
-    };
-
-    /// Ordena los turnos por hora de inicio y calcula el offset de slots de cada
-    /// uno (los slots de un turno continúan donde terminan los del anterior).
-    QVector<TurnoOrdenado> ordenarTurnos(const QVector<TurnoDTO>& turnos)
-    {
-        QVector<TurnoOrdenado> ordenados;
-        ordenados.reserve(turnos.size());
-        for (const TurnoDTO& t : turnos)
-            ordenados.append(TurnoOrdenado{t.nombre, t.inicio, t.fin, t.numSlots, 0});
-
-        std::sort(ordenados.begin(), ordenados.end(),
-                  [](const TurnoOrdenado& a, const TurnoOrdenado& b) {
-                      return a.inicio < b.inicio;
-                  });
-
-        int offset = 0;
-        for (TurnoOrdenado& t : ordenados)
-        {
-            t.offset = offset;
-            offset += t.numSlots;
-        }
-        return ordenados;
-    }
-
     /// Índice del aula con `id` en `aulas`, o -1 si no está.
     int indiceAula(const QVector<AulaDTO>& aulas, int id)
     {
@@ -99,68 +64,30 @@ namespace
                 return &p;
         return nullptr;
     }
-
-    /// Slots (absolutos del día) cubiertos por una franja de disponibilidad.
-    ///
-    /// La franja declara el horario de reloj en que el docente está disponible y
-    /// puede abarcar VARIOS turnos (p. ej. 07:00–18:00 cubre mañana y tarde). Se
-    /// emite cada bloque —anclado en el `inicio` de su turno y avanzando en pasos
-    /// de `duracionMinutos`, sin que el receso desplace bloques— que cae
-    /// ÍNTEGRAMENTE dentro de la franja. Es la misma semántica que usa la
-    /// cobertura del seed («la franja contiene un bloque completo»).
-    QVector<int> slotsDeFranja(const FranjaHoraria& franja,
-                               const QVector<TurnoOrdenado>& turnos,
-                               int duracionMinutos)
-    {
-        QVector<int> listaSlots;
-        if (duracionMinutos <= 0 || !franja.inicio.isValid() || !franja.fin.isValid())
-            return listaSlots;
-
-        const int paso = duracionMinutos * 60;
-        for (const TurnoOrdenado& t : turnos)
-        {
-            for (int k = 0; k < t.numSlots; ++k)
-            {
-                const QTime bloqueInicio = t.inicio.addSecs(k * paso);
-                const QTime bloqueFin    = bloqueInicio.addSecs(paso);
-                if (bloqueInicio >= franja.inicio && bloqueFin <= franja.fin)
-                    listaSlots.append(t.offset + k);
-            }
-        }
-        return listaSlots;
-    }
-
-    QJsonArray intArray(const QVector<int>& valores)
-    {
-        QJsonArray arr;
-        for (int v : valores)
-            arr.append(v);
-        return arr;
-    }
 } // namespace
 
-Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
-                                            const SolverConfig& parametros,
-                                            int duracionMinutos,
-                                            const QDateTime& ahora)
+Resultado<EntradaConstruida> construirEntradaCompleta(const DatosDominio& datos,
+                                                      const SolverConfig& parametros,
+                                                      int duracionMinutos,
+                                                      const QDateTime& ahora)
 {
     // 1. Tipos obligatorios (RF-1). Orden determinista: aulas y luego materias, en el orden de la
     //    instantánea; el primer defecto detiene la construcción y no se emite JSON.
     for (const AulaDTO& a : datos.aulas)
         if (a.tipoAula.trimmed().isEmpty())
-            return Resultado<QJsonObject>::error(
+            return Resultado<EntradaConstruida>::error(
                 QStringLiteral("El aula «%1» no tiene tipo de aula. Asígnelo en el catálogo de "
                                "tipos antes de generar el horario.")
                     .arg(a.nombre));
 
     for (const MateriaDTO& m : datos.materias)
         if (m.tipoAula.trimmed().isEmpty())
-            return Resultado<QJsonObject>::error(
+            return Resultado<EntradaConstruida>::error(
                 QStringLiteral("La materia «%1» no tiene tipo de aula requerido. Asígnelo antes "
                                "de generar el horario.")
                     .arg(m.nombre));
 
-    const QVector<TurnoOrdenado> turnosOrdenados = ordenarTurnos(datos.turnos);
+    const QVector<TurnoProyectado> turnosOrdenados = ordenarTurnos(datos.turnos);
 
     SolverConfig salida;
 
@@ -178,7 +105,7 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
     // recibida fuera de 30–90 falla sin emitir JSON (mismo punto único que el contrato).
     const QString errorDuracion = duracion_horaria::errorDeRango(duracionMinutos);
     if (!errorDuracion.isEmpty())
-        return Resultado<QJsonObject>::error(errorDuracion);
+        return Resultado<EntradaConstruida>::error(errorDuracion);
 
     // Materias: pool global en el orden de la instantánea; el tipo viaja por su nombre.
     for (const MateriaDTO& m : datos.materias)
@@ -195,7 +122,7 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
     }
 
     // Turnos: slots absolutos por orden de inicio + ventana del turno para V2.
-    for (const TurnoOrdenado& t : turnosOrdenados)
+    for (const TurnoProyectado& t : turnosOrdenados)
     {
         TurnoConfig turno;
         turno.nombre = t.nombre;
@@ -276,6 +203,8 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
         {
             Disponibilidad sol;
             sol.dia  = disp.franja.dia - 1;   // dominio: 0=domingo; solver: 0=lunes
+            // Rejilla COMPARTIDA con las preferencias (`proyeccion_preferencias`): cada bloque
+            // que cae entero dentro de la franja, en todos los turnos del día.
             sol.slot = slotsDeFranja(disp.franja, turnosOrdenados,
                                      salida.franja_horaria.duracion_minutos);
             if (sol.dia >= 0)
@@ -325,13 +254,29 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
     salida.dimensiones.num_dias       = parametros.dimensiones.num_dias;
 
     int totalSlots = 0;
-    for (const TurnoOrdenado& t : turnosOrdenados)
+    for (const TurnoProyectado& t : turnosOrdenados)
         totalSlots += t.numSlots;
     salida.dimensiones.num_slots_dia =
         parametros.dimensiones.num_slots_dia > 0 ? parametros.dimensiones.num_slots_dia
                                                  : totalSlots;
 
-    // JSON final: 13 secciones (12 del SolverConfig + `meta`).
+    // Preferencias (013, RF-2/RF-3): SIEMPRE desde los datos, ya proyectadas. La sección del
+    // preset no se copia (la salida se construye campo a campo): se ignora y se sobrescribe.
+    // Se proyecta sobre la configuración ya completa —cursos, planes, turnos y disponibilidad—
+    // y con 0 intervinientes el arreglo queda vacío, así que `toJson` omite la sección.
+    const ProyeccionPreferencias proyeccion =
+        proyectarPreferencias(datos, salida, duracionMinutos);
+    for (const PreferenciaProyectada& interviniente : proyeccion.intervinientes)
+    {
+        PreferenciaSolverConfig preferencia;
+        preferencia.docente = interviniente.docente;
+        preferencia.dia     = interviniente.dia;
+        preferencia.slot    = interviniente.slot;
+        preferencia.sentido = textoDeSentido(interviniente.sentido);
+        salida.preferencias.append(preferencia);
+    }
+
+    // JSON final: las secciones del contrato 2.0 (sin `preferencias` vacía) + `meta`.
     QJsonObject json = salida.toJson();
 
     QJsonObject meta;
@@ -340,7 +285,23 @@ Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
         ahora.isValid() ? ahora.toString(Qt::ISODate) : QString();
     json["meta"] = meta;
 
-    return Resultado<QJsonObject>::exito(json);
+    EntradaConstruida entrada;
+    entrada.json          = json;
+    entrada.intervinientes = proyeccion.intervinientes;
+    entrada.noAplicadas    = proyeccion.noAplicadas;
+    return Resultado<EntradaConstruida>::exito(entrada);
+}
+
+Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            int duracionMinutos,
+                                            const QDateTime& ahora)
+{
+    const Resultado<EntradaConstruida> construida =
+        construirEntradaCompleta(datos, parametros, duracionMinutos, ahora);
+    if (!construida.ok)
+        return Resultado<QJsonObject>::error(construida.mensajeError, construida.codigoError);
+    return Resultado<QJsonObject>::exito(construida.valor.json);
 }
 
 Resultado<QJsonObject> ConstructorEntradaSolver::construir(const DatosDominio& datos,

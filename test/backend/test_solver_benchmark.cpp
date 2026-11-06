@@ -90,6 +90,46 @@ private:
         return config;
     }
 
+    /// La misma configuración grande con preferencias proyectadas: cada docente evita la mañana
+    /// del primer día y prefiere la tarde del último (013, escenario de RNF-3).
+    SolverConfig crearConfigGrandeConPreferencias() {
+        SolverConfig config = crearConfigGrande();
+        for (int p = 0; p < config.profesores.size(); ++p) {
+            PreferenciaSolverConfig evitada;
+            evitada.docente = p;
+            evitada.dia = 0;
+            evitada.slot = {0, 1, 2};
+            evitada.sentido = QStringLiteral("evitada");
+            config.preferencias.append(evitada);
+
+            PreferenciaSolverConfig preferida;
+            preferida.docente = p;
+            preferida.dia = 4;
+            preferida.slot = {3, 4, 5};
+            preferida.sentido = QStringLiteral("preferida");
+            config.preferencias.append(preferida);
+        }
+        return config;
+    }
+
+    /// Resumen determinista de una salida: curso|día|slot|materia|profesor|aula, ordenado.
+    static QString resumenDeSalida(const Solver::ResultadoSolver& resultado) {
+        QStringList clases;
+        for (auto it = resultado.resultado.horarios.constBegin();
+             it != resultado.resultado.horarios.constEnd(); ++it)
+            for (const DiaOutput& dia : it.value().dias)
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                    clases.append(QStringLiteral("%1|%2|%3|%4|%5|%6")
+                                      .arg(it.key())
+                                      .arg(dia.dia)
+                                      .arg(asignacion.slot)
+                                      .arg(asignacion.materia)
+                                      .arg(asignacion.profesor)
+                                      .arg(asignacion.aula));
+        clases.sort();
+        return clases.join(QLatin1Char('\n'));
+    }
+
 private slots:
     void benchmark_solverGrandeResuelve() {
         SolverConfig config = crearConfigGrande();
@@ -120,6 +160,49 @@ private slots:
 
         QVERIFY(resultado.exito);
         QVERIFY(elapsed < 60000); // < 60 segundos
+    }
+
+    void benchmark_SolverGrandeConPreferencias() {
+        Solver solver;
+
+        // Referencia: la misma entrada sin preferencias (RNF-3).
+        const SolverConfig referenciaConfig = crearConfigGrande();
+        QElapsedTimer timer;
+        timer.start();
+        const auto referencia = solver.resolver(referenciaConfig);
+        const qint64 msReferencia = timer.elapsed();
+        QVERIFY2(referencia.exito, qPrintable(referencia.errores.join("\n")));
+
+        // Con preferencias (fase 1 + 2a + 2b).
+        const SolverConfig config = crearConfigGrandeConPreferencias();
+        timer.restart();
+        const auto primera = solver.resolver(config);
+        const qint64 msPrimera = timer.elapsed();
+        timer.restart();
+        const auto segunda = solver.resolver(config);
+        const qint64 msSegunda = timer.elapsed();
+
+        QVERIFY2(primera.exito, qPrintable(primera.errores.join("\n")));
+        QVERIFY2(segunda.exito, qPrintable(segunda.errores.join("\n")));
+
+        // RNF-2: dos ejecuciones seguidas dan el mismo horario.
+        QCOMPARE(resumenDeSalida(segunda), resumenDeSalida(primera));
+
+        // RNF-3: techo de 60 s (el +50 % se documenta, no se aserta: depende de la máquina).
+        QVERIFY2(msPrimera < 60000,
+                 qPrintable(QStringLiteral("la primera ejecución tardó %1 ms").arg(msPrimera)));
+        QVERIFY2(msSegunda < 60000,
+                 qPrintable(QStringLiteral("la segunda ejecución tardó %1 ms").arg(msSegunda)));
+
+        const double sobrecoste = msReferencia > 0
+                                      ? 100.0 * (msPrimera - msReferencia) / msReferencia
+                                      : 0.0;
+        qDebug() << "=== BENCHMARK CON PREFERENCIAS ===";
+        qDebug() << "Referencia (sin preferencias):" << msReferencia << "ms";
+        qDebug() << "Con preferencias (fase 1 + 2a + 2b):" << msPrimera << "ms /"
+                 << msSegunda << "ms";
+        qDebug() << "Sobrecoste frente a la referencia:" << sobrecoste
+                 << "% (umbral +50 %, se documenta en journal.md)";
     }
 
     void benchmark_verificaConsistencia() {

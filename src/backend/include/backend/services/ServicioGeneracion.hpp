@@ -15,16 +15,26 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
+#include <QVector>
 
 #include <functional>
 
 #include "backend/data/horario_salida.hpp"
 #include "backend/services/ConstructorEntradaSolver.hpp"
 #include "backend/services/ValidadorSalidaSolver.hpp"
+#include "backend/services/preferencias_cumplimiento.hpp"
+#include "backend/services/proyeccion_preferencias.hpp"
 
-/// Huella determinista de una instantánea de dominio y de la duración efectiva de la
-/// hora académica (para detectar «datos anteriores»). Pura.
-QString huellaDatos(const DatosDominio& datos, int duracionMinutos);
+/// Huella determinista de una instantánea de dominio, de la duración efectiva de la hora
+/// académica y de la proyección de las preferencias intervinientes (para detectar «datos
+/// anteriores»). Pura.
+///
+/// Entran solo las preferencias que **intervienen**, ya proyectadas —docente por índice, día de
+/// la generación, franjas y sentido—; el rango de reloj declarado **no** entra (RF-6 de la 013).
+/// Sin intervinientes no se emite el bloque y la huella vale exactamente lo mismo que antes de
+/// la 013. El orden de la lista y el de las franjas no la altera: se canonizan antes de hashear.
+QString huellaDatos(const DatosDominio& datos, int duracionMinutos,
+                    const QVector<PreferenciaProyectada>& intervinientes);
 
 /// Devuelve una copia del horario con `metadata.fecha_generacion` estampada con
 /// `ahora` (inyectado). Pura.
@@ -73,6 +83,9 @@ struct ResultadoGeneracion
     HorarioSalida horario;      ///< Válido si `presentable`.
     AnalisisSalida analisis;    ///< Avisos P1–P3 y conflictos P4.
     bool          presentable = false;
+    /// Estado por preferencia y cumplimiento agregado (013, RF-8). Aditivo: no viaja en el
+    /// contrato de salida del solver, se calcula aquí sobre el horario y la proyección.
+    CumplimientoPreferencias cumplimiento;
 };
 
 /// Orquesta una generación. Una sola en curso a la vez.
@@ -100,7 +113,11 @@ public:
                                 QObject* padre = nullptr);
 
     /// Inicia una generación. Si ya hay una en curso, no hace nada.
-    void generar(const QJsonObject& entrada, const QString& huella);
+    ///
+    /// `noAplicadas` es el diagnóstico de la construcción (preferencias que no intervinieron,
+    /// con su motivo); se usa para informar el cumplimiento del resultado (013, RF-8).
+    void generar(const QJsonObject& entrada, const QString& huella,
+                 const QVector<PreferenciaNoAplicada>& noAplicadas = {});
 
     bool enCurso() const { return m_enCurso; }
     const ResultadoGeneracion& ultimoResultado() const { return m_ultimo; }
@@ -123,6 +140,7 @@ private:
     bool m_enCurso = false;
     quint64 m_generacion = 0;
     QString m_huella;
+    QVector<PreferenciaNoAplicada> m_noAplicadas;   ///< diagnóstico de la última generación
     SolverConfig m_config;
     ResultadoGeneracion m_ultimo;
 };

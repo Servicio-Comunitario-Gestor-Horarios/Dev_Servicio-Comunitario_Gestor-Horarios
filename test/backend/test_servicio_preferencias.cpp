@@ -10,10 +10,11 @@
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
 #include <backend/services/ServicioPreferencias.hpp>
+#include <backend/services/proyeccion_preferencias.hpp>
 
 /// Tests del servicio de preferencias horarias del docente (RF-1, RF-2, RF-3,
-/// RNF-1): CRUD, orden, duplicados y solapes de sentidos opuestos. Las
-/// preferencias solo se persisten: no afectan a la generación.
+/// RNF-1): CRUD, orden, duplicados y solapes de sentidos opuestos. Este servicio solo
+/// persiste; el consumo por la generación es de la 013 (huella con las intervinientes).
 class TestServicioPreferencias : public QObject
 {
     Q_OBJECT
@@ -492,11 +493,12 @@ private slots:
         QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
     }
 
-    // ─── Sin efecto en la generación ni en la huella (RF-5) ─────────────────
+    // ─── Solo las preferencias INTERVINIENTES entran en la huella (013, RF-6) ─
 
-    /// Las preferencias no viajan al solver ni entran en la huella: cambiarlas no marca
-    /// «datos anteriores» mientras el solver no las consuma.
-    void huellaDatos_noCambiaConLasPreferenciasYtoProfesorLasIgnora()
+    /// Una preferencia que no interviene (aquí, domingo) llega a la huella como lista vacía y
+    /// no la cambia; una interviniente (ya proyectada) sí, y también su sentido. `toProfesor()`
+    /// sigue ignorándolas: el modelo del solver no cambia.
+    void huellaDatos_cambiaSoloConLasPreferenciasIntervinientesYtoProfesorLasIgnora()
     {
         DatosDominio sinPreferencias;
         ProfesorDTO docente;
@@ -507,26 +509,34 @@ private slots:
         docente.disponibilidad = {disponibilidad};
         sinPreferencias.docentes = {docente};
 
-        const QString huellaBase = huellaDatos(sinPreferencias, 35);
+        const QString huellaBase = huellaDatos(sinPreferencias, 35, {});
         QVERIFY(!huellaBase.isEmpty());
 
         PreferenciaDTO preferencia;
         preferencia.id = 7;
         preferencia.idProfesor = QStringLiteral("P1");
-        preferencia.franja = franja(2, 14, 0, 16, 0);
+        preferencia.franja = franja(0, 14, 0, 16, 0);   // domingo: no interviene nunca
         preferencia.sentido = SentidoPreferencia::Preferida;
 
         DatosDominio conPreferencias = sinPreferencias;
         conPreferencias.docentes[0].preferencias = {preferencia};
         QCOMPARE(conPreferencias.docentes[0].preferencias.size(), 1);
 
-        // La huella es la misma con y sin la preferencia (RF-5).
-        QCOMPARE(huellaDatos(conPreferencias, 35), huellaBase);
+        // No interviene: el llamador pasa la lista vacía y la huella no cambia (RF-6).
+        QCOMPARE(huellaDatos(conPreferencias, 35, {}), huellaBase);
 
-        // Tampoco influye su contenido: otro sentido deja la misma huella.
-        DatosDominio conOtra = conPreferencias;
-        conOtra.docentes[0].preferencias[0].sentido = SentidoPreferencia::Evitada;
-        QCOMPARE(huellaDatos(conOtra, 35), huellaBase);
+        // Una interviniente proyectada sí cambia la huella; su sentido también.
+        PreferenciaProyectada interviniente;
+        interviniente.docente = 0;
+        interviniente.dia = 1;
+        interviniente.slot = {4, 5};
+        interviniente.sentido = SentidoPreferencia::Preferida;
+        const QString conInterviniente = huellaDatos(conPreferencias, 35, {interviniente});
+        QVERIFY(conInterviniente != huellaBase);
+
+        PreferenciaProyectada evitada = interviniente;
+        evitada.sentido = SentidoPreferencia::Evitada;
+        QVERIFY(huellaDatos(conPreferencias, 35, {evitada}) != conInterviniente);
 
         // `toProfesor()` no copia las preferencias: el modelo del solver no cambia.
         const Profesor antes = sinPreferencias.docentes[0].toProfesor();
