@@ -203,18 +203,3 @@ QVector<QVector<int>> segmentosTurno(const TurnoConfig& turno, const QVector<Eve
     return segmentos;
 }
 
-bool esInicioSegmento(int slot, const QVector<QVector<int>>& segmentos)
-{
-    for (const QVector<int>& seg : segmentos)
-        if (!seg.isEmpty() && seg.first() == slot)
-            return true;
-    return false;
-}
-
-int calcularPenalizacionGrupo(int tamano, int horasDia)
-{
-    if (tamano <= 0) return 0;
-    if (tamano == 1) return (horasDia == 1) ? 0 : 1;  // D-4
-    if (tamano == 2 || tamano == 3) return 0;
-    return tamano - 3;  // ≥ 4
-}

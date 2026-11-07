@@ -169,25 +169,14 @@ private slots:
         QVERIFY(ContratoSolver::COSTE_SUPLENTE > 0);
     }
 
-    // ─── T1: PESO_AGRUPACION y funciones puras de agrupación ───
+    // ─── Jerarquía de las constantes del objetivo ───
 
-    void constantes_jerarquiaConAgrupacion()
-    {
-        using namespace ContratoSolver;
-        // Jerarquía: 1000 > 100 > 10 > 0
-        QVERIFY(PESO_HORAS > COSTE_SUPLENTE);
-        QVERIFY(COSTE_SUPLENTE > PESO_AGRUPACION);
-        QVERIFY(PESO_AGRUPACION > 0);
-        QCOMPARE(PESO_AGRUPACION, 10);
-    }
-
-    /// RF-5 (013): la preferencia pesa más que la agrupación y menos que un suplente, con 25
-    /// como constante del motor (no viaja en la configuración).
+    /// RF-5 (013): la preferencia pesa menos que un suplente y más que 0, con 25 como
+    /// constante del motor (no viaja en la configuración).
     void constantes_jerarquiaConPreferencia()
     {
         using namespace ContratoSolver;
         QCOMPARE(PESO_PREFERENCIA, 25);
-        QVERIFY(PESO_AGRUPACION < PESO_PREFERENCIA);
         QVERIFY(PESO_PREFERENCIA < COSTE_SUPLENTE);
         QVERIFY(COSTE_SUPLENTE < PESO_HORAS);
     }
@@ -257,106 +246,6 @@ private slots:
         QVector<QVector<int>> segs = segmentosTurno(t, eventos);
         QCOMPARE(segs.size(), 1);
         QCOMPARE(segs[0], (QVector<int>{0,1,2,3,4,5,6,7}));
-    }
-
-    // ─── esInicioSegmento ───
-
-    void esInicioSegmento_primeraFranjaSiempreInicio()
-    {
-        const SolverConfig cfg = configPrueba();
-        const TurnoConfig* manana = nullptr;
-        const TurnoConfig* tarde = nullptr;
-        for (const TurnoConfig& t : cfg.turnos.turnos) {
-            if (t.nombre == QStringLiteral("Mañana")) manana = &t;
-            else if (t.nombre == QStringLiteral("Tarde")) tarde = &t;
-        }
-        QVERIFY(manana);
-        QVERIFY(tarde);
-
-        QVector<QVector<int>> segsManana = segmentosTurno(*manana, cfg.eventos);
-        QVector<QVector<int>> segsTarde = segmentosTurno(*tarde, cfg.eventos);
-
-        QVERIFY(esInicioSegmento(0, segsManana));
-        QVERIFY(esInicioSegmento(8, segsTarde));
-    }
-
-    void esInicioSegmento_despuesDeReceso()
-    {
-        const SolverConfig cfg = configPrueba();
-        const TurnoConfig* manana = nullptr;
-        const TurnoConfig* tarde = nullptr;
-        for (const TurnoConfig& t : cfg.turnos.turnos) {
-            if (t.nombre == QStringLiteral("Mañana")) manana = &t;
-            else if (t.nombre == QStringLiteral("Tarde")) tarde = &t;
-        }
-        QVERIFY(manana);
-        QVERIFY(tarde);
-
-        QVector<QVector<int>> segsManana = segmentosTurno(*manana, cfg.eventos);
-        QVector<QVector<int>> segsTarde = segmentosTurno(*tarde, cfg.eventos);
-
-        // Mañana: receso tras 1 → slot 2 es inicio del 2º segmento
-        QVERIFY(esInicioSegmento(2, segsManana));
-        // Tarde: receso tras 9 → slot 10 es inicio
-        QVERIFY(esInicioSegmento(10, segsTarde));
-    }
-
-    void esInicioSegmento_noInicioEnMedioDeSegmento()
-    {
-        const SolverConfig cfg = configPrueba();
-        const TurnoConfig* manana = nullptr;
-        const TurnoConfig* tarde = nullptr;
-        for (const TurnoConfig& t : cfg.turnos.turnos) {
-            if (t.nombre == QStringLiteral("Mañana")) manana = &t;
-            else if (t.nombre == QStringLiteral("Tarde")) tarde = &t;
-        }
-        QVERIFY(manana);
-        QVERIFY(tarde);
-
-        QVector<QVector<int>> segsManana = segmentosTurno(*manana, cfg.eventos);
-        QVector<QVector<int>> segsTarde = segmentosTurno(*tarde, cfg.eventos);
-
-        // Mañana: 1,3,4,5,6,7 no son inicios
-        QVERIFY(!esInicioSegmento(1, segsManana));
-        QVERIFY(!esInicioSegmento(3, segsManana));
-        QVERIFY(!esInicioSegmento(4, segsManana));
-        // Tarde: 9 no (es la última del 1º segmento), 11-15 no
-        QVERIFY(!esInicioSegmento(9, segsTarde));
-        QVERIFY(!esInicioSegmento(11, segsTarde));
-    }
-
-    // ─── calcularPenalizacionGrupo ───
-
-    void calcularPenalizacionGrupo_tablaRF2()
-    {
-        // | tamaño | horasDía | penalización |
-        // | 1      | 1        | 0 (D-4)    |
-        // | 1      | >1       | 1          |
-        // | 2,3    | cualquier| 0          |
-        // | 4      | cualquier| 1 (4-3)    |
-        // | 5      | cualquier| 2 (5-3)    |
-        // | 8      | cualquier| 5 (8-3)    |
-
-        QCOMPARE(calcularPenalizacionGrupo(1, 1), 0);  // D-4: 1h/día perdonado
-        QCOMPARE(calcularPenalizacionGrupo(1, 2), 1);  // grupo 1, horas día > 1
-        QCOMPARE(calcularPenalizacionGrupo(1, 3), 1);
-        QCOMPARE(calcularPenalizacionGrupo(1, 5), 1);
-
-        QCOMPARE(calcularPenalizacionGrupo(2, 1), 0);  // 2-3 = ideal
-        QCOMPARE(calcularPenalizacionGrupo(2, 2), 0);
-        QCOMPARE(calcularPenalizacionGrupo(3, 1), 0);
-        QCOMPARE(calcularPenalizacionGrupo(3, 5), 0);
-
-        QCOMPARE(calcularPenalizacionGrupo(4, 1), 1);  // 4-3
-        QCOMPARE(calcularPenalizacionGrupo(4, 4), 1);
-        QCOMPARE(calcularPenalizacionGrupo(5, 2), 2);  // 5-3
-        QCOMPARE(calcularPenalizacionGrupo(8, 8), 5);  // 8-3
-    }
-
-    void calcularPenalizacionGrupo_tamanoCeroDevuelveCero()
-    {
-        QCOMPARE(calcularPenalizacionGrupo(0, 1), 0);
-        QCOMPARE(calcularPenalizacionGrupo(0, 5), 0);
     }
 
     // ─── Contrato 2.0 (specs 009 y 010) ───

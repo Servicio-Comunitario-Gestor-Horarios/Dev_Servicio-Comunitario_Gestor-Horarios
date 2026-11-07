@@ -368,65 +368,6 @@ private slots:
         QVERIFY2(conflictos(a).contains(QStringLiteral("aula «(desconocida)»")),
                  qPrintable(texto(a)));
     }
-
-    // ── S3: análisis de agrupación ──
-
-    void agrupacion_dosFranjasContiguas_penalizacionCero()
-    {
-        // Materia en slots 0 y 1 (mismo segmento) → grupo de 2, penalización 0.
-        HorarioSalida h;
-        CursoOutput curso;
-        curso.turno = QStringLiteral("manana");
-        DiaOutput dia;
-        dia.dia = 0;
-        dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}, AsignacionOutput{1, 0, 0, 0}};
-        curso.dias = {dia};
-        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
-
-        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
-        QCOMPARE(a.grupos.size(), 1);
-        QCOMPARE(a.grupos[0].tamano, 2);
-        QCOMPARE(a.grupos[0].penalizacion, 0);
-        QCOMPARE(a.penalizacionAgrupacion, 0);
-    }
-
-    void agrupacion_cruzandoReceso_dosGruposDeUno()
-    {
-        // Materia en slots 1 y 2 (cruzan el receso) → dos grupos de 1, horas día = 2
-        // → penalización 1 + 1 = 2.
-        HorarioSalida h;
-        CursoOutput curso;
-        curso.turno = QStringLiteral("manana");
-        DiaOutput dia;
-        dia.dia = 0;
-        dia.asignaciones = {AsignacionOutput{1, 0, 0, 0}, AsignacionOutput{2, 0, 0, 0}};
-        curso.dias = {dia};
-        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
-
-        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
-        QCOMPARE(a.grupos.size(), 2);
-        QCOMPARE(a.grupos[0].tamano, 1);
-        QCOMPARE(a.grupos[1].tamano, 1);
-        QCOMPARE(a.penalizacionAgrupacion, 2);
-    }
-
-    void agrupacion_unaSolaHoraDia_perdonada()
-    {
-        // Materia con 1 sola franja en el día → grupo de 1 pero perdonado (D-4).
-        HorarioSalida h;
-        CursoOutput curso;
-        curso.turno = QStringLiteral("manana");
-        DiaOutput dia;
-        dia.dia = 0;
-        dia.asignaciones = {AsignacionOutput{0, 0, 0, 0}};
-        curso.dias = {dia};
-        h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
-
-        const AnalisisSalida a = analizarSalidaSolver(h, configBase());
-        QCOMPARE(a.grupos.size(), 1);
-        QCOMPARE(a.grupos[0].tamano, 1);
-        QCOMPARE(a.penalizacionAgrupacion, 0);
-    }
 };
 
 QTEST_MAIN(TestValidadorSalida)

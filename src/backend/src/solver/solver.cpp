@@ -4,7 +4,8 @@
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
-#include "backend/solver/restricciones/restricciones_agrupacion.hpp"
+#include "backend/solver/restricciones/restricciones_bloques.hpp"
+#include "backend/solver/config/bloques.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/cp_model.h"
@@ -186,7 +187,15 @@ QString primeraCausaNoFactible(const SolverConfig& config) {
     if (!causa.isEmpty()) return causa;
     causa = causaConflictoDePersona(config);
     if (!causa.isEmpty()) return causa;
-    return causaConflictoDeAsignacion(config);
+    causa = causaConflictoDeAsignacion(config);
+    if (!causa.isEmpty()) return causa;
+    // (5) conflicto de bloques (014, RF-10): solo condiciones detectables sobre la entrada y
+    // SIEMPRE después de (1)–(4); un fallo de aula concreta no se atribuye a (5).
+    for (int c = 0; c < config.cursos.size(); ++c) {
+        QString motivo;
+        if (rejilla::causaCincoDeCurso(config, c, &motivo)) return motivo;
+    }
+    return {};
 }
 
 /// ¿La respuesta contiene una solución utilizable? (OPTIMAL o FEASIBLE)
@@ -227,11 +236,11 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config,
     ResultadoSolver resultado;
     resultado.exito = false;
 
-    // FASE 1 — referencia (013, RF-1): el modelo de HOY, S1 + S2 + S3. Es la generación de
-    // referencia contra la que se exige la igualdad de reparto y de exceso.
+    // FASE 1 — referencia: el modelo de S1 + S2. Es la generación de referencia contra la que
+    // se exige la igualdad de reparto y de exceso.
     prepararModelo(config);
     construirObjetivo(config);
-    const CpSolverResponse referencia = ejecutar(presupuesto.referencia);
+    const CpSolverResponse referencia = ejecutar(presupuesto.referencia, presupuesto.workers);
 
     if (!esFactible(referencia.status())) {
         resultado.tiempo_ms = timer.elapsed();
@@ -243,62 +252,53 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config,
     // índices de variable no valdrían para leerla).
     HorarioSalida horario = extraerSolucion(referencia, config);
 
-    // Sin preferencias no se ejecuta la fase 2: se devuelve exactamente la referencia (RF-4).
-    if (config.preferencias.isEmpty()) {
-        resultado.exito = true;
-        resultado.tiempo_ms = timer.elapsed();
-        horario.metadata.tiempo_ejecucion_ms = static_cast<int>(resultado.tiempo_ms);
-        resultado.resultado = horario;
-        return resultado;
-    }
-
-    // FASE 2 — cumplimiento de preferencias con z* y e* FIJADOS por igualdad (RF-1). La
-    // garantía estructural es por construcción, no por magnitudes: la preferencia solo elige
-    // dónde caen las clases.
+    // FASE 2a — separación y huecos con z* y e* FIJADOS por igualdad (RF-7/RF-8). La garantía
+    // estructural se mantiene: el reparto de docentes y el exceso son los de la referencia, y
+    // los términos blandos solo deciden DÓNDE caen las clases.
     const AnclajeEstructural anclaje = extraerAnclaje(referencia);
     prepararModelo(config);
     fijarAnclaje(anclaje);
-    model.Minimize(expresionPreferencias(config));
-    const CpSolverResponse fase2 = ejecutar(presupuesto.preferencias);
+    model.Minimize(expresionSeparacionViernes(config));
+    const CpSolverResponse fase2a = ejecutar(presupuesto.separacionHuecos, presupuesto.workers);
 
-    if (esFactible(fase2.status())) {
-        // Se extrae AHORA, antes de reconstruir el modelo para la 2b.
-        horario = extraerSolucion(fase2, config);
+    bool hayFase2a = false;
+    int64_t valorFase2a = 0;
+    if (esFactible(fase2a.status())) {
+        horario = extraerSolucion(fase2a, config);
+        hayFase2a = true;
+        // `expresionSeparacionViernes` es entera: se redondea para fijarla por igualdad en 2b.
+        valorFase2a = static_cast<int64_t>(std::llround(fase2a.objective_value()));
+    } else if (fase2a.status() == CpSolverStatus::INFEASIBLE ||
+               fase2a.status() == CpSolverStatus::UNKNOWN) {
+        // Escalera 2a→referencia: se devuelve la referencia (P7). La separación y los huecos son
+        // blandos y nunca convierten en infactible un horario que la referencia ya resolvía.
+    } else {
+        // MODEL_INVALID y otros errores internos se propagan como fallo.
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.errores = analizarFallo(fase2a, config);
+        return resultado;
+    }
 
-        // FASE 2b — S3 como desempate con la preferencia FIJADA a su valor de la 2a (RF-5).
-        // Así la preferencia gana a la agrupación en agregado: no depende de 25 frente a 10.
-        // `objective_value()` es la suma entera de la expresión de preferencias; se redondea
-        // para pasarla como término independiente de la igualdad.
-        const int64_t valorPreferencia =
-            static_cast<int64_t>(std::llround(fase2.objective_value()));
-
+    // FASE 2b — preferencia con el valor de la 2a FIJADO por igualdad. Así la preferencia no
+    // puede empeorar la separación ni los huecos (RF-8). Sin preferencias se omite.
+    if (hayFase2a && !config.preferencias.isEmpty()) {
         prepararModelo(config);
         fijarAnclaje(anclaje);
-        model.AddEquality(expresionPreferencias(config), valorPreferencia);
-        construirObjetivoSoloS3();
-        const CpSolverResponse fase2b = ejecutar(presupuesto.agrupacion);
+        model.AddEquality(expresionSeparacionViernes(config), valorFase2a);
+        model.Minimize(expresionPreferencias(config));
+        const CpSolverResponse fase2b = ejecutar(presupuesto.preferencias, presupuesto.workers);
 
         if (esFactible(fase2b.status())) {
             horario = extraerSolucion(fase2b, config);
         } else if (fase2b.status() == CpSolverStatus::INFEASIBLE ||
                    fase2b.status() == CpSolverStatus::UNKNOWN) {
-            // 2b→2a: el cumplimiento ya estaba garantizado; S3 solo desempataba. Se queda la
-            // solución de la 2a (P7).
+            // Escalera 2b→2a: se queda la solución de la 2a (P7).
         } else {
-            // MODEL_INVALID y otros errores internos se propagan como fallo.
+            // MODEL_INVALID y otros errores internos sí se propagan como fallo.
             resultado.tiempo_ms = timer.elapsed();
             resultado.errores = analizarFallo(fase2b, config);
             return resultado;
         }
-    } else if (fase2.status() == CpSolverStatus::INFEASIBLE ||
-               fase2.status() == CpSolverStatus::UNKNOWN) {
-        // P6/P7: 2a→1, se devuelve la referencia. La preferencia se incumple antes que cambiar
-        // el reparto de docentes o el exceso de horas; nunca se declara infactible por preferir.
-    } else {
-        // MODEL_INVALID y otros errores internos sí se propagan como fallo.
-        resultado.tiempo_ms = timer.elapsed();
-        resultado.errores = analizarFallo(fase2, config);
-        return resultado;
     }
 
     resultado.exito = true;
@@ -319,10 +319,11 @@ void Solver::prepararModelo(const SolverConfig& config) {
     agregarRestricciones(config);
 }
 
-CpSolverResponse Solver::ejecutar(double presupuesto) {
-    // Parámetros deterministas: un worker, seed 0 y presupuesto determinista (RNF-1).
+CpSolverResponse Solver::ejecutar(double presupuesto, int workers) {
+    // Parámetros de búsqueda: seed 0 y presupuesto determinista. El defecto de producción es
+    // 8 workers (PresupuestoFases::workers, 014b); la prueba de aceptación puede ajustarlo.
     SatParameters params;
-    params.set_num_search_workers(1);
+    params.set_num_search_workers(workers > 0 ? workers : 1);
     params.set_random_seed(0);
     params.set_max_deterministic_time(presupuesto);
 
@@ -353,6 +354,28 @@ void Solver::fijarAnclaje(const AnclajeEstructural& anclaje) {
     for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
         model.AddEquality(it.value(), anclaje.excesoPorDocente.value(it.key(), 0));
     }
+}
+
+LinearExpr Solver::expresionSeparacionViernes(const SolverConfig& config) const {
+    const rejilla::PesosBlandos pesos = rejilla::pesosBlandos(config);
+    LinearExpr expresion(0);
+
+    // Separación blanda con prioridad alta: una violación pesa más que todos los huecos
+    // no-viernes juntos.
+    for (auto it = vars.incumpleSeparacion.constBegin();
+         it != vars.incumpleSeparacion.constEnd(); ++it) {
+        expresion = expresion + LinearExpr(it.value()) * pesos.separacion;
+    }
+
+    // Viernes (día de generación 4): los huecos fuera del viernes.
+    for (auto it = vars.ocupada.constBegin(); it != vars.ocupada.constEnd(); ++it) {
+        const auto [c, d, s] = it.key();
+        (void)c; (void)s;
+        if (d == 4) continue;
+        expresion = expresion + (LinearExpr(1) - LinearExpr(it.value())) * pesos.huecoViernes;
+    }
+
+    return expresion;
 }
 
 LinearExpr Solver::expresionPreferencias(const SolverConfig& config) const {
@@ -412,24 +435,6 @@ void Solver::construirObjetivo(const SolverConfig& config) {
         }
     }
 
-    // S3: penalización por fragmentación (agrupación de bloques) - RF-2
-    // Penalización = PESO_AGRUPACION · Σ (isolated + longGroup)
-    //   isolated  → grupo de 1          (1 unidad)
-    //   longGroup → 4.ª franja o más    (1 unidad por franja extra)
-    //   grupos de 2–3 → 0
-    // Esto equivale a f(len): 1 → 1, 2–3 → 0, ≥4 → len − 3.
-    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
-        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
-
-    model.Minimize(objetivo);
-}
-
-void Solver::construirObjetivoSoloS3() {
-    // S3 tal cual lo define hoy el motor: PESO_AGRUPACION por cada clase AISLADA (grupo de 1).
-    // Es el mismo término que la fase 1, sin S1 ni S2 (ya fijados por igualdad).
-    LinearExpr objetivo = LinearExpr(0);
-    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
-        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
     model.Minimize(objetivo);
 }
 
@@ -437,7 +442,7 @@ void Solver::agregarRestricciones(const SolverConfig& config) {
     agregarRestriccionesTurnos(model, config, vars);
     agregarRestriccionesAulas(model, config, vars);
     agregarRestriccionProfesores(model, config, vars);
-    agregarRestriccionesAgrupacion(model, config, vars);
+    agregarRestriccionesBloques(model, config, vars);
 }
 
 HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const SolverConfig& config) {
@@ -519,10 +524,12 @@ QStringList Solver::analizarFallo(const CpSolverResponse& response, const Solver
             if (!causa.isEmpty())
                 errores.append(causa);
             else
-                errores.append(QStringLiteral("Causa: no atribuible. Ninguna categoría de (1) a (4) "
+                errores.append(QStringLiteral("Causa: no atribuible. Ninguna categoría de (1) a (5) "
                                               "explica el fallo; revise la capacidad de los tipos de "
-                                              "aula, las franjas de los turnos y la disponibilidad "
-                                              "de los docentes."));
+                                              "aula, las franjas de los turnos y la disponibilidad de "
+                                              "los docentes, y el diagnóstico de bloques (apariciones "
+                                              "frente a días no consecutivos, restos sin pareja del "
+                                              "mismo tipo y huecos que no caben al final)."));
 
             errores.append(QStringLiteral("Entorno: %1 docentes, %2 cursos, %3 materias, %4 aulas.")
                 .arg(config.profesores.size())

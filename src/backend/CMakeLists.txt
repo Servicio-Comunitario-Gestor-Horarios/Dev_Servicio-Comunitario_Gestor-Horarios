@@ -66,9 +66,11 @@ target_sources(backend PRIVATE
 				src/services/ConstructorEntradaSolver.cpp
 				src/services/ValidadorEntradaSolver.cpp
 				src/services/ValidadorSalidaSolver.cpp
+				src/services/analisis_bloques.cpp
 				src/services/ServicioGeneracion.cpp
 				include/backend/services/ServicioGeneracion.hpp
 				src/solver/config/contrato_solver.cpp
+				src/solver/config/bloques.cpp
 )
 
 target_include_directories(backend PUBLIC
@@ -100,7 +102,7 @@ target_sources(backend_solver PRIVATE
 				src/solver/restricciones/restricciones_turnos.cpp
 				src/solver/restricciones/restricciones_aulas.cpp
 				src/solver/restricciones/restricciones_profesores.cpp
-				src/solver/restricciones/restricciones_agrupacion.cpp
+				src/solver/restricciones/restricciones_bloques.cpp
 )
 
 target_include_directories(backend_solver PUBLIC

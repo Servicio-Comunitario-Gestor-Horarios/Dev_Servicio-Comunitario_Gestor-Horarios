@@ -7,16 +7,6 @@
 #include <backend/solver/config/solver_config.hpp>
 #include <backend/solver/solver.hpp>
 
-/// Helper: franjas en las que se imparte una materia en un curso.
-static QVector<int> franjasDeMateria(const CursoOutput& curso, int materia) {
-    QVector<int> franjas;
-    for (const auto& dia : curso.dias)
-        for (const auto& asig : dia.asignaciones)
-            if (asig.materia == materia) franjas.append(asig.slot);
-    std::sort(franjas.begin(), franjas.end());
-    return franjas;
-}
-
 /// Tests del solver CP-SAT con el contrato nuevo (spec 005).
 /// El curso se identifica por anio+seccion; sus materias salen del plan.
 class TestSolverHorarios : public QObject {
@@ -71,9 +61,9 @@ private:
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, 3, 2, 2, 3};
-        config.franja_horaria = {60, 3};
-        config.turnos.turnos = {{"manana", {0, 1, 2}}};
+        config.dimensiones = {2, 2, 3, 2, 2, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
 
         config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
         config.aulas = {{"A1", "Aula común", 30},
@@ -84,37 +74,41 @@ private:
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
                          {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
         config.profesores = {
-            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
-            {"Prof B", 6, 6, "manana", "Plan B", {}, {0, 1}, {}, dispCompleta(2, 3)}};
+            {"Prof A", 4, 4, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 4)},
+            {"Prof B", 4, 4, "manana", "Plan B", {}, {0, 1}, {}, dispCompleta(2, 4)}};
         return config;
     }
 
-    // Caso R2 del reviewer: dos cursos comparten la referencia A1 (5 días × 6 franjas = 30) y
-    // cada uno cursa 14 bloques comunes + 2 de laboratorio. Con un solo laboratorio los 4
-    // bloques de laboratorio necesitan 4 franjas distintas (una clase por franja y aula), así
-    // que A1 pierde 4 franjas y solo le quedan 26 para 28 bloques comunes: infactible por
-    // aula. Con 2 laboratorios los mismos 4 bloques caben en 2 franjas (una por aula) y el
-    // mismo dato es factible. Cada curso tiene su docente propio y con disponibilidad completa
-    // (16 bloques ≤ 30 franjas), así que la causa solo puede ser de aula.
+    // Caso R2 del reviewer: dos cursos comparten la referencia A1 (3 días × 6 franjas = 18) y
+    // cada uno cursa 8 bloques comunes (4 + 4) + 2 de laboratorio. Con un solo laboratorio los
+    // 4 bloques de laboratorio no pueden ser simultáneos: ocupan 4 franjas y dejan A1 con 7
+    // pares para 8 bloques comunes (infactible por aula). Con 2 laboratorios los dos pares de
+    // laboratorio caben a la vez en 2 franjas: A1 conserva 8 pares y el mismo dato es factible.
+    // Cada curso tiene su docente propio (10 bloques ≤ 18 franjas), así que la causa solo puede
+    // ser de aula. Ajuste T4: materias comunes de 4 h + 4 h para que la alineación (una
+    // aparición por materia y día) sea posible.
     static SolverConfig configDosCursosCasiLlenosConLaboratorios(int laboratorios) {
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, laboratorios + 1, 2, 5, 6};
+        config.dimensiones = {2, 4, laboratorios + 1, 2, 5, 6};
         config.franja_horaria = {60, 6};
         config.turnos.turnos = {{"manana", {0, 1, 2, 3, 4, 5}}};
 
-        config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
+        config.materias = {{"Matematica", "Aula común"},
+                           {"Historia", "Aula común"},
+                           {"Ciencias", "Aula común"},
+                           {"Laboratorio", "Laboratorio"}};
         config.aulas = {{"A1", "Aula común", 30}};
         for (int i = 1; i <= laboratorios; ++i)
             config.aulas.append({QStringLiteral("Lab %1").arg(i), "Laboratorio", 20});
-        config.planes = {{"Plan A", {{0, 1, 14}, {1, 1, 2}}},
-                         {"Plan B", {{0, 2, 14}, {1, 2, 2}}}};
+        config.planes = {{"Plan A", {{0, 1, 4}, {1, 1, 4}, {2, 1, 4}, {3, 1, 4}}},
+                         {"Plan B", {{0, 2, 4}, {1, 2, 4}, {2, 2, 4}, {3, 2, 4}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
                          {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
         config.profesores = {
-            {"Prof A", 16, 16, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(5, 6)},
-            {"Prof B", 16, 16, "manana", "Plan B", {}, {0, 1}, {}, dispCompleta(5, 6)}};
+            {"Prof A", 16, 16, "manana", "Plan A", {}, {0, 1, 2, 3}, {}, dispCompleta(5, 6)},
+            {"Prof B", 16, 16, "manana", "Plan B", {}, {0, 1, 2, 3}, {}, dispCompleta(5, 6)}};
         return config;
     }
 
@@ -129,7 +123,7 @@ private:
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {3, 2, 3, 3, 1, 6};
+        config.dimensiones = {3, 2, 3, 3, 3, 6};
         config.franja_horaria = {60, 6};
         config.turnos.turnos = {{"TB", {0, 1, 2, 3}}, {"TL", {4, 5}}};
 
@@ -145,8 +139,8 @@ private:
         config.profesores = {
             // Titular de laboratorio con UNA sola franja disponible (slot 4 de TL).
             {"Prof Lab", 2, 2, "", "", {}, {1}, {}, {{0, {4}}}},
-            {"Prof B", 4, 4, "", "", {}, {0}, {}, dispCompleta(1, 6)},
-            {"Prof C", 4, 4, "", "", {}, {0}, {}, dispCompleta(1, 6)}};
+            {"Prof B", 4, 4, "", "", {}, {0}, {}, dispCompleta(3, 6)},
+            {"Prof C", 4, 4, "", "", {}, {0}, {}, dispCompleta(3, 6)}};
         return config;
     }
 
@@ -159,7 +153,7 @@ private:
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, 3, 2, 2, 4};
+        config.dimensiones = {2, 2, 3, 2, 3, 4};
         config.franja_horaria = {60, 4};
         config.turnos.turnos = {{"T1", {0, 1, 2, 3}}, {"T2", {2, 3}}};
 
@@ -172,8 +166,8 @@ private:
         config.cursos = {{1, "A", "T1", 20, "Plan A", 0},
                          {2, "B", "T2", 20, "Plan B", 0}};   // MISMA referencia, turnos distintos
         config.profesores = {
-            {"Prof A", 6, 6, "T1", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 4)},
-            {"Prof B", 4, 4, "T2", "Plan B", {}, {0, 1}, {}, dispCompleta(2, 4)}};
+            {"Prof A", 6, 6, "T1", "Plan A", {}, {0, 1}, {}, dispCompleta(3, 4)},
+            {"Prof B", 4, 4, "T2", "Plan B", {}, {0, 1}, {}, dispCompleta(3, 4)}};
         return config;
     }
 
@@ -184,24 +178,24 @@ private:
     static SolverConfig configVentanasDeTurnoHall() {
         SolverConfig config;
         config.version = "2.0";
-        config.aula_fija = false;
-        config.dimensiones = {3, 1, 1, 3, 1, 7};
-        config.franja_horaria = {60, 7};
-        config.turnos.turnos = {{"TB", {4}}, {"TC", {5, 6}}};
+        config.aula_fija = true;
+        config.dimensiones = {3, 1, 2, 3, 1, 8};
+        config.franja_horaria = {40, 8};
+        config.turnos.turnos = {{"TB", {4, 5}}, {"TC", {6, 7}}};
 
         config.materias = {{"Matemática", "Aula de estudio"}};
-        config.aulas = {{"A1", "Aula de estudio", 30}};
-        config.planes = {{"PA", {{0, 1, 1}}},
-                         {"PB", {{0, 2, 1}}},
-                         {"PC", {{0, 3, 1}}}};
-        config.cursos = {{1, "A", "TB", 20, "PA", -1},
-                         {2, "B", "TB", 20, "PB", -1},
-                         {3, "C", "TC", 20, "PC", -1}};
+        config.aulas = {{"A1", "Aula de estudio", 30}, {"A2", "Aula de estudio", 30}};
+        config.planes = {{"PA", {{0, 1, 2}}},
+                         {"PB", {{0, 2, 2}}},
+                         {"PC", {{0, 3, 2}}}};
+        config.cursos = {{1, "A", "TB", 20, "PA", 0},     // referencia A1
+                         {2, "B", "TB", 20, "PB", 0},     // MISMA referencia
+                         {3, "C", "TC", 20, "PC", 0}};    // misma referencia
         config.profesores = {
-            // Ninguno declara turno ni plan (vacío = cualquiera); uno por curso, con su celda.
-            {"Prof A", 1, 1, "", "", {1}, {0}, {}, {{0, {4}}}},
-            {"Prof B", 1, 1, "", "", {2}, {0}, {}, {{0, {4}}}},
-            {"Prof C", 1, 1, "", "", {3}, {0}, {}, {{0, {5, 6}}}}};
+            // Ninguno declara turno ni plan (vacío = cualquiera); uno por curso, con sus franjas.
+            {"Prof A", 2, 2, "", "", {}, {0}, {}, {{0, {4, 5}}}},
+            {"Prof B", 2, 2, "", "", {}, {0}, {}, {{0, {4, 5}}}},
+            {"Prof C", 2, 2, "", "", {}, {0}, {}, {{0, {6, 7}}}}};
         return config;
     }
 
@@ -570,127 +564,6 @@ private slots:
         QCOMPARE(slotsB, 4);
     }
 
-    // ── T5: Agrupación de bloques (S3) ──
-
-    // AC-3: una materia de 2 h en un solo día debe ir en 2 franjas CONTIGUAS,
-    // no en 2 grupos de 1 (la penalización de S3 desincentiva el segundo arranque).
-    void solver_agrupacion_dosHorasContiguas() {
-        SolverConfig config;
-        config.version = "2.0";
-        config.aula_fija = true;
-        config.dimensiones = {1, 1, 1, 1, 1, 4};   // 1 día, 4 franjas
-        config.franja_horaria = {40, 4};
-        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
-        config.materias = {{"Matematica", "regular"}};
-        config.aulas = {{"Aula 1", "regular", 30}};
-        config.planes = {{"Plan General", {{0, 1, 2}}}};   // 2 horas
-        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
-        config.profesores = {
-            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
-
-        Solver solver;
-        auto resultado = solver.resolver(config);
-        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
-
-        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
-        const QVector<int> franjas = franjasDeMateria(curso, 0);
-        QCOMPARE(franjas.size(), 2);
-        // Contiguas: la diferencia entre los dos slots debe ser 1.
-        QCOMPARE(franjas[1] - franjas[0], 1);
-    }
-
-    // AC-9: el evento del turno rompe la contigüidad. Con un evento tras la franja 1,
-    // una materia de 2 h debe ir en {0,1} o {2,3}, nunca en {1,2}.
-    void solver_agrupacion_eventoRompeContiguedad() {
-        SolverConfig config;
-        config.version = "2.0";
-        config.aula_fija = true;
-        config.dimensiones = {1, 1, 1, 1, 1, 4};
-        config.franja_horaria = {40, 4};
-        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
-        config.eventos = {{"Receso", "manana", 2, 1, 10, "", ""}};   // rompe entre 1 y 2
-        config.materias = {{"Matematica", "regular"}};
-        config.aulas = {{"Aula 1", "regular", 30}};
-        config.planes = {{"Plan General", {{0, 1, 2}}}};
-        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
-        config.profesores = {
-            {"Prof A", 2, 2, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
-
-        Solver solver;
-        auto resultado = solver.resolver(config);
-        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
-
-        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
-        const QVector<int> franjas = franjasDeMateria(curso, 0);
-        QCOMPARE(franjas.size(), 2);
-        // No deben ser {1,2} (cruzando el evento). Válidas: {0,1} o {2,3}.
-        const bool mismoSegmento = (franjas[0] == 0 && franjas[1] == 1) ||
-                                   (franjas[0] == 2 && franjas[1] == 3);
-        QVERIFY2(mismoSegmento,
-                 qPrintable(QString("Slots %1,%2 cruzan el evento").arg(franjas[0]).arg(franjas[1])));
-    }
-
-    // AC-4: una materia de 4 h en un día de 4 franjas ocupa 4 contiguas (un solo grupo).
-    void solver_agrupacion_cuatroHorasUnGrupo() {
-        SolverConfig config;
-        config.version = "2.0";
-        config.aula_fija = true;
-        config.dimensiones = {1, 1, 1, 1, 1, 4};
-        config.franja_horaria = {40, 4};
-        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
-        config.materias = {{"Matematica", "regular"}};
-        config.aulas = {{"Aula 1", "regular", 30}};
-        config.planes = {{"Plan General", {{0, 1, 4}}}};
-        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
-        config.profesores = {
-            {"Prof A", 4, 4, "manana", "Plan General", {}, {0}, {}, {{0, {0, 1, 2, 3}}}}};
-
-        Solver solver;
-        auto resultado = solver.resolver(config);
-        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
-
-        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
-        const QVector<int> franjas = franjasDeMateria(curso, 0);
-        QCOMPARE(franjas.size(), 4);
-        QCOMPARE(franjas, (QVector<int>{0, 1, 2, 3}));
-    }
-
-    // Cinco horas semanales de una materia en un curso sin acoplamiento docente:
-    // el solver DEBE agruparlas en 2+3 (ningún grupo de 1).
-    void solver_agrupacion_cincoHorasFormaDosMasTres() {
-        SolverConfig config;
-        config.version = "2.0";
-        config.aula_fija = true;
-        config.dimensiones = {1, 1, 1, 1, 5, 8};
-        config.franja_horaria = {40, 8};
-        config.turnos.turnos = {{"manana", {0,1,2,3,4,5,6,7}}};
-        config.materias = {{"Matematica", "regular"}};
-        config.aulas = {{"Aula 1", "regular", 30}};
-        config.planes = {{"Plan General", {{0, 1, 5}}}};
-        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
-        QVector<Disponibilidad> disp;
-        for (int d = 0; d < 5; ++d) disp.append({d, {0,1,2,3,4,5,6,7}});
-        config.profesores = {
-            {"Prof A", 5, 5, "manana", "Plan General", {}, {0}, {}, disp}};
-
-        Solver solver;
-        auto resultado = solver.resolver(config);
-        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
-
-        const auto& curso = resultado.resultado.horarios[claveCurso(1, "A")];
-        // Contar grupos por día: 5 horas deben repartirse en grupos de 2 y 3,
-        // nunca en 5 días de 1 hora (5 grupos de 1).
-        int gruposDeUno = 0, gruposDeDosTres = 0;
-        for (const auto& dia : curso.dias) {
-            if (dia.asignaciones.isEmpty()) continue;
-            const int n = dia.asignaciones.size();
-            if (n == 1) ++gruposDeUno;
-            else if (n == 2 || n == 3) ++gruposDeDosTres;
-        }
-        QCOMPARE(gruposDeUno, 0);
-        QVERIFY(gruposDeDosTres >= 2);
-    }
-
     // ── S1: el exceso sobre horas_aula es la válvula cuando no hay capacidad ──
     void solver_excesoDeHorasEsLaValvulaSinCapacidad() {
         // Misma configuración salvo la capacidad del docente: con 4 h cubre los 4 bloques sin
@@ -869,7 +742,7 @@ private slots:
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, 3, 2, 3, 4};
+        config.dimensiones = {2, 2, 3, 2, 5, 4};
         config.franja_horaria = {60, 4};
         config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
 
@@ -881,8 +754,8 @@ private slots:
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},     // referencia = Aula 1
                          {2, "B", "manana", 20, "Plan B", 0}};    // comparte la referencia
         config.profesores = {
-            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)},
-            {"Prof B", 4, 4, "", "", {}, {0}, {}, dispCompleta(3, 4)}};
+            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(5, 4)},
+            {"Prof B", 4, 4, "", "", {}, {0}, {}, dispCompleta(5, 4)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -939,7 +812,7 @@ private slots:
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, 3, 2, 2, 4};
+        config.dimensiones = {2, 2, 3, 2, 3, 4};
         config.franja_horaria = {60, 4};
         config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
 
@@ -950,8 +823,8 @@ private slots:
         config.planes = {{"Plan A", {{0, 1, 4}, {1, 1, 2}}}, {"Plan B", {{0, 2, 4}, {1, 2, 2}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0}, {2, "B", "manana", 20, "Plan B", 1}};
         config.profesores = {
-            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)},
-            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)}};
+            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)},
+            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -1047,8 +920,8 @@ private slots:
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},    // referencia = Aula A
                          {2, "B", "manana", 20, "Plan B", 1}};   // referencia = Aula B
         config.profesores = {
-            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)},
-            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)}};
+            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)},
+            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -1082,8 +955,8 @@ private slots:
         config.cursos = {{1, "A", "manana", 20, "Plan A", -1},
                          {2, "B", "manana", 20, "Plan B", -1}};
         config.profesores = {
-            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)},
-            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(2, 4)}};
+            {"Prof A", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)},
+            {"Prof B", 6, 6, "", "", {}, {0, 1}, {}, dispCompleta(3, 4)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -1192,15 +1065,15 @@ private slots:
     }
 
     // ── RF-6: la referencia compartida no cabe y ninguna categoría lo explica ──
-    // 1|A y 2|B comparten «A1» (Aula común): 1|A tiene 2 bloques comunes + 4 de laboratorio y 2|B
-    // necesita 3 bloques comunes. El conteo del tipo no falla (5 ≤ 6) y cada curso cabe en su
-    // turno, pero la contención en la referencia compartida deja la infactibilidad sin categoría:
-    // «no atribuible», sin nombrar entidades.
+    // 1|A y 2|B comparten «A1» (Aula común): 1|A tiene un bloque común + uno de laboratorio y
+    // 2|B necesita dos bloques comunes. El conteo del tipo no falla (6 ≤ 6) y cada curso cabe en
+    // su turno, pero la contención en la referencia compartida deja la infactibilidad sin
+    // categoría: «no atribuible», sin nombrar entidades.
     void solver_causaNoAtribuibleCuandoLaReferenciaCompartidaNoCabe() {
-        // 1|A y 2|B comparten la referencia «A1» (Aula común). 1|A tiene 2 bloques comunes
-        // + 4 de laboratorio: sus 6 clases ocupan las 6 franjas del turno (2 días × 3), así
-        // que en las 4 franjas del laboratorio A1 queda vacía y bloqueada. 2|B necesita
-        // 3 franjas en A1 y solo le quedan 2 libres (las de las clases comunes de 1|A).
+        // Ajuste T4: 1|A (2 comunes + 2 de laboratorio) y 2|B (4 comunes), totales pares y con
+        // una aparición por materia y día. En el día del bloque común de 1|A, 2|B también
+        // necesita A1; en el día del laboratorio, A1 queda bloqueada por las clases desplazadas
+        // y 2|B no encuentra dos franjas libres.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -1210,20 +1083,20 @@ private slots:
 
         config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
         config.aulas = {{"A1", "Aula común", 30}, {"Lab", "Laboratorio", 20}};
-        config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 4}}},
-                         {"Plan B", {{0, 2, 3}}}};
+        config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 2}}},
+                         {"Plan B", {{0, 2, 2}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
                          {2, "B", "manana", 20, "Plan B", 0}};   // MISMA referencia
         config.profesores = {
-            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
-            {"Prof B", 3, 3, "manana", "Plan B", {}, {0}, {}, dispCompleta(2, 3)}};
+            {"Prof A", 4, 4, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
+            {"Prof B", 2, 2, "manana", "Plan B", {}, {0}, {}, dispCompleta(2, 3)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
 
-        QVERIFY2(!resultado.exito, "la referencia compartida no aloja los 5 bloques de Aula común");
+        QVERIFY2(!resultado.exito, "la referencia compartida no aloja los 6 bloques de Aula común");
         const QString texto = resultado.errores.join("\n");
-        // El conteo del tipo no falla (5 ≤ 6) y ninguna categoría explica la infactibilidad:
+        // El conteo del tipo no falla (6 ≤ 6) y ninguna categoría explica la infactibilidad:
         // el desenlace es «no atribuible», sin nombrar entidades.
         QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
         QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
@@ -1235,24 +1108,26 @@ private slots:
     void solver_causaDeAulaConCapacidadSuficienteNoInventaElConflicto() {
         // Mismo escenario, pero 2|B tiene su propia referencia (A2, otra aula común): A1
         // conserva sus 2 franjas libres y el dato es factible.
+        // Ajuste T3a: con el emparejamiento duro los segmentos deben admitir tramos pares; se
+        // usan 4 franjas por día (2 + 2) para que el escenario siga siendo factible.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {2, 2, 3, 2, 2, 3};
-        config.franja_horaria = {60, 3};
-        config.turnos.turnos = {{"manana", {0, 1, 2}}};
+        config.dimensiones = {2, 2, 3, 2, 3, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
 
         config.materias = {{"Matematica", "Aula común"}, {"Laboratorio", "Laboratorio"}};
         config.aulas = {{"A1", "Aula común", 30},
                         {"A2", "Aula común", 30},
                         {"Lab", "Laboratorio", 20}};
         config.planes = {{"Plan A", {{0, 1, 2}, {1, 1, 4}}},
-                         {"Plan B", {{0, 2, 3}}}};
+                         {"Plan B", {{0, 2, 2}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},
                          {2, "B", "manana", 20, "Plan B", 1}};   // referencias distintas
         config.profesores = {
-            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(2, 3)},
-            {"Prof B", 3, 3, "manana", "Plan B", {}, {0}, {}, dispCompleta(2, 3)}};
+            {"Prof A", 6, 6, "manana", "Plan A", {}, {0, 1}, {}, dispCompleta(3, 4)},
+            {"Prof B", 2, 2, "manana", "Plan B", {}, {0}, {}, dispCompleta(3, 4)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -1324,44 +1199,42 @@ private slots:
         QVERIFY(resultado.errores.isEmpty());
     }
 
-    // ── RF-6: el tipo tiene capacidad (7 ≤ 12) y la infactibilidad no se atribuye ──
-    // 1|A ocupa todas sus franjas con laboratorio y bloquea A1; 2|B llena A2 y 3|C necesita un
-    // bloque de «Aula base». El conteo del tipo no falla (7 bloques ≤ 2 aulas × 6 franjas), así que
-    // ninguna categoría lo explica. La referencia de 3|C sigue en la cancha: los fixtures del motor
-    // no pasan por V18.
+    // ── RF-6: el tipo tiene capacidad (4 ≤ 4) y la infactibilidad no se atribuye ──
+    // 1|A ocupa sus 2 franjas con laboratorio y bloquea A1; 2|B llena A2 con su bloque de «Aula
+    // base» y 3|C necesita un bloque de ese tipo, pero no le queda ninguna franja utilizable. El
+    // conteo del tipo no falla (4 bloques ≤ 2 aulas × 2 franjas), así que ninguna categoría lo
+    // explica.
     void solver_causaNoAtribuibleCuandoElTipoTieneCapacidad() {
-        // 1|A ocupa sus 6 franjas con laboratorio y bloquea su referencia A1 (tipo «Aula base»)
-        // en todas ellas; 2|B llena A2 con 6 bloques de «Aula base» y 3|C necesita 1 bloque de ese
-        // tipo, pero no le queda ninguna franja utilizable. El conteo del tipo no falla (7 ≤ 12).
+        // Ajuste T4: cursos de 2 h (un bloque simple) para que la alineación sea posible.
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
-        config.dimensiones = {3, 3, 4, 3, 1, 6};
-        config.franja_horaria = {60, 6};
-        config.turnos.turnos = {{"manana", {0, 1, 2, 3, 4, 5}}};
+        config.dimensiones = {3, 3, 4, 3, 1, 2};
+        config.franja_horaria = {40, 2};
+        config.turnos.turnos = {{"manana", {0, 1}}};
 
         config.materias = {{"Matematica", "Aula base"},
                            {"Laboratorio", "Laboratorio"},
                            {"Educacion Fisica", "Cancha"}};
         config.aulas = {{"A1", "Aula base", 30}, {"A2", "Aula base", 30},
                         {"Lab", "Laboratorio", 20}, {"Cancha", "Cancha", 40}};
-        config.planes = {{"Plan A", {{1, 1, 6}}},
-                         {"Plan B", {{0, 2, 6}}},
-                         {"Plan C", {{0, 3, 1}}}};
+        config.planes = {{"Plan A", {{1, 1, 2}}},
+                         {"Plan B", {{0, 2, 2}}},
+                         {"Plan C", {{0, 3, 2}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan A", 0},     // referencia A1
                          {2, "B", "manana", 20, "Plan B", 1},     // referencia A2
                          {3, "C", "manana", 20, "Plan C", 3}};    // referencia Cancha
         config.profesores = {
-            {"Prof A", 6, 6, "manana", "Plan A", {}, {1}, {}, dispCompleta(1, 6)},
-            {"Prof B", 6, 6, "manana", "Plan B", {}, {0}, {}, dispCompleta(1, 6)},
-            {"Prof C", 1, 1, "manana", "Plan C", {}, {0}, {}, dispCompleta(1, 6)}};
+            {"Prof A", 2, 2, "manana", "Plan A", {}, {1}, {}, dispCompleta(1, 2)},
+            {"Prof B", 2, 2, "manana", "Plan B", {}, {0}, {}, dispCompleta(1, 2)},
+            {"Prof C", 2, 2, "manana", "Plan C", {}, {0}, {}, dispCompleta(1, 2)}};
 
         Solver solver;
         auto resultado = solver.resolver(config);
 
-        QVERIFY2(!resultado.exito, "A1 y A2 no dan cabida a los 7 bloques del tipo");
+        QVERIFY2(!resultado.exito, "A1 y A2 no dan cabida a los 4 bloques del tipo");
         const QString texto = resultado.errores.join("\n");
-        // 7 ≤ 12: el conteo del tipo pasa (la referencia de 3|C sigue en la cancha: los fixtures
+        // 4 ≤ 4: el conteo del tipo pasa (la referencia de 3|C sigue en la cancha: los fixtures
         // del motor no pasan por V18) y la infactibilidad se queda sin categoría.
         QVERIFY2(!texto.contains("Causa ("), qPrintable(texto));
         QVERIFY2(texto.contains("no atribuible"), qPrintable(texto));
@@ -1441,7 +1314,7 @@ private slots:
     // existe (2 bloques en L1 y 8 bloques de «Aula base» en A1/A2).
     void solver_causaSaturacionPorTipoConDocenteSuficienteNoInventaElConflicto() {
         SolverConfig config = configLaboratorioEnTurnoDistinto();
-        config.profesores[0].disponibilidad = dispCompleta(1, 6);
+        config.profesores[0].disponibilidad = dispCompleta(2, 6);
 
         Solver solver;
         auto resultado = solver.resolver(config);
@@ -1512,10 +1385,10 @@ private slots:
     }
 
     // ── T14/RNF-1: la misma entrada da la misma salida, también en el caso INFEASIBLE ──
-    void solver_esReproducible_mismaEntradaMismaSalida() {
-        // El motor fija num_search_workers(1) y random_seed(0): dos motores nuevos sobre el mismo
-        // dato deben coincidir en éxito, en el resumen de cada clase y en los errores (texto
-        // incluido).
+    void solver_dosEjecucionesValidas_mismaEntrada() {
+        // 014b: con 8 workers no se promete el mismo horario. Dos motores nuevos sobre el mismo
+        // dato deben coincidir en éxito, número de clases y diagnóstico (los diagnósticos y los
+        // cálculos puros sí son deterministas).
         const auto resolverConMotorNuevo = [](const SolverConfig& config) {
             Solver solver;
             return solver.resolver(config);
@@ -1527,7 +1400,8 @@ private slots:
         QVERIFY2(factible1.exito, qPrintable(factible1.errores.join("\n")));
         QVERIFY(!resumenDeSalida(factible1).isEmpty());
         QCOMPARE(factible2.exito, factible1.exito);
-        QCOMPARE(resumenDeSalida(factible2), resumenDeSalida(factible1));
+        QCOMPARE(factible2.resultado.metadata.total_asignaciones,
+                 factible1.resultado.metadata.total_asignaciones);
         QCOMPARE(factible2.errores, factible1.errores);
 
         const SolverConfig infactible = configVentanasDeTurnoHall();
@@ -1536,12 +1410,11 @@ private slots:
         QVERIFY2(!infactible1.exito, "el fixture de ventanas debe ser INFEASIBLE");
         QVERIFY(!infactible1.errores.isEmpty());
         QCOMPARE(infactible2.exito, infactible1.exito);
-        QCOMPARE(resumenDeSalida(infactible2), resumenDeSalida(infactible1));
         QCOMPARE(infactible2.errores, infactible1.errores);
     }
 
     // ── F3: reutilizar la instancia no arrastra modelo ni variables ──────────────
-    void solver_reutilizarLaMismaInstancia_daElMismoResultado() {
+    void solver_reutilizarLaMismaInstancia_daUnResultadoValido() {
         Solver solver;
         const SolverConfig config = crearConfigMinima();
         const auto primera = solver.resolver(config);
@@ -1550,7 +1423,8 @@ private slots:
         QVERIFY2(primera.exito, qPrintable(primera.errores.join("\n")));
         QVERIFY2(segunda.exito, qPrintable(segunda.errores.join("\n")));
         QCOMPARE(segunda.exito, primera.exito);
-        QCOMPARE(resumenDeSalida(segunda), resumenDeSalida(primera));
+        QCOMPARE(segunda.resultado.metadata.total_asignaciones,
+                 primera.resultado.metadata.total_asignaciones);
         QCOMPARE(segunda.errores, primera.errores);
     }
 
@@ -1566,10 +1440,12 @@ private slots:
         QVERIFY(!infactible.errores.isEmpty());
         QVERIFY(infactible.resultado.horarios.isEmpty());
 
-        // Y volver al dato factible da lo mismo que la primera vez.
+        // Y volver al dato factible da un resultado válido, sin arrastrar el infactible.
         const auto tercera = solver.resolver(factible);
         QVERIFY2(tercera.exito, qPrintable(tercera.errores.join("\n")));
-        QCOMPARE(resumenDeSalida(tercera), resumenDeSalida(primera));
+        QCOMPARE(tercera.resultado.metadata.total_asignaciones,
+                 primera.resultado.metadata.total_asignaciones);
+        QCOMPARE(tercera.errores, primera.errores);
     }
 };
 

@@ -127,7 +127,7 @@ void ScheduleGenerationWidget::setClient(InternalClient* client)
         // La huella incluye la duración efectiva (spec 011): si el dominio o D
         // cambian durante el cálculo, el resultado se marca «datos anteriores».
         m_servicio = new ServicioGeneracion(
-            *m_puerto, 60000,
+            *m_puerto, 300000,
             [this]() {
                 return m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo, leerOpciones())
                                 : QString();

@@ -1,12 +1,122 @@
 #include "backend/services/ValidadorSalidaSolver.hpp"
 
+#include "backend/solver/config/bloques.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
+#include <algorithm>
 #include <QMap>
 #include <QSet>
 
 namespace
 {
+    /// Índice en `config.cursos` del curso con esa clave (`año|sección`), o -1.
+    int indiceCurso(const SolverConfig& config, const QString& clave)
+    {
+        for (int i = 0; i < config.cursos.size(); ++i)
+            if (claveCurso(config.cursos[i].anio, config.cursos[i].seccion) == clave)
+                return i;
+        return -1;
+    }
+
+    /// P4 ampliado (014, RF-12): bloque de 1, materia mal alineada o dos aulas en un bloque.
+    void comprobarBloques(const HorarioSalida& horario, const SolverConfig& config,
+                          AnalisisSalida& analisis)
+    {
+        for (auto it = horario.horarios.constBegin(); it != horario.horarios.constEnd(); ++it)
+        {
+            const QString& clave = it.key();
+            const int curso = indiceCurso(config, clave);
+            if (curso < 0) continue;
+
+            QSet<FranjaSemana> ocupadas;
+            QMap<int, QSet<FranjaSemana>> porMateria;
+            QMap<FranjaSemana, int> materiaPorFranja;
+            QMap<FranjaSemana, int> aulaPorFranja;
+            for (const DiaOutput& dia : it.value().dias)
+            {
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                {
+                    const FranjaSemana franja{dia.dia, asignacion.slot};
+                    ocupadas.insert(franja);
+                    porMateria[asignacion.materia].insert(franja);
+                    materiaPorFranja.insert(franja, asignacion.materia);
+                    aulaPorFranja.insert(franja, asignacion.aula);
+                }
+            }
+
+            // Bloque de 1: franjas ocupadas que no forman par.
+            const int sueltas = rejilla::bloquesDeUno(config, curso, ocupadas);
+            if (sueltas > 0)
+                analisis.conflictos.append(
+                    QStringLiteral("El curso «%1» tiene %2 franjas sin bloque de dos horas.")
+                        .arg(clave)
+                        .arg(sueltas));
+
+            // Materia mal alineada: más franjas descubiertas que su resto.
+            for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[curso]))
+            {
+                const int materia = mc.materiaIDx;
+                const int horas =
+                    bloques(mc.horasSemanales, config.franja_horaria.duracion_minutos);
+                const int descubiertas = rejilla::franjasDescubiertasDeMateria(
+                    config, curso, porMateria.value(materia));
+                if (descubiertas > horas % 2)
+                {
+                    const QString nombre =
+                        (materia >= 0 && materia < config.materias.size())
+                            ? config.materias[materia].nombre
+                            : QString::number(materia);
+                    analisis.conflictos.append(
+                        QStringLiteral("La materia «%1» del curso «%2» tiene %3 franjas "
+                                       "descubiertas y su resto es %4.")
+                            .arg(nombre)
+                            .arg(clave)
+                            .arg(descubiertas)
+                            .arg(horas % 2));
+                }
+            }
+
+            // Hueco que no es sufijo: una franja libre con clase después en el mismo día.
+            QVector<int> franjasTurno = slotsTurno(config, config.cursos[curso].turno);
+            std::sort(franjasTurno.begin(), franjasTurno.end());
+            for (int dia = 0; dia < config.dimensiones.num_dias; ++dia)
+            {
+                bool hayHueco = false;
+                for (int slot : franjasTurno)
+                {
+                    const bool ocupada = ocupadas.contains(FranjaSemana{dia, slot});
+                    if (!ocupada)
+                        hayHueco = true;
+                    else if (hayHueco)
+                    {
+                        analisis.conflictos.append(
+                            QStringLiteral("El curso «%1» tiene un hueco que no es sufijo el día %2 "
+                                           "(franja %3).")
+                                .arg(clave)
+                                .arg(dia)
+                                .arg(slot));
+                        break;
+                    }
+                }
+            }
+
+            // Dos aulas distintas en un mismo bloque.
+            for (const rejilla::Par& par : rejilla::paresDeCurso(config, curso, ocupadas))
+            {
+                const int aulaA = aulaPorFranja.value(FranjaSemana{par.dia, par.inicio}, -1);
+                const int aulaB = aulaPorFranja.value(FranjaSemana{par.dia, par.inicio + 1}, -1);
+                if (aulaA >= 0 && aulaB >= 0 && aulaA != aulaB)
+                    analisis.conflictos.append(
+                        QStringLiteral("El bloque del curso «%1» (día %2, franjas %3-%4) usa "
+                                       "dos aulas distintas.")
+                            .arg(clave)
+                            .arg(par.dia)
+                            .arg(par.inicio)
+                            .arg(par.inicio + 1));
+            }
+        }
+    }
+
     /// Clave de ocupación de P4: un recurso (docente o aula) ocupado en una franja concreta.
     ///
     /// P4 debe distinguir el recurso: dos clases en la misma franja solo chocan si comparten
@@ -27,14 +137,6 @@ namespace
         }
     };
 
-    /// Índice en `config.cursos` del curso con esa clave (`año|sección`), o -1.
-    int indiceCurso(const SolverConfig& config, const QString& clave)
-    {
-        for (int i = 0; i < config.cursos.size(); ++i)
-            if (claveCurso(config.cursos[i].anio, config.cursos[i].seccion) == clave)
-                return i;
-        return -1;
-    }
 } // namespace
 
 AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverConfig& config)
@@ -129,81 +231,8 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
         }
     }
 
-    // ── S3: análisis de agrupación de bloques ──
-    // Para cada (curso, materia, día, segmento), detectar los grupos contiguos
-    // y calcular su penalización (RF-2).
-    {
-        QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
-        for (const TurnoConfig& t : config.turnos.turnos)
-            segmentosPorTurno[t.nombre] = segmentosTurno(t, config.eventos);
-
-        for (auto itCurso = horario.horarios.constBegin();
-             itCurso != horario.horarios.constEnd(); ++itCurso)
-        {
-            const QString& nombreCurso = itCurso.key();
-            const CursoOutput& curso = itCurso.value();
-            const int idxCurso = indiceCurso(config, nombreCurso);
-            if (idxCurso < 0) continue;
-
-            const CursoSolverConfig& cursoCfg = config.cursos[idxCurso];
-            const QVector<QVector<int>>& segs = segmentosPorTurno.value(cursoCfg.turno);
-            if (segs.isEmpty()) continue;
-
-            for (const DiaOutput& dia : curso.dias)
-            {
-                // Horas del día por materia (suma sobre todos los segmentos).
-                QMap<int, int> horasDia;
-                for (const AsignacionOutput& asig : dia.asignaciones)
-                    horasDia[asig.materia] += 1;
-
-                for (int seg = 0; seg < segs.size(); ++seg)
-                {
-                    const QVector<int>& franjas = segs[seg];
-
-                    for (auto itM = horasDia.constBegin(); itM != horasDia.constEnd(); ++itM)
-                    {
-                        const int materia = itM.key();
-                        int runLen = 0;
-                        int runInicio = -1;
-
-                        auto cerrarGrupo = [&]() {
-                            if (runLen <= 0) return;
-                            GrupoAgrupacion g;
-                            g.curso = nombreCurso;
-                            g.materia = materia;
-                            g.dia = dia.dia;
-                            g.segmento = seg;
-                            g.inicio = runInicio;
-                            g.tamano = runLen;
-                            g.penalizacion = calcularPenalizacionGrupo(runLen, horasDia.value(materia));
-                            analisis.grupos.append(g);
-                            analisis.penalizacionAgrupacion += g.penalizacion;
-                            runLen = 0;
-                            runInicio = -1;
-                        };
-
-                        for (int f : franjas)
-                        {
-                            bool tiene = false;
-                            for (const AsignacionOutput& asig : dia.asignaciones)
-                                if (asig.materia == materia && asig.slot == f) { tiene = true; break; }
-
-                            if (tiene)
-                            {
-                                if (runLen == 0) runInicio = f;
-                                ++runLen;
-                            }
-                            else
-                            {
-                                cerrarGrupo();
-                            }
-                        }
-                        cerrarGrupo();
-                    }
-                }
-            }
-        }
-    }
+    // P4 ampliado (014): bloque de 1, materia mal alineada o dos aulas en un bloque.
+    comprobarBloques(horario, config, analisis);
 
     // P2: ningún profesor excede sus horas requeridas. Es el único aviso que queda (005 I2):
     // las horas no cubiertas (P1) y la capacidad de aula (P3) se retiraron.

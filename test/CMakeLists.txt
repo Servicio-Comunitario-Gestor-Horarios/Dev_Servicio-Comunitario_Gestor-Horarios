@@ -107,6 +107,12 @@ if(TARGET backend)
 	# Comprobación única de validez de la base (016 T1).
 	add_gtest(test_comprobacion_validez backend/test_comprobacion_validez.cpp backend)
 
+	# Funciones puras de la rejilla de bloques de dos horas (014 T2).
+	add_gtest(test_bloques backend/test_bloques.cpp backend)
+
+	# Informe de bloques, desvío, huecos y separación (014 T6).
+	add_gtest(test_analisis_bloques backend/test_analisis_bloques.cpp backend)
+
 	# Configuración global de la hora académica: valor efectivo y edición (011 T3).
 	add_qtest(test_servicio_configuracion_horaria
 				backend/test_servicio_configuracion_horaria.cpp
@@ -145,8 +151,19 @@ endif()
 # Solver CP-SAT — requiere el target `backend_solver`
 # ============================================================
 if(TARGET backend_solver)
+	# Fixture de aceptación sin EF (014 T7): datos del centro de 24 cursos.
+	add_library(fixture_centro STATIC backend/fixtures/centro_sin_ef.cpp)
+	target_link_libraries(fixture_centro PUBLIC backend)
+	target_include_directories(fixture_centro PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/backend)
+
 	add_gtest(test_backend_variables_cp_sat backend/test_variables_cp_sat.cpp backend_solver)
 	add_qtest(test_solver_horarios backend/test_solver_horarios.cpp backend_solver)
+	# Emparejamiento en bloques de dos horas: segmento lleno, tramo impar y tamaño (014 T3a).
+	add_gtest(test_solver_bloques backend/test_solver_bloques.cpp backend_solver)
+	# Aceptación del centro sin EF (014 T7). Es lento: etiqueta `slow` y fuera de la suite normal.
+	add_gtest(test_solver_centro_sin_ef backend/test_solver_centro_sin_ef.cpp
+					fixture_centro backend_solver)
+	set_tests_properties(test_solver_centro_sin_ef PROPERTIES LABELS "slow")
 	add_qtest(test_solver_benchmark backend/test_solver_benchmark.cpp backend_solver)
 	# Objetivo con preferencias: referencia, anclaje estructural y deduplicación (013 T5).
 	add_gtest(test_solver_preferencias backend/test_solver_preferencias.cpp backend_solver)

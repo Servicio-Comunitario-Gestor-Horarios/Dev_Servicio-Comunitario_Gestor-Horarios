@@ -345,6 +345,15 @@ private slots:
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::Listo);
         QVERIFY(servicio.ultimoResultado().presentable);
+
+        // 014, RF-12: el informe de bloques es aditivo y se calcula sobre la salida.
+        const AnalisisBloques& bloques = servicio.ultimoResultado().bloques;
+        QCOMPARE(bloques.bloques.size(), 1);
+        QCOMPARE(bloques.bloquesSimples, 1);
+        QCOMPARE(bloques.bloquesCompartidos, 0);
+        QCOMPARE(bloques.bloquesDeUno, 0);
+        QCOMPARE(bloques.desvio, 0);
+        QCOMPARE(bloques.materias.size(), 1);
     }
 
     void datosAnteriores_siLaHuellaCambia()

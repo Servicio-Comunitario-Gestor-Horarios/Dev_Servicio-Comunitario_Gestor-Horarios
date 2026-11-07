@@ -33,8 +33,8 @@ QVector<Disponibilidad> dispCompleta(int dias, int franjas)
     return disp;
 }
 
-/// Un curso de 1|A con una materia de 2 h en 2 días × 4 franjas. La fase 1 coloca las dos
-/// clases en un grupo contiguo de 2 (S3); hay sitio de sobra para moverlas.
+/// Un curso de 1|A con una materia de 2 h en 2 días × 4 franjas. La fase 1 reparte las clases
+/// con S1+S2; hay sitio de sobra para moverlas.
 SolverConfig configDosDias()
 {
     SolverConfig config;
@@ -60,17 +60,18 @@ SolverConfig configInvariantes()
     SolverConfig config;
     config.version = "2.0";
     config.aula_fija = true;
-    config.dimensiones = {2, 1, 1, 2, 2, 4};
+    config.dimensiones = {2, 1, 2, 2, 2, 4};
     config.franja_horaria = {60, 4};
     config.turnos.turnos = {{QStringLiteral("manana"), {0, 1, 2, 3}}};
     config.materias = {{QStringLiteral("Matemática"), QStringLiteral("Aula de estudio")}};
-    config.aulas = {{QStringLiteral("A1"), QStringLiteral("Aula de estudio"), 30}};
+    config.aulas = {{QStringLiteral("A1"), QStringLiteral("Aula de estudio"), 30},
+                    {QStringLiteral("A2"), QStringLiteral("Aula de estudio"), 30}};
     config.planes = {{QStringLiteral("Plan A"), {{0, 1, 2}}},
                      {QStringLiteral("Plan B"), {{0, 2, 2}}}};
     config.cursos = {{1, QStringLiteral("A"), QStringLiteral("manana"), 20,
                       QStringLiteral("Plan A"), 0},
                      {2, QStringLiteral("B"), QStringLiteral("manana"), 20,
-                      QStringLiteral("Plan B"), 0}};
+                      QStringLiteral("Plan B"), 1}};
     config.profesores = {
         {QStringLiteral("Ana"), 2, 2, QStringLiteral("manana"), {}, {}, {0}, {},
          dispCompleta(2, 4)},
@@ -79,28 +80,28 @@ SolverConfig configInvariantes()
     return config;
 }
 
-/// Un curso con una materia de 5 h, un titular con capacidad justa (5 h de aula) y un suplente
+/// Un curso con una materia de 4 h, un titular con capacidad justa (4 h de aula) y un suplente
 /// elegible: la referencia asigna al titular sin exceso y la preferencia no puede cambiarlo.
 SolverConfig configSuplente()
 {
     SolverConfig config;
     config.version = "2.0";
     config.aula_fija = true;
-    config.dimensiones = {2, 1, 1, 1, 5, 1};
-    config.franja_horaria = {60, 1};
-    config.turnos.turnos = {{QStringLiteral("manana"), {0}}};
+    config.dimensiones = {2, 1, 1, 1, 5, 2};
+    config.franja_horaria = {60, 2};
+    config.turnos.turnos = {{QStringLiteral("manana"), {0, 1}}};
     config.materias = {{QStringLiteral("Matemática"), QStringLiteral("Aula de estudio")}};
     config.aulas = {{QStringLiteral("A1"), QStringLiteral("Aula de estudio"), 30}};
-    config.planes = {{QStringLiteral("Ciencias"), {{0, 1, 5}}}};
+    config.planes = {{QStringLiteral("Ciencias"), {{0, 1, 4}}}};
     config.cursos = {{1, QStringLiteral("A"), QStringLiteral("manana"), 20,
                       QStringLiteral("Ciencias"), 0}};
     config.profesores = {
-        // Titular con capacidad justa (5 bloques).
-        {QStringLiteral("Titular"), 5, 5, QStringLiteral("manana"), QStringLiteral("Ciencias"),
-         {1}, {0}, {}, dispCompleta(5, 1)},
+        // Titular con capacidad justa (4 bloques).
+        {QStringLiteral("Titular"), 4, 4, QStringLiteral("manana"), QStringLiteral("Ciencias"),
+         {1}, {0}, {}, dispCompleta(5, 2)},
         // Suplente elegible para la misma materia.
-        {QStringLiteral("Suplente"), 5, 5, QStringLiteral("manana"), QStringLiteral("Ciencias"),
-         {1}, {}, {{0, 1}}, dispCompleta(5, 1)}};
+        {QStringLiteral("Suplente"), 4, 4, QStringLiteral("manana"), QStringLiteral("Ciencias"),
+         {1}, {}, {{0, 1}}, dispCompleta(5, 2)}};
     return config;
 }
 
@@ -113,6 +114,14 @@ PreferenciaSolverConfig preferencia(int docente, int dia, const QVector<int>& fr
     p.dia = dia;
     p.slot = franjas;
     p.sentido = sentido;
+    return p;
+}
+
+/// Presupuesto de 1 worker para pruebas que comparan horarios exactos (014b). El producto usa 8.
+Solver::PresupuestoFases unSoloWorker()
+{
+    Solver::PresupuestoFases p;
+    p.workers = 1;
     return p;
 }
 
@@ -159,32 +168,6 @@ int contarClases(const HorarioSalida& horario)
     return total;
 }
 
-/// Nº de clases AISLADAS (la penalización que aplica hoy S3): una clase de una materia en un día
-/// sin otra clase de la misma materia en la franja anterior ni en la siguiente. Los fixtures no
-/// declaran eventos, así que el día es un solo segmento.
-int clasesAisladas(const HorarioSalida& horario)
-{
-    int aisladas = 0;
-    for (auto itCurso = horario.horarios.constBegin(); itCurso != horario.horarios.constEnd();
-         ++itCurso) {
-        // (materia, día) → franjas ocupadas.
-        QMap<QPair<int, int>, QSet<int>> franjas;
-        for (const DiaOutput& dia : itCurso.value().dias)
-            for (const AsignacionOutput& asignacion : dia.asignaciones)
-                franjas[qMakePair(asignacion.materia, dia.dia)].insert(asignacion.slot);
-
-        for (auto it = franjas.constBegin(); it != franjas.constEnd(); ++it) {
-            for (int slot : it.value()) {
-                const bool tieneVecina = it.value().contains(slot - 1) ||
-                                         it.value().contains(slot + 1);
-                if (!tieneVecina)
-                    ++aisladas;
-            }
-        }
-    }
-    return aisladas;
-}
-
 /// Asignación observada de docente por materia-curso: `curso|materia` → conjunto de docentes
 /// que dan clase de esa materia (debe ser uno solo; se guarda el conjunto para detectar cambios).
 QMap<QString, QSet<int>> asignacionDocente(const HorarioSalida& horario)
@@ -218,14 +201,22 @@ QMap<int, int> excesoPorDocente(const HorarioSalida& horario, const SolverConfig
 
 // ─── Sin preferencias: la referencia no cambia (RNF-4) ───────────────────────
 
-TEST(TestSolverPreferencias, sinPreferencias_salidaIdenticaALaActual)
+TEST(TestSolverPreferencias, sinPreferencias_daUnParAdyacenteValido)
 {
     Solver solver;
     const auto resultado = solver.resolver(configDosDias());
 
     ASSERT_TRUE(resultado.exito) << resultado.errores.join("\n").toStdString();
-    EXPECT_EQ(resumenDeSalida(resultado),
-              QStringLiteral("1|A|1|2|0|0|0\n1|A|1|3|0|0|0"));
+    // 014b: con 8 workers no se fija el horario exacto; sí que sea un par adyacente del día.
+    const QSet<QPair<int, int>> franjas =
+        clasesDeMateria(resultado.resultado, QStringLiteral("1|A"), 0);
+    ASSERT_EQ(franjas.size(), 2);
+    auto it = franjas.constBegin();
+    const QPair<int, int> a = *it;
+    ++it;
+    const QPair<int, int> b = *it;
+    EXPECT_EQ(a.first, b.first) << "las dos clases deben caer el mismo día";
+    EXPECT_EQ(qAbs(a.second - b.second), 1) << "deben ser franjas adyacentes";
 }
 
 // ─── Garantía estructural (RF-1) ────────────────────────────────────────────
@@ -270,7 +261,7 @@ TEST(TestSolverPreferencias, mismasPreferencias_mismaAsignacionDocenteYExceso)
 TEST(TestSolverPreferencias, evitada_mueveLaClaseFueraDeLaFranja)
 {
     Solver solver;
-    const auto referencia = solver.resolver(configDosDias());
+    const auto referencia = solver.resolver(configDosDias(), unSoloWorker());
     ASSERT_TRUE(referencia.exito) << referencia.errores.join("\n").toStdString();
     const QSet<QPair<int, int>> franjasReferencia =
         clasesDeMateria(referencia.resultado, QStringLiteral("1|A"), 0);
@@ -295,26 +286,27 @@ TEST(TestSolverPreferencias, evitada_mueveLaClaseFueraDeLaFranja)
 TEST(TestSolverPreferencias, preferida_atraeLaClase)
 {
     Solver solver;
-    const auto referencia = solver.resolver(configDosDias());
+    const auto referencia = solver.resolver(configDosDias(), unSoloWorker());
     ASSERT_TRUE(referencia.exito) << referencia.errores.join("\n").toStdString();
     const QSet<QPair<int, int>> franjasReferencia =
         clasesDeMateria(referencia.resultado, QStringLiteral("1|A"), 0);
 
-    // Se prefiere el día que la referencia deja libre, en dos franjas contiguas.
+    // Se prefiere el día que la referencia deja libre, en dos franjas al inicio (el hueco queda
+    // al final y el valor de la 2a no cambia).
     const bool referenciaEnDia0 = std::any_of(franjasReferencia.begin(), franjasReferencia.end(),
                                               [](const QPair<int, int>& f) { return f.first == 0; });
     const int diaPreferido = referenciaEnDia0 ? 1 : 0;
 
     SolverConfig config = configDosDias();
-    config.preferencias = {preferencia(0, diaPreferido, {2, 3}, QStringLiteral("preferida"))};
+    config.preferencias = {preferencia(0, diaPreferido, {0, 1}, QStringLiteral("preferida"))};
 
-    const auto conPreferencia = solver.resolver(config);
+    const auto conPreferencia = solver.resolver(config, unSoloWorker());
     ASSERT_TRUE(conPreferencia.exito) << conPreferencia.errores.join("\n").toStdString();
 
     const QSet<QPair<int, int>> franjas =
         clasesDeMateria(conPreferencia.resultado, QStringLiteral("1|A"), 0);
-    EXPECT_EQ(franjas, (QSet<QPair<int, int>>{qMakePair(diaPreferido, 2),
-                                             qMakePair(diaPreferido, 3)}));
+    EXPECT_EQ(franjas, (QSet<QPair<int, int>>{qMakePair(diaPreferido, 0),
+                                             qMakePair(diaPreferido, 1)}));
 }
 
 TEST(TestSolverPreferencias, dosPreferenciasSolapadasMismoSentido_cuentanUnaVez)
@@ -330,8 +322,8 @@ TEST(TestSolverPreferencias, dosPreferenciasSolapadasMismoSentido_cuentanUnaVez)
     una.preferencias = {preferencia(0, 0, {0, 1, 2}, QStringLiteral("evitada"))};
 
     Solver solver;
-    const auto conDos = solver.resolver(dos);
-    const auto conUna = solver.resolver(una);
+    const auto conDos = solver.resolver(dos, unSoloWorker());
+    const auto conUna = solver.resolver(una, unSoloWorker());
 
     ASSERT_TRUE(conDos.exito) << conDos.errores.join("\n").toStdString();
     ASSERT_TRUE(conUna.exito) << conUna.errores.join("\n").toStdString();
@@ -360,7 +352,7 @@ TEST(TestSolverPreferencias, preferenciaCedeSiNoHayAlternativa)
 
 TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaSuplente)
 {
-    // 5 h de la materia en franjas evitadas: el docente no cambia (S2 intacto).
+    // 4 h de la materia en franjas evitadas: el docente no cambia (S2 intacto).
     SolverConfig config = configSuplente();
     for (int dia = 0; dia < 5; ++dia)
         config.preferencias.append(preferencia(0, dia, {0}, QStringLiteral("evitada")));
@@ -369,7 +361,7 @@ TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaSuplente)
     const auto resultado = solver.resolver(config);
 
     ASSERT_TRUE(resultado.exito) << resultado.errores.join("\n").toStdString();
-    EXPECT_EQ(contarClases(resultado.resultado), 5);
+    EXPECT_EQ(contarClases(resultado.resultado), 4);
     for (const DiaOutput& dia : resultado.resultado.horarios.value(QStringLiteral("1|A")).dias)
         for (const AsignacionOutput& asignacion : dia.asignaciones)
             EXPECT_EQ(asignacion.profesor, 0) << "la preferencia no puede pasar al suplente";
@@ -377,7 +369,7 @@ TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaSuplente)
 
 TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaExceso)
 {
-    // La misma acumulación no crea exceso de horas (S1 intacto): el titular tiene 5 h de aula.
+    // La misma acumulación no crea exceso de horas (S1 intacto): el titular tiene 4 h de aula.
     SolverConfig config = configSuplente();
     for (int dia = 0; dia < 5; ++dia)
         config.preferencias.append(preferencia(0, dia, {0}, QStringLiteral("evitada")));
@@ -406,8 +398,8 @@ TEST(TestSolverPreferencias, preferenciaNoRompeInvariantesDuras)
     ASSERT_TRUE(resultado.exito) << resultado.errores.join("\n").toStdString();
 
     QSet<QString> cursoPorFranja;            // exclusividad de curso (curso|día|slot)
-    QSet<QPair<int, int>> docentePorFranja;  // exclusividad de docente
-    QSet<QPair<int, int>> aulaPorFranja;     // exclusividad de aula
+    QSet<QString> docentePorFranja;          // docente|día|slot
+    QSet<QString> aulaPorFranja;             // aula|día|slot
     QMap<QString, int> bloquesPorMateria;
 
     for (auto it = resultado.resultado.horarios.constBegin();
@@ -418,18 +410,25 @@ TEST(TestSolverPreferencias, preferenciaNoRompeInvariantesDuras)
                 EXPECT_GE(asignacion.slot, 0);
                 EXPECT_LE(asignacion.slot, 3);
 
-                const QPair<int, int> franja = qMakePair(dia.dia, asignacion.slot);
+                const QString franjaDocente = QStringLiteral("%1|%2|%3")
+                                                  .arg(asignacion.profesor)
+                                                  .arg(dia.dia)
+                                                  .arg(asignacion.slot);
+                const QString franjaAula = QStringLiteral("%1|%2|%3")
+                                               .arg(asignacion.aula)
+                                               .arg(dia.dia)
+                                               .arg(asignacion.slot);
                 const QString cursoFranja =
                     QStringLiteral("%1|%2|%3").arg(it.key()).arg(dia.dia).arg(asignacion.slot);
                 EXPECT_FALSE(cursoPorFranja.contains(cursoFranja))
                     << "un curso no puede tener dos clases en la misma franja";
-                EXPECT_FALSE(docentePorFranja.contains(franja))
+                EXPECT_FALSE(docentePorFranja.contains(franjaDocente))
                     << "un docente no puede dar dos clases en la misma franja";
-                EXPECT_FALSE(aulaPorFranja.contains(franja))
+                EXPECT_FALSE(aulaPorFranja.contains(franjaAula))
                     << "un aula no puede alojar dos clases en la misma franja";
                 cursoPorFranja.insert(cursoFranja);
-                docentePorFranja.insert(franja);
-                aulaPorFranja.insert(franja);
+                docentePorFranja.insert(franjaDocente);
+                aulaPorFranja.insert(franjaAula);
 
                 // El docente asignado opta por la materia (titular o suplente declarado).
                 const int materia = asignacion.materia;
@@ -465,80 +464,32 @@ TEST(TestSolverPreferencias, ordenDeDeclaracionNoInfluye)
                               preferencia(0, 0, {0, 1}, QStringLiteral("evitada"))};
 
     Solver solver;
-    const auto a = solver.resolver(unOrden);
-    const auto b = solver.resolver(otroOrden);
+    const auto a = solver.resolver(unOrden, unSoloWorker());
+    const auto b = solver.resolver(otroOrden, unSoloWorker());
 
     ASSERT_TRUE(a.exito) << a.errores.join("\n").toStdString();
     ASSERT_TRUE(b.exito) << b.errores.join("\n").toStdString();
     EXPECT_EQ(resumenDeSalida(a), resumenDeSalida(b));
 }
 
-// ─── Jerarquía preferencia > S3 (fase 2b) ───────────────────────────────────
+// ─── Preferencia como fase 2 ────────────────────────────────────────────────
 
-TEST(TestSolverPreferencias, preferenciaGanaALaAgrupacion)
+TEST(TestSolverPreferencias, preferenciaEligeLasFranjasPreferidas)
 {
-    // Materia de 2 h en un día de 4 franjas. La preferencia exige las franjas 0 y 3, que dejan
-    // las dos clases AISLADAS (S3 las penaliza); la referencia las agrupa en una sola tirada.
+    // Materia de 2 h en un día de 4 franjas. Con el emparejamiento duro las dos clases deben
+    // formar un par adyacente; la preferencia premia el par (0,1) frente a los demás.
     SolverConfig config = configDosDias();
     config.dimensiones = {1, 1, 1, 1, 1, 4};
     config.franja_horaria = {60, 4};
     config.turnos.turnos = {{QStringLiteral("manana"), {0, 1, 2, 3}}};
     config.profesores[0].disponibilidad = dispCompleta(1, 4);
-    config.preferencias = {preferencia(0, 0, {0, 3}, QStringLiteral("preferida"))};
-
-    Solver solver;
-    const auto resultado = solver.resolver(config);
-    ASSERT_TRUE(resultado.exito) << resultado.errores.join("\n").toStdString();
-
-    // La preferencia manda sobre S3: las dos clases acaban en las franjas preferidas aunque el
-    // horario quede peor agrupado (ninguna otra asignación vale −50 en preferencia).
-    EXPECT_EQ(clasesDeMateria(resultado.resultado, QStringLiteral("1|A"), 0),
-              (QSet<QPair<int, int>>{qMakePair(0, 0), qMakePair(0, 3)}));
-}
-
-TEST(TestSolverPreferencias, fase2b_mejoraLaAgrupacionSinCambiarLaPreferencia)
-{
-    // La preferencia deja varias soluciones con el mismo valor. La 2b fija ese valor y
-    // desempata por S3: nunca pierde cumplimiento y no empeora la agrupación de la 2a.
-    SolverConfig config = configDosDias();
-    config.preferencias = {preferencia(0, 0, {0, 1}, QStringLiteral("evitada"))};
-
-    Solver solver;
-    const auto conFase2b = solver.resolver(config);
-
-    Solver::PresupuestoFases sinFase2b;
-    sinFase2b.agrupacion = 1e-9;   // agota la 2b: se queda la solución de la 2a
-    const auto soloFase2a = solver.resolver(config, sinFase2b);
-
-    ASSERT_TRUE(conFase2b.exito) << conFase2b.errores.join("\n").toStdString();
-    ASSERT_TRUE(soloFase2a.exito) << soloFase2a.errores.join("\n").toStdString();
-
-    // Mismo cumplimiento: ninguna clase en las franjas evitadas en ninguno de los dos.
-    const QSet<QPair<int, int>> evitadas{qMakePair(0, 0), qMakePair(0, 1)};
-    const auto clasesCon2b = clasesDeMateria(conFase2b.resultado, QStringLiteral("1|A"), 0);
-    const auto clasesSolo2a = clasesDeMateria(soloFase2a.resultado, QStringLiteral("1|A"), 0);
-    for (const QPair<int, int>& franja : clasesCon2b)
-        EXPECT_FALSE(evitadas.contains(franja));
-    for (const QPair<int, int>& franja : clasesSolo2a)
-        EXPECT_FALSE(evitadas.contains(franja));
-
-    // 2b no puede empeorar la agrupación (S3 = nº de clases aisladas en su materia y día).
-    EXPECT_LE(clasesAisladas(conFase2b.resultado), clasesAisladas(soloFase2a.resultado));
-}
-
-TEST(TestSolverPreferencias, fase2bAgotada_devuelveLaFase2a)
-{
-    // Con la 2b fuera de presupuesto se devuelve la 2a (preferencia cumplida), no la referencia
-    // ni un error: la escalera 2b→2a conserva el cumplimiento.
-    SolverConfig config = configDosDias();
     config.preferencias = {preferencia(0, 0, {0, 1}, QStringLiteral("preferida"))};
 
-    Solver::PresupuestoFases presupuesto;
-    presupuesto.agrupacion = 1e-9;
     Solver solver;
-    const auto resultado = solver.resolver(config, presupuesto);
-
+    const auto resultado = solver.resolver(config, unSoloWorker());
     ASSERT_TRUE(resultado.exito) << resultado.errores.join("\n").toStdString();
+
+    // La preferencia manda dentro de la fase: las dos clases acaban en el par preferido.
     EXPECT_EQ(clasesDeMateria(resultado.resultado, QStringLiteral("1|A"), 0),
               (QSet<QPair<int, int>>{qMakePair(0, 0), qMakePair(0, 1)}));
 }
@@ -551,7 +502,7 @@ TEST(TestSolverPreferencias, fase2SinSolucion_devuelveLaReferencia)
     // referencia la satisface); el caso alcanzable es que el presupuesto de la fase 2 se agote
     // (UNKNOWN). Entonces se devuelve la referencia, no un error.
     Solver solver;
-    const auto referencia = solver.resolver(configDosDias());
+    const auto referencia = solver.resolver(configDosDias(), unSoloWorker());
     ASSERT_TRUE(referencia.exito) << referencia.errores.join("\n").toStdString();
 
     SolverConfig config = configDosDias();
@@ -560,6 +511,7 @@ TEST(TestSolverPreferencias, fase2SinSolucion_devuelveLaReferencia)
     Solver::PresupuestoFases presupuesto;
     presupuesto.referencia = 6.0;
     presupuesto.preferencias = 1e-9;   // agota la fase 2 antes de encontrar solución
+    presupuesto.workers = 1;           // comparación exacta de horario (test)
     const auto conFase2Agotada = solver.resolver(config, presupuesto);
 
     ASSERT_TRUE(conFase2Agotada.exito) << conFase2Agotada.errores.join("\n").toStdString();

@@ -27,8 +27,9 @@ using namespace operations_research::sat;
  *                          solo se crean las aulas de los tipos que el curso requiere
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
  * - exceso             (e): bloques por encima del tope de horas de aula (S1)
- * - hay                (h): presencia de la materia en (m,c,d,seg,s) para S3
- * - isolated           (i): grupo de 1 (penaliza)
+ * - ocupada            (o): el curso tiene clase en (c,d,s) (R1)
+ * - par                (p): par de franjas (s, s+1) emparejado; solo dentro del segmento (R2)
+ * - materiaEnFranja    (u): la materia tiene clase en (m,c,d,s) (R3)
 
  */
 struct VariablesSolver {
@@ -37,14 +38,18 @@ struct VariablesSolver {
     QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;               ///< z: [p][c][m]
     QMap<int, IntVar> exceso;                                              ///< e[p]
 
-    // --- S3: Agrupación de bloques ---
-    // hay[m][c][d][seg][s] = 1 si la materia tiene clase en esa franja.
-    // isolated[m][c][d][seg][s] = 1 si la franja es un grupo de 1 (penaliza 1).
-    // longGroup[m][c][d][seg][s] = 1 si la franja es la 4.ª+ consecutiva (penaliza 1).
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> hay;                 ///< [m][c][d][seg][s]
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> isolated;            ///< [m][c][d][seg][s]
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> longGroup;           ///< [m][c][d][seg][s]
+    // ── Emparejamiento en bloques de dos horas (014, R1–R3) ──
+    QMap<std::tuple<int, int, int>, BoolVar> ocupada;          ///< [c][d][s]
+    QMap<std::tuple<int, int, int>, BoolVar> par;              ///< [c][d][s] (par que empieza en s)
+    QMap<std::tuple<int, int, int, int>, BoolVar> materiaEnFranja;  ///< [m][c][d][s]
 
+    // ── Alineación (014, R4–R6) ──
+    /// [m][c][d][s]: el par (s, s+1) es entero de la materia (bloque simple).
+    QMap<std::tuple<int, int, int, int>, BoolVar> bloqueSimple;
+
+    // ── Separación blanda con prioridad alta (014b, R8) ──
+    QMap<std::tuple<int, int, int>, BoolVar> apareceDia;          ///< [m][c][d]
+    QMap<std::tuple<int, int, int>, BoolVar> incumpleSeparacion;  ///< [m][c][d] (d y d+1)
 };
 
 /**

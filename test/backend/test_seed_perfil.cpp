@@ -901,7 +901,7 @@ private slots:
             QVERIFY2(carga * 10 <= 6 * docente.horasAula, qPrintable(docente.id));
             maximo = qMax(maximo, carga);
         }
-        QCOMPARE(maximo, 18);   // «GHC 1.º/2.º» (6 h × 3 secciones) es el 60 % exacto del tope 30.
+        QCOMPARE(maximo, 18);   // «Ciencias Naturales 1.º/2.º» (6 h × 3 secciones) es el 60 % del tope 30.
         QVERIFY(docentesCumplenCarga(perfil, VarianteDocentes::Holgada, nullptr));
     }
 

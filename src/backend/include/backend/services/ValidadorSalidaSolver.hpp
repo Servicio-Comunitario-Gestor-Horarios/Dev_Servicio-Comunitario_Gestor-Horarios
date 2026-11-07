@@ -8,7 +8,6 @@
  * de cálculo:
  *  - P2: ningún profesor excede sus horas requeridas (aviso).
  *  - P4: sin conflictos de solapamiento (profesor, aula o curso).
- *  - S3: análisis de agrupación de bloques (grupos de 2–3 franjas contiguas).
  *
  * P2 genera avisos; P4 hace que el resultado no sea presentable. Es una función pura
  * (sin E/S) que el frontend consume para pintar el horario y sus avisos.
@@ -19,32 +18,15 @@
 
 #include <QString>
 #include <QStringList>
-#include <QVector>
 
 #include "backend/data/horario_salida.hpp"
 #include "backend/solver/config/solver_config.hpp"
-
-/// Un grupo contiguo de una materia-curso en un día y segmento.
-struct GrupoAgrupacion
-{
-    QString curso;        ///< Clave del curso ("año|sección").
-    int materia = -1;     ///< Índice de materia.
-    int dia = -1;         ///< Día (0 = lunes).
-    int segmento = -1;    ///< Índice del segmento dentro del turno.
-    int inicio = -1;      ///< Primera franja del grupo.
-    int tamano = 0;       ///< Número de franjas contiguas.
-    int penalizacion = 0; ///< Penalización S3 (0 si 2–3; 1 si 1 injustificado; n-3 si ≥4).
-};
 
 /// Resultado de analizar la salida del solver.
 struct AnalisisSalida
 {
     QStringList conflictos;  ///< P4: solapamientos encontrados (no vacío ⇒ no presentable).
     QStringList avisos;      ///< P2: exceso de horas requeridas por el docente.
-
-    /// S3: grupos contiguos detectados y penalización total.
-    QVector<GrupoAgrupacion> grupos;
-    int penalizacionAgrupacion = 0;
 
     /// Un resultado con conflictos de solapamiento nunca es presentable.
     bool presentable() const { return conflictos.isEmpty(); }

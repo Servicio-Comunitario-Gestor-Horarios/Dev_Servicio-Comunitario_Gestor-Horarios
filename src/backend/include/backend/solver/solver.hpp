@@ -19,15 +19,16 @@ class Solver {
             double tiempo_ms;
         };
 
-        /// Presupuesto determinista (segundos) de cada fase (013, §3 del plan).
+        /// Presupuesto determinista (segundos) de cada fase.
         ///
-        /// La fase 2 solo se ejecuta si hay preferencias y la 2b solo si la 2a produjo solución.
-        /// Los tests pueden reducir un presupuesto para ejercitar la escalera de plazo
-        /// (2b→2a→referencia) sin cambiar los valores de producción.
+        /// `separacionHuecos` gobierna la fase 2a (separación + huecos) y `preferencias` la 2b.
+        /// La 2b solo se ejecuta si hay preferencias y la 2a produjo solución. `workers` vale 8
+        /// por defecto (decisión 014b: el determinismo ya no es requisito); seed 0 se mantiene.
         struct PresupuestoFases {
-            double referencia = 6.0;
-            double preferencias = 2.0;
-            double agrupacion = 1.0;
+            double referencia = 60.0;
+            double separacionHuecos = 20.0;
+            double preferencias = 10.0;
+            int workers = 8;
         };
 
         ResultadoSolver resolver(const SolverConfig& config);
@@ -49,15 +50,14 @@ class Solver {
         /// Reinicia `model`/`vars` y construye el modelo de una fase (F3): dos resoluciones
         /// seguidas no arrastran variables ni restricciones.
         void prepararModelo(const SolverConfig& config);
-        CpSolverResponse ejecutar(double presupuesto);
+        CpSolverResponse ejecutar(double presupuesto, int workers);
         AnclajeEstructural extraerAnclaje(const CpSolverResponse& response) const;
         void fijarAnclaje(const AnclajeEstructural& anclaje);
+        LinearExpr expresionSeparacionViernes(const SolverConfig& config) const;
         LinearExpr expresionPreferencias(const SolverConfig& config) const;
 
         void agregarRestricciones(const SolverConfig& config);
         void construirObjetivo(const SolverConfig& config);
-        /// Objetivo de la fase 2b: solo S3 (agrupación). S1 y S2 ya están fijados por igualdad.
-        void construirObjetivoSoloS3();
         HorarioSalida extraerSolucion(const CpSolverResponse& response, const SolverConfig& config);
         QStringList analizarFallo(const CpSolverResponse& response, const SolverConfig& config);
 };

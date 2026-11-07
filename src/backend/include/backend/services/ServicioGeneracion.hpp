@@ -5,7 +5,7 @@
  * @brief Orquestación de una generación de horarios (RF-1, RF-3, RF-5).
  *
  * Construye/valida la entrada, la envía al proceso de cálculo por un puerto
- * inyectable, espera con un plazo (60 s en producción) y analiza la salida.
+ * inyectable, espera con un plazo (300 s en producción) y analiza la salida.
  * Marca «datos anteriores» si la instantánea de dominio cambió durante el
  * cálculo. Es UI-free: los desenlaces se exponen por `finalizada()` y por
  * `ultimoResultado()`, que consume el frontend.
@@ -22,6 +22,7 @@
 #include "backend/data/horario_salida.hpp"
 #include "backend/services/ConstructorEntradaSolver.hpp"
 #include "backend/services/ValidadorSalidaSolver.hpp"
+#include "backend/services/analisis_bloques.hpp"
 #include "backend/services/preferencias_cumplimiento.hpp"
 #include "backend/services/proyeccion_preferencias.hpp"
 
@@ -86,6 +87,9 @@ struct ResultadoGeneracion
     /// Estado por preferencia y cumplimiento agregado (013, RF-8). Aditivo: no viaja en el
     /// contrato de salida del solver, se calcula aquí sobre el horario y la proyección.
     CumplimientoPreferencias cumplimiento;
+    /// Informe de bloques, desvío, huecos y separación (014, RF-12). Aditivo: no cambia el
+    /// contrato de salida del solver.
+    AnalisisBloques bloques;
 };
 
 /// Orquesta una generación. Una sola en curso a la vez.
@@ -95,7 +99,7 @@ class ServicioGeneracion : public QObject
 
 public:
     /// @param puerto       Transporte hacia el proceso de cálculo (no se posee).
-    /// @param plazoMs      Plazo de espera (60 s en producción; corto en tests).
+    /// @param plazoMs      Plazo de espera (300 s en producción; corto en tests).
     /// @param huellaActual Devuelve la huella de la instantánea actual; si al
     ///                     recibir la respuesta difiere de la enviada, el
     ///                     resultado se marca «datos anteriores». Vacío = nunca.
@@ -106,7 +110,7 @@ public:
     ///                     antes de `padre` para que olvidar el cableado no compile.
     /// @param padre        Objeto Qt padre.
     explicit ServicioGeneracion(PuertoSolver& puerto,
-                                int plazoMs = 60000,
+                                int plazoMs = 300000,
                                 std::function<QString()> huellaActual = {},
                                 std::function<QDateTime()> reloj = {},
                                 std::function<QString()> revisarBase = {},

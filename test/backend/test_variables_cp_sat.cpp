@@ -99,6 +99,9 @@ TEST_F(VariablesTest, EmptyConfig_NoVariablesCreated) {
     // Assert
     EXPECT_TRUE(vars.assignment.isEmpty());
     EXPECT_TRUE(vars.aulaAssignment.isEmpty());
+    EXPECT_TRUE(vars.ocupada.isEmpty());
+    EXPECT_TRUE(vars.par.isEmpty());
+    EXPECT_TRUE(vars.materiaEnFranja.isEmpty());
 }
 
 TEST_F(VariablesTest, OneProfessorOneCourse_CreatesCorrectVariables) {
@@ -132,6 +135,69 @@ TEST_F(VariablesTest, AssignmentKeysAreCorrect) {
     // slot 6 es tarde, turno es mañana
     std::tuple<int,int,int,int,int> wrongSlot{0, 0, 0, 0, 6};
     EXPECT_FALSE(vars.assignment.contains(wrongSlot));
+}
+
+TEST_F(VariablesTest, OcupadaYPar_SeCreanPorSegmento) {
+    // Turno mañana de 6 franjas sin eventos → un segmento [0..5] por día.
+    SolverConfig cfg = makeBaseConfig();
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // `ocupada` existe en todas las franjas del turno: 5 días × 6 = 30.
+    EXPECT_EQ(vars.ocupada.size(), 30);
+    EXPECT_TRUE(vars.ocupada.contains({0, 0, 0}));
+    EXPECT_TRUE(vars.ocupada.contains({0, 4, 5}));
+
+    // `par` solo donde `s+1` está en el mismo segmento: 5 por día × 5 = 25.
+    EXPECT_EQ(vars.par.size(), 25);
+    EXPECT_TRUE(vars.par.contains({0, 0, 0}));
+    EXPECT_TRUE(vars.par.contains({0, 0, 4}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 5}));   // última franja del segmento
+}
+
+TEST_F(VariablesTest, Par_RespetaElEventoDelTurno) {
+    // Evento tras la franja 1: segmentos [0,1] y [2..5]; `par` no cruza el evento.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.eventos = {{"Receso", "manana", 2, 1, 10, "", ""}};
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    EXPECT_EQ(vars.ocupada.size(), 30);       // las franjas no cambian
+    EXPECT_EQ(vars.par.size(), 20);           // 1 + 3 por día × 5
+    EXPECT_TRUE(vars.par.contains({0, 0, 0}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 1}));   // último del primer segmento
+    EXPECT_TRUE(vars.par.contains({0, 0, 2}));
+    EXPECT_TRUE(vars.par.contains({0, 0, 4}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 5}));   // último del segundo segmento
+}
+
+TEST_F(VariablesTest, MateriaEnFranja_SoloDondeHayClase) {
+    SolverConfig cfg = makeBaseConfig();
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // 1 materia × 1 curso × 5 días × 6 franjas con `x` = 30.
+    EXPECT_EQ(vars.materiaEnFranja.size(), 30);
+    EXPECT_TRUE(vars.materiaEnFranja.contains({0, 0, 0, 0}));
+    EXPECT_TRUE(vars.materiaEnFranja.contains({0, 0, 4, 5}));
+}
+
+TEST_F(VariablesTest, OcupadaYPar_ExistenAunqueNoHayaDocente) {
+    // Sin docente disponible no hay `x`, pero la rejilla del curso sigue existiendo: R1 fija
+    // `ocupada = 0` y R2 propaga `par = 0`. No se crea `materiaEnFranja`.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.profesores[0].disponibilidad = {};
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    EXPECT_TRUE(vars.assignment.isEmpty());
+    EXPECT_EQ(vars.ocupada.size(), 30);
+    EXPECT_EQ(vars.par.size(), 25);
+    EXPECT_TRUE(vars.materiaEnFranja.isEmpty());
 }
 
 TEST_F(VariablesTest, ProfessorNotTeachingSubject_NoVariables) {

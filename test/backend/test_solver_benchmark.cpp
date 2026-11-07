@@ -58,14 +58,19 @@ private:
         };
 
         // Planes embebidos: materias {materia_idx, curso(anio), horas}.
+        // Ajuste T3a: cada curso suma 10 h (par) y sus turnos tienen 3 franjas/día, así que
+        // cada día lleva 2 clases (tramo par). Antes había totales impares (9 y 11) y 12 h en
+        // un turno de 3 franjas, que el emparejamiento duro ya no admite.
+        // Ajuste T3b (R7): Tecnología es la única materia de laboratorio; sus horas deben ser
+        // pares para poder formar pares del mismo tipo (3 h no tiene con quién compartir).
         config.planes = {
             {"General", {{0,1,4},{5,1,3},{10,1,3},
                          {5,2,4},{7,2,3},{10,2,3},
-                         {6,3,3},{8,3,3},{12,3,3},
-                         {5,4,3},{7,4,3},{13,4,3}}},
-            {"Ciencias", {{0,2,4},{1,2,3},{2,2,3},{3,2,2},
-                          {0,3,3},{1,3,3},{2,3,3},{4,3,2},
-                          {0,4,3},{3,4,3},{14,4,3}}}
+                         {6,3,4},{8,3,3},{12,3,3},
+                         {5,4,4},{7,4,3},{13,4,3}}},
+            {"Ciencias", {{0,2,4},{1,2,2},{2,2,2},{3,2,2},
+                          {0,3,3},{1,3,3},{2,3,2},{4,3,2},
+                          {0,4,4},{3,4,4},{14,4,2}}}
         };
 
         // 10 profesores con disponibilidad completa
@@ -75,16 +80,16 @@ private:
         }
 
         config.profesores = {
-            {"Prof 01", 16, 16, "manana", "General", {},   {0, 5},    {}, dispCompleta},
-            {"Prof 02", 14, 14, "manana", "Ciencias", {},  {0, 1},    {}, dispCompleta},
-            {"Prof 03", 14, 14, "manana", "Ciencias", {},  {2, 3, 4}, {}, dispCompleta},
+            {"Prof 01", 16, 16, "",       "General", {},   {0, 5},    {}, dispCompleta},
+            {"Prof 02", 14, 14, "",       "Ciencias", {},  {0, 1},    {}, dispCompleta},
+            {"Prof 03", 14, 14, "",       "Ciencias", {},  {2, 3, 4}, {}, dispCompleta},
             {"Prof 04", 12, 12, "",       "", {},          {5, 6},    {}, dispCompleta},
             {"Prof 05", 14, 14, "",       "", {},          {7, 8},    {}, dispCompleta},
-            {"Prof 06", 12, 12, "tarde",  "General", {},   {10, 11},  {}, dispCompleta},
+            {"Prof 06", 12, 12, "",       "General", {},   {10, 11},  {}, dispCompleta},
             {"Prof 07", 12, 12, "",       "", {},          {10, 12},  {}, dispCompleta},
             {"Prof 08", 10, 10, "",       "", {},          {13, 14},  {}, dispCompleta},
-            {"Prof 09", 14, 14, "manana", "General", {},   {0, 5, 6}, {}, dispCompleta},
-            {"Prof 10", 14, 14, "tarde",  "Ciencias", {},  {0, 1, 3, 4}, {}, dispCompleta}
+            {"Prof 09", 14, 14, "",       "General", {},   {0, 5, 6}, {}, dispCompleta},
+            {"Prof 10", 14, 14, "",       "Ciencias", {},  {0, 1, 3, 4}, {}, dispCompleta}
         };
 
         return config;
@@ -159,7 +164,7 @@ private slots:
         }
 
         QVERIFY(resultado.exito);
-        QVERIFY(elapsed < 60000); // < 60 segundos
+        QVERIFY(elapsed < 60000); // techo histórico del benchmark (no es el plazo del servicio: 300 s)
     }
 
     void benchmark_SolverGrandeConPreferencias() {
@@ -185,10 +190,13 @@ private slots:
         QVERIFY2(primera.exito, qPrintable(primera.errores.join("\n")));
         QVERIFY2(segunda.exito, qPrintable(segunda.errores.join("\n")));
 
-        // RNF-2: dos ejecuciones seguidas dan el mismo horario.
-        QCOMPARE(resumenDeSalida(segunda), resumenDeSalida(primera));
+        // 014b: con 8 workers no se promete el mismo horario; ambas ejecuciones deben ser
+        // válidas y cubrir el mismo número de clases.
+        QCOMPARE(segunda.resultado.metadata.total_asignaciones,
+                 primera.resultado.metadata.total_asignaciones);
 
-        // RNF-3: techo de 60 s (el +50 % se documenta, no se aserta: depende de la máquina).
+        // Techo histórico del benchmark: 60 s (no es el plazo del servicio, 300 s). El +50 %
+        // se documenta, no se aserta: depende de la máquina.
         QVERIFY2(msPrimera < 60000,
                  qPrintable(QStringLiteral("la primera ejecución tardó %1 ms").arg(msPrimera)));
         QVERIFY2(msSegunda < 60000,

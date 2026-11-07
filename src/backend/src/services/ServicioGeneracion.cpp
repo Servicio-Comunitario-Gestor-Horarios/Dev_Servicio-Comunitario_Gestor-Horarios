@@ -249,6 +249,8 @@ void ServicioGeneracion::alResponder(const RespuestaSolver& respuesta)
     // 013, RF-8: estado por preferencia y agregado, sobre el horario y la proyección ya
     // calculada. No cambia el contrato de salida del solver.
     m_ultimo.cumplimiento = analizarPreferencias(m_config, horario, m_noAplicadas);
+    // 014, RF-12: informe aditivo de bloques, desvío, huecos y separación sobre el horario.
+    m_ultimo.bloques = analizarBloques(horario, m_config);
 
     // P4: conflictos de solapamiento ⇒ el cálculo falló.
     if (!analisis.presentable())
