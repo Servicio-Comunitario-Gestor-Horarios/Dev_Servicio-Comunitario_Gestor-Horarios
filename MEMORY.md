@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** **013 (preferencias del docente en la generación)** **implementada y cerrada (2026-11-06)**; la 015 y la 016 (tipo general en el esquema, **esquema v6**) están cerradas y commiteadas en `c7b9427`. Suites **58/58** (`backend`) y **63/63** (`full-release`) en el host.
-- **Fecha:** 2026-11-06
-- **Rama:** `feat/Motor`, `HEAD` = `c7b9427`. La 013 está **en el árbol, sin commitear** (commits pendientes).
-- **Specs en curso:** ninguna. **014** (materias en bloques de dos horas) **planificada** y sin escribir; la generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
-- **Siguiente paso:** escribir la **014** y **decidir los commits** de la 013 (un commit por unidad de trabajo revisable).
+- **Fase:** **014 (materias en bloques de dos horas)** **implementada y cerrada (2026-11-07)**; la **013** (preferencias) cerrada el 2026-11-06 y commiteada en `2eb45ec`; la 015/016 (tipo general, **esquema v6**) cerradas en `c7b9427`. Suites **61/61** (`backend`) y **66/66** (`full-release`) en el host.
+- **Fecha:** 2026-11-07
+- **Rama:** `feat/Motor`, `HEAD` = `bf06df6` (commit «backup» del usuario). La **014** está **en el árbol, sin commitear** (spec, código, tests, docs y esta nota).
+- **Specs en curso:** ninguna. Siguientes: **seed con los planes reales de `seed.md`**, **aforo simultáneo por aula (cancha)** y **rendimiento/descomposición**.
+- **Siguiente paso:** la **seed** con los planes reales, la spec de **aforo simultáneo**, la de **rendimiento** y **decidir los commits** de la 014. La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
 
 ## Specs activas
 
@@ -25,7 +25,7 @@
 | 011-horas-academicas | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T10; **T8 adelantada**; APROBADO 2026-10-29) |
 | 012-preferencias-docente | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T9; APROBADO 2026-10-29) |
 | 013-preferencias-docente-solver | aprobada (2026-11-04) | **implementada y cerrada (2026-11-06)** (T1–T10; APROBADO 2026-11-06; re-baseada a v6 en `c7b9427`; sin commits) |
-| 014-bloques-de-dos-horas | — (planificada) | no abierta; se escribe después de la 013 |
+| 014-bloques-de-dos-horas | aprobada (2026-11-06) | **implementada y cerrada (2026-11-07)** (014a T1–T7 + 014b B1–B7; APROBADO 2026-11-07; sin commits) |
 | 015-tipo-general-en-el-esquema | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T8; APROBADO 2026-11-05; esquema **v6**) |
 | 016-tipo-general-comprobacion-y-cierre | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T9; APROBADO; T8 del planner) |
 
@@ -158,13 +158,15 @@
 
 - **Preferencias del docente en la generación (013, implementada y cerrada el 2026-11-06):** prioridad **blanda con garantía estructural** — la preferencia nunca cambia la asignación de docente por materia-curso ni el exceso de horas, y se logra con **tres resoluciones**: fase 1 = modelo actual (referencia), fase 2a con `z*` y `e*` fijados por igualdad minimizando la preferencia, y fase 2b que fija ese valor y desempata con S3. `PESO_PREFERENCIA = 25` (10 < 25 < 100), unidad por franja deduplicada por (docente, día, slot). Contrato 2.0 con sección **opcional `preferencias`** ya proyectada (docente por índice, día de la generación, franjas, sentido): `toJson` la omite vacía, **el preset no la persiste** (se elimina al guardar) y la ignora al cargar, y la equivalencia de ida y vuelta es de la **configuración** (acotación anotada en 005/010). Proyección reloj→franja en la construcción con **la misma rejilla** que la disponibilidad (bloque entero, todos los turnos, el evento no corta) y filtro de día dominio→generación (domingo no aplica; sábado solo si la semana lo incluye); solo viajan las **intervinientes** y las demás se informan como **no aplicadas** con motivo (c) > (a) > (b). **V19** y catálogo **V1–V19**; constitución §7.2 con S1/S2/preferencia/S3 y §7.4 a V1–V19. Huella con bloque `pref:` solo de intervinientes (golden sin preferencias `3c50f3ab…`). **Cumplimiento** por preferencia en el resultado del backend (día de dominio, motivo, clases incumplidas, tres totales); la salida del solver no cambia. Medición: 3937 ms → 4676 ms (**+18,8 %**), techo de 60 s asertado. **Deudas:** cobertura de aristas (sentidos opuestos solapados, cambio de preset que altere los intervinientes, turnos solapados, mejora estricta de la 2b); preset con preferencias inválidas se rechaza al cargar; sección de tipo incorrecto se tolera como vacía; `cumplimiento` vacío en NoFactible/ContratoInvalido; `longGroup` fuera del objetivo (deuda pre-existente); `docs/solver/Informe-Motor-Solver.md` en «V1–V13» (histórico).
 
+- **Materias en bloques de dos horas (014, implementada y cerrada el 2026-11-07):** **S3 eliminada** (la 009-agrupación queda superada; la sustituyen el **emparejamiento** y la **alineación**). Reglas duras: bloques de **2 franjas adyacentes** por segmento, cada materia en **bloques enteros** salvo su resto, **un bloque por materia y día**, **misma aula** en el bloque, resto compartido entre dos materias impares del mismo tipo, y **huecos al final del día**. Blandas: **separación de un día** (prioridad alta) y **viernes** para los huecos. Causa **(5) conflicto de bloques** (total impar; 11 h o más). **8 workers** (misma entrada ⇒ horario **válido**, no idéntico) y **plazo del proceso 300 s** (002). **Centro real factible** con 30 docentes: **848 clases, desvío 0, separación 2**; **172,6 s** el centro y **183,58 s** el test lento. La **cancha** se confirma para **dos cursos simultáneos**; el **aforo simultáneo por aula** es **spec futura**. Deudas: test de aceptación con 30 docentes; aserciones por curso de huecos 6/4 y `bloquesCompartidos == 4` (opcional); `docs/solver/Tareas-Implementacion.md` conserva «<60 s» histórico.
+
 ## Siguiente paso
 
-1. **Escribir la 014** (materias en bloques de dos horas) y **decidir los commits** de la 013 (hoy en el árbol).
+1. **Seed** con los planes reales de `seed.md`; después **aforo simultáneo por aula** y **rendimiento/descomposición**; y **decidir los commits** de la 014 (hoy en el árbol).
 2. **Deudas del frontend:** **resueltas en `feat/frontend-generacion` (2026-11-01)** — builder con D, `huellaActual` cableado, selector de duración retirado, eventos en lugar de recesos, `test_generacion_seed` reescrito (35 min, rejilla del seed). Queda solo la **pantalla de gestión del catálogo de tipos de aula** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) y, de la 012, la **UI de preferencias** (solo API): ambas son funcionalidad nueva, no bloquean la compilación.
 3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; `feat/frontend-generacion` **sí la tiene** (viene de `develop`) y la conservó al integrar la rama de datos: la agrupación S3 del solver convive con la ocupación por `ClaveOcupacion` de la 010. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
 4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-5. **MEMORY actualizado** (2026-11-06) con el cierre de la 013 (58/58 y 63/63).
+5. **MEMORY actualizado** (2026-11-07) con el cierre de la 014 (61/61 y 66/66).
 6. **DistribuciÃ³n:** el **ZIP portable** ya se genera con `cmake --build build-rel --target package` (`cmake/Packaging.cmake`; ver `docs/guias/desarrollo/CMAKE_GUIDE.md` Â§Empaquetado). Falta lo que venga despuÃ©s: un instalador (Inno Setup o NSIS) que envuelva ese ZIP y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
@@ -203,6 +205,7 @@
 - 015: **T1–T8 completas** ✅ (APROBADO 2026-11-05; esquema **v6**: fila + dos disparadores + guardia ampliada; seed reutiliza y conserva el general).
 - 016: **T1–T9 completas** ✅ (APROBADO 2026-11-05; comprobación en tres momentos, ayuda estricta, V18, huella; T8 del planner re-baseó la 013).
 - 013: **T1–T10 completas** ✅ (APROBADO 2026-11-06; contrato con `preferencias`, V19, proyección, fases 1/2a/2b, huella, cumplimiento y docs).
+- 014: **implementada y cerrada** ✅ (014a T1–T7 + 014b B1–B7; S3 eliminada, bloques de 2 h, 8 workers, plazo 300 s, informe de bloques y seed a horas pares).
 - Tests ajenos que fallan: **ninguno**. El antiguo **flaky `test_middleware_transport`** estaba **mal atribuido**: no era ajeno al solver, sino una **colisión del nombre fijo del socket IPC** entre los tests que levantan `InternalServer` (`health_check`, `transport`, `ipc_aislamiento_bd`) al correr en paralelo; **corregido el 2026-10-29** con `RESOURCE_LOCK` de CTest (`fd7ac33`). La suite es estable hoy en serie y en paralelo (`-j4`/`-j8`). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
 - **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`, dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004 cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distinguía una base vieja de una nueva. Medidas:
   - `VersionEsquema::esquemaEsperado(db, QString* motivo)` explica exactamente lo que no cuadra (tablas/columnas faltantes y tablas retiradas presentes).
