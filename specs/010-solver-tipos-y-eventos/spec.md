@@ -193,8 +193,16 @@ tipo de aula, ni una reforma del frontend, ni una decisión sobre compartir la c
   ninguna categoría resulta aplicable, ENTONCES el resultado se informa como **causa no atribuible**, sin
   inventar una categoría (esto sustituye a la promesa de la 005 de que las categorías cubren todas las
   invariantes duras).
+  > **Superado por la 014 (2026-11-07): el catálogo pasa a (1)–(5).** Se añade **«(5) conflicto de
+  > bloques»**, después de (1)–(4) y antes de «no atribuible», con condiciones detectables: **total semanal
+  > impar** o **materia con más apariciones que días** (`⌈h/2⌉ > nº_días`; con 5 días, 11 h o más). El
+  > **emparejamiento**, la **alineación** y los **huecos al final** son reglas duras; la separación es
+  > blanda. El detalle vive en la 014 (RF-5/RF-10).
 - **Eventos del turno:** metadatos del turno que el solver **ignora** para programar; viajan en el
   contrato para que la entrada sea la instantánea completa de los datos.
+  > **Superado por la 014 (2026-11-07): los eventos no crean ni quitan franjas, pero definen los segmentos
+  > del bloque.** El solver deja de ignorarlos para la contigüidad: un bloque de dos horas no cruza un
+  > evento. La metadata (nombre, posición, orden, duración y horario) se mantiene.
 
 ## Requisitos funcionales
 

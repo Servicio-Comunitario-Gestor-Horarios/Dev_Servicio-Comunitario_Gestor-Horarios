@@ -596,3 +596,11 @@ persistido, no la configuración de cálculo.
 ## Dudas abiertas
 
 Ninguna.
+
+## Nota 014b (B7, 2026-11-06)
+
+El catálogo sintético del **31059** cambia, para cumplir RNF-8 de la 014 (ninguna materia impar de
+laboratorio/taller sin pareja del mismo tipo), **Ciencias Naturales 1.º y 2.º: 5 → 6 h** (laboratorio
+par) y compensa con **GHC 1.º y 2.º: 6 → 5 h** (general; sigue habiendo cuatro materias generales
+impares que emparejan sus restos). Los años siguen sumando **40 h**; el resto de planes y recuentos no
+cambia.

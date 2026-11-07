@@ -32,6 +32,15 @@ Estado: implementada (2026-11-06)
 > **Orden de trabajo (decisión del usuario, 2026-11-04).** Primero **esta** spec (013) y después la
 > **014** (las materias se asignan en bloques de dos horas). La 014 no se diseña aquí.
 
+> **Superada en parte por la 014 (2026-11-07).** Quedan superados: su **RF-5** (jerarquía con S3), sus
+> **criterios 6 y 10**, sus definiciones de **S3**, **`PESO_AGRUPACION`** y **generación de referencia** en
+> lo que dependa de S3, y la **prueba de contrato que fija `PESO_AGRUPACION == 10`**. Las **fases** de
+> generación pasan a **1** (referencia: reglas duras + S1 + S2), **2a** (separación + viernes, con `z*`/`e*`
+> fijados) y **2b** (preferencia, con el valor de 2a fijado). La **garantía estructural** (reparto de
+> docentes y exceso de horas) se mantiene **respecto de la nueva generación de referencia**. La **huella no
+> cambia** respecto de la 013 y la **reproducibilidad del horario** queda superada (8 workers; misma
+> entrada ⇒ válido, no idéntico).
+
 ## Contexto y objetivo
 
 El centro ya guarda **cuándo puede** dar clase cada docente (su disponibilidad) y **cuándo prefiere**
@@ -163,6 +172,10 @@ docentes ni del reparto de docentes.
     docente o exceder horas.
   - **La comprobación es comparativa:** para un mismo escenario, la asignación de docentes y el exceso
     por docente con preferencias son **idénticos** a los de la generación de referencia.
+    > **Nota (014, 2026-11-07): la referencia es la nueva.** «La generación de referencia» es la **fase 1
+    > de la 014** (reglas duras + S1 + S2, con `z*`/`e*`), no la generación previa a la 014: la igualdad se
+    > exige **dentro de cada ejecución** y contra esa referencia, no contra un horario anterior. La
+    > preferencia sigue sin cambiar **dónde** se asigna cada docente ni el exceso de horas.
 - **EL SISTEMA no usará las preferencias para elegir qué docente dicta una materia-curso:** la
   elegibilidad por plan, turno, año y disponibilidad y la preferencia **titular antes que suplente (S2)**
   se mantienen **intactas**.
@@ -414,9 +427,18 @@ docentes ni del reparto de docentes.
   resultado (se canonizan antes de construir el objetivo). Las preferencias **sí** cambian el horario
   respecto de la generación de referencia (RF-4); lo que no cambia es que el resultado sea único para una
   entrada dada.
+  > **Superado en la reproducibilidad del horario por la 014 (2026-11-06).** La 014 busca con **8 workers**
+  > y **no promete el mismo horario entre ejecuciones**: la misma entrada produce un horario **válido**, no
+  > necesariamente idéntico. La validez y la garantía estructural **dentro de cada ejecución** (respecto de
+  > su propia referencia) se mantienen.
 - **RNF-3. Desempeño:** el escenario de referencia del proyecto (13 cursos, 2 turnos, 16 franjas) se
-  resuelve por debajo del plazo vigente de **60 s** y su tiempo de cálculo **no supera en más del 50 %**
-  el de la generación de referencia en ese mismo escenario. El plan mide y documenta ese margen (RF-5).
+  resuelve por debajo del **plazo vigente del proceso de cálculo, 300 s** (002; la 014b supersede el plazo
+  anterior de un minuto), y su tiempo de cálculo se mide y documenta con su margen (RF-5).
+  > **Superado el «+50 %» por la 014 (2026-11-07).** La comparación «no supera en más del 50 % el tiempo de
+  > la generación de referencia» valía con **1 worker** y una sola referencia. La 014 usa **8 workers** y
+  > **tres fases** (1 referencia, 2a separación+viernes, 2b preferencia) con presupuestos 60/20/10, y mide
+  > **172,6 s** en el centro completo (848 clases). El requisito vigente es el **plazo de 300 s**; la
+  > comparación relativa se sustituye por **documentar el margen medido** en `journal.md`.
 - **RNF-4. Sin regresión:** sin preferencias intervinientes, el horario generado y su coste son idénticos
   a los actuales; las invariantes duras, las prioridades S1/S2/S3 y las validaciones existentes no
   cambian. La comprobación se ancla al escenario de datos de prueba y su preset vigentes en `bb1767a`.
@@ -425,6 +447,12 @@ docentes ni del reparto de docentes.
   > por el esquema) y la 016, el ancla pasa a ser el **escenario posterior a la 015/016** —perfil del seed
   > **sin** «Aula de estudio» y base **v6** con el tipo general garantizado— en lugar del escenario de
   > `bb1767a`. Es un cambio de **referencia de comprobación**, no de comportamiento.
+  > **Superado por la 014 (2026-11-07): S1/S2/S3 no se mantienen y «idéntico a los actuales» cambia.** La
+  > 014 **elimina S3** y sustituye la agrupación por el emparejamiento y la alineación; el motor busca con
+  > **8 workers**, así que la comparación «mismo horario y mismo coste» se sustituye por **validez e
+  > invariantes** (RNF-1 de la 014) y por la **garantía estructural respecto de la nueva generación de
+  > referencia** (fases 1/2a/2b). S1 y S2 se conservan; la igualdad **bit a bit** con la salida anterior no
+  > se exige (RF-13 de la 014).
 - **RNF-5. Verificación sin la interfaz:** la construcción puede excluir la interfaz de usuario y sus
   pruebas; con esa configuración, backend, datos, seed, consola y sus pruebas compilan y pasan.
 - **RNF-6. Protección de datos:** no se modifica ni migra ninguna preferencia persistida; no hay
@@ -540,7 +568,8 @@ docentes ni del reparto de docentes.
 ## Criterios de finalización
 
 1. **Garantía estructural:** con las mismas preferencias, la asignación de docente por materia-curso y el
-   exceso de horas por docente son **idénticos** a los de la generación de referencia; una prueba
+   exceso de horas por docente son **idénticos** a los de la generación de referencia (**la nueva: fase 1
+   de la 014**); una prueba
    comparativa lo comprueba (RF-1, RF-5).
 2. La sección de preferencias es **opcional** en el contrato `2.0`, lleva **día, franjas y sentido por
    índice de docente**, sin rangos de reloj, y sin ella equivale a «sin preferencias»; la
@@ -577,10 +606,14 @@ docentes ni del reparto de docentes.
     > **Ancla supersedida (2026-11-05):** la comparación se hace contra el escenario **posterior a la
     > 015/016** (seed sin «Aula de estudio», base v6 con el tipo general garantizado), no contra `bb1767a`.
     > El criterio es el mismo.
+    > **Superado por la 014 (2026-11-07):** «idénticos a los actuales» ya no se exige. El criterio pasa a
+    > **validez e invariantes** con **8 workers** (puede cambiar el horario) y a la **garantía estructural
+    > frente a la nueva generación de referencia** (fase 1 de la 014). S3 eliminada.
 12. El resultado es determinista y reproducible con y sin preferencias, y el orden de declaración de las
     preferencias no influye (RNF-2).
-13. El escenario de referencia sigue bajo 60 s y no supera en más del 50 % el tiempo de la generación de
-    referencia (RNF-3).
+13. El escenario de referencia queda bajo el **plazo de 300 s** y el margen medido se documenta (RNF-3);
+    el «+50 %» respecto de la generación de referencia queda **superado por la 014** (8 workers y fases
+    1/2a/2b).
 14. Cada RF tiene al menos una comprobación verificable en las tareas (RNF-7).
 
 ## Dudas abiertas

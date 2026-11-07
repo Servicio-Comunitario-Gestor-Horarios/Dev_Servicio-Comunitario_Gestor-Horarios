@@ -12,6 +12,12 @@ Estado: aprobada (2026-10-18)
 > 005, cobertura de emergencia) y de las **dos specs «009»** queda anotado, sin resolver, en la 005 y
 > en la 013.
 
+> **Superada entera por la 014 (2026-11-07).** La 014 **elimina S3**: la agrupación se mide con el
+> **desvío de la rejilla del curso** (emparejamiento de **bloques de dos horas** y alineación por materia),
+> no con grupos de 1 por materia. Quedan superadas su métrica de S3, su `PESO_AGRUPACION` y sus **criterios
+> de aceptación, incluido AC-8**, y los tests que los fijan. Se conserva su noción de **segmento
+> contiguo** (hoy definida por los **eventos** del turno) y el corte por receso.
+
 ## Contexto y problema
 
 Hoy el solver optimiza solo dos prioridades blandas:

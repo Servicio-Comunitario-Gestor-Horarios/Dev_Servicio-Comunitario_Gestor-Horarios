@@ -192,6 +192,9 @@ y no obligan.
 - **Bloque:** unidad mínima de clase, igual a una franja. La conversión de horas académicas a bloques es
   la identidad: `bloques(horas) = horas`. **Toda comparación de horas se hace en bloques** (nunca horas
   contra bloques).
+  > **Nota (014, 2026-11-07): «bloque» de 1 h y «bloque de dos horas».** Esta definición se mantiene: una
+  > hora académica es una **franja** y `bloques(horas) = horas`. La 014 usa **«bloque de dos horas»** para
+  > el par de franjas contiguas de una materia; no cambia el «bloque = franja» de esta spec.
 - **Turno:** conjunto de franjas de un día (por ejemplo, «mañana» o «tarde»). El turno **del curso** es
   **obligatorio** en esta spec (RF-7); si un curso no lo declara, la entrada se **rechaza** (V7). La
   **asignación automática de turno** queda **diferida a la spec 006**.
@@ -340,6 +343,11 @@ y no obligan.
   > - **Excepción de precedencia:** si un curso necesita más bloques que franjas tiene su turno, la causa
   >   es **(3) conflicto de persona** aunque la capacidad del tipo también falle; fuera de ese caso, el
   >   orden (1)(2)(3)(4) no cambia.
+  > **Superado por la 014 (2026-11-07): el catálogo pasa a (1)–(5).** Se añade **«(5) conflicto de
+  > bloques»**, después de (1)–(4) y antes de «no atribuible», con **condiciones detectables**: **total
+  > semanal impar** de un curso o **materia con más apariciones que días** (`⌈h/2⌉ > nº_días`; con 5 días,
+  > **11 h o más**). El **emparejamiento**, la **alineación** y los **huecos al final del día** son reglas
+  > duras; la **separación** es blanda y no causa (5). El detalle vive en la 014 (RF-5/RF-10).
 
 ## Catálogo de reglas
 
@@ -514,6 +522,10 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
 - **EL SISTEMA es reproducible:** bajo el **mismo JSON y el mismo solver**, produce el mismo
   resultado (RNF-1). Esta reproducibilidad **no** cubre el desempate entre candidatos equivalentes
   (titulares entre sí o suplentes entre sí): cualquiera de ellos es válido.
+  > **Superado en la reproducibilidad por la 014 (2026-11-07).** La 014 busca con **8 workers** y **no
+  > promete el mismo horario entre ejecuciones**: la misma entrada produce un horario **válido**, no
+  > necesariamente idéntico. La **validez** y los **diagnósticos y cálculos puros** se mantienen (ver
+  > RNF-1).
 
 ### RF-7. Contrato de configuración de cursos
 
@@ -708,9 +720,17 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   siempre el mismo resultado. **No** se exige desempatar entre candidatos equivalentes: dos titulares
   elegibles para la misma materia-curso (o dos suplentes, bajo el coste fijo) son intercambiables y
   **cualquiera de ellos es una solución válida** (desempate **diferido**).
+  > **Superado en la reproducibilidad del horario por la 014 (2026-11-06).** La 014 busca con **8 workers**
+  > y **no promete el mismo horario entre ejecuciones**: la misma entrada produce un horario **válido**, no
+  > necesariamente idéntico. La validez, las invariantes y los diagnósticos/cálculos puros se mantienen.
 - **RNF-2. Desempeño:** el escenario de gran tamaño del conjunto de pruebas debe resolverse en menos
   de 60 segundos, **medido en el entorno de referencia del banco de pruebas del proyecto** (el entorno
   donde se ejecuta la suite completa), no en hardware arbitrario.
+  > **Superado el umbral por la 014 y la 002 (2026-11-07).** El escenario de gran tamaño es el **fixture
+  > sin EF de la 014** (24 cursos, **848 clases**) y su referencia vigente es el **plazo del proceso de
+  > cálculo de 300 s** (002), con **8 workers**: medido en **172,6 s** (centro completo, Release) y
+  > **183,58 s** en el test lento. El umbral de **60 s** queda superado; el escenario y el margen se
+  > documentan en la 014 (RNF-2) y en su `journal.md`. *(La nota no cambia el resto de RNF-2.)*
 - **RNF-3. Mensajes de error en español:** todo rechazo o fallo de factibilidad identificará la causa
   (categoría y entidad cuando sea posible) y, cuando exista, la acción disponible para el usuario.
 - **RNF-4. Trazabilidad:** toda regla de esta spec tendrá al menos una comprobación verificable en las
