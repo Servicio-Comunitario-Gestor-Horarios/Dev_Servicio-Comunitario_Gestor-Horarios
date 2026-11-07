@@ -150,7 +150,7 @@ Frontend (Qt6)                    Backend (C++)                   Solver CP-SAT
 | `tarde.inicio` | string (HH:mm) | `"14:00"` | Hora de inicio |
 | `tarde.fin` | string (HH:mm) | `"14:10"` | Hora de fin |
 
-> **Nota sobre el receso**: El receso NO ocupa un slot. Es un gap de tiempo entre bloques. `despues_de_slot = 1` significa que el receso ocurre después del slot 1 (entre slot 1 y slot 2). El solver ignora el receso — solo la UI lo muestra.
+> **Nota sobre el receso**: El receso NO ocupa un slot. Es un gap de tiempo entre bloques. `despues_de_slot = 1` significa que el receso ocurre después del slot 1 (entre slot 1 y slot 2). Desde la spec 014 **define un corte de segmento** (las franjas a sus lados no forman bloque); la UI también lo muestra. (Nota histórica: antes de la 014 el solver lo ignoraba.)
 
 #### `cursos[]`
 
@@ -829,7 +829,7 @@ Un preset es idéntico al JSON de entrada completo (Sección 3.2). No tiene camp
 | Decisión | Elección | Justificación |
 |----------|----------|---------------|
 | Pool de materias | Híbrido (global + por curso) | Unicidad de nombres + horas específicas por curso |
-| Receso | Gap entre slots (`despues_de_slot`) | No ocupa slot; el solver lo ignora |
+| Receso | Gap entre slots (`despues_de_slot`) | No ocupa slot; desde 014 define un corte de segmento |
 | Profesor-materia | Dual (asignadas + suplente) | Flexibilidad para suplencias con pesos |
 | Planificación | Personalizable por profesor | Cada profesor tiene `horas_aula` propio |
 | Penalizaciones | Hardcoded en C++ | Por ahora; mover a JSON si se necesita |

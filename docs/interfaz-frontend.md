@@ -642,7 +642,8 @@ El contexto vive durante toda la sesión (RAII) y se destruye al cerrar. El proc
 
 `src/backend/include/backend/services/ServicioGeneracion.hpp`. UI-free (QObject con señal
 `finalizada()`). Recibe un `PuertoSolver` (el arranque inyecta el cliente IPC real; los tests, un
-doble) y un plazo (60 s por defecto).
+doble) y un plazo (300 s por defecto). El horario resultante es **válido** con las reglas
+vigentes; con 8 workers y semilla fija **no se promete el mismo horario entre ejecuciones**.
 
 ```cpp
 struct ResultadoGeneracion {
@@ -661,7 +662,7 @@ struct ResultadoGeneracion {
 class ServicioGeneracion : public QObject {
     Q_OBJECT
 public:
-    ServicioGeneracion(PuertoSolver& puerto, int plazoMs = 60000,
+    ServicioGeneracion(PuertoSolver& puerto, int plazoMs = 300000,
                        std::function<QString()> huellaActual = {},
                        std::function<QDateTime()> reloj = {},
                        std::function<QString()> revisarBase = {}, QObject* padre = nullptr);
@@ -827,8 +828,9 @@ obtiene de `ScheduleVisualizationWidget::schedulesDirectory()`.
 **Visualización dirigida por datos (`dialogs/`):** el documento que consumen los diálogos de horarios
 lleva, además de `teachers`/`years` y `_meta`, un bloque **`_cuadricula`** con la rejilla con la que se
 generó: `duracion_minutos`, `num_dias`, `num_slots_dia`, `turnos` (nombre, franjas `slot` y hora de
-`inicio`) y `recesos` (`turno`, `despues_de_slot`, `duracion`, `inicio`, `fin`). Cada sección declara
-además su `turno`. `ScheduleModel::rowsFor` construye las filas de cada horario con esos datos: las
+`inicio`) y `recesos` (`turno`, `despues_de_slot`, `duracion`, `inicio`, `fin`); en el motor estos
+`recesos` son los **eventos** del turno: no ocupan franja y **definen los segmentos** del bloque. Cada
+sección declara además su `turno`. `ScheduleModel::rowsFor` construye las filas de cada horario con esos datos: las
 franjas del turno del curso (o de todos los turnos si es un docente), la hora de cada bloque
 (`inicio + k·duración + recesos previos`) y una fila de receso con su duración real. Si el documento
 no trae `_cuadricula` (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se

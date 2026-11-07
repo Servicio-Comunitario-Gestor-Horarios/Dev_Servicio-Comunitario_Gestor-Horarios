@@ -272,8 +272,9 @@ Consecuencias prácticas al escribir un preset:
 
 ## 4. Eventos del turno
 
-Los eventos (recesos, actos, intervalos) son **metadata**: el solver **los ignora** y no los
-replanifica. Sustituyen a la antigua sección `recesos` del contrato 1.0.
+Los eventos (recesos, actos, intervalos) **no crean ni quitan franjas**, pero **definen los
+segmentos** válidos del bloque: dos franjas separadas por un evento no forman bloque (spec 014).
+Sustituyen a la antigua sección `recesos` del contrato 1.0.
 
 ```json
 "eventos": [
@@ -479,8 +480,8 @@ Cómo se lee:
 - El curso `1ro A` declara `aula: 0` → su **aula de referencia** es `A1` («Aula de estudio»).
 - `Matemática` exige «Aula de estudio»: se imparte en `A1`. `Tecnología` exige «Laboratorio»: se
   imparte en `L1`, y mientras tanto `A1` queda **vacía y bloqueada** en esa franja.
-- El receso va después de la franja 2 y cabe en su ventana (08:30–09:00): es metadata, no ocupa
-  franja. El turno declara `inicio`/`fin` porque el evento trae horario.
+- El receso va después de la franja 2 y cabe en su ventana (08:30–09:00): no ocupa franja y define
+  el corte de segmento entre las franjas 1 y 2 (spec 014). El turno declara `inicio`/`fin` porque el evento trae horario.
 - V14: 2 + 2 = 4 bloques frente a 5 días × 6 franjas.
 
 ---
