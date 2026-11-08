@@ -1,8 +1,3 @@
-/**
- * @file subject_list_widget.cpp
- * @brief Implementación del widget de gestión de asignaturas y planes de estudio conectado a NucleoDatos.
- */
-
 #include "subject_list_widget.hpp"
 #include "../forms/subject_form_dialog.hpp"
 #include "../forms/plan_form_dialog.hpp"
@@ -41,9 +36,6 @@ void SubjectListWidget::setupUi() {
     masterLayout->setContentsMargins(40, 40, 40, 40);
     masterLayout->setSpacing(24);
 
-    // ==========================================
-    // COLUMNA IZQUIERDA: PESTAÑAS (Asignaturas / Planes de Estudio)
-    // ==========================================
     QTabWidget *tabWidget = new QTabWidget(this);
     tabWidget->setStyleSheet(
         "QTabWidget::pane { border: 1px solid #e2e8f0; border-radius: 12px; background: white; }"
@@ -51,7 +43,6 @@ void SubjectListWidget::setupUi() {
         "QTabBar::tab:selected { background: white; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; }"
         );
 
-    // --- Pestaña 1: Asignaturas ---
     QWidget *tabAsignaturas = new QWidget();
     QVBoxLayout *leftContentLayout = new QVBoxLayout(tabAsignaturas);
     leftContentLayout->setContentsMargins(20, 20, 20, 20);
@@ -85,7 +76,6 @@ void SubjectListWidget::setupUi() {
     headerLayout->addWidget(m_registerButton);
     leftContentLayout->addLayout(headerLayout);
 
-    // Tabla de Asignaturas
     m_table = new QTableWidget(0, 3, this);
     m_table->setObjectName("SubjectTable");
     m_table->setHorizontalHeaderLabels({"Nombre", "Tipo de aula", "Acciones"});
@@ -111,7 +101,6 @@ void SubjectListWidget::setupUi() {
     leftContentLayout->addWidget(m_table);
     tabWidget->addTab(tabAsignaturas, "📚 Asignaturas");
 
-    // --- Pestaña 2: Planes de Estudio ---
     QWidget *tabPlanes = new QWidget();
     QVBoxLayout *planesLayout = new QVBoxLayout(tabPlanes);
     planesLayout->setContentsMargins(20, 20, 20, 20);
@@ -168,9 +157,6 @@ void SubjectListWidget::setupUi() {
     planesLayout->addWidget(tablePlanes);
     tabWidget->addTab(tabPlanes, "📋 Planes de Estudio");
 
-    // ==========================================
-    // COLUMNA DERECHA: PANEL LATERAL DINÁMICO
-    // ==========================================
     QFrame *sidePanel = new QFrame(this);
     sidePanel->setObjectName("SubjectSidePanel");
     sidePanel->setFixedWidth(310);
@@ -233,7 +219,7 @@ void SubjectListWidget::setupUi() {
 
     connect(m_registerButton, &QPushButton::clicked, this, &SubjectListWidget::abrirFormularioNuevo);
 
-    // --- CONEXIÓN COMPLETA PARA PLANES DE ESTUDIO (ISSUE #97) ---
+    // --- CONEXIÓN DE PLANES CON HORAS INTEGRADAS ---
     connect(btnNuevoPlan, &QPushButton::clicked, this, [this, tablePlanes]() {
         if (!m_nucleo) return;
 
@@ -249,7 +235,7 @@ void SubjectListWidget::setupUi() {
         dialogo.setWindowTitle("Nuevo Plan de Estudio");
 
         connect(&dialogo, &gestor::frontend::forms::PlanFormDialog::planGuardado,
-                this, [this, tablePlanes, nombresMaterias](const QString& codigo, const QString& nombre, const QString& desc, const QStringList& materias) {
+                this, [this, tablePlanes, nombresMaterias](const QString& codigo, const QString& nombre, const QString& desc, const QList<gestor::frontend::forms::MateriaPlanInfo>& materias, int totalHoras) {
 
                     int fila = tablePlanes->rowCount();
                     tablePlanes->insertRow(fila);
@@ -257,7 +243,7 @@ void SubjectListWidget::setupUi() {
                     QTableWidgetItem *itemCod = new QTableWidgetItem(codigo);
                     QTableWidgetItem *itemNom = new QTableWidgetItem(nombre);
                     QTableWidgetItem *itemMat = new QTableWidgetItem(QString::number(materias.size()));
-                    QTableWidgetItem *itemHoras = new QTableWidgetItem("0");
+                    QTableWidgetItem *itemHoras = new QTableWidgetItem(QString::number(totalHoras));
 
                     itemCod->setTextAlignment(Qt::AlignCenter);
                     itemNom->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -269,7 +255,6 @@ void SubjectListWidget::setupUi() {
                     tablePlanes->setItem(fila, 2, itemMat);
                     tablePlanes->setItem(fila, 3, itemHoras);
 
-                    // Función auxiliar robusta para inyectar y conectar acciones a cualquier fila
                     auto configurarAccionesFila = [this, tablePlanes, nombresMaterias](auto self, int f, const QString& nPlan) -> void {
                         QWidget *panelAcciones = new QWidget();
                         QHBoxLayout *layoutAcciones = new QHBoxLayout(panelAcciones);
@@ -292,7 +277,6 @@ void SubjectListWidget::setupUi() {
                         layoutAcciones->addWidget(btnEl);
                         tablePlanes->setCellWidget(f, 4, panelAcciones);
 
-                        // Eliminar
                         connect(btnEl, &QPushButton::clicked, this, [this, tablePlanes, nPlan, f]() {
                             if (QMessageBox::question(this, "Confirmar impacto de eliminación",
                                                       "¿Está seguro de eliminar el plan '" + nPlan + "'?\n\nEsta acción desvinculará el plan de las asignaturas asociadas.",
@@ -301,7 +285,6 @@ void SubjectListWidget::setupUi() {
                             }
                         });
 
-                        // Editar
                         connect(btnEd, &QPushButton::clicked, this, [this, tablePlanes, f, nombresMaterias]() {
                             QString codActual = tablePlanes->item(f, 0)->text();
                             QString nomActual = tablePlanes->item(f, 1)->text();
@@ -311,16 +294,16 @@ void SubjectListWidget::setupUi() {
                             dialogoEdicion.cargarDatos(codActual, nomActual, "", {});
 
                             connect(&dialogoEdicion, &gestor::frontend::forms::PlanFormDialog::planGuardado,
-                                    this, [tablePlanes, f](const QString& nc, const QString& nn, const QString&, const QStringList& mat) {
+                                    this, [tablePlanes, f](const QString& nc, const QString& nn, const QString&, const QList<gestor::frontend::forms::MateriaPlanInfo>& mat, int tH) {
                                         tablePlanes->item(f, 0)->setText(nc);
                                         tablePlanes->item(f, 1)->setText(nn);
                                         tablePlanes->item(f, 2)->setText(QString::number(mat.size()));
+                                        tablePlanes->item(f, 3)->setText(QString::number(tH));
                                         QMessageBox::information(nullptr, "Éxito", "Plan actualizado correctamente.");
                                     });
                             dialogoEdicion.exec();
                         });
 
-                        // Duplicar
                         connect(btnDup, &QPushButton::clicked, this, [this, tablePlanes, f, nombresMaterias, self]() {
                             QString codActual = tablePlanes->item(f, 0)->text();
                             QString nomActual = tablePlanes->item(f, 1)->text();
@@ -330,14 +313,14 @@ void SubjectListWidget::setupUi() {
                             dialogoDup.cargarDatos(codActual + "-COPY", nomActual + " (Copia)", "Copia de plan existente", {});
 
                             connect(&dialogoDup, &gestor::frontend::forms::PlanFormDialog::planGuardado,
-                                    this, [this, tablePlanes, self](const QString& codigo, const QString& nombre, const QString&, const QStringList& materias) {
+                                    this, [this, tablePlanes, self](const QString& codigo, const QString& nombre, const QString&, const QList<gestor::frontend::forms::MateriaPlanInfo>& materias, int tH) {
                                         int nuevaFila = tablePlanes->rowCount();
                                         tablePlanes->insertRow(nuevaFila);
 
                                         QTableWidgetItem *iC = new QTableWidgetItem(codigo);
                                         QTableWidgetItem *iN = new QTableWidgetItem(nombre);
                                         QTableWidgetItem *iM = new QTableWidgetItem(QString::number(materias.size()));
-                                        QTableWidgetItem *iH = new QTableWidgetItem("0");
+                                        QTableWidgetItem *iH = new QTableWidgetItem(QString::number(tH));
 
                                         iC->setTextAlignment(Qt::AlignCenter);
                                         iN->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -451,10 +434,8 @@ void SubjectListWidget::insertarMateriaEnTabla(int id, const QString& nombre, co
     int fila = m_table->rowCount();
     m_table->insertRow(fila);
 
+    // Mantenemos el requisito real sin sobreescribir con "-- Seleccione --"
     QString tipoAulaValido = requisitos;
-    if (tipoAulaValido.isEmpty()) {
-        tipoAulaValido = "-- Seleccione --";
-    }
 
     QTableWidgetItem *itemNombre = new QTableWidgetItem(nombre);
     QTableWidgetItem *itemReq = new QTableWidgetItem(tipoAulaValido);
