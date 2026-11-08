@@ -37,6 +37,7 @@ public:
     // ─── Docentes ─────────────────────────────────────────────────────────
 
     Resultado<QVector<ProfesorDTO>> listarDocentes() const;
+    Resultado<ProfesorDTO> obtenerDocente(const QString& id) const;
     Resultado<ProfesorDTO> crearDocente(const QString& id, const QString& nombre,
                                         const QString& email,
                                         const QString& telefono = QString());
@@ -48,6 +49,20 @@ public:
     // NUEVO: Manejo de materias asignadas a un docente
     bool asignarMateriaPorNombre(const QString& idProfesor, const QString& nombreMateria);
     bool limpiarMaterias(const QString& idProfesor);
+
+    /**
+     * @brief Guarda de forma atómica la ficha completa de un docente.
+     *
+     * Reemplaza disponibilidad, preferencias, materias titulares y materias
+     * suplentes. Si cualquier parte falla, no se aplica nada. Es la operación
+     * que usa el panel de docentes para los botones Guardar/Descartar.
+     */
+    bool guardarFichaDocente(const QString& idProfesor,
+                             const QVector<FranjaHoraria>& disponibilidad,
+                             const QVector<PreferenciaDTO>& preferencias,
+                             const QVector<int>& materiasTitulares,
+                             const QVector<int>& materiasSuplentes,
+                             QString* error = nullptr);
 
     // ─── Aulas ────────────────────────────────────────────────────────────
 

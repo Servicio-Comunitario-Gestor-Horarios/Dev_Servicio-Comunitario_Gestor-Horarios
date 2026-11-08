@@ -62,7 +62,9 @@ class SelectorMateriasDialog : public QDialog
 public:
     SelectorMateriasDialog(const QStringList& disponibles,
                            const QStringList& seleccionadas,
-                           QWidget* parent = nullptr);
+                           QWidget* parent = nullptr,
+                           const QString& titulo = QString(),
+                           const QString& ayuda = QString());
 
     /// Materias marcadas al aceptar (o al consultar en cualquier momento).
     QStringList seleccionadas() const;

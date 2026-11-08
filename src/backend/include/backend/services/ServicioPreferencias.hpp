@@ -56,6 +56,14 @@ public:
     /// Borra solo las preferencias del docente y devuelve cuántas borró (0 es válido).
     Resultado<int> limpiar(const QString& idProfesor);
 
+    /// Reemplaza todas las preferencias del docente.
+    ///
+    /// Borra las actuales y reinserta la lista usando la misma validación que
+    /// `agregar`. No abre transacción: el llamador debe envolverla para que un
+    /// fallo a mitad no deje la lista parcialmente reemplazada.
+    Resultado<bool> reemplazar(const QString& idProfesor,
+                               const QVector<PreferenciaDTO>& preferencias);
+
 private:
     QSqlDatabase& m_db;
 };

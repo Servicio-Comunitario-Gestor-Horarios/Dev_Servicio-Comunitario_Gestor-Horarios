@@ -12,12 +12,14 @@
 #include <QComboBox>
 #include <QHeaderView>
 #include <QPalette>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTime>
 #include <QVBoxLayout>
 
 #include <backend/services/NucleoDatos.hpp>
@@ -26,6 +28,7 @@
 #include "dialogs/schedule_theme.hpp"
 #include "services/preferencias_docente_ui.hpp"
 #include "views/schedule_generation_widget.hpp"
+#include "views/teacher_list_widget.hpp"
 #include "widgets/combo_multiple.hpp"
 #include "widgets/selector_materias.hpp"
 
@@ -336,6 +339,136 @@ private slots:
             QVERIFY(nucleo.eliminarDocente(QStringLiteral("T999")));
             vista.sincronizarDocentes();
             QCOMPARE(tabla->rowCount(), inicial);
+        }
+        QSqlDatabase::removeDatabase(conexion);
+    }
+
+    /// El panel de docentes (#94) guarda en la base la disponibilidad y las
+    /// preferencias marcadas en las rejillas.
+    void elPanelDelDocentePersisteDisponibilidadYPreferencias()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+
+        PreferenciasDocenteUI::usarOrganizacion(
+            QStringLiteral("LiceoRobertSerraPruebaPanel"),
+            QStringLiteral("GestorHorariosPruebaPanel"));
+        PreferenciasDocenteUI::limpiar();
+
+        seed::OpcionesAplicacion siembra;
+        siembra.rutaDb = dir.filePath(QStringLiteral("panel_docente.db"));
+        const seed::ResultadoAplicacion sembrado = seed::aplicar(siembra);
+        QVERIFY2(sembrado.ok(), qPrintable(sembrado.detalle));
+
+        const QString conexion = QStringLiteral("test_panel_docente");
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conexion);
+            db.setDatabaseName(siembra.rutaDb);
+            QVERIFY2(db.open(), qPrintable(db.lastError().text()));
+
+            NucleoDatos nucleo(db);
+            TeacherListWidget vista;
+            vista.setNucleoDatos(&nucleo);
+            vista.actualizarTema(true);
+            vista.actualizarTema(false);
+
+            auto* tabla = vista.findChild<QTableWidget*>(QStringLiteral("TeacherTable"));
+            QVERIFY(tabla);
+            QVERIFY(tabla->rowCount() > 0);
+
+            tabla->setCurrentCell(0, 0);
+            QVERIFY(QMetaObject::invokeMethod(&vista, "onDocenteSeleccionado"));
+
+            auto* gridDisp = vista.findChild<QTableWidget*>(QStringLiteral("AvailabilityGrid"));
+            auto* gridPref = vista.findChild<QTableWidget*>(QStringLiteral("PreferencesGrid"));
+            QVERIFY(gridDisp && gridPref);
+            QVERIFY(gridDisp->rowCount() > 0);
+
+            const QString cedula = tabla->item(0, 0)->text();
+
+            int filaDisp = -1;
+            int colDisp = -1;
+            for (int r = 0; r < gridDisp->rowCount() && filaDisp < 0; ++r) {
+                for (int c = 0; c < gridDisp->columnCount(); ++c) {
+                    auto* item = gridDisp->item(r, c);
+                    if (item && item->toolTip() == QStringLiteral("Disponible")) {
+                        filaDisp = r;
+                        colDisp = c;
+                        break;
+                    }
+                }
+            }
+            QVERIFY2(filaDisp >= 0, "debe existir alguna hora disponible en el seed");
+            QVERIFY(QMetaObject::invokeMethod(&vista, "onDisponibilidadCellClicked",
+                                              Q_ARG(int, filaDisp), Q_ARG(int, colDisp)));
+
+            int filaPref = -1;
+            int colPref = -1;
+            for (int r = 0; r < gridPref->rowCount() && filaPref < 0; ++r) {
+                for (int c = 0; c < gridPref->columnCount(); ++c) {
+                    auto* item = gridPref->item(r, c);
+                    auto* disp = gridDisp->item(r, c);
+                    if (item && disp
+                        && item->toolTip() == QStringLiteral("Sin preferencia")
+                        && disp->toolTip() == QStringLiteral("Disponible")) {
+                        filaPref = r;
+                        colPref = c;
+                        break;
+                    }
+                }
+            }
+            QVERIFY2(filaPref >= 0, "debe existir alguna hora libre para preferir");
+            QVERIFY(QMetaObject::invokeMethod(&vista, "onPreferenciasCellClicked",
+                                              Q_ARG(int, filaPref), Q_ARG(int, colPref)));
+
+            auto* botonGuardar =
+                vista.findChild<QPushButton*>(QStringLiteral("TeacherSaveButton"));
+            QVERIFY(botonGuardar);
+            QVERIFY(botonGuardar->isEnabled());
+            botonGuardar->click();
+
+            const auto guardado = nucleo.obtenerDocente(cedula);
+            QVERIFY(guardado.ok);
+
+            int duracion = 35;
+            if (const auto config = nucleo.configuracionHoraria(); config.ok)
+                duracion = config.valor.duracionMinutos;
+
+            const QString etiquetaDisp = gridDisp->verticalHeaderItem(filaDisp)->text();
+            const QTime inicioDisp = QTime::fromString(etiquetaDisp.left(5),
+                                                       QStringLiteral("HH:mm"));
+            QVERIFY(inicioDisp.isValid());
+            const QTime finDisp = inicioDisp.addSecs(duracion * 60);
+
+            bool cubierta = false;
+            for (const DisponibilidadDTO& disp : guardado.valor.disponibilidad) {
+                if (disp.franja.dia == colDisp + 1
+                    && disp.franja.inicio <= inicioDisp
+                    && disp.franja.fin >= finDisp) {
+                    cubierta = true;
+                    break;
+                }
+            }
+            QVERIFY2(!cubierta, "la hora marcada como no disponible no debe persistir como disponible");
+
+            const QString etiquetaPref = gridPref->verticalHeaderItem(filaPref)->text();
+            const QTime inicioPref = QTime::fromString(etiquetaPref.left(5),
+                                                       QStringLiteral("HH:mm"));
+            QVERIFY(inicioPref.isValid());
+
+            bool preferida = false;
+            for (const PreferenciaDTO& pref : guardado.valor.preferencias) {
+                if (pref.sentido == SentidoPreferencia::Preferida
+                    && pref.franja.dia == colPref + 1
+                    && pref.franja.inicio == inicioPref) {
+                    preferida = true;
+                    break;
+                }
+            }
+            QVERIFY2(preferida, "la hora preferida debe quedar guardada en la base");
+
+            QCOMPARE(gridDisp->item(filaDisp, colDisp)->toolTip(),
+                     QStringLiteral("No disponible"));
         }
         QSqlDatabase::removeDatabase(conexion);
     }

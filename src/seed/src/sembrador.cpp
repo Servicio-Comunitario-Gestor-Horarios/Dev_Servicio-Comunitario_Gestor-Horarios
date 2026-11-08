@@ -410,6 +410,7 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         // así que se borran antes que él; después, sus materias.
         if (!borrarTabla(QStringLiteral("Preferencia_Profesor")) ||
             !borrarTabla(QStringLiteral("Disponibilidad_Profesor")) ||
+            !borrarTabla(QStringLiteral("Profesor_Materia_Suplente")) ||
             !borrarTabla(QStringLiteral("Profesor_Materia")) ||
             !borrarTabla(QStringLiteral("Profesores"))) {
             return abortar(
@@ -432,8 +433,9 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
             // Profesores al final.
             for (const char* tabla :
                  {"Eventos", "Preferencia_Profesor", "Disponibilidad_Profesor",
-                  "Profesor_Materia", "Cursos", "PlanEstudio_Materia", "PlanEstudio",
-                  "Materias", "Turnos", "Aulas", "TiposAula", "Profesores"}) {
+                  "Profesor_Materia_Suplente", "Profesor_Materia", "Cursos",
+                  "PlanEstudio_Materia", "PlanEstudio", "Materias", "Turnos", "Aulas",
+                  "TiposAula", "Profesores"}) {
                 if (!borrarTabla(QString::fromLatin1(tabla))) {
                     return abortar(QStringLiteral(
                         "No se pudieron borrar los datos previos para el reemplazo total."));

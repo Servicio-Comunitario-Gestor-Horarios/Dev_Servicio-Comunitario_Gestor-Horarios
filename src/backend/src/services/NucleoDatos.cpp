@@ -1,6 +1,7 @@
 #include "backend/services/NucleoDatos.hpp"
 
 #include <QDebug>
+#include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariant>
@@ -75,6 +76,10 @@ Resultado<QVector<ProfesorDTO>> NucleoDatos::listarDocentes() const {
     return m_profesor.listarProfesores();
 }
 
+Resultado<ProfesorDTO> NucleoDatos::obtenerDocente(const QString& id) const {
+    return m_profesor.obtenerProfesor(id);
+}
+
 Resultado<ProfesorDTO> NucleoDatos::crearDocente(const QString& id,
                                                  const QString& nombre,
                                                  const QString& email,
@@ -122,6 +127,68 @@ bool NucleoDatos::limpiarMaterias(const QString& idProfesor) {
         [this, idProfesor]() {
             return m_profesor.limpiarMaterias(idProfesor);
         });
+}
+
+bool NucleoDatos::guardarFichaDocente(const QString& idProfesor,
+                                      const QVector<FranjaHoraria>& disponibilidad,
+                                      const QVector<PreferenciaDTO>& preferencias,
+                                      const QVector<int>& materiasTitulares,
+                                      const QVector<int>& materiasSuplentes,
+                                      QString* error) {
+    const QString id = idProfesor.trimmed();
+    auto fallar = [error](const QString& mensaje) {
+        if (error)
+            *error = mensaje;
+        return false;
+    };
+
+    if (id.isEmpty())
+        return fallar(QStringLiteral("El docente es obligatorio."));
+
+    const auto existente = m_profesor.obtenerProfesor(id);
+    if (!existente.ok)
+        return fallar(existente.mensajeError);
+
+    QSet<int> titularesSet;
+    for (int idMateria : materiasTitulares)
+        titularesSet.insert(idMateria);
+    for (int idMateria : materiasSuplentes) {
+        if (titularesSet.contains(idMateria))
+            return fallar(QStringLiteral(
+                "Una materia no puede ser titular y suplente a la vez."));
+    }
+
+    if (!m_db.transaction())
+        return fallar(QStringLiteral("No se pudo iniciar la transacción de guardado."));
+
+    QString detalle;
+
+    bool ok = m_profesor.reemplazarDisponibilidad(id, disponibilidad, detalle);
+    if (ok) {
+        const auto prefs = m_preferencias.reemplazar(id, preferencias);
+        ok = prefs.ok;
+        if (!ok)
+            detalle = prefs.mensajeError;
+    }
+    if (ok)
+        ok = m_profesor.reemplazarMaterias(id, materiasTitulares, detalle);
+    if (ok)
+        ok = m_profesor.reemplazarMateriasSuplentes(id, materiasSuplentes, detalle);
+
+    if (!ok) {
+        m_db.rollback();
+        return fallar(detalle.isEmpty()
+                          ? QStringLiteral("No se pudo guardar la ficha del docente.")
+                          : detalle);
+    }
+
+    if (!m_db.commit()) {
+        const QString mensaje = m_db.lastError().text();
+        m_db.rollback();
+        return fallar(QStringLiteral("No se pudo confirmar el guardado: %1").arg(mensaje));
+    }
+
+    return true;
 }
 
 // ─── Aulas ─────────────────────────────────────────────────────────────────
