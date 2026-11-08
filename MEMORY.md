@@ -4,8 +4,8 @@
 
 ## Fase actual
 
-- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor). Suite **47/47** en verde.
-- **Fecha:** 2026-10-17
+- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor) y **controles de la vista de generación** (años y materias suplentes sin texto libre, filas de 40 px y popups con el color del tema). Suite **48/48** en verde.
+- **Fecha:** 2026-10-18
 - **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
 - **Specs en curso:** `specs/005-nucleo-solver` (implementada; T10 abierta por pendientes) y `specs/008-datos-de-prueba` (implementada; APROBADA por el reviewer)
 - **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo), los menores de la 008 y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
@@ -65,6 +65,7 @@
 - **Hora académica = bloque (2026-10-17):** `bloques(horas) = horas` y `bloques_aula(horas_aula) = horas_aula`; `duracion_minutos` define **solo** la duración real de la franja. D3/S1/V14 sin conversión. Constitución §7 enmendada. Implementado en **005-T11**.
 - **Seed de datos de prueba (spec 008):** `gestor-horarios-seed` + librería `seed`; **solo puebla la BD, no genera presets**. Plan 31059 adaptado a **40 h académicas/año** (4 planes GEN/EXA/NAT/SOC), 57 materias-año, 210 cargas, 13 cursos **sin turno**, 16 aulas, 2 turnos de 8 franjas de 40 min con receso, 4 variantes de docentes (65/43/64/65; demanda 520, Σ topes 461). Las 210 cargas y los docentes se insertan por **SQL directo** dentro de una transacción única (no `asignarCarga`). Guía: `docs/guias/datos-prueba.md`; suite 46/46.
 - **Empaquetado portable (2026-10-18):** `cmake/Packaging.cmake` (incluido desde el `CMakeLists.txt` raíz) añade `install()` + CPack (`ZIP`) para distribuir el ejecutable con todas sus dependencias, **sin instalación ni administrador**. Las DLL y plugins de Qt los copia `windeployqt` (`--no-translations`, `--no-system-d3d-compiler`, `--no-system-dxc-compiler`, `--no-opengl-sw` y sin los drivers SQL distintos de SQLite, porque la interfaz solo usa Widgets/Network/Sql y solo `QSQLITE`); las de OR-Tools se copian desde `<ortools_DIR>/../../../bin`; el runtime de Visual C++ se instala **app-local** desde `VCToolsRedistDir` en vez de arrastrar `vc_redist.x64.exe`. ICU no se empaqueta: lo aporta Windows (`System32\icuuc.dll`). Se genera solo en Windows y solo en Release; en Docker se omite. Guía: `docs/guias/desarrollo/CMAKE_GUIDE.md` §Empaquetado. Verificado en el host: 44 archivos, 119,6 MB expandido / 38,1 MB el ZIP; `--version` y `--backend` (6 s) con el `PATH` limpio; sonda `QSQLITE` dentro del ZIP descomprimido; auditoría `dumpbin` sin dependencias sin resolver.
+- **Paquete con datos de demostración (2026-10-18):** el paquete estándar **no** trae datos (la app crea la base vacía en `%APPDATA%`); para una entrega que funcione recién descomprimida se añadió `GESTOR_PACK_DEMO` (OFF por defecto) a `cmake/Packaging.cmake`: el ZIP y su carpeta raíz pasan a llamarse «Generador de Horarios Demo» y se incluyen `datos-demo/` (base sembrada del Plan 31059 + su preset) y, en la raíz, `Instalar-datos-demo.bat` + `LEEME-DATOS-DEMO.txt`. El `.bat` copia la base a `%APPDATA%\LiceoRobertSerra\GestorHorarios\gestor_horarios.db` **solo si no existe** (nunca pisa datos del usuario) y recuerda dónde está el preset, que se carga con «Cargar preset…» (el instalador no lo copia: la app lo lee de donde esté). Si faltara algún archivo de `datos-prueba/`, la configuración falla con un mensaje explícito. Verificado: 48 archivos, 38,2 MB; el `.bat` instaló la base (hash idéntico a `datos-prueba/`) en un `%APPDATA%` simulado y en la segunda ejecución no tocó nada; `--version` del paquete OK.
 
 ## Siguiente paso
 
@@ -197,6 +198,31 @@
     visualización conserva las 520 clases, incluidas las de la tarde). **Suite 47/47 en verde.**
     Verificado con un barrido de los 86 destinos posibles sobre un horario de prueba (0 clases perdidas
     o duplicadas) y a ojo con capturas de las ventanas.
+
+- **Vista de generación: tablas, popups y elección de años/suplentes (2026-10-18, 3.ª vuelta).** El
+  dueño reportó tres defectos en «Generar horarios»; los tres son de presentación y se corrigen sin
+  tocar el contrato del solver:
+  - **Controles de celda descentrados.** Con la fila por defecto (30 px) el control de celda (32 px:
+    `min-height:24` + relleno + borde) más el relleno de `QTableWidget::item` (4 px) desbordaba la fila
+    hacia abajo: cada desplegable se veía como un rectángulo desfasado del centro. Ahora
+    `setDefaultSectionSize(40)` (constante `kAltoFilaControl`) en las dos tablas deja 4 px por arriba y
+    por abajo y el control queda centrado.
+  - **Popups de los desplegables en negro.** El popup es una ventana aparte y heredaba una paleta sin
+    brush de fondo (el `background` del QSS no fija `QPalette::Base` del árbol): los ítems los pintaba
+    el delegado **en negro**. `aplicarEstilo()` fija ahora explícitamente la paleta de la vista del
+    popup (`Base`/`Window` = superficie del tema, `Text`/`WindowText`/`ButtonText` = texto,
+    `Highlight` = acento, `HighlightedText` = blanco) y se vuelve a llamar al final de
+    `recargarDesdeNucleo()`, porque los combos de las celdas se crean al poblar.
+  - **Sin texto libre para «años» ni «materias suplentes».** Widgets nuevos en
+    `src/frontend/src/widgets/`: `ComboMultiple` (desplegable con casillas que **no cierra** el popup al
+    marcar; resume la selección y admite datos por ítem) para los años, y
+    `BotonMateriasSuplentes` + `SelectorMateriasDialog` (botón de celda que abre una rejilla de materias
+    marcables, con contador y `Limpiar`/`Cancelar`/`Aceptar`) para las suplentes. Los dos respetan los
+    tokens de `ScheduleTheme`, así que se ven bien en claro y en oscuro.
+  - Pruebas: `test_selector_generacion` (`test/frontend/`) cubre el resumen y el marcado/desmarcado sin
+    cerrar el popup, el botón y el diálogo de suplentes, la altura de fila y —por aserción sobre
+    `view()->palette()`— que **todos** los popups llevan el color del tema en claro y en oscuro.
+    **Suite 48/48 en verde.** Verificado además con capturas (tablas y diálogo, claro y oscuro).
 
 - **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
   probó el flujo completo de la vista «Generación de horario» con la base sembrada

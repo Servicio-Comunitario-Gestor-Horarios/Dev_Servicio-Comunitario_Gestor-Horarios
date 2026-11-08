@@ -20,6 +20,8 @@ set(FRONTEND_SOURCES
 				src/dialogs/student_schedule_dialog.cpp
 				src/forms/settings_dialog.cpp
 				src/views/schedule_generation_widget.cpp
+				src/widgets/combo_multiple.cpp
+				src/widgets/selector_materias.cpp
 )
 
 # === CABECERAS DEL FRONTEND ===
@@ -43,6 +45,8 @@ set(FRONTEND_HEADERS
 				src/dialogs/schedule_theme.hpp
 				src/forms/settings_dialog.hpp
 				src/views/schedule_generation_widget.hpp
+				src/widgets/combo_multiple.hpp
+				src/widgets/selector_materias.hpp
 				src/services/generacion_tipos.hpp
 )
 
