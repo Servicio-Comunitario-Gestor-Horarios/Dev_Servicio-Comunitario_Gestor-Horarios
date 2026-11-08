@@ -52,7 +52,7 @@ private slots:
     void onDisponibilidadCellClicked(int fila, int columna);
     void onPreferenciasCellClicked(int fila, int columna);
 
-    // Interacción en Panel de Asignaturas
+    // Interacción en Panel de Asignaturas (#95)
     void onEditarTitularesClicked();
     void onEditarSuplentesClicked();
 
@@ -83,7 +83,7 @@ private:
     QPushButton* m_btnTabAsignaturas = nullptr;
     QStackedWidget* m_stackedViews = nullptr;
 
-    // Contenido de las pestañas
+    // Contenido de las pestañas de rejillas
     QTableWidget* m_gridDisponibilidad = nullptr;
     QTableWidget* m_gridPreferencias = nullptr;
 
@@ -107,13 +107,13 @@ private:
     bool m_isDark = false;
     int m_idDocenteActual = -1;
 
-    // Estado Rejillas
+    // Estado Rejillas (#94)
     QSet<CeldaRejilla> m_noDisponibleOriginal;
     QSet<CeldaRejilla> m_noDisponibleModificado;
     QSet<CeldaRejilla> m_preferidoOriginal;
     QSet<CeldaRejilla> m_preferidoModificado;
 
-    // Estado Asignaturas
+    // Estado Asignaturas (#95)
     QStringList m_titularesOriginal;
     QStringList m_titularesModificado;
     QStringList m_suplentesOriginal;
