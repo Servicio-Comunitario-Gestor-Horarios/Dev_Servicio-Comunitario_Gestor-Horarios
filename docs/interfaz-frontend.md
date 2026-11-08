@@ -579,6 +579,17 @@ sus slots; 40 min en los datos de prueba del centro); ambos quedan editables. La
 cada curso es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún
 sin asignar (los del centro se siembran sin turno; el solver exige uno, V7).
 
+**Controles de las tablas.** Las celdas editables llevan widgets, no texto libre: turno y plan son
+desplegables, las horas son `QSpinBox`, los **años** son un desplegable de **selección múltiple**
+(`widgets/combo_multiple.{hpp,cpp}`: casillas que no cierran el popup al marcar, con el resumen de lo
+elegido en el propio control) y las **materias suplentes** un botón que resume la elección y abre
+`SelectorMateriasDialog` (`widgets/selector_materias.{hpp,cpp}`, rejilla de materias marcables con
+contador). Las dos tablas fijan `verticalHeader()->setDefaultSectionSize(40)` para dar cabida al
+control de celda (32 px) más el relleno del ítem y que quede centrado, y `aplicarEstilo()` fija la
+**paleta de la vista del popup** de cada desplegable (`Base`/`Window` = superficie del tema, `Text`,
+`Highlight` = acento): sin eso el popup heredaba un brush nulo y el delegado pintaba los ítems en
+negro en el tema claro.
+
 **Cableado (`MainWindow`):** el `InternalClient` se guarda como miembro y se inyecta en las vistas;
 en `setNucleoDatos` se lo reenvía a la vista de generación con el `NucleoDatos*`. Al recibir
 `horarioGenerado`, la ventana llama a `ScheduleVisualizationWidget::loadSchedules(...)` y salta a la

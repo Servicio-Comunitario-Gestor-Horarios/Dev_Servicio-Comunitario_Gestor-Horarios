@@ -4,6 +4,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QRegularExpressionValidator>
+#include <QMap>
 
 namespace gestor::frontend::forms {
 
@@ -14,16 +15,17 @@ public:
     explicit TeacherFormDialog(QWidget *parent = nullptr);
     ~TeacherFormDialog() override = default;
 
-    // Se eliminó 'id' y se agregó 'materias'
+    // Cargar datos sin materias
     void cargarDatos(const QString& cedula, const QString& nombre,
-                     const QString& email, const QString& telefono,
-                     const QString& materias);
+                     const QString& email, const QString& telefono);
+
+    // Método para validar cédulas duplicadas
+    void setDocentesExistentes(const QMap<QString, QString>& cedulaANombre, const QString& cedulaActual = QString());
 
 signals:
-    // Se eliminó 'id' y se agregó 'materias' para enviar a la base de datos
+    // Señal sin materias y sin ID
     void profesorGuardado(const QString& cedula, const QString& nombre,
-                          const QString& email, const QString& telefono,
-                          const QString& materias);
+                          const QString& email, const QString& telefono);
 
 private slots:
     void guardarProfesor();
@@ -35,10 +37,12 @@ private:
     QLineEdit *campoNombre;
     QLineEdit *campoEmail;
     QLineEdit *campoTelefono;
-    QLineEdit *campoMaterias; // <-- NUEVO: Campo para la materia
 
     QPushButton *botonGuardar;
     QPushButton *botonCancelar;
+
+    QMap<QString, QString> m_docentesExistentes;
+    QString m_cedulaOriginal;
 };
 
 } // namespace gestor::frontend::forms
