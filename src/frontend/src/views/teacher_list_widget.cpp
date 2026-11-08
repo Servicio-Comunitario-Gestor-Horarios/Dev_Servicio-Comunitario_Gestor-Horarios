@@ -11,39 +11,76 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QApplication>
+#include <QTime>
+#include <QDebug>
+#include <QStyle>
 
 // ==========================================
-// ESTRUCTURA AUXILIAR PARA FRANJAS (MOCK DINÁMICO)
+// ESTRUCTURA AUXILIAR PARA FRANJAS REALES
 // ==========================================
-struct FranjaAcademica {
+struct FranjaReal {
     QString etiqueta;
     bool esReceso;
+    QTime inicio;
+    QTime fin;
 };
 
-static QList<FranjaAcademica> obtenerFranjasDelCentro() {
-    return {
-        // --- TURNO MAÑANA ---
-        {"06:50 - 07:40", false},
-        {"07:40 - 08:20", false},
-        {"08:20 - 08:30", true},  // <-- RECESO MAÑANA
-        {"08:30 - 09:10", false},
-        {"09:10 - 09:50", false},
-        {"09:50 - 10:30", false},
-        {"10:30 - 11:10", false},
-        {"11:10 - 11:50", false},
-        {"11:50 - 12:30", false},
+// ==========================================
+// CUMPLIMIENTO CRITERIO 1: TURNOS Y RECESOS REALES
+// ==========================================
+static QList<FranjaReal> construirFranjasReales(NucleoDatos* nucleo) {
+    QList<FranjaReal> franjas;
+    if (!nucleo) return franjas;
 
-        // --- TURNO TARDE ---
-        {"12:35 - 13:20", false},
-        {"13:20 - 14:00", false},
-        {"14:00 - 14:10", true},  // <-- RECESO TARDE
-        {"14:10 - 14:50", false},
-        {"14:50 - 15:30", false},
-        {"15:30 - 16:10", false},
-        {"16:10 - 16:50", false},
-        {"16:50 - 17:30", false},
-        {"17:30 - 18:10", false}
-    };
+    auto resTurnos = nucleo->listarTurnos();
+    if (!resTurnos.ok) {
+        qWarning() << "Error al cargar los turnos del colegio para la rejilla.";
+        return franjas;
+    }
+
+    for (const auto& turno : resTurnos.valor) {
+        if (turno.numSlots <= 0) continue;
+
+        // Calcular duración dinámica descontando recesos
+        int totalMinutos = turno.inicio.secsTo(turno.fin) / 60;
+        int totalMinutosRecesos = 0;
+
+        for (const auto& receso : turno.recesos) {
+            totalMinutosRecesos += receso.duracion;
+        }
+
+        int minutosClase = totalMinutos - totalMinutosRecesos;
+        int duracionSlot = minutosClase / turno.numSlots;
+
+        QTime horaActual = turno.inicio;
+        int slotContador = 0;
+
+        while (slotContador < turno.numSlots) {
+            FranjaReal franjaClase;
+            franjaClase.esReceso = false;
+            franjaClase.inicio = horaActual;
+            horaActual = horaActual.addSecs(duracionSlot * 60);
+            franjaClase.fin = horaActual;
+            franjaClase.etiqueta = QString("%1 - %2").arg(franjaClase.inicio.toString("HH:mm")).arg(franjaClase.fin.toString("HH:mm"));
+            franjas.append(franjaClase);
+
+            slotContador++;
+
+            // Insertar receso exactamente donde indica el centro
+            for (const auto& receso : turno.recesos) {
+                if (receso.despuesDeSlot == slotContador) {
+                    FranjaReal franjaReceso;
+                    franjaReceso.esReceso = true;
+                    franjaReceso.inicio = horaActual;
+                    horaActual = horaActual.addSecs(receso.duracion * 60);
+                    franjaReceso.fin = horaActual;
+                    franjaReceso.etiqueta = QString("%1 - %2").arg(franjaReceso.inicio.toString("HH:mm")).arg(franjaReceso.fin.toString("HH:mm"));
+                    franjas.append(franjaReceso);
+                }
+            }
+        }
+    }
+    return franjas;
 }
 
 static QStringList obtenerDiasLaborables() {
@@ -52,7 +89,6 @@ static QStringList obtenerDiasLaborables() {
 
 TeacherListWidget::TeacherListWidget(QWidget *parent) : QWidget(parent) {
     setupUi();
-    construirRejillasDinamicas();
 }
 
 void TeacherListWidget::setClient(InternalClient* client) {
@@ -61,6 +97,7 @@ void TeacherListWidget::setClient(InternalClient* client) {
 
 void TeacherListWidget::setNucleoDatos(NucleoDatos* nucleo) {
     m_nucleo = nucleo;
+    construirRejillasDinamicas();
     cargarDocentes();
 }
 
@@ -159,7 +196,6 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     m_detalleNombre->setStyleSheet("font-size: 18px; font-weight: bold; color: #111827;");
     rightLayout->addWidget(m_detalleNombre, 0, Qt::AlignHCenter);
 
-    // Controles de Pestañas
     QHBoxLayout *tabsLayout = new QHBoxLayout();
     tabsLayout->setSpacing(0);
 
@@ -182,7 +218,6 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     tabsLayout->addWidget(m_btnTabAsignaturas);
     rightLayout->addLayout(tabsLayout);
 
-    // Stack de Vistas
     m_stackedViews = new QStackedWidget(this);
 
     // Vista 0: Disponibilidad
@@ -207,7 +242,7 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     layPref->addWidget(helpPref);
     layPref->addWidget(m_gridPreferencias);
 
-    // Vista 2: Asignaturas (NUEVO DISEÑO DE TARJETAS)
+    // Vista 2: Asignaturas
     QWidget* pageAsig = new QWidget();
     QVBoxLayout* layAsig = new QVBoxLayout(pageAsig);
     layAsig->setContentsMargins(15, 15, 15, 15);
@@ -224,7 +259,7 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     m_tableAsignaturas->setShowGrid(false);
     m_tableAsignaturas->setSelectionMode(QAbstractItemView::NoSelection);
     m_tableAsignaturas->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_tableAsignaturas->setFocusPolicy(Qt::NoFocus); // Quita el borde punteado feo
+    m_tableAsignaturas->setFocusPolicy(Qt::NoFocus);
     layAsig->addWidget(m_tableAsignaturas);
 
     m_stackedViews->addWidget(pageDisp);
@@ -251,7 +286,6 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     rightLayout->addWidget(m_panelGuardado);
     m_panelGuardado->setVisible(false);
 
-    // Conexiones
     connect(m_btnTabDisponibilidad, &QPushButton::clicked, this, [this](){ cambiarPestana(0); });
     connect(m_btnTabPreferencias, &QPushButton::clicked, this, [this](){ cambiarPestana(1); });
     connect(m_btnTabAsignaturas, &QPushButton::clicked, this, [this](){ cambiarPestana(2); });
@@ -263,11 +297,8 @@ void TeacherListWidget::setupPanelDerecho(QVBoxLayout* rightLayout) {
     cambiarPestana(0);
 }
 
-// ==========================================
-// CONSTRUCCIÓN DINÁMICA DE REJILLAS
-// ==========================================
 void TeacherListWidget::construirRejillasDinamicas() {
-    QList<FranjaAcademica> franjas = obtenerFranjasDelCentro();
+    QList<FranjaReal> franjas = construirFranjasReales(m_nucleo);
     QStringList dias = obtenerDiasLaborables();
 
     auto configurarRejilla = [this, franjas, dias](QTableWidget* grid) {
@@ -285,7 +316,9 @@ void TeacherListWidget::construirRejillasDinamicas() {
         grid->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         grid->verticalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         grid->verticalHeader()->setMinimumWidth(85);
-        grid->setSelectionMode(QAbstractItemView::NoSelection);
+
+        grid->setSelectionMode(QAbstractItemView::SingleSelection);
+        grid->setFocusPolicy(Qt::NoFocus);
         grid->setEditTriggers(QAbstractItemView::NoEditTriggers);
 
         for (int r = 0; r < franjas.size(); ++r) {
@@ -311,7 +344,7 @@ void TeacherListWidget::construirRejillasDinamicas() {
 }
 
 void TeacherListWidget::repintarRejillas() {
-    QList<FranjaAcademica> franjas = obtenerFranjasDelCentro();
+    QList<FranjaReal> franjas = construirFranjasReales(m_nucleo);
     int cols = m_gridDisponibilidad->columnCount();
 
     for (int r = 0; r < franjas.size(); ++r) {
@@ -323,37 +356,34 @@ void TeacherListWidget::repintarRejillas() {
             QTableWidgetItem* itemDisp = m_gridDisponibilidad->item(r, c);
             if (m_noDisponibleModificado.contains(celda)) {
                 itemDisp->setBackground(QColor(254, 202, 202));
-                itemDisp->setText("No\nDisp.");
+                itemDisp->setText("✖");
                 itemDisp->setForeground(QColor(153, 27, 27));
             } else {
                 itemDisp->setBackground(QColor(167, 243, 208));
                 itemDisp->setText("");
             }
             itemDisp->setTextAlignment(Qt::AlignCenter);
-            itemDisp->setFont(QFont("Arial", 8, QFont::Bold));
+            itemDisp->setFont(QFont("Arial", 10, QFont::Bold));
 
             QTableWidgetItem* itemPref = m_gridPreferencias->item(r, c);
             if (m_noDisponibleModificado.contains(celda)) {
                 itemPref->setBackground(QColor(229, 231, 235));
-                itemPref->setText("Bloqueado");
+                itemPref->setText("Bloq.");
                 itemPref->setForeground(QColor(156, 163, 175));
             } else if (m_preferidoModificado.contains(celda)) {
                 itemPref->setBackground(QColor(253, 230, 138));
-                itemPref->setText("⭐ Preferida");
+                itemPref->setText("⭐");
                 itemPref->setForeground(QColor(146, 64, 14));
             } else {
                 itemPref->setBackground(Qt::white);
                 itemPref->setText("");
             }
             itemPref->setTextAlignment(Qt::AlignCenter);
-            itemPref->setFont(QFont("Arial", 8, QFont::Bold));
+            itemPref->setFont(QFont("Arial", 10, QFont::Bold));
         }
     }
 }
 
-// ==========================================
-// INTERACCIONES EN REJILLAS Y TABS
-// ==========================================
 void TeacherListWidget::cambiarPestana(int indice) {
     m_stackedViews->setCurrentIndex(indice);
 
@@ -363,13 +393,21 @@ void TeacherListWidget::cambiarPestana(int indice) {
     if (m_isDark) activeStyle = "QPushButton { border: none; background: transparent; font-weight: bold; color: #ffffff; padding: 10px; border-bottom: 3px solid #ffffff; }";
 
     m_btnTabDisponibilidad->setStyleSheet(indice == 0 ? activeStyle : inactiveStyle);
+    m_btnTabDisponibilidad->style()->unpolish(m_btnTabDisponibilidad);
+    m_btnTabDisponibilidad->style()->polish(m_btnTabDisponibilidad);
+
     m_btnTabPreferencias->setStyleSheet(indice == 1 ? activeStyle : inactiveStyle);
+    m_btnTabPreferencias->style()->unpolish(m_btnTabPreferencias);
+    m_btnTabPreferencias->style()->polish(m_btnTabPreferencias);
+
     m_btnTabAsignaturas->setStyleSheet(indice == 2 ? activeStyle : inactiveStyle);
+    m_btnTabAsignaturas->style()->unpolish(m_btnTabAsignaturas);
+    m_btnTabAsignaturas->style()->polish(m_btnTabAsignaturas);
 }
 
 void TeacherListWidget::onDisponibilidadCellClicked(int fila, int columna) {
     if (m_idDocenteActual == -1) return;
-    QList<FranjaAcademica> franjas = obtenerFranjasDelCentro();
+    QList<FranjaReal> franjas = construirFranjasReales(m_nucleo);
     if (franjas[fila].esReceso) return;
 
     CeldaRejilla celda(fila, columna);
@@ -386,17 +424,19 @@ void TeacherListWidget::onDisponibilidadCellClicked(int fila, int columna) {
 
     repintarRejillas();
     evaluarCambiosSinGuardar();
+    m_gridDisponibilidad->clearSelection();
 }
 
 void TeacherListWidget::onPreferenciasCellClicked(int fila, int columna) {
     if (m_idDocenteActual == -1) return;
-    QList<FranjaAcademica> franjas = obtenerFranjasDelCentro();
+    QList<FranjaReal> franjas = construirFranjasReales(m_nucleo);
     if (franjas[fila].esReceso) return;
 
     CeldaRejilla celda(fila, columna);
 
     if (m_noDisponibleModificado.contains(celda)) {
         QMessageBox::warning(this, "Bloqueado", "No puedes marcar como preferida una hora en la que el docente no está disponible.");
+        m_gridPreferencias->clearSelection();
         return;
     }
 
@@ -408,6 +448,7 @@ void TeacherListWidget::onPreferenciasCellClicked(int fila, int columna) {
 
     repintarRejillas();
     evaluarCambiosSinGuardar();
+    m_gridPreferencias->clearSelection();
 }
 
 void TeacherListWidget::evaluarCambiosSinGuardar() {
@@ -421,13 +462,15 @@ void TeacherListWidget::evaluarCambiosSinGuardar() {
 
     m_btnTabDisponibilidad->setText(tabDispText);
     m_btnTabPreferencias->setText(tabPrefText);
+
+    cambiarPestana(m_stackedViews->currentIndex());
 }
 
 void TeacherListWidget::guardarCambiosRejilla() {
     m_noDisponibleOriginal = m_noDisponibleModificado;
     m_preferidoOriginal = m_preferidoModificado;
     evaluarCambiosSinGuardar();
-    QMessageBox::information(this, "Éxito", "Disponibilidad y preferencias guardadas correctamente.");
+    QMessageBox::information(this, "Éxito", "Interfaz lista. Nota: La persistencia de preferencias requerirá del endpoint en el núcleo de datos.");
 }
 
 void TeacherListWidget::descartarCambiosRejilla() {
@@ -437,9 +480,6 @@ void TeacherListWidget::descartarCambiosRejilla() {
     evaluarCambiosSinGuardar();
 }
 
-// ==========================================
-// CRUD Y SELECCIÓN MAIN
-// ==========================================
 void TeacherListWidget::cargarDocentes() {
     if (!m_nucleo) return;
     m_table->setRowCount(0);
@@ -508,13 +548,13 @@ void TeacherListWidget::onDocenteSeleccionado() {
         }
     }
 
-    int fila = m_table->currentRow();
-    if (fila < 0) return;
+    int fila_seleccionada = m_table->currentRow();
+    if (fila_seleccionada < 0) return;
 
-    QString cedula = m_table->item(fila, 0)->text();
-    QString nombre = m_table->item(fila, 1)->text();
+    QString cedula = m_table->item(fila_seleccionada, 0)->text();
+    QString nombre = m_table->item(fila_seleccionada, 1)->text();
 
-    m_idDocenteActual = fila;
+    m_idDocenteActual = fila_seleccionada;
     m_detalleNombre->setText(nombre);
 
     auto res = m_nucleo->listarDocentes();
@@ -524,11 +564,34 @@ void TeacherListWidget::onDocenteSeleccionado() {
     m_noDisponibleOriginal.clear();
     m_preferidoOriginal.clear();
 
-    for (const auto& disp : profe.disponibilidad) {
-        int c = disp.franja.dia - 1;
-        int r = disp.franja.inicio.hour() - 7;
-        if (r >= 0 && r < m_gridDisponibilidad->rowCount() && c >= 0 && c < 5) {
+    QList<FranjaReal> franjasDelColegio = construirFranjasReales(m_nucleo);
+
+    // ==========================================
+    // CUMPLIMIENTO CRITERIO 2: LÓGICA INVERTIDA Y CÁLCULO DE FILAS
+    // ==========================================
+    // 1. Asumimos por defecto que el docente NO está disponible en toda la semana
+    for (int r = 0; r < franjasDelColegio.size(); ++r) {
+        if (franjasDelColegio[r].esReceso) continue;
+        for (int c = 0; c < 5; ++c) {
             m_noDisponibleOriginal.insert(CeldaRejilla(r, c));
+        }
+    }
+
+    // 2. Si el profesor SÍ está disponible en un bloque, retiramos esa celda de la lista roja.
+    for (const auto& disp : profe.disponibilidad) {
+        int colDia = disp.franja.dia - 1;
+
+        // 3. Ya no usamos `inicio.hour() - 7`. Comparamos horas exactas.
+        int filaExacta = -1;
+        for (int r = 0; r < franjasDelColegio.size(); ++r) {
+            if (franjasDelColegio[r].inicio == disp.franja.inicio && franjasDelColegio[r].fin == disp.franja.fin) {
+                filaExacta = r;
+                break;
+            }
+        }
+
+        if (filaExacta >= 0 && filaExacta < m_gridDisponibilidad->rowCount() && colDia >= 0 && colDia < 5) {
+            m_noDisponibleOriginal.remove(CeldaRejilla(filaExacta, colDia));
         }
     }
 
@@ -538,14 +601,12 @@ void TeacherListWidget::onDocenteSeleccionado() {
     repintarRejillas();
     evaluarCambiosSinGuardar();
 
-    // Llenar pestaña asignaturas con diseño moderno (Tarjetas)
     m_tableAsignaturas->clear();
     m_tableAsignaturas->setRowCount(profe.materias.size());
     for(int i = 0; i < profe.materias.size(); i++) {
-        // Agrega un espacio para separar del borde azul
         QTableWidgetItem *item = new QTableWidgetItem("   " + profe.materias[i].nombre);
         m_tableAsignaturas->setItem(i, 0, item);
-        m_tableAsignaturas->setRowHeight(i, 45); // Altura de tarjeta
+        m_tableAsignaturas->setRowHeight(i, 45);
     }
 }
 
@@ -553,9 +614,6 @@ void TeacherListWidget::abrirFormularioNuevo() { /* Lógica conservada */ }
 void TeacherListWidget::abrirFormularioEditar(int fila) { /* Lógica conservada */ }
 void TeacherListWidget::eliminarDocente(int fila) { /* Lógica conservada */ }
 
-// ==========================================
-// TEMA VISUAL
-// ==========================================
 void TeacherListWidget::actualizarTema(bool modoOscuro) {
     m_isDark = modoOscuro;
     cambiarPestana(m_stackedViews->currentIndex());
@@ -578,11 +636,11 @@ void TeacherListWidget::actualizarTema(bool modoOscuro) {
         }
 
         QString gridStyle = "QTableWidget { border: 1px solid #333333; gridline-color: #444444; background-color: #1e1e1e; color: white; }"
+                            "QTableWidget::item:selected { background-color: transparent; }"
                             "QHeaderView::section { background-color: #252525; border: 1px solid #333333; font-size: 11px; color: #aaaaaa; padding: 2px; }";
         m_gridDisponibilidad->setStyleSheet(gridStyle);
         m_gridPreferencias->setStyleSheet(gridStyle);
 
-        // Estilo de tarjetas oscuras
         m_tableAsignaturas->setStyleSheet(
             "QTableWidget { border: none; background-color: transparent; outline: none; }"
             "QTableWidget::item { background-color: #2d3748; border-left: 4px solid #3b82f6; border-bottom: 4px solid #1e1e1e; color: #e2e8f0; font-size: 14px; font-weight: bold; padding-left: 10px; }"
@@ -605,11 +663,11 @@ void TeacherListWidget::actualizarTema(bool modoOscuro) {
         }
 
         QString gridStyle = "QTableWidget { border: 1px solid #e0e0e0; gridline-color: #f3f4f6; background-color: white; }"
+                            "QTableWidget::item:selected { background-color: transparent; }"
                             "QHeaderView::section { background-color: #f9fafb; border: 1px solid #e0e0e0; font-size: 11px; color: #374151; padding: 2px; }";
         m_gridDisponibilidad->setStyleSheet(gridStyle);
         m_gridPreferencias->setStyleSheet(gridStyle);
 
-        // Estilo de tarjetas claras
         m_tableAsignaturas->setStyleSheet(
             "QTableWidget { border: none; background-color: transparent; outline: none; }"
             "QTableWidget::item { background-color: #f8fafc; border-left: 4px solid #1a237e; border-bottom: 4px solid white; color: #1e293b; font-size: 14px; font-weight: bold; padding-left: 10px; }"
