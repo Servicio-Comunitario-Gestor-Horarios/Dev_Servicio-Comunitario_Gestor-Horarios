@@ -288,9 +288,11 @@ void TeacherListWidget::setupUi()
         auto* label = new QLabel(texto, padre);
         label->setObjectName(QStringLiteral("TeacherLegendText"));
         label->setMinimumWidth(0);
-        // La leyenda es decorativa: si falta espacio debe encogerse en vez de
-        // imponer el ancho del texto a toda la columna derecha.
-        label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+        // La leyenda debe verse completa, pero sin imponer el ancho de todo el
+        // texto a la columna derecha: al partir palabras el ancho mínimo queda
+        // acotado al de la palabra mas larga.
+        label->setWordWrap(true);
+        label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         fila->addWidget(swatch);
         fila->addWidget(label);
     };

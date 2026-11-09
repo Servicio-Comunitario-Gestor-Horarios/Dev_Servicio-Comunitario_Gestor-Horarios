@@ -11,12 +11,15 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QHeaderView>
+#include <QImage>
+#include <QLabel>
 #include <QPalette>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QTableWidget>
+#include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTime>
@@ -471,6 +474,60 @@ private slots:
                      QStringLiteral("No disponible"));
         }
         QSqlDatabase::removeDatabase(conexion);
+    }
+
+    /// La leyenda de colores de las rejillas de docentes debe mostrar el texto
+    /// que explica cada color, no solo el cuadro de color.
+    void laLeyendaDelPanelDocenteMuestraSuTexto()
+    {
+        TeacherListWidget vista;
+        vista.resize(1280, 800);
+        vista.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&vista));
+
+        auto* tabs = vista.findChild<QTabWidget*>(QStringLiteral("TeacherTabs"));
+        QVERIFY(tabs);
+
+        const auto leyendas = vista.findChildren<QLabel*>(QStringLiteral("TeacherLegendText"));
+        QCOMPARE(leyendas.size(), 5);
+
+        // Las dos primeras pestañas (disponibilidad y preferencias) llevan leyenda.
+        for (int pagina = 0; pagina < 2; ++pagina) {
+            tabs->setCurrentIndex(pagina);
+            QCoreApplication::processEvents();
+
+            int visibles = 0;
+            for (QLabel* leyenda : leyendas) {
+                if (!leyenda->isVisible())
+                    continue;
+                ++visibles;
+                QVERIFY2(!leyenda->text().isEmpty(),
+                         "cada color de la leyenda debe llevar su texto");
+                QVERIFY2(leyenda->width() > 0,
+                         qPrintable(QStringLiteral("la leyenda '%1' quedo sin ancho")
+                                        .arg(leyenda->text())));
+
+                // Comprueba que el texto se pinta de verdad: el fondo del QLabel
+                // es transparente, asi que cualquier pixel con alfa es tinta.
+                QImage imagen(leyenda->size(), QImage::Format_ARGB32_Premultiplied);
+                imagen.fill(Qt::transparent);
+                leyenda->render(&imagen);
+                int tinta = 0;
+                for (int y = 0; y < imagen.height() && tinta == 0; ++y) {
+                    const auto* fila = reinterpret_cast<const QRgb*>(imagen.constScanLine(y));
+                    for (int x = 0; x < imagen.width(); ++x) {
+                        if (qAlpha(fila[x]) > 0) {
+                            tinta = 1;
+                            break;
+                        }
+                    }
+                }
+                QVERIFY2(tinta > 0,
+                         qPrintable(QStringLiteral("la leyenda '%1' no dibuja texto")
+                                        .arg(leyenda->text())));
+            }
+            QVERIFY2(visibles > 0, "la pestaña debe mostrar su leyenda");
+        }
     }
 };
 
