@@ -259,7 +259,10 @@ void TeacherListWidget::setupUi()
     m_gridDisponibilidad->verticalHeader()->setDefaultSectionSize(28);
     m_gridDisponibilidad->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_gridDisponibilidad->horizontalHeader()->setMinimumHeight(30);
-    m_gridDisponibilidad->setShowGrid(false);
+    // Retícula visible: sin ella las celdas parecen un panel único hasta que se
+    // pinta una. `gridline-color` se ajusta por tema en `actualizarTema`.
+    m_gridDisponibilidad->setShowGrid(true);
+    m_gridDisponibilidad->setGridStyle(Qt::SolidLine);
     m_gridDisponibilidad->setSelectionMode(QAbstractItemView::NoSelection);
     m_gridDisponibilidad->setEditTriggers(QAbstractItemView::NoEditTriggers);
     layDisp->addWidget(m_gridDisponibilidad, 1);
@@ -305,7 +308,8 @@ void TeacherListWidget::setupUi()
     m_gridPreferencias->verticalHeader()->setDefaultSectionSize(28);
     m_gridPreferencias->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_gridPreferencias->horizontalHeader()->setMinimumHeight(30);
-    m_gridPreferencias->setShowGrid(false);
+    m_gridPreferencias->setShowGrid(true);
+    m_gridPreferencias->setGridStyle(Qt::SolidLine);
     m_gridPreferencias->setSelectionMode(QAbstractItemView::NoSelection);
     m_gridPreferencias->setEditTriggers(QAbstractItemView::NoEditTriggers);
     layPref->addWidget(m_gridPreferencias, 1);
@@ -1349,6 +1353,9 @@ void TeacherListWidget::actualizarTema(bool modoOscuro)
     const QString campoBorde = modoOscuro ? QStringLiteral("#444444") : QStringLiteral("#d1d5db");
     const QString acento = modoOscuro ? QStringLiteral("#3b82f6") : QStringLiteral("#1e3a8a");
     const QString acentoHover = modoOscuro ? QStringLiteral("#2563eb") : QStringLiteral("#162a69");
+    // Color de la retícula de las rejillas de disponibilidad/preferencias. Debe
+    // contrastar tanto sobre las celdas pintadas como sobre las vacías.
+    const QString lineaRejilla = modoOscuro ? QStringLiteral("#5b6472") : QStringLiteral("#b6c2d1");
 
     if (auto t = findChild<QLabel*>(QStringLiteral("TeacherTitle")))
         t->setStyleSheet(QStringLiteral("font-size: 24px; font-weight: bold; color: %1;")
@@ -1404,12 +1411,18 @@ void TeacherListWidget::actualizarTema(bool modoOscuro)
     for (QTableWidget* grid : {m_gridDisponibilidad, m_gridPreferencias}) {
         if (!grid)
             continue;
+        // La retícula se dibuja con `showGrid(true)`; aquí solo se define su
+        // color. Las cabeceras llevan además separadores propios para que las
+        // filas/columnas se distingan aunque la celda esté pintada.
+        grid->setShowGrid(true);
         grid->setStyleSheet(
-            QStringLiteral("QTableWidget { border: none; gridline-color: %1;"
-                           " background-color: %2; color: %3; }"
-                           "QHeaderView::section { background-color: %4; border: none;"
-                           " font-size: 11px; color: %5; padding: 3px; }")
-                .arg(panelBorde, tablaFondo, tablaTexto, tablaHeader, headerTexto));
+            QStringLiteral("QTableWidget { border: 1px solid %1; gridline-color: %2;"
+                           " background-color: %3; color: %4; }"
+                           "QHeaderView::section { background-color: %5; border: none;"
+                           " border-right: 1px solid %2; border-bottom: 1px solid %2;"
+                           " font-size: 11px; color: %6; padding: 3px; }")
+                .arg(panelBorde, lineaRejilla, tablaFondo, tablaTexto, tablaHeader,
+                     headerTexto));
     }
 
     for (QListWidget* lista : {m_listTitulares, m_listSuplentes}) {
