@@ -1,11 +1,13 @@
 # Datos de prueba del centro — `gestor-horarios-seed`
 
-> Herramienta de **desarrollo** que puebla una base de datos con un **centro de Educación Media
-> General completo, ficticio, determinista y reutilizable**: el **Plan de Estudio 31059** (Resolución
-> DM/0033, Gaceta Oficial 41.221 del 24-08-2017) con **cuatro planes** y **cuatro variantes de
-> profesorado** intercambiables. El módulo vive en `src/seed/`.
+> Herramienta de **desarrollo** que puebla una base de datos con el **centro real del Liceo
+> Nacional Robert Serra** (periodo **2026/2027**): **2 planes** de estudio, **24 cursos** en dos
+> turnos, **12 aulas** de uso general y **una cancha**, **32 docentes** y la **matrícula del centro**.
+> Es un **conjunto único**: no hay profesorados alternativos, planes derivados ni selección de perfil.
+> El módulo vive en `src/seed/`.
 >
-> Solo puebla la **base de datos**. **No genera horarios ni presets del solver** (ver §6).
+> Solo puebla la **base de datos**. **No genera horarios ni presets del solver** (ver §6) y **no se
+> declara generable** hasta que exista el aforo simultáneo de la cancha.
 
 ---
 
@@ -13,44 +15,100 @@
 
 | Entidad | Cantidad |
 |---|---|
-| Turnos (Mañana 07:00–11:50 · Tarde 12:40–17:30, 8 franjas de 35 min) | 2 |
-| Eventos (un «Receso» de 10 min tras la 2.ª franja: 08:10–08:20 y 13:50–14:00) | 2 |
-| Tipos de aula (`Aula de estudio`, `Laboratorio`, `Taller`) | 3 |
-| Aulas (13 para cursos + reserva + laboratorio + taller) | 16 |
-| Materias-año del catálogo (51 del 31059 + 6 nuevas de los derivados) | 57 |
-| Planes de estudio (General + 3 áreas de desarrollo) | 4 |
-| Cargas plan-materia | 210 |
-| Cursos (3 secciones en 1.º–3.º, 2 en 4.º–5.º; **sin turno**) | 13 |
+| Duración de la hora académica (configuración, una fila; no es dato de dominio) | **40 min** |
+| Turnos (Mañana 07:00–12:40 · Tarde 12:40–18:10, 8 franjas de 40 min) | 2 |
+| Eventos (receso y acto cívico de la mañana; receso de la tarde) | 3 |
+| Tipos de aula leídos de la base (`Aula de estudio` + `Cancha`; declarado por el conjunto: 1) | 2 |
+| Aulas (12 generales de capacidad 44, compartidas entre turnos, + cancha de 88) | 13 |
+| Materias-año del catálogo (**79 con carga + 6 sin carga**) | **85 materias** |
+| Planes de estudio (31059 y 31060) | 2 |
+| Cargas plan-materia | **95 cargas** |
+| Cursos (12 de mañana + 12 de tarde, **con turno**) | **24 cursos** |
+| Docentes (30 posiciones del centro + 2 añadidos) | **32 docentes** |
+| Materias asignadas | **272** |
+| Disponibilidades (32 docentes × 5 días) | **160** |
 | Preferencias (no se siembran) | 0 |
+| Matrícula total declarada en el perfil (579 de 31059 + 310 de 31060) | **889** |
+| Clases del conjunto (96 de Educación Física; 48 por turno) | **876** |
 
-- **Escala de carga:** cada año de cada plan suma **40 horas académicas** (la hora del 31059 es una
-  **hora académica = un bloque**; la escala 44/44/46/46/46 del plan oficial se reduce al techo semanal
-  de 40 bloques = 8 franjas × 5 días). **1 hora académica = 1 bloque**, sin conversión ni redondeo.
-- **Planes:** `GEN` (General), `EXA` (Ciencias Exactas), `NAT` (Ciencias Naturales) y `SOC` (Ciencias
-  Sociales). Los tres derivados añaden **2 materias nuevas de su eje** en 4.º/5.º y recortan 1 h en
-  tres áreas base del mismo año, de modo que **todos los años suman 40/40/40/40/40 h académicas**.
+### Planes
 
-  Materias por año: `GEN 9/9/10/11/12 · EXA 9/9/10/12/13 · NAT 9/9/10/12/13 · SOC 9/9/10/12/13`.
+| Plan | Nombre | Áreas | Horas por año (1.º–5.º) | Materias por año (1.º–5.º) | Cargas |
+|---|---|---|---|---|---|
+| **31059** | Media General | 12 | **34/34/34/36/34** | 8/8/9/10/10 | 45 |
+| **31060** | Ciencias y Tecnología | 10 | **40/40/40/40/40** | 10/10/10/10/10 | 50 |
 
-- **Docentes ficticios** (nombres, correos y teléfonos inventados, con acentos y eñes), con sus
-  materias asignadas y su disponibilidad.
+- **31059** (tras excluir las dos áreas sin titular, ver abajo): Castellano 4/4/4/4/3 · Inglés y
+  otras lenguas extranjeras 4/4/4/4/3 · Matemáticas 4×5 · Educación Física 4×5 · Arte y Patrimonio
+  4/4 · Ciencias Naturales 6/6 · Física 3.º–5.º 4/4/4 · Química 3.º–5.º 4/4/4 · Biología 3.º–5.º
+  4/4/4 · Geografía, Historia y Ciudadanía 6/6/4/4/4 · Formación para la Soberanía Nacional 4.º–5.º
+  2/2 · Orientación y Convivencia 2×5. **Todas las sumas son pares.**
+- **31060**: Lengua y Literatura 4×5 · Idiomas 4×5 · Matemáticas 4×5 · Educación Física 4×5 ·
+  Biología, Ambiente y Tecnología 4×5 · Física 2/2/4/4/4 · Química 2/2/4/4/4 · Geografía, Historia y
+  Soberanía Nacional 6/6/4/4/4 · Orientación Vocacional 4/4/2/2/2 · Innovación Tecnológica y
+  Productividad 6×5.
+
+### Catálogo de materias
+
+- **Una materia por área y año** (`«<Área> <año>º»`). **16 compartidas** entre los dos planes:
+  Matemáticas 1.º–5.º, Educación Física 1.º–5.º, Física 3.º–5.º y Química 3.º–5.º (4 en 5.º). Se
+  siembran **una sola vez** con la carga de cada plan.
+- **6 materias sin carga** (excepción de prueba): «Participación en los Grupos de Creación,
+  Recreación y Producción» de 1.º a 5.º y «Ciencias de la Tierra» de 5.º. Sus áreas **no están en
+  ningún plan**; existen para probar docentes habilitados sin materia que impartir.
+- **Tipos de aula:** todas las materias usan el tipo general salvo **Educación Física**, que exige
+  **`Cancha`**. El centro **no tiene laboratorios ni talleres**.
+
+### Cursos, turnos y aulas
+
+| Turno | Plan | Cursos | Aulas de referencia |
+|---|---|---|---|
+| **Mañana** | 31059 | 1A, 1B, 3A, 3B, 3C, 4A, 4B, 4C, 5A, 5B, 5C, 5D | 01–12 |
+| **Tarde** | 31059 | 2A, 2B, 2C | 01–03 |
+| **Tarde** | 31060 | 1C, 1D, 1E, 2D, 2E, 3D, 3E, 4D, 4E | 10–12, 04–05, 07–06, 09–08 |
+
+- **Turno en el curso:** se siembra en `Cursos.turno` (dato del centro). **12 y 12** cursos; ninguna
+  aula de referencia se repite **dentro** del mismo turno y las 12 aulas se **comparten** entre
+  turnos.
+- **Letras libres (D-12):** 31059 usa A, B (1.º), A–C (2.º–4.º) y A–D (5.º); 31060 usa C, D, E (1.º)
+  y D, E (2.º–4.º). Las 24 parejas año+sección son únicas y de un carácter. **No son las letras del
+  documento**: la identidad con el plan es una spec futura.
+- **Matrícula:** 32–44 alumnos por curso (44 en 4.º A y 4.º B). Vive en el **perfil**, no en el
+  modelo; total **889** (579 + 310). La consumirá el preset como número de estudiantes.
+- **El plan de cada curso no se persiste** (el modelo no tiene plan): lo declara el perfil y lo
+  aporta la configuración al generar.
+
+### Horas, eventos y duración
+
+| Turno | Ventana | Rejilla | Eventos |
+|---|---|---|---|
+| Mañana | **07:00–12:40** | 8 × 40, termina a las 12:20 | Receso 08:20–08:30 · Acto cívico 08:30–08:40 |
+| Tarde | **12:40–18:10** | 8 × 40, termina a las 18:00 | Receso 14:00–14:10 |
+
+- Encaje: mañana `8 × 40 + 20 = 340` y tarde `8 × 40 + 10 = 330`. El desfase entre la rejilla
+  aritmética y el fin de la ventana (20/10 min) es el tiempo de los eventos; **los eventos no crean
+  ni quitan franjas**.
+- **Duración 40 min:** es configuración global (una sola fila). Aplicar el conjunto la deja en **40**
+  (el valor de fábrica es 35) y es idempotente. **1 hora académica = 1 bloque**: 34/36/40 horas son
+  34/36/40 bloques y la duración no es factor de conversión.
+- **Clases:** **876** (414 de mañana + 462 de tarde). **96 son de Educación Física** (4 h × 24
+  cursos; **48 por turno**) y van a la cancha.
 
 ## 2. Requisitos y compilación
 
-El ejecutable depende de `seed` → `datos` → `backend` (Qt6 Core/Sql), sin OR-Tools. Se compila con el
-preset **`full`** (`BUILD_BACKEND=ON`, que exige OR-Tools presente en el entorno de configuración; por
-eso se compila dentro del contenedor `gestor-dev`).
+El ejecutable depende de `seed` → `datos` → `backend` (Qt6 Core/Sql). Se compila con
+`BUILD_BACKEND=ON` y `BUILD_SEED=ON` (por defecto); con `BUILD_BACKEND=OFF` (preset `dev-frontend`)
+el seed **no** se compila.
 
 ```bash
-cmake --preset full
-cmake --build build
-# ejecutable: build/src/seed/gestor-horarios-seed
+cmake --preset backend
+cmake --build --preset backend --parallel
+# ejecutable: build-backend/src/seed/gestor-horarios-seed
 ```
 
-Opciones de CMake: `BUILD_SEED` (por defecto `ON`). Con `BUILD_BACKEND=OFF` (preset `dev-frontend`) el
-seed **no** se compila.
-
-Dentro del contenedor:
+Con los presets `full` (Docker) y `full-release` el binario queda en
+`build/src/seed/gestor-horarios-seed` y `build-rel/src/seed/gestor-horarios-seed`,
+respectivamente. En el contenedor del proyecto:
 
 ```bash
 docker exec -it gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build"
@@ -60,73 +118,80 @@ docker exec -it gestor-dev bash -lc "cd /workspace && ./build/src/seed/gestor-ho
 ## 3. Uso
 
 ```bash
-gestor-horarios-seed --db <ruta> [--variante <v>] [--reemplazar | --solo-docentes] [--si] [--ayuda] [--version]
+gestor-horarios-seed --db <ruta> [--reemplazar] [--si] [--ayuda] [--version]
 ```
 
 | Opción | Efecto |
 |---|---|
 | `--db <ruta>` | **Obligatoria.** Base destino (se crea con el esquema si no existe). |
-| `--variante <v>` | Variante de docentes: `holgada` (por defecto), `suplentes`, `sin-profesorado` o `sin-disponibilidad`. |
 | `--reemplazar` | Reemplazo total (borra y repuebla; exige `--si` y deja respaldo). |
-| `--solo-docentes` | Recarga solo docentes, sus materias y su disponibilidad (exige `--si` y respaldo); el resto de los datos no se toca. |
 | `--si` | Confirma la operación destructiva (sin terminal interactiva). |
 | `--ayuda`, `--help`, `-h` | Muestra la ayuda. |
 | `--version` | Muestra la versión. |
 
+Las antiguas opciones de **selección de profesorado** y de **recarga parcial de docentes** ya no
+existen: el conjunto es uno solo y cualquier argumento desconocido termina con **código 1**.
+
 **Códigos de salida:** `0` ok · `1` uso/argumentos · `2` base con datos · `3` confirmación requerida ·
-`4` respaldo fallido · `5` apertura/esquema · `6` variante desconocida · `7` escritura/atomicidad ·
-`8` perfil incoherente.
+`4` respaldo fallido · `5` apertura/esquema · `7` escritura/atomicidad · `8` perfil o docentes
+incoherentes.
 
 ### Ejemplo de salida en éxito
 
-```
+```text
 Base: /tmp/centro.db
-Variante: holgada
-Hora académica: 35 min (configuraciones: 1)
-Turnos: 2   Eventos: 2   Aulas: 16   Materias: 57   Planes: 4   Materias de plan: 210
-Cursos: 13 (sin turno)   Docentes: 65   Materias asignadas: 65   Disponibilidades: 325   Tipos de aula: 3
+Centro: Liceo Nacional Robert Serra (2026/2027)
+Hora académica: 40 min (configuraciones: 1)
+Turnos: 2   Eventos: 3   Aulas: 13   Materias: 85   Planes: 2   Materias de plan: 95
+Cursos: 24 (12 Mañana · 12 Tarde)   Docentes: 32   Materias asignadas: 272   Disponibilidades: 160   Tipos de aula: 2
 Preferencias: 0
-Materias por año: GEN 9/9/10/11/12 · EXA 9/9/10/12/13 · NAT 9/9/10/12/13 · SOC 9/9/10/12/13
-GEN  General            40/40/40/40/40 h académicas
-EXA  Ciencias Exactas   40/40/40/40/40 h académicas
-NAT  Ciencias Naturales 40/40/40/40/40 h académicas
-SOC  Ciencias Sociales  40/40/40/40/40 h académicas
+Clases: 876 (EF 96; 48 por turno)
+Clases por plan: 31059 516 · 31060 360
+Clases por año: 31059 68/102/102/108/136 · 31060 120/80/80/80
+Materias por año: 31059 8/8/9/10/10 · 31060 10/10/10/10/10
+31059  Media General         34/34/34/36/34 h académicas
+31060  Ciencias y Tecnología 40/40/40/40/40 h académicas
+Matrícula: 889 (579 + 310)
+Capacidad docente: 576 por turno (16 × 36)   Demanda: 414 Mañana · 462 Tarde
+Generable: no — «Mañana»: 48 clases de Educación Física frente a 40 franjas de cancha (aforo 1). Pendiente el aforo simultáneo (dos cursos), que lo resolverá su spec.
 Respaldo: no aplica
 ok
 ```
 
-## 4. Las cuatro variantes de docentes
+La aplicación sobre una base nueva tarda menos de **1 s** en el entorno de referencia (límite de
+RNF-1: 15 s).
 
-Cada variante es un conjunto **completo e intercambiable** de docentes, con sus materias asignadas y su
-disponibilidad. **El resto de los datos (planes, cursos, aulas, turnos) es idéntico** entre variantes.
+## 4. Profesorado del centro y tope de horas
 
-| Variante | Docentes | Materias asignadas | Disponibilidades | Propósito |
-|---|---|---|---|---|
-| `holgada` | 65 | 65 | 325 | Titulares con carga **≤ 60 % de su tope** (holgada); cubre **todas** las materias-año en **ambos turnos**. |
-| `suplentes` | 43 | 57 | 215 | Titulares **cerca de su tope** (≥ 80 %, ratio hasta ~1,15); Σ topes al **88,65 % de la demanda** y **24 suplentes sin materias** para que el preset declare suplencias. |
-| `sin-profesorado` | 64 | 64 | 320 | **Inválida a propósito:** `Física 3º` queda sin ningún docente (cobertura falla en ambos turnos). |
-| `sin-disponibilidad` | 65 | 65 | 325 | **Inválida a propósito:** los docentes de `Física 3º` tienen disponibilidad `19:00–21:00` (solape nulo con ambos turnos). |
-
-Las dos últimas son **deliberadamente inválidas** para ejercitar los dos modos de rechazo de la
-validación previa del solver (sin docente elegible / sin solape de disponibilidad).
-
-### Alternar la variante sin tocar el resto de los datos
-
-```bash
-# De holgada a suplentes: solo se borran y recargan docentes, materias y disponibilidad.
-gestor-horarios-seed --db /tmp/centro.db --variante suplentes --solo-docentes --si
-```
-
-Al aplicar dos veces la misma variante, el estado final es el mismo (sin duplicados). Pedir una
-variante inexistente sale con código **6** y **no toca ningún dato**.
+- **32 docentes** con identidad ficticia `P001`…`P032` (nombres, correos y teléfonos inventados,
+  RNF-6): las **30 posiciones** del centro con sus mismas áreas y turnos, más **2 añadidos** para las
+  materias sin carga (uno por turno).
+- **Tope de 36 horas académicas de aula** para todos (D-3): las 40 h del contrato del centro
+  incluyen actividades «fuera de aula» (planificación, CRP, atención familiar, coordinación…) que se
+  descuentan y **no se programan**.
+- **Turnos:** **16 docentes por turno** (15 del centro + 1 añadido). El turno vive en el perfil y
+  **no se persiste**: se materializa en la disponibilidad, con **un rango por día de lunes a
+  viernes** y la ventana completa del turno en reloj (07:00–12:40 / 12:40–18:10).
+- **Regla de asignación:** cada docente recibe **todas las materias-año del catálogo de sus áreas**,
+  contando **una sola vez** las compartidas, **sin filtrar por año** y **solo si el área tiene cursos
+  en su turno**. «Biología» y «Biología, Ambiente y Tecnología» son áreas distintas: la primera queda
+  en la mañana y la segunda **solo** en la tarde. Las materias de **5.º de 31060** (año sin cursos)
+  cuentan porque su área tiene cursos en la tarde.
+- **272 materias asignadas** y **160 disponibilidades**. Los dos añadidos suman **6** materias sin
+  carga (5 de Participación y 1 de Ciencias de la Tierra).
+- **Cobertura por turno:** cada materia de cada curso tiene al menos un docente habilitado en el
+  turno de ese curso; si faltara, la aplicación se rechazaría identificando área, año y turno.
+- **Exceso blando conocido:** en la tarde, **Inglés + Idiomas** suman 48 clases con una sola docente
+  habilitada: 12 h por encima del tope. Es un aviso (S1), no una infactibilidad; el horario no se
+  genera en esta entrega de todos modos (§6).
 
 ## 5. Seguridad (protección de la base)
 
-- **Falla con datos:** si la base ya tiene datos y no se pide una operación destructiva, la aplicación
-  falla **sin escribir** (`La base ya tiene datos; use «--reemplazar» para reemplazarlos.`, código **2**).
-- **Operaciones destructivas** (`--reemplazar` o `--solo-docentes`) exigen **`--si`**; sin él, salen
-  con código **3** (`Confirmación requerida`) **antes** de respaldar o borrar.
-- **Respaldo obligatorio:** antes de borrar, deja un respaldo (`VACUUM INTO`) con ruta única
+- **Falla con datos:** si la base ya tiene datos y no se pide reemplazo, la aplicación falla **sin
+  escribir** (`La base ya tiene datos; use «--reemplazar» para reemplazarlos.`, código **2**).
+- **Reemplazo total:** exige **`--si`**; sin él sale con código **3** (`Confirmación requerida`)
+  **antes** de respaldar o borrar.
+- **Respaldo obligatorio:** antes de borrar deja un respaldo (`VACUUM INTO`) con ruta única
   (`<base>.respaldo-<fecha-hora>`; si existe, prueba `-2`, `-3`…). Si el respaldo falla, **aborta sin
   borrar nada** (código **4**).
 - **Atomicidad:** toda aplicación o reemplazo es una única transacción: o quedan todos los datos del
@@ -134,46 +199,57 @@ variante inexistente sale con código **6** y **no toca ningún dato**.
 
 ## 6. Límites y fuera de alcance
 
-- **Datos ficticios:** nombres, correos y teléfonos inventados; **ninguna persona real** (constitución
-  §5). No es un importador de datos reales ni una carga de producción.
-- **No genera presets del solver:** el conjunto solo describe el centro persistido. El **turno de cada
-  curso** (los cursos se siembran **sin turno**), el **número de estudiantes**, los **filtros del
-  docente** (turno, plan, años, horas de aula) y las **suplencias con su `peso`** viven en el preset
-  (spec 005), que este conjunto **no** genera. Solo garantiza que los datos persistidos permiten
-  construir presets coherentes y ejercitar las cuatro variantes.
-- **El conjunto sembrado no es generable con la regla de tipo (spec 010).** Desde la 010 toda clase se
-  imparte en un aula cuyo **tipo** coincide con el tipo de aula que exige su materia, y el conjunto
-  siembra **un solo laboratorio** (8 franjas × 5 días = **40 franjas**). La demanda de las materias que
-  piden laboratorio ronda los **≈104 bloques** de ciencias por semana, así que **no existe horario
-  factible** para este centro con esa regla: el conjunto es un fixture de persistencia, no un caso
-  resoluble del solver. La **009 ya retiró la promesa de generabilidad** del seed y la 010 no la
-  recupera; por eso **no se intenta generar** el horario del seed y `test_generacion_seed` queda fuera
-  del preset `backend`. La generabilidad se recuperará con los **datos reales del liceo** (decisión del
-  usuario), no con este conjunto ficticio.
-- **La duración de la franja no cambia la carga:** 1 hora académica = 1 bloque, y cada año suma 40
-  horas académicas (= 40 bloques). Los **35 minutos** son la duración **real** de la franja (rejilla
-  horaria, eventos y disponibilidad), no un factor de conversión; 40 h × 35 = **1400 min** (23 h 20).
-  El evento «Receso» de 10 minutos tras la 2.ª franja encaja por la invariante
-  `8 × 35 + 10 = 290` min = ventana del turno. La siembra asegura la configuración global en 35 (una
-  fila, no es dato de dominio).
-- **Semana de referencia:** 5 días (lunes a viernes); es una propiedad de la configuración que acompaña
-  al conjunto y **no se persiste**.
+- **El conjunto no es generable todavía (D-5, D-9).** Con la exclusividad de aula vigente, la
+  Educación Física de cada turno son **48 clases** frente a **40 franjas** de cancha (5 días × 8
+  franjas, aforo 1): **48 > 40**. Con el aforo simultáneo (dos cursos en la cancha con docentes
+  distintos) cabría (**96 ≤ 160** en la semana y **48 ≤ 80** por turno), pero eso es una spec
+  posterior. Hasta entonces:
+  - El **informe** de la aplicación y esta guía lo declaran con la causa y la acción
+    («aforo simultáneo pendiente»).
+  - **Ninguna verificación genera** un horario con este conjunto; la aceptación de generación
+    (876 clases, desvío 0, separación y huecos informados, < 300 s) se hará al cerrar el aforo.
+  - El conjunto es la **base de ese escenario**: la spec del aforo solo añadirá la capacidad.
+- **Educación Física en la cancha:** 96 clases en la semana y 48 por turno; la capacidad de la
+  cancha (88, dos grupos) es condición necesaria, **no prueba** de que exista horario.
+- **La duración no cambia la carga:** 1 hora académica = 1 bloque; cada año suma
+  34/34/34/36/34 (31059) o 40×5 (31060) horas académicas. Los **40 minutos** son la duración real de
+  la franja (rejilla, eventos y disponibilidad): 34 bloques × 40 min = 1360 min (22 h 40) en 1.º–3.º
+  y 5.º de 31059, 36 × 40 = 1440 min (24 h) en 4.º y 40 × 40 = 1600 min (26 h 40) en 31060.
+- **Nombres ficticios:** el conjunto derivado no contiene nombres reales; el documento del centro
+  (`seed.md`) sigue siendo la fuente versionada y **no se amplía**.
+- **No genera presets:** el seed solo describe el centro persistido. El **plan de cada curso**, el
+  **número de estudiantes** (la matrícula del perfil), los filtros del docente y las suplencias
+  viven en la configuración del solver, que este conjunto **no** genera. Los cursos **ya traen su
+  turno** en la base.
+- **Paquete de demostración fuera de alcance:** `GESTOR_PACK_DEMO` y su carpeta `datos-demo/` **no se
+  regeneran** con el centro real: siguen con el conjunto sintético o se retiran en otra spec.
+- **Semana de referencia:** 5 días (lunes a viernes); es propiedad de la configuración y **no se
+  persiste**.
 - **Determinismo:** aplicar el mismo perfil dos veces sobre bases vacías deja los mismos datos
-  (nombres, códigos, recuentos y relaciones), salvo las marcas de auditoría (`fecha_creacion` y
-  `fecha_modificacion`).
-- **Fuera de alcance:** no genera horarios, no añade pantallas, no importa datos reales y no cambia el
-  esquema ni el modelo.
+  (nombres, códigos, recuentos y relaciones), salvo las marcas de auditoría.
+- **Fuera de alcance:** no genera horarios, no añade pantallas, no importa datos reales y no cambia
+  el esquema ni el modelo (el turno del curso y la sección de un carácter ya existían).
 
 ## 7. Verificación
 
-Suite completa:
+Suites del proyecto (desde la raíz):
 
 ```bash
-docker exec -it gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"
+cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend
+cmake --preset full-release && cmake --build build-rel --parallel && ctest --preset full-release
 ```
 
 Solo los tests del seed (más rápido):
 
 ```bash
-docker exec -it gestor-dev bash -lc "cd /workspace && cmake --build build && ctest --test-dir build -R 'test_seed' --output-on-failure"
+ctest --preset backend -R "test_seed_perfil|test_seed_aplicacion" --output-on-failure
+ctest --preset full-release -R "test_entrada_seed|test_selector_generacion" --output-on-failure
+```
+
+Aplicación real y comprobación del informe:
+
+```bash
+build-backend/src/seed/gestor-horarios-seed --db /tmp/centro.db
+# esperado: 85 materias, 24 cursos (12/12), 32 docentes, 272 asignaciones,
+#           160 disponibilidades, 13 aulas, 3 eventos, 40 min y «Generable: no»
 ```

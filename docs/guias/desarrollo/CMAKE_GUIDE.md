@@ -172,6 +172,11 @@ Con `GESTOR_PACK_DEMO=ON`:
   (`preset-centro-31059-holgada.json`);
 - van a la raíz `Instalar-datos-demo.bat` y `LEEME-DATOS-DEMO.txt`.
 
+> **Aviso (spec 017).** Ese paquete de demostración **no se regenera** con el centro real: sigue con
+> el conjunto sintético que describe este apartado (o se retirará en otra spec). El seed
+> `gestor-horarios-seed` ya siembra el **centro real** (2 planes 31059/31060, 24 cursos con turno, 13
+> aulas, 32 docentes y 40 min); ver `docs/guias/datos-prueba.md`.
+
 El `.bat` copia la base a `%APPDATA%\LiceoRobertSerra\GestorHorarios\gestor_horarios.db` **solo si no
 existe** una: nunca pisa los datos del usuario. El preset no se instala, se carga desde el paquete con
 «Cargar preset…» en la ventana *Generar horarios*. Si falta alguno de los archivos de `datos-prueba/`,

@@ -143,8 +143,9 @@ ventana queda al final. Derivarla del turno da otro número.
 - [x] **Retirar el selector de duración**; si se quiere ofrecer, que edite la configuración global
       (`consultar`/`guardar`), no el preset.
 - [x] **Panel de avisos**: dejar solo P2.
-- [x] **`test/frontend/test_generacion_seed.cpp`**: fija `duracion_minutos == 40`; al migrar el builder,
-      reescribirlo a **35** y a la rejilla nueva del seed.
+- [x] **`test/frontend/test_generacion_seed.cpp`**: fijaba `duracion_minutos == 40` y se reescribió a
+      **35** con la rejilla del seed sintético. **Retirado en la 017**: el centro real no se declara
+      generable y lo sustituye `test_entrada_seed` (compone y valida sin resolver).
 - [ ] **Opcional**: mostrar `ProfesorDTO.preferencias` (API nueva de la 012, sin UI todavía).
       *(Sigue pendiente; no bloquea.)*
 - [x] **Formularios y listas con el catálogo** (deuda de la 009): `idTipoAula` en aulas y materias,
@@ -172,9 +173,12 @@ cmake --preset full && cmake --build build
 cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend   # 56/56
 ```
 
-Datos de prueba del seed vigente: turnos **Mañana 07:00–11:50** y **Tarde 12:40–17:30**, 8 franjas de
-**35 min**, eventos «Receso» en **08:10–08:20** y **13:50–14:00** (`8 × 35 + 10 = 290`). La rejilla de
-clases va de 07:00 a **11:40** y de 12:40 a **17:20**; el `fin` del turno añade los 10 min del evento.
+Datos de prueba del seed vigente (centro real 2026/2027): turnos **Mañana 07:00–12:40** y
+**Tarde 12:40–18:10**, 8 franjas de **40 min**, eventos **Receso 08:20–08:30** y **Acto cívico
+08:30–08:40** (mañana) y **Receso 14:00–14:10** (tarde): `8 × 40 + 20 = 340` y
+`8 × 40 + 10 = 330`. La rejilla de clases va de 07:00 a **12:20** y de 12:40 a **18:00**; el `fin`
+del turno añade los 20/10 min de los eventos. (El seed sintético de la 011 usaba 35 min y
+11:50/17:30.)
 
 ---
 
@@ -209,5 +213,6 @@ Documentada también en `docs/interfaz-frontend.md` §5 y §6:
 - Migración del builder y de la vista de generación (§2 y §4 de este documento).
 - `horasAula` y la aritmética en minutos de la vista: la conversión de presentación es
   `duracion_horaria::minutosDeHorasAcademicas(horas, D)`.
-- `test_generacion_seed` con la rejilla de 35.
+- `test_generacion_seed` con la rejilla de 35. **Resuelto en la 017:** se retira y lo sustituye
+  `test_entrada_seed` (24 cursos, 32 docentes, 40 min; compone y valida **sin resolver**).
 - UI de preferencias (la 012 solo entrega servicios y API).

@@ -771,8 +771,8 @@ eso la composición vive en el frontend, en `src/frontend/src/services/` (se com
     preferenciasNoAplicadas}`. Reutiliza `construirEntradaCompleta` (backend, 013) y **después inyecta
     por curso** el `plan`, el `turno` y el
     `num_estudiantes` (las `materias` se derivan del plan embebido y el año del curso vía
-    `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. El `turno` del
-    preset tiene prioridad sobre el de la base (que suele venir vacío en los datos sembrados); el
+    `NucleoDatos::listarCargaDePlan`), y aplica la opción global de aulas fijas. El `turno` **ya
+    viene en la base** con el centro real (12 Mañana / 12 Tarde) y el preset lo replica; el
     `aula` la toma el constructor desde la base. `avisos` recoge los datos incompletos (curso sin
     plan, plan sin materias, lecturas fallidas).
   - `horasSugeridasPorDocente(nucleo, cursos)` → precarga válida de horas por docente.
@@ -799,14 +799,16 @@ informativo.
 
 Al cargar la base por primera vez, la vista **deriva de los turnos** el nº de slots por día (suma de
 los slots de todos los turnos) y la **duración del bloque** (franja del turno menos la **suma de las
-duraciones de sus eventos**, sobre sus slots; 35 min en los datos de prueba del centro), ambos
-editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). El campo `duracion_minutos` del
+duraciones de sus eventos**, sobre sus slots; **40 min** en el centro real: `(340 − 20) / 8` y
+`(330 − 10) / 8`), ambos editables. La fórmula es la misma de `calculo_eventos` (§2.4.2). El campo
+`duracion_minutos` del
 preset es **derivado**: la construcción (`construirEntradaCompleta`; el envoltorio
 `construirJsonEntrada`) lo sobrescribe siempre con el de la configuración
 global y su valor nunca se usa; un cambio de configuración desde que se guardó el preset no es error
 ni aviso. La columna **Turno** de cada curso
-es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos aún sin asignar
-(los del centro se siembran sin turno; el solver exige uno, V7).
+es un desplegable con los turnos de la base y una opción «Sin turno» para los cursos sin asignar; en
+el centro real los **24 cursos ya traen su turno** (12 Mañana / 12 Tarde), la configuración no lo
+sobrescribe (D-8, capacidad futura de la spec 006) y el solver exige uno (V7).
 
 **Controles de las tablas.** Las celdas editables llevan widgets, no texto libre: turno y plan son
 desplegables, las horas son `QSpinBox`, los **años** son un desplegable de **selección múltiple**
@@ -867,12 +869,12 @@ El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_c
 `frontend` y `backend`). La rejilla (filas por turno, receso, horas y tramos) por
 `test_cuadricula_horario` (`test/frontend/test_cuadricula_horario.cpp`).
 
-La integración completa (sembrar una base de prueba, componer la entrada desde el frontend con un
-reparto plan/turno por curso, validarla y **resolverla** con el motor) está cubierta por
-`test_generacion_seed` (`test/frontend/test_generacion_seed.cpp`), añadido cuando existen `frontend`,
-`backend_solver` y `seed`. Requiere ejecutarse con la configuración que enlaza OR-Tools
-(`Release`/Docker); en `Debug` sobre Windows el motor no arranca (CRT de depuración contra las DLL
-Release de OR-Tools).
+La integración del centro real (sembrar la base, componer la entrada desde el frontend con el
+plan, el turno y la matrícula de cada curso, y validarla **sin resolver**) está cubierta por
+`test_entrada_seed` (`test/frontend/test_entrada_seed.cpp`, añadido cuando existen `frontend` y
+`seed`). El conjunto **no se declara generable** hasta el aforo simultáneo de la cancha (48 clases
+de Educación Física por turno frente a 40 franjas), así que no se resuelve; el antiguo
+`test_generacion_seed` se retiró en la 017.
 
 
 ---
@@ -997,3 +999,16 @@ firmas nuevas. El equipo de interfaz debe migrar:
 > `ServicioGeneracion::generar` recibe el diagnóstico de no aplicadas y `ResultadoGeneracion` expone
 > `cumplimiento` (aditivo; el contrato de salida del solver no cambia). Verificado con
 > `ctest --preset backend` (**58/58**) y `ctest --preset full-release` (**63/63**).
+>
+> **Actualización 2026-11-08 (spec 017).** El conjunto de datos de prueba es ahora el **centro real
+> del Liceo Nacional Robert Serra (2026/2027)**: 2 planes (**31059** Media General y **31060**
+> Ciencias y Tecnología), **85 materias** (79 con carga + 6 sin carga; 16 compartidas), **95 cargas**,
+> **24 cursos con turno** (12 Mañana / 12 Tarde), **13 aulas** (12 generales de 44 compartidas entre
+> turnos + 1 cancha de 88), **32 docentes** (30 posiciones + 2 añadidos; **272** asignaciones y
+> **160** disponibilidades, tope 36), **40 min** de hora académica y **3 eventos**; matrícula **889**
+> (579 + 310). **No hay profesorados alternativos** ni conjuntos inválidos de ejemplo. Los cursos
+> **ya traen su turno** en la base y la configuración no lo sobrescribe (D-8; sobrescribirlo es
+> capacidad futura de la spec 006). El conjunto **no se declara generable** hasta el aforo simultáneo
+> de la cancha (**48 > 40** por turno); `test_generacion_seed` se retiró y su sustituto
+> `test_entrada_seed` compone y valida **sin resolver** (ver §3.6). Verificado con
+> `ctest --preset backend` (**61/61**) y `ctest --preset full-release` (**66/66**).
