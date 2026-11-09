@@ -34,11 +34,20 @@ private slots:
     void abrirConfiguracion();
     void aplicarTemaGlobal(bool modoOscuro); // <--- Declaración añadida
 
+protected:
+    // Reajusta la disposicion cuando cambia el estado de la ventana
+    // (maximizar/restaurar). El area cliente definitiva no siempre esta
+    // aplicada al recibir el evento, asi que el trabajo se difiere.
+    void changeEvent(QEvent* event) override;
+
 private:
     void setupSidebar();
     void setupCentralArea();
     void configurarEstilosMenu();
     void activarBoton(QPushButton* btn); // <--- Declaración añadida que soluciona tu error
+
+    void reajustarDisposicion();
+    void programarReajuste();
 
     QFrame *m_sidebar = nullptr;
     QStackedWidget *m_contenedorVistas = nullptr;
@@ -62,4 +71,7 @@ private:
 
     /// Núcleo de datos del cliente, inyectado por el arranque (no lo posee).
     NucleoDatos* m_nucleo = nullptr;
+
+    // Evita acumular varios reajustes diferidos del mismo cambio de estado.
+    bool m_reajustePendiente = false;
 };

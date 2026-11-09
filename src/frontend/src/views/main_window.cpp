@@ -33,6 +33,10 @@
 #include <QJsonObject>
 #include <QVariant>
 #include <QSettings>
+#include <QEvent>
+#include <QLayout>
+#include <QScreen>
+#include <QTimer>
 
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
@@ -57,7 +61,13 @@ void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Liceo Nacional Robert Serra - Gestión");
-    resize(1280, 720);
+    // Tamano inicial acotado al area disponible: 1280x720 fijos se salian por
+    // los laterales en portatiles y con escalado de pantalla. El arranque real
+    // muestra la ventana maximizada (ver aplicacion_frontend.cpp).
+    const QRect disponible = screen() ? screen()->availableGeometry()
+                                      : QRect(0, 0, 1280, 720);
+    resize(qBound(640, disponible.width() - 40, 1280),
+           qBound(480, disponible.height() - 40, 720));
 
     QWidget *centralWidget = new QWidget(this);
     centralWidget->setObjectName("FondoPrincipal");
@@ -109,6 +119,49 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     bool darkMode = settings.value("darkMode", false).toBool();
     aplicarTemaGlobal(darkMode);
     mostrarInicio();
+}
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    QMainWindow::changeEvent(event);
+    if (event && event->type() == QEvent::WindowStateChange)
+        programarReajuste();
+}
+
+void MainWindow::programarReajuste()
+{
+    if (m_reajustePendiente)
+        return;
+    m_reajustePendiente = true;
+    // Windows comunica el cambio de estado antes de aplicar el area cliente
+    // definitiva. Reajustar en el siguiente ciclo del bucle de eventos evita
+    // que algunos paneles conserven el tamano anterior hasta restaurar y
+    // volver a maximizar.
+    QTimer::singleShot(0, this, [this]() {
+        m_reajustePendiente = false;
+        reajustarDisposicion();
+    });
+}
+
+void MainWindow::reajustarDisposicion()
+{
+    if (QWidget* central = centralWidget()) {
+        if (QLayout* lay = central->layout())
+            lay->activate();
+    }
+
+    if (m_contenedorVistas) {
+        if (QLayout* lay = m_contenedorVistas->layout())
+            lay->activate();
+        if (QWidget* actual = m_contenedorVistas->currentWidget()) {
+            if (QLayout* lay = actual->layout())
+                lay->activate();
+            actual->updateGeometry();
+        }
+        m_contenedorVistas->updateGeometry();
+    }
+
+    update();
 }
 
 void MainWindow::setupSidebar() {

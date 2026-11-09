@@ -172,11 +172,17 @@ void TeacherListWidget::setupUi()
 
     auto* titulo = new QLabel(QStringLiteral("Gestión de Docentes"), leftWidget);
     titulo->setObjectName(QStringLiteral("TeacherTitle"));
+    titulo->setWordWrap(true);
+    titulo->setMinimumWidth(0);
 
     auto* subtitulo = new QLabel(
         QStringLiteral("Administra la información, disponibilidad y materias del personal académico"),
         leftWidget);
     subtitulo->setObjectName(QStringLiteral("TeacherSub"));
+    // Sin ajuste de linea el texto impone su ancho completo como minimo y la
+    // ventana no puede encogerse ni maximizarse dentro de la pantalla.
+    subtitulo->setWordWrap(true);
+    subtitulo->setMinimumWidth(0);
 
     textLayout->addWidget(titulo);
     textLayout->addWidget(subtitulo);
@@ -214,7 +220,9 @@ void TeacherListWidget::setupUi()
     // ── Columna derecha: pestañas de la ficha ─────────────────────────────
     auto* rightPanel = new QFrame(this);
     rightPanel->setObjectName(QStringLiteral("TeacherRightPanel"));
-    rightPanel->setMinimumWidth(520);
+    // Minimo holgado pero no rigido: 520 px impedia encajar la vista en
+    // portatiles y en pantallas con escalado.
+    rightPanel->setMinimumWidth(340);
     rightPanel->setMaximumWidth(640);
 
     auto* rightLayout = new QVBoxLayout(rightPanel);
@@ -223,6 +231,8 @@ void TeacherListWidget::setupUi()
 
     m_detalleNombre = new QLabel(QStringLiteral("Detalles del Docente"), rightPanel);
     m_detalleNombre->setObjectName(QStringLiteral("DetailTitle"));
+    m_detalleNombre->setWordWrap(true);
+    m_detalleNombre->setMinimumWidth(0);
     m_detalleNombre->setAlignment(Qt::AlignHCenter);
     rightLayout->addWidget(m_detalleNombre);
 
@@ -258,6 +268,7 @@ void TeacherListWidget::setupUi()
     m_gridDisponibilidad->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
     m_gridDisponibilidad->verticalHeader()->setDefaultSectionSize(28);
     m_gridDisponibilidad->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_gridDisponibilidad->horizontalHeader()->setMinimumSectionSize(40);
     m_gridDisponibilidad->horizontalHeader()->setMinimumHeight(30);
     // Retícula visible: sin ella las celdas parecen un panel único hasta que se
     // pinta una. `gridline-color` se ajusta por tema en `actualizarTema`.
@@ -276,6 +287,10 @@ void TeacherListWidget::setupUi()
                                   .arg(color));
         auto* label = new QLabel(texto, padre);
         label->setObjectName(QStringLiteral("TeacherLegendText"));
+        label->setMinimumWidth(0);
+        // La leyenda es decorativa: si falta espacio debe encogerse en vez de
+        // imponer el ancho del texto a toda la columna derecha.
+        label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
         fila->addWidget(swatch);
         fila->addWidget(label);
     };
@@ -307,6 +322,7 @@ void TeacherListWidget::setupUi()
     m_gridPreferencias->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
     m_gridPreferencias->verticalHeader()->setDefaultSectionSize(28);
     m_gridPreferencias->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_gridPreferencias->horizontalHeader()->setMinimumSectionSize(40);
     m_gridPreferencias->horizontalHeader()->setMinimumHeight(30);
     m_gridPreferencias->setShowGrid(true);
     m_gridPreferencias->setGridStyle(Qt::SolidLine);
@@ -340,6 +356,8 @@ void TeacherListWidget::setupUi()
 
     auto* lblTit = new QLabel(QStringLiteral("Materias que dicta (titular):"), pageAsig);
     lblTit->setObjectName(QStringLiteral("TeacherSectionTitle"));
+    lblTit->setWordWrap(true);
+    lblTit->setMinimumWidth(0);
     layAsig->addWidget(lblTit);
 
     m_listTitulares = new QListWidget(pageAsig);
@@ -362,6 +380,8 @@ void TeacherListWidget::setupUi()
 
     auto* lblSup = new QLabel(QStringLiteral("Materias en las que puede ser suplente:"), pageAsig);
     lblSup->setObjectName(QStringLiteral("TeacherSectionTitle"));
+    lblSup->setWordWrap(true);
+    lblSup->setMinimumWidth(0);
     layAsig->addWidget(lblSup);
 
     m_listSuplentes = new QListWidget(pageAsig);
@@ -387,6 +407,10 @@ void TeacherListWidget::setupUi()
 
     m_estadoGuardado = new QLabel(QStringLiteral("Selecciona un docente"), m_panelGuardado);
     m_estadoGuardado->setObjectName(QStringLiteral("TeacherStatus"));
+    // El estado puede envolverse: asi su texto no ensancha la barra de guardado
+    // por encima del panel cuando la ventana es estrecha.
+    m_estadoGuardado->setWordWrap(true);
+    m_estadoGuardado->setMinimumWidth(0);
 
     m_btnDescartar = new QPushButton(QStringLiteral("Descartar cambios"), m_panelGuardado);
     m_btnDescartar->setObjectName(QStringLiteral("TeacherDiscardButton"));

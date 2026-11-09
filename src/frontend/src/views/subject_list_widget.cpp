@@ -126,9 +126,13 @@ void SubjectListWidget::setupUi() {
 
     m_titulo = new QLabel("Gestión de Asignaturas", this);
     m_titulo->setObjectName("SubjectTitle");
+    m_titulo->setWordWrap(true);
+    m_titulo->setMinimumWidth(0);
 
     m_subtitulo = new QLabel("Administra las asignaturas y su tipo de aula", this);
     m_subtitulo->setObjectName("SubjectSub");
+    m_subtitulo->setWordWrap(true);
+    m_subtitulo->setMinimumWidth(0);
 
     textLayout->addWidget(m_titulo);
     textLayout->addWidget(m_subtitulo);
@@ -229,7 +233,8 @@ void SubjectListWidget::setupUi() {
     // ==========================================
     QFrame *sidePanel = new QFrame(this);
     sidePanel->setObjectName("SubjectSidePanel");
-    sidePanel->setFixedWidth(310);
+    sidePanel->setMinimumWidth(220);
+    sidePanel->setMaximumWidth(310);
 
     QVBoxLayout *sideLayout = new QVBoxLayout(sidePanel);
     sideLayout->setContentsMargins(24, 28, 24, 28);
@@ -237,6 +242,7 @@ void SubjectListWidget::setupUi() {
 
     QLabel *summaryTitle = new QLabel("Controles de Resumen", sidePanel);
     summaryTitle->setObjectName("SummaryTitle");
+    summaryTitle->setWordWrap(true);
     sideLayout->addWidget(summaryTitle);
 
     QHBoxLayout *occupancyLayout = new QHBoxLayout();
@@ -268,6 +274,7 @@ void SubjectListWidget::setupUi() {
 
     QLabel *notifTitle = new QLabel("Notificaciones Recientes", sidePanel);
     notifTitle->setObjectName("NotifTitle");
+    notifTitle->setWordWrap(true);
     sideLayout->addWidget(notifTitle);
 
     // Contenedor dinámico de notificaciones
