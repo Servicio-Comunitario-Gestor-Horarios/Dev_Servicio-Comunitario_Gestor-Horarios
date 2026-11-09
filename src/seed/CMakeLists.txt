@@ -1,9 +1,9 @@
 # src/seed/CMakeLists.txt
 # ===
-# Módulo seed: datos de prueba del centro (Plan de Estudio 31059).
+# Módulo seed: el centro real del Liceo Nacional Robert Serra (2026/2027).
 #
-# Biblioteca estática con el perfil, las variantes de docentes y el aplicador.
-# No depende de OR-Tools ni de Qt Widgets: enlaza `datos` (que arrastra
+# Biblioteca estática con el perfil del conjunto, la plantilla de docentes y el
+# aplicador. No depende de OR-Tools ni de Qt Widgets: enlaza `datos` (que arrastra
 # `backend` + Qt6 Core/Sql) para persistir el centro en la base.
 #
 # Dependencias:

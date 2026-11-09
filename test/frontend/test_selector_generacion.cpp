@@ -298,7 +298,7 @@ private slots:
 
             PreferenciasDocenteUI::Preferencia preferencia;
             preferencia.turno = QStringLiteral("Tarde");
-            preferencia.plan = QStringLiteral("NAT");
+            preferencia.plan = QStringLiteral("31059");
             preferencia.anio = 2;
             PreferenciasDocenteUI::guardar(idSegundo, preferencia);
 
@@ -306,7 +306,7 @@ private slots:
             QCOMPARE(qobject_cast<QComboBox*>(tabla->cellWidget(1, 3))->currentText(),
                      QStringLiteral("Tarde"));
             QCOMPARE(qobject_cast<QComboBox*>(tabla->cellWidget(1, 4))->currentText(),
-                     QStringLiteral("NAT"));
+                     QStringLiteral("31059"));
             auto* aniosSegundo = qobject_cast<ComboMultiple*>(tabla->cellWidget(1, 5));
             QVERIFY(aniosSegundo);
             QCOMPARE(aniosSegundo->datosSeleccionados(), QVariantList{2});

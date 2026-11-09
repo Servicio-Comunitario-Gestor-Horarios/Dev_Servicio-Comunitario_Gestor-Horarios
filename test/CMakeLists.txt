@@ -200,11 +200,12 @@ if(TARGET frontend AND TARGET backend)
 						${CMAKE_SOURCE_DIR}/src/frontend/src)
 	endif()
 
-	# Integración: composición de la entrada + solver con los datos sembrados.
-	if(TARGET backend_solver AND TARGET seed)
-		add_qtest(test_generacion_seed frontend/test_generacion_seed.cpp
-						frontend backend_solver seed Qt6::Sql)
-		target_include_directories(test_generacion_seed PRIVATE
+	# Composición de la entrada del solver con el centro real, sin resolver (017-T4):
+	# compone los 24 cursos con plan/turno/matrícula, valida V1–V19 y hace ida y vuelta
+	# del preset; no genera (el conjunto aún no es generable hasta el aforo simultáneo).
+	if(TARGET seed)
+		add_qtest(test_entrada_seed frontend/test_entrada_seed.cpp frontend seed Qt6::Sql)
+		target_include_directories(test_entrada_seed PRIVATE
 						${CMAKE_SOURCE_DIR}/src/frontend/src)
 	endif()
 endif()

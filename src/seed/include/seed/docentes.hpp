@@ -1,7 +1,5 @@
 #pragma once
 
-#include <optional>
-
 #include <QString>
 #include <QStringList>
 #include <QTime>
@@ -11,61 +9,50 @@
 
 namespace seed {
 
-/// Las cuatro variantes de profesorado del conjunto (spec 008, RF-6/RF-7/RF-8).
-enum class VarianteDocentes {
-    Holgada,
-    Suplentes,
-    SinProfesorado,
-    SinDisponibilidad,
-};
-
 /// Franja de disponibilidad de un docente: día (1 = lunes … 5 = viernes) y rango horario.
 struct FranjaDef {
-    int dia;
+    int dia = 0;
     QTime inicio;
     QTime fin;
 };
 
-/// Docente de una variante: identidad, contacto, materias asignadas, disponibilidad
-/// (5 filas, lunes–viernes) y tope de horas de aula (`horasAula` vive en el preset; se
-/// declara en el perfil solo para comprobar la carga/cobertura, RF-6/RF-7).
+/// Docente del centro: identidad, contacto, turno (del perfil, no persistido), materias
+/// asignadas, disponibilidad (5 filas, lunes–viernes) y tope de horas de aula (`horasAula`
+/// = 36 horas académicas para todos, D-3).
 struct DocenteDef {
     QString id;
     QString nombre;
     QString email;
     QString telefono;
-    QStringList materias;
-    QVector<FranjaDef> disponibilidad;
-    int horasAula;
+    QString turno;             ///< «Mañana» o «Tarde»: vive en el perfil y no se persiste
+    QStringList materias;      ///< materias-año del catálogo asignadas
+    QVector<FranjaDef> disponibilidad; ///< 5 filas, una por día, con la ventana del turno
+    int horasAula = 0;         ///< tope de horas académicas de aula (36)
 };
 
-/// Genera la plantilla de una variante (determinista, RF-11). El `perfil` aporta las cargas
-/// para calcular el tope de los titulares de la variante de suplentes.
-QVector<DocenteDef> docentesDeVariante(const Perfil& perfil, VarianteDocentes variante);
+/// Los 32 docentes del conjunto (30 posiciones del centro con nombres ficticios y 2
+/// añadidos para las materias sin carga de D-4), deterministas y en orden fijo (P001…P032).
+/// Aplica la regla de asignación del plan §5.4: todas las materias-año del área de cada
+/// posición, una sola vez, sin filtrar por año y solo si el área tiene cursos en el turno
+/// del docente. Pura: no lee reloj, disco ni configuración.
+QVector<DocenteDef> docentesDelCentro(const Perfil& perfil);
 
-/// Recuentos esperados del conjunto aplicado (RF-12): 2 turnos, 2 eventos, 3 tipos de aula,
-/// 16 aulas, 57
-/// materias, 4 planes, 210 materias de plan, 13 cursos y, según la variante, docentes,
-/// materias asignadas y disponibilidades. Determinista y pura: se usa para contrastar lo
-/// escrito en la base (RF-12) sin recalcular a mano los recuentos de profesorado.
-Recuentos recuentosEsperados(const Perfil& perfil, VarianteDocentes variante);
+/// Recuentos esperados del conjunto aplicado (plan §4.8): 2 turnos, 3 eventos, 2 tipos de
+/// aula (general + cancha), 13 aulas, 85 materias, 2 planes, 95 cargas, 24 cursos, 32
+/// docentes, 272 asignaciones, 160 disponibilidades, 0 preferencias, duración 40 y 1 fila
+/// de configuración. Determinista y pura: contrasta lo escrito en la base (RF-8).
+Recuentos recuentosEsperados(const Perfil& perfil);
 
-/// Comprueba la cobertura de una variante a nivel de datos: cada materia-año tiene ≥1 docente
-/// asignado y, para cada uno de los dos turnos, ≥1 docente de esa materia con un rango que
-/// contiene un bloque completo del turno (fronteras `inicio + k×40`). Devuelve la primera
-/// materia-año que falla en `error`.
-bool coberturaDeVariante(const Perfil& perfil, VarianteDocentes variante, QString* error);
+/// Valida la plantilla de docentes (RF-6, plan §6.10): 32 docentes, identidades y contactos
+/// únicos, tope de 36 horas de aula, turno declarado y 16 por turno, 5 filas de
+/// disponibilidad en los días 1–5 dentro de la ventana de su turno y 272 asignaciones a
+/// materias del catálogo. Deja en `error` el primer problema encontrado, en español.
+bool validarDocentes(const Perfil& perfil, const QVector<DocenteDef>& docentes, QString* error);
 
-/// Comprueba las restricciones de carga de una variante (RF-6/RF-7): holgada ≤ 0,6×tope;
-/// suplentes con cada titular ≥ 0,8×tope, ratio carga/tope en [1,00, 1,15] y Σ topes entre el
-/// 85 % y el 90 % de la demanda; las inválidas heredan la relación de la holgada. Pura.
-bool docentesCumplenCarga(const Perfil& perfil, VarianteDocentes variante, QString* error);
-
-/// Nombre legible de la variante («holgada», «suplentes», «sin profesorado»,
-/// «sin disponibilidad»).
-QString nombreVariante(VarianteDocentes variante);
-
-/// Convierte texto a variante (acepta con guiones: «sin-profesorado»). Nulo si no existe.
-std::optional<VarianteDocentes> varianteDesdeTexto(const QString& texto);
+/// Comprueba la cobertura a nivel de datos (RF-6): cada materia del catálogo tiene al menos
+/// un docente asignado y cada materia de cada curso tiene docente habilitado **en el turno
+/// de ese curso**. Deja en `error` la primera materia descubierta.
+bool coberturaDelCentro(const Perfil& perfil, const QVector<DocenteDef>& docentes,
+                        QString* error);
 
 } // namespace seed

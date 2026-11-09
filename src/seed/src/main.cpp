@@ -11,9 +11,9 @@
 
 namespace {
 
-/// Código de salida del proceso para cada estado de la aplicación (plan 008 §7):
+/// Código de salida del proceso para cada estado de la aplicación:
 /// 0 ok · 1 uso · 2 base con datos · 3 confirmación requerida · 4 respaldo fallido ·
-/// 5 apertura/esquema · 6 variante desconocida · 7 escritura · 8 perfil incoherente.
+/// 5 apertura/esquema · 7 escritura · 8 perfil incoherente.
 int codigoSalida(seed::EstadoAplicacion estado) {
     using Estado = seed::EstadoAplicacion;
     switch (estado) {
@@ -24,42 +24,39 @@ int codigoSalida(seed::EstadoAplicacion estado) {
     case Estado::RespaldoFallido:      return 4;
     case Estado::EsquemaNoEsperado:    return 5;
     case Estado::FalloApertura:        return 5;
-    case Estado::VarianteDesconocida:  return 6;
     case Estado::FalloEscritura:       return 7;
     case Estado::PerfilIncoherente:    return 8;
     }
     return 1;
 }
 
-/// Ayuda de la CLI (RF-13): lista todas las opciones y sus efectos.
+/// Ayuda de la CLI (RF-1): lista todas las opciones y sus efectos.
 void imprimirUso(QTextStream& salida) {
-    salida << "Uso: gestor-horarios-seed --db <ruta> [--variante <v>]\n"
-              "                     [--reemplazar | --solo-docentes] [--si] [--ayuda] [--version]\n"
+    salida << "Uso: gestor-horarios-seed --db <ruta> [--reemplazar] [--si] [--ayuda] [--version]\n"
               "\n"
-              "Puebla una base con el centro de datos de prueba (Plan de Estudio 31059).\n"
+              "Puebla una base con el centro real del Liceo Nacional Robert Serra (2026/2027):\n"
+              "2 planes (31059 y 31060), 24 cursos en dos turnos, 12 aulas y una cancha,\n"
+              "32 docentes y la hora académica de 40 min. Es un conjunto único: no hay\n"
+              "variantes de docentes ni planes derivados.\n"
+              "\n"
+              "El conjunto NO se declara generable: la Educación Física necesita 48 clases por\n"
+              "turno en la cancha y solo hay 40 franjas (aforo simultáneo pendiente de su spec).\n"
               "\n"
               "Opciones:\n"
               "  --db <ruta>      Base de destino (obligatoria; se crea si no existe).\n"
-              "  --variante <v>   Variante de docentes: holgada (por defecto), suplentes,\n"
-              "                   sin-profesorado o sin-disponibilidad.\n"
               "  --reemplazar     Reemplazo total (borra y repuebla; exige --si y respaldo).\n"
-              "  --solo-docentes  Recarga solo docentes, sus materias y su disponibilidad\n"
-              "                   (exige --si y respaldo).\n"
               "  --si             Confirma la operación destructiva (sin terminal interactiva).\n"
               "  --ayuda          Muestra esta ayuda.\n"
               "  --version        Muestra la versión.\n";
 }
 
-/// Informe completo de la aplicación (RF-12, plan §8): la línea de base, el informe
-/// determinista de `resumenTexto` (variante, recuentos, materias por año y totales por plan),
-/// la ruta del respaldo si lo hubo y `ok`.
+/// Informe completo de la aplicación (RF-8): la línea de base, el informe determinista de
+/// `resumenTexto` (hora académica, recuentos, materias por año y totales por plan), la ruta
+/// del respaldo si lo hubo y `ok`.
 void imprimirResumen(QTextStream& salida, const seed::OpcionesAplicacion& opciones,
                      const seed::ResultadoAplicacion& resultado) {
     salida << "Base: " << opciones.rutaDb << '\n';
-    salida << seed::resumenTexto(seed::perfilPorDefecto(), opciones.variante,
-                                 resultado.recuentos, resultado.duracionMinutos,
-                                 resultado.configuraciones)
-           << '\n';
+    salida << seed::resumenTexto(seed::perfilPorDefecto(), resultado.recuentos) << '\n';
     if (resultado.rutaRespaldo.isEmpty()) {
         salida << "Respaldo: no aplica\n";
     } else {
@@ -81,27 +78,15 @@ int main(int argc, char* argv[]) {
     seed::OpcionesAplicacion opciones;
     QString rutaDb;
     bool ayuda = false;
-    bool salir = false;   // ya se decidió el desenlace (--version, uso inválido, variante…)
+    bool salir = false;   // ya se decidió el desenlace (--version, uso inválido…)
     int codigo = 0;
 
     for (int i = 1; i < argumentos.size() && !salir; ++i) {
         const QString& arg = argumentos[i];
         if (arg == QStringLiteral("--db") && i + 1 < argumentos.size()) {
             rutaDb = argumentos[++i];
-        } else if (arg == QStringLiteral("--variante") && i + 1 < argumentos.size()) {
-            const QString texto = argumentos[++i];
-            const auto variante = seed::varianteDesdeTexto(texto);
-            if (!variante.has_value()) {
-                error << "Variante de docentes desconocida: «" << texto << "»\n";
-                codigo = codigoSalida(seed::EstadoAplicacion::VarianteDesconocida);
-                salir = true;
-            } else {
-                opciones.variante = *variante;
-            }
         } else if (arg == QStringLiteral("--reemplazar")) {
             opciones.reemplazarTodo = true;
-        } else if (arg == QStringLiteral("--solo-docentes")) {
-            opciones.soloDocentes = true;
         } else if (arg == QStringLiteral("--si")) {
             opciones.confirmado = true;
         } else if (arg == QStringLiteral("--ayuda") || arg == QStringLiteral("--help") ||

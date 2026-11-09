@@ -11,7 +11,9 @@ namespace seed {
 /// Entrada del catálogo: un área de formación en un año concreto («Castellano 1º»).
 struct MateriaAnio {
     QString nombre;
-    int anio;
+    int anio = 0;
+    QString area;              ///< área de formación exacta del catálogo (nombre completo)
+    bool sinCarga = false;     ///< materia de las áreas excluidas de todo plan (excepción de D-4)
 };
 
 /// Enlace plan-materia: una materia-año con su carga semanal en horas académicas.
@@ -34,10 +36,10 @@ struct AulaDef {
     int capacidad;
     QString edificio;
     QString piso;
-    QString tipo;              ///< tipo del catálogo de tipos de aula (RF-6, RF-10)
+    QString tipo;              ///< tipo del catálogo de tipos de aula (RF-5)
 };
 
-/// Evento del turno (RF-1, RF-10): suceso con nombre que ocupa tiempo tras la k-ésima franja.
+/// Evento del turno (RF-7): suceso con nombre que ocupa tiempo tras la k-ésima franja.
 struct EventoDef {
     QString nombre;            ///< nombre del suceso («Receso», «Acto cívico»…)
     int despuesDeSlot = 0;     ///< posición 1..numSlots (después de la k-ésima franja)
@@ -55,38 +57,46 @@ struct TurnoDef {
     QVector<EventoDef> eventos; ///< eventos del turno, en el orden en que se declaran
 };
 
-/// Curso de un año y sección, sin turno (el turno lo aporta el preset).
+/// Curso del centro: año, sección, turno y aula de referencia (lo persistido) más el plan
+/// y la matrícula, que viven solo en el perfil (RF-4).
 struct CursoDef {
-    int anio;
+    int anio = 0;
     QString seccion;
     QString aula;
+    QString plan;              ///< plan del curso en el perfil; no se persiste
+    QString turno;             ///< turno del curso; se persiste en `Cursos.turno`
+    int matricula = 0;         ///< alumnos del grupo (32–44); no se persiste
 };
 
-/// Conjunto de datos de prueba del centro.
+/// Conjunto de datos de prueba del centro (Liceo Nacional Robert Serra, 2026/2027).
 struct Perfil {
-    QStringList          tiposAula; ///< catálogo declarado: 2 («Laboratorio» y «Taller»); el general lo pone el esquema
-    QVector<TurnoDef>    turnos;   ///< 2 (se rellena en 008-T3)
-    QVector<AulaDef>     aulas;    ///< 16 (se rellena en 008-T3)
-    QVector<MateriaAnio> materias; ///< 51 del 31059 (57 con las nuevas en 008-T2)
-    QVector<PlanDef>     planes;   ///< 4 (General en T1; derivados en 008-T2)
-    QVector<CursoDef>    cursos;   ///< 13 (se rellena en 008-T3)
+    QStringList          tiposAula; ///< catálogo declarado: 1 («Cancha»); el general lo pone el esquema
+    QVector<TurnoDef>    turnos;   ///< 2 (Mañana y Tarde)
+    QVector<AulaDef>     aulas;    ///< 13 (12 generales y una cancha)
+    QVector<MateriaAnio> materias; ///< 85 (79 con carga y 6 sin carga)
+    QVector<PlanDef>     planes;   ///< 2 (31059 y 31060)
+    QVector<CursoDef>    cursos;   ///< 24 (12 en cada turno)
+    int duracionMinutos = 0;       ///< duración de la hora académica (configuración): 40
 };
 
-/// Recuentos por entidad del conjunto aplicado (RF-12, RF-10 de la 009). Se leen de la base
-/// tras el commit, no del perfil, para que el informe verifique lo escrito (plan §8).
+/// Recuentos por entidad del conjunto aplicado (RF-8). Se leen de la base tras el commit
+/// (más la duración y su fila de configuración), no del perfil, para que el informe
+/// verifique lo escrito (plan §7).
 struct Recuentos {
     int turnos = 0;            ///< filas de Turnos (2)
-    int eventos = 0;           ///< filas de Eventos (2)
-    int tiposAula = 0;         ///< filas de TiposAula (3)
-    int aulas = 0;             ///< filas de Aulas (16)
-    int materias = 0;          ///< filas de Materias (57)
-    int planes = 0;            ///< filas de PlanEstudio (4)
-    int planMaterias = 0;      ///< filas de PlanEstudio_Materia (210)
-    int cursos = 0;            ///< filas de Cursos (13)
-    int docentes = 0;          ///< filas de Profesores
-    int asignaciones = 0;      ///< filas de Profesor_Materia
-    int disponibilidades = 0;  ///< filas de Disponibilidad_Profesor
+    int eventos = 0;           ///< filas de Eventos (3)
+    int tiposAula = 0;         ///< filas de TiposAula (2: general y cancha)
+    int aulas = 0;             ///< filas de Aulas (13)
+    int materias = 0;          ///< filas de Materias (85)
+    int planes = 0;            ///< filas de PlanEstudio (2)
+    int planMaterias = 0;      ///< filas de PlanEstudio_Materia (95)
+    int cursos = 0;            ///< filas de Cursos (24)
+    int docentes = 0;          ///< filas de Profesores (32)
+    int asignaciones = 0;      ///< filas de Profesor_Materia (272)
+    int disponibilidades = 0;  ///< filas de Disponibilidad_Profesor (160)
     int preferencias = 0;      ///< filas de Preferencia_Profesor (0: el conjunto no las siembra)
+    int duracionMinutos = 0;   ///< duración efectiva de la hora académica (40)
+    int configuraciones = 0;   ///< filas de ConfiguracionHoraria (1)
 };
 
 /// Identidad: 1 hora académica = 1 bloque (sin conversión ni redondeo). Pura.
@@ -98,42 +108,47 @@ int horasDeAnio(const PlanDef& plan, int anio);
 /// Suma de bloques (coinciden con las horas) de un plan en un año; -1 si no tiene ese año. Pura.
 int bloquesDeAnio(const PlanDef& plan, int anio);
 
-/// Secciones de un año: 3 en 1.º–3.º y 2 en 4.º–5.º. Pura.
-int seccionesDeAnio(int anio);
-
-/// ¿Es una de las 6 materias nuevas de un plan derivado? (no son áreas del 31059 y no
-/// añaden demanda, RF-3). Pura.
-bool esMateriaNueva(const QString& nombre);
-
-/// Tipo de aula que pide una materia por su área (prefijo, no nombre exacto): ciencias
-/// experimentales (Física, Química, Biología, Ciencias Naturales y Ciencias de la Tierra,
-/// incluidas las «Aplicada») → «Laboratorio»; informática/taller → «Taller»; Educación
-/// Física → «Cancha»; el resto → el tipo general (RF-10). Pura.
+/// Tipo de aula que pide una materia por su área: Educación Física exige «Cancha»; el resto,
+/// el tipo general del esquema (RF-3). Pura.
 QString tipoEspecializadoDeMateria(const QString& nombre);
 
 /// Tipo final de una materia: el especializado de su área si el conjunto tiene al menos un
-/// aula de ese tipo; en caso contrario, el tipo general (N1, RF-10). Pura.
+/// aula de ese tipo; en caso contrario, el tipo general (RF-3). Pura.
 QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas);
 
-/// Horas máximas de una materia entre los planes que la incluyen (0 si no la incluye ninguno).
-/// Pura.
-int horasMaximas(const Perfil& perfil, const QString& materia);
+/// Horas académicas de un curso: suma de las cargas del plan del curso en su año; -1 si el
+/// perfil no declara ese plan (plan §5.1). Pura.
+int horasDeCurso(const Perfil& perfil, const CursoDef& curso);
 
-/// Carga de una materia-año = horasMaximas × secciones del año; **0** para las 6 materias
-/// nuevas (sustituyen horas base y no añaden demanda, RF-3). Pura.
-int cargaMateria(const Perfil& perfil, const QString& materia);
-
-/// Σ cargaMateria de las materias de un docente. Pura.
-int cargaAsignada(const Perfil& perfil, const QStringList& materias);
-
-/// Demanda total = 13 cursos × 40 = 520; coincide con Σ cargaMateria del catálogo. Pura.
+/// Demanda total del centro: Σ horasDeCurso de los 24 cursos (876); -1 si un curso declara
+/// un plan inexistente. Pura.
 int demandaTotal(const Perfil& perfil);
+
+/// Demanda de un turno: Σ horasDeCurso de sus cursos (mañana 414, tarde 462); -1 si un curso
+/// declara un plan inexistente o el turno no existe. Pura.
+int demandaPorTurno(const Perfil& perfil, const QString& turno);
+
+/// ¿Tiene el área algún curso en el turno dado? (Regla de asignación de docentes, plan §5.3.)
+/// Pura.
+bool areaConCursosEnTurno(const Perfil& perfil, const QString& area, const QString& turno);
+
+/// Demanda de un área en un turno: Σ horas de las materias del área en los planes de los
+/// cursos de ese turno (Educación Física: 48 por turno). -1 si el turno no existe o un curso
+/// declara un plan inexistente. Pura.
+int demandaDeAreaPorTurno(const Perfil& perfil, const QString& area, const QString& turno);
+
+/// Motivo por el que el conjunto **no se declara generable** (RF-9, plan §5.5): la Educación
+/// Física de cada turno necesita más clases que franjas de cancha con aforo 1. Devuelve el
+/// primer turno que no cabe, con sus cifras, o "" si el conjunto cabría. No es validación:
+/// la aplicación no falla por esto. Pura.
+QString motivoNoGenerable(const Perfil& perfil);
 
 /// Perfil por defecto, construido una sola vez e inmutable. No lee reloj, disco ni configuración.
 const Perfil& perfilPorDefecto();
 
-/// Valida la coherencia del perfil (catálogo, planes y aulas) y deja en `error` el primer
-/// problema encontrado, en español e identificando plan/año/materia. Pura.
+/// Valida la coherencia del perfil (planes, catálogo, cursos, aulas, turnos y duración) y deja
+/// en `error` el primer problema encontrado, en español e identificando plan/año/curso/área y
+/// el valor recibido. Pura.
 bool validarPerfil(const Perfil& perfil, QString* error);
 
 } // namespace seed
