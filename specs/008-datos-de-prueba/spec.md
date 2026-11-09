@@ -2,6 +2,23 @@
 
 Estado: implementada (2026-10-17)
 
+> **Sustituida en sus datos por la 017 (2026-11-08).** El conjunto de datos de prueba pasa a ser el **centro
+> real** (Liceo Nacional Robert Serra, 2026/2027): **2 planes** (31059 y 31060), **85 materias** (79 con
+> carga y 6 sin carga), **24 cursos con turno**, **13 aulas** (12 de uso general compartidas entre turnos
+> + 1 cancha), **32 docentes** y **hora académica de 40 min** (07:00–12:40 y 12:40–18:10). Se **retiran
+> las cuatro variantes de docentes** (holgada, suplentes, sin profesorado y sin disponibilidad) y los **tres
+> planes derivados** (EXA/NAT/SOC), con su conmutación. Quedan **superados** de esta spec: **«cada curso un
+> aula propia y distinta»** (12 aulas para 24 cursos, **compartidas entre turnos**), los **cursos sembrados
+> sin turno** (ahora el **turno es dato del curso** y se persiste) y la **ventana de mañana 07:00–12:30**,
+> que pasa a **07:00–12:40** por el **acto cívico** (8 × 40 + 10 + 10). El conjunto **no se declara
+> generable** hasta que exista el **aforo simultáneo** de la cancha: **48 clases de Educación Física por
+> turno frente a 40 franjas de cancha** (con aforo ×2: 96 ≤ 160 y 48 ≤ 80).
+>
+> **Sigue vigente** lo que no es dato del centro: las garantías de **aplicación segura** (base de destino
+> obligatoria, fallo si hay datos, confirmación explícita y **respaldo previo obligatorio**), el **reemplazo
+> total atómico** en una **transacción única** y el **determinismo**. El detalle está en
+> `specs/017-datos-reales-del-centro/`.
+
 > **Anotado por la 015 (2026-11-05).** La fila del tipo general no cuenta como dato de dominio; el
 > recuento de tipos es 3 y se lee de la base; el perfil no declara «Aula de estudio» (015, RF-5).
 
