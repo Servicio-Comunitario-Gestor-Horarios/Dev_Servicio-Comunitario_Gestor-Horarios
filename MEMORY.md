@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** **014 (materias en bloques de dos horas)** **implementada y cerrada (2026-11-07)**; la **013** (preferencias) cerrada el 2026-11-06 y commiteada en `2eb45ec`; la 015/016 (tipo general, **esquema v6**) cerradas en `c7b9427`. Suites **61/61** (`backend`) y **66/66** (`full-release`) en el host.
-- **Fecha:** 2026-11-07
-- **Rama:** `feat/Motor`, `HEAD` = `bf06df6` (commit «backup» del usuario). La **014** está **en el árbol, sin commitear** (spec, código, tests, docs y esta nota).
-- **Specs en curso:** ninguna. Siguientes: **seed con los planes reales de `seed.md`**, **aforo simultáneo por aula (cancha)** y **rendimiento/descomposición**.
-- **Siguiente paso:** la **seed** con los planes reales, la spec de **aforo simultáneo**, la de **rendimiento** y **decidir los commits** de la 014. La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
+- **Fase:** **017 (datos reales del centro)** **implementada y cerrada (2026-11-09)** con la validación **APROBADA**; la **014** cerrada el 2026-11-07 (`b5844b5`) y la **013** el 2026-11-06 (`2eb45ec`); 015/016 cerradas en `c7b9427` (esquema **v6**). Suites **61/61** (`backend`) y **66/66** (`full-release`) en el host.
+- **Fecha:** 2026-11-09
+- **Rama:** `feat/Motor`, `HEAD` = `b5844b5`. La **017** está **en el árbol, sin commitear** (spec, estado, plan, tareas, journal, seed nuevo, tests y guías).
+- **Specs en curso:** **ninguna**. Siguientes: **aforo simultáneo por aula (cancha ×2, fijado en 2)** y **rendimiento/descomposición**.
+- **Siguiente paso:** **decidir los commits** de la 017; después la spec de **aforo simultáneo** (la generación del centro real queda para ella, porque hoy **no genera**) y la de **rendimiento**. La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
 
 ## Specs activas
 
@@ -19,7 +19,7 @@
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
 | 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9) |
 | 005-nucleo-solver | aprobada | **implementada (2026-10-29)** (T1–T9 + T11; **T10 cerrada el 2026-10-29**) |
-| 008-datos-de-prueba | aprobada | **implementada** (T1–T9; 57 materias, 4 planes, 13 cursos, 4 variantes) |
+| 008-datos-de-prueba | aprobada | **implementada** (T1–T9) · **superada en datos por la 017 (2026-11-08)** |
 | 009-tipos-de-aula-y-eventos | aprobada (2026-10-23) | **implementada** (T1–T9; APROBADO 2026-10-24) |
 | 010-solver-tipos-y-eventos | aprobada (2026-10-23; cambio de requisitos 2026-10-26) | **implementada (2026-10-27)** (T1–T10 + T11–T16; APROBADO de la 2.ª entrega 2026-10-27) |
 | 011-horas-academicas | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T10; **T8 adelantada**; APROBADO 2026-10-29) |
@@ -28,6 +28,7 @@
 | 014-bloques-de-dos-horas | aprobada (2026-11-06) | **implementada y cerrada (2026-11-07)** (014a T1–T7 + 014b B1–B7; APROBADO 2026-11-07; sin commits) |
 | 015-tipo-general-en-el-esquema | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T8; APROBADO 2026-11-05; esquema **v6**) |
 | 016-tipo-general-comprobacion-y-cierre | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T9; APROBADO; T8 del planner) |
+| 017-datos-reales-del-centro | aprobada (2026-11-08) | **implementada y cerrada (2026-11-09)** (T1–T10; APROBADO 2026-11-09; sin commits) |
 
 > Épico **solver** (numeración real del trabajo): **004 → 005 → 008 → 009 → 010 → 011 → 012 (cerradas)** → **015 (tipo general en el esquema, cerrada el 2026-11-05, esquema v6)** → **016 (comprobación y cierre, cerrada el 2026-11-05)**; **013** (preferencias en el solver) aprobada y **re-baseada a v6**, sin implementar; **014** (materias en bloques de dos horas) planificada y sin escribir. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado**; la 007 queda además **descartada/diferida** por decisión del usuario (2026-11-04).
 
@@ -160,13 +161,15 @@
 
 - **Materias en bloques de dos horas (014, implementada y cerrada el 2026-11-07):** **S3 eliminada** (la 009-agrupación queda superada; la sustituyen el **emparejamiento** y la **alineación**). Reglas duras: bloques de **2 franjas adyacentes** por segmento, cada materia en **bloques enteros** salvo su resto, **un bloque por materia y día**, **misma aula** en el bloque, resto compartido entre dos materias impares del mismo tipo, y **huecos al final del día**. Blandas: **separación de un día** (prioridad alta) y **viernes** para los huecos. Causa **(5) conflicto de bloques** (total impar; 11 h o más). **8 workers** (misma entrada ⇒ horario **válido**, no idéntico) y **plazo del proceso 300 s** (002). **Centro real factible** con 30 docentes: **848 clases, desvío 0, separación 2**; **172,6 s** el centro y **183,58 s** el test lento. La **cancha** se confirma para **dos cursos simultáneos**; el **aforo simultáneo por aula** es **spec futura**. Deudas: test de aceptación con 30 docentes; aserciones por curso de huecos 6/4 y `bloquesCompartidos == 4` (opcional); `docs/solver/Tareas-Implementacion.md` conserva «<60 s» histórico.
 
+- **Datos reales del centro (017, implementada y cerrada el 2026-11-09):** el **conjunto de prueba pasa a ser el centro real** (Liceo Nacional Robert Serra, 2026/2027) y **sustituye** al sintético de la 008: **2 planes** (31059 **34/34/34/36/34** y 31060 **40×5**), **85 materias** (79 con carga + **6 sin carga**), **95 cargas**, **24 cursos con turno** (12 + 12; letras libres en 31060) con **matrícula 889** (579 + 310), **13 aulas** (12 de 44 **compartidas entre turnos** + **cancha** de 88), **32 docentes** (30 + 2 añadidos), **272 asignaciones** y **160 disponibilidades**, tope **36 h académicas**, **40 min** (07:00–12:40 / 12:40–18:10, receso ×2 + acto cívico) y **876 clases** (**96 de EF**, 48 por turno; 780 sin EF; 944 el plan completo). **Se retiran** las 4 variantes, los planes derivados y la conmutación; el **turno se persiste en el curso**; la duración es **configuración** y el conjunto la deja en **40**. **No genera** hasta el **aforo simultáneo** de la cancha (**48 > 40** franjas por turno; con aforo ×2, **96 ≤ 160**) y el informe lo declara (`Generable: no`). `test_generacion_seed` **se sustituye** por `test_entrada_seed` (compone y valida, **no resuelve**; el anterior se **borró**). Suites **61/61** y **66/66**; seed en **0,089–0,18 s**. **Deudas:** identidad (año, sección, plan), aforo simultáneo, el «no generable» **no** es función de interfaz en esta entrega, el **paquete demo** (`GESTOR_PACK_DEMO`/`datos-demo/`) **no** se regenera, y `seed.md` sigue versionado con nombres reales mientras el conjunto usa ficticios (`P001`–`P032`).
+
 ## Siguiente paso
 
-1. **Seed** con los planes reales de `seed.md`; después **aforo simultáneo por aula** y **rendimiento/descomposición**; y **decidir los commits** de la 014 (hoy en el árbol).
+1. **017 (datos reales) cerrada:** **decidir los commits** (hoy en el árbol); después **aforo simultáneo por aula** (cancha ×2, **fijado en 2**; 96 ≤ 160 y 48 ≤ 80 por turno) y **rendimiento/descomposición**.
 2. **Deudas del frontend:** **resueltas en `feat/frontend-generacion` (2026-11-01)** — builder con D, `huellaActual` cableado, selector de duración retirado, eventos en lugar de recesos, `test_generacion_seed` reescrito (35 min, rejilla del seed). Queda solo la **pantalla de gestión del catálogo de tipos de aula** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) y, de la 012, la **UI de preferencias** (solo API): ambas son funcionalidad nueva, no bloquean la compilación.
 3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; `feat/frontend-generacion` **sí la tiene** (viene de `develop`) y la conservó al integrar la rama de datos: la agrupación S3 del solver convive con la ocupación por `ClaveOcupacion` de la 010. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
 4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
-5. **MEMORY actualizado** (2026-11-07) con el cierre de la 014 (61/61 y 66/66).
+5. **MEMORY actualizado** (2026-11-09) con el cierre de la 017 (61/61 y 66/66).
 6. **DistribuciÃ³n:** el **ZIP portable** ya se genera con `cmake --build build-rel --target package` (`cmake/Packaging.cmake`; ver `docs/guias/desarrollo/CMAKE_GUIDE.md` Â§Empaquetado). Falta lo que venga despuÃ©s: un instalador (Inno Setup o NSIS) que envuelva ese ZIP y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
