@@ -139,6 +139,63 @@ private:
         return a.conflictos.join(QLatin1Char('\n'));
     }
 
+    /// 018: configuración con una cancha (aforo 2) añadida al catálogo, en el índice 2.
+    /// Conserva el turno de 4 franjas y el receso tras la segunda (segmentos [0,1] y [2,3]).
+    static constexpr int kCancha = 2;
+
+    SolverConfig configConCancha() const
+    {
+        SolverConfig config = configConDosDocentes();
+        config.aulas.append(
+            AulaSolverConfig{QStringLiteral("Cancha"), QStringLiteral("Cancha"), 88});
+        return config;
+    }
+
+    /// Curso del plan «Ciencias» con aula de referencia A1.
+    static CursoSolverConfig cursoDelPlan(const QString& seccion)
+    {
+        CursoSolverConfig c;
+        c.anio = 1;
+        c.seccion = seccion;
+        c.turno = QStringLiteral("manana");
+        c.num_estudiantes = 20;
+        c.plan = QStringLiteral("Ciencias");
+        c.aula = 0;
+        return c;
+    }
+
+    /// Dos clases (franjas `slotA` y `slotB` del día 0) del mismo curso, materia 0, con el
+    /// docente y el aula indicados.
+    static CursoOutput cursoEnFranjas(const QString& /*seccion*/, int slotA, int slotB, int aula,
+                                      int profesor)
+    {
+        CursoOutput curso;
+        curso.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        dia.asignaciones = {AsignacionOutput{slotA, 0, profesor, aula},
+                            AsignacionOutput{slotB, 0, profesor, aula}};
+        curso.dias = {dia};
+        return curso;
+    }
+
+    /// Dos clases en el par 0–1 del día 0 (posición de par completa).
+    static CursoOutput cursoEnPar(int aula, int profesor)
+    {
+        return cursoEnFranjas(QString(), 0, 1, aula, profesor);
+    }
+
+    /// Docente adicional sin tope de horas, para que dos cursos no choquen por docente.
+    static ProfesorSolverConfig docente(const QString& nombre)
+    {
+        ProfesorSolverConfig p;
+        p.nombre = nombre;
+        p.horas_requeridas = -1;
+        p.horas_aula = -1;
+        return p;
+    }
+
+
     /// Todos los mensajes del análisis, solo para el diagnóstico de un fallo.
     static QString texto(const AnalisisSalida& a)
     {
@@ -366,6 +423,114 @@ private slots:
         QVERIFY(!a.presentable());
         QVERIFY(a.hayConflictoSolapamiento());
         QVERIFY2(conflictos(a).contains(QStringLiteral("aula «(desconocida)»")),
+                 qPrintable(texto(a)));
+    }
+
+    // ── 018 T3: comprobación de la salida con aforo y pares cruzados ──────────────────────
+
+    /// RF-7: dos cursos distintos con docentes distintos en la cancha, en la misma posición de
+    /// par, son válidos; el aforo es un máximo, no una exclusividad de una clase por aula.
+    void dosCursosEnLaCanchaEnElMismoPar_esPresentable()
+    {
+        const SolverConfig config = configConCancha();
+
+        HorarioSalida h;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnPar(kCancha, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnPar(kCancha, 1);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY2(a.conflictos.isEmpty(), qPrintable(texto(a)));
+        QVERIFY(a.presentable());
+    }
+
+    /// RF-7: tres clases en la cancha en la misma franja superan su aforo 2 y se marcan con el
+    /// aula, el día, la franja, el número de clases y el aforo.
+    void tresCursosEnLaCancha_esConflictoDeAforo()
+    {
+        SolverConfig config = configConCancha();
+        config.cursos.append(cursoDelPlan(QStringLiteral("C")));
+        config.profesores.append(docente(QStringLiteral("Carla")));
+
+        HorarioSalida h;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnPar(kCancha, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnPar(kCancha, 1);
+        h.horarios[claveCurso(1, QStringLiteral("C"))] = cursoEnPar(kCancha, 2);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY(!a.presentable());
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aula «Cancha»")), qPrintable(texto(a)));
+        QVERIFY2(conflictos(a).contains(QStringLiteral("3 clases")), qPrintable(texto(a)));
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aforo es 2")), qPrintable(texto(a)));
+    }
+
+    /// RF-7: un aula de aforo 1 sigue sin admitir dos clases en la misma franja, y el mensaje
+    /// informa del número de clases y del aforo.
+    void dosCursosEnAulaDeAforoUno_esConflicto()
+    {
+        const SolverConfig config = configConCancha();
+
+        HorarioSalida h;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnPar(0, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnPar(0, 1);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY(!a.presentable());
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aula «A1»")), qPrintable(texto(a)));
+        QVERIFY2(conflictos(a).contains(QStringLiteral("2 clases")), qPrintable(texto(a)));
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aforo es 1")), qPrintable(texto(a)));
+    }
+
+    /// RF-7: un aula cuyo índice no existe tiene aforo 1; dos clases en ella son conflicto y se
+    /// nombra como desconocida.
+    void aulaInexistenteConAforoUno_dosClasesEsConflicto()
+    {
+        const SolverConfig config = configConCancha();
+        QCOMPARE(config.aulas.size(), 3);   // A1, Laboratorio y Cancha
+
+        HorarioSalida h;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnPar(9, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnPar(9, 1);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY(!a.presentable());
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aula «(desconocida)»")),
+                 qPrintable(texto(a)));
+        QVERIFY2(conflictos(a).contains(QStringLiteral("aforo es 1")), qPrintable(texto(a)));
+    }
+
+    /// RF-7: una clase sin aula declarada (índice negativo) no cuenta como ocupación: no crea
+    /// ni alivia el conflicto de aforo de la cancha.
+    void claseSinAula_noCuentaParaElAforo()
+    {
+        SolverConfig config = configConCancha();
+        config.cursos.append(cursoDelPlan(QStringLiteral("C")));
+
+        HorarioSalida h;
+        // Dos cursos en la cancha (aforo 2, justo en el límite)...
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnPar(kCancha, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnPar(kCancha, 1);
+        // ...y un tercero sin aula en las mismas franjas: no ocupa la cancha.
+        h.horarios[claveCurso(1, QStringLiteral("C"))] = cursoEnPar(-1, -1);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY2(a.conflictos.isEmpty(), qPrintable(texto(a)));
+        QVERIFY(a.presentable());
+    }
+
+    /// RF-5/RF-7: un par cruzado (un curso en 0–1 y otro en 1–2 de la cancha) comparte una sola
+    /// franja de cada bloque y se marca como conflicto.
+    void parCruzadoEnLaCancha_esConflicto()
+    {
+        const SolverConfig config = configConCancha();
+
+        HorarioSalida h;
+        h.horarios[claveCurso(1, QStringLiteral("A"))] = cursoEnFranjas(QString(), 0, 1, kCancha, 0);
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = cursoEnFranjas(QString(), 1, 2, kCancha, 1);
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+        QVERIFY(!a.presentable());
+        QVERIFY2(conflictos(a).contains(
+                     QStringLiteral("ocupa la cancha en una sola franja del bloque")),
                  qPrintable(texto(a)));
     }
 };

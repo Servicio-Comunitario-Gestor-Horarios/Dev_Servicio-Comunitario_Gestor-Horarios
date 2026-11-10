@@ -27,9 +27,14 @@ constexpr int kNumApellidos = 20;
 /// incluyen actividades «fuera de aula» y se descuentan.
 constexpr int kTopeHorasAula = 36;
 
-/// Tamaño y total de asignaciones del conjunto (plan §4.6/§4.7).
-constexpr int kNumDocentes = 32;
+/// Tamaño y total de asignaciones del conjunto (plan §4.6/§4.7, ampliado por la 018).
+constexpr int kNumDocentes = 33;
 constexpr int kAsignacionesEsperadas = 272;
+
+/// Docentes por turno (018, T4b): la tarde suma el docente de apoyo de idiomas (P033), porque
+/// P028 (Inglés e Idiomas) acumulaba 48 clases frente a las 40 franjas de un turno.
+constexpr int kDocentesManana = 16;
+constexpr int kDocentesTarde = 17;
 
 /// Identificador legible y estable: P001, P002, …
 QString idDocente(int indice) {
@@ -108,13 +113,18 @@ const PosicionDocente kPosiciones[] = {
     {kTarde, 1, {"Innovación Tecnológica y Productividad"}, false},
     {kTarde, 1, {"Orientación Vocacional"}, false},
     {kTarde, 2, {"Castellano", "Lengua y Literatura"}, false},
-    {kTarde, 2, {"Inglés y otras lenguas extranjeras", "Idiomas"}, false},
+    {kTarde, 1, {"Inglés y otras lenguas extranjeras"}, false},
     {kTarde, 2, {"Biología", "Biología, Ambiente y Tecnología"}, false},
     {kTarde, 2, {"Matemáticas", "Física"}, false},
 
     // ── Docentes añadidos para las materias sin carga de D-4 (P031 y P032) ─────────────
     {kManana, 1, {"Participación en los Grupos de Creación, Recreación y Producción"}, true},
     {kTarde, 1, {"Ciencias de la Tierra"}, true},
+
+    // ── Docente de apoyo de idiomas (018, T4b: P033) ───────────────────────────────────
+    // P028 se queda con Inglés (12 clases de 31059 2º) y este docente recibe Idiomas (36
+    // clases de 31060); juntos no superan las 40 franjas del turno ni las 36 h de aula.
+    {kTarde, 1, {"Idiomas"}, false},
 };
 
 /// Turno del perfil con ese nombre, o nullptr.
@@ -249,7 +259,7 @@ bool validarDocentes(const Perfil& perfil, const QVector<DocenteDef>& docentes, 
     };
 
     if (docentes.size() != kNumDocentes) {
-        return falla(QStringLiteral("El conjunto debe tener 32 docentes (tiene %1).")
+        return falla(QStringLiteral("El conjunto debe tener 33 docentes (tiene %1).")
                          .arg(docentes.size()));
     }
 
@@ -361,12 +371,20 @@ bool validarDocentes(const Perfil& perfil, const QVector<DocenteDef>& docentes, 
         }
     }
 
-    // 15 posiciones del centro más 1 añadido en cada turno (D-13, D-4).
+    // 15 posiciones del centro más 1 añadido en cada turno (D-13, D-4) y el apoyo de idiomas
+    // de la tarde (018, T4b): 16 en la mañana y 17 en la tarde.
     for (const TurnoDef& turno : perfil.turnos) {
-        if (porTurno.value(turno.nombre) != 16) {
-            return falla(QStringLiteral("El turno «%1» tiene %2 docentes (se esperan 16).")
+        int esperados = 0;
+        if (turno.nombre == QString::fromUtf8(kManana)) {
+            esperados = kDocentesManana;
+        } else if (turno.nombre == QString::fromUtf8(kTarde)) {
+            esperados = kDocentesTarde;
+        }
+        if (porTurno.value(turno.nombre) != esperados) {
+            return falla(QStringLiteral("El turno «%1» tiene %2 docentes (se esperan %3).")
                              .arg(turno.nombre)
-                             .arg(porTurno.value(turno.nombre)));
+                             .arg(porTurno.value(turno.nombre))
+                             .arg(esperados));
         }
     }
 

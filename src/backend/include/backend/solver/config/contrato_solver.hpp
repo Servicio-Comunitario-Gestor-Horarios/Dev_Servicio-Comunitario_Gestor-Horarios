@@ -85,7 +85,19 @@ int demandaDelTipo(const SolverConfig& config, const QString& clave);
 /// Nº de aulas del centro del tipo `clave`.
 int aulasDelTipo(const SolverConfig& config, const QString& clave);
 
-/// Capacidad del tipo `clave`: `aulasDelTipo × |franjasDelTipo|`.
+/// Aforo simultáneo del tipo `clave` (018, RF-1): cancha → 2; cualquier otro → 1.
+/// Envuelve `aforo_aula::aforoDeClave` (una sola verdad).
+int aforoDelTipo(const QString& clave);
+
+/// Aforo del aula `indice` (018): puente índice → tipo → clave → aforo.
+/// Un índice fuera de rango devuelve 1 (RF-7): nunca abre un hueco en la comprobación.
+int aforoDelAula(const SolverConfig& config, int indice);
+
+/// Posiciones de par de un turno (018, RF-5): Σ ⌊|segmento|/2⌋ sobre `segmentosTurno`.
+/// En el centro, 4 por día (1 en el primer segmento + 3 en el segundo).
+int posicionesDePar(const TurnoConfig& turno, const QVector<EventoConfig>& eventos);
+
+/// Capacidad del tipo `clave`: `aulasDelTipo × |franjasDelTipo| × aforoDelTipo` (018, RF-6).
 int capacidadDelTipo(const SolverConfig& config, const QString& clave);
 
 /// Tipo de aula general/ordinario del centro, por la convención de nombre única:

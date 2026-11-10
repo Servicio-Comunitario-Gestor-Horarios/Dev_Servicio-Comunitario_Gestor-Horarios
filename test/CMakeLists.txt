@@ -160,6 +160,9 @@ if(TARGET backend_solver)
 	add_qtest(test_solver_horarios backend/test_solver_horarios.cpp backend_solver)
 	# Emparejamiento en bloques de dos horas: segmento lleno, tramo impar y tamaño (014 T3a).
 	add_gtest(test_solver_bloques backend/test_solver_bloques.cpp backend_solver)
+	# Aforo simultáneo de la cancha: dos cursos en el mismo par, tres en la misma franja y el
+	# par cruzado forzado (018 T2).
+	add_gtest(test_solver_aforo backend/test_solver_aforo.cpp backend_solver)
 	# Aceptación del centro sin EF (014 T7). Es lento: etiqueta `slow` y fuera de la suite normal.
 	add_gtest(test_solver_centro_sin_ef backend/test_solver_centro_sin_ef.cpp
 					fixture_centro backend_solver)
@@ -202,11 +205,22 @@ if(TARGET frontend AND TARGET backend)
 
 	# Composición de la entrada del solver con el centro real, sin resolver (017-T4):
 	# compone los 24 cursos con plan/turno/matrícula, valida V1–V19 y hace ida y vuelta
-	# del preset; no genera (el conjunto aún no es generable hasta el aforo simultáneo).
+	# del preset; no genera. El informe declara el conjunto generable desde la 018.
 	if(TARGET seed)
 		add_qtest(test_entrada_seed frontend/test_entrada_seed.cpp frontend seed Qt6::Sql)
 		target_include_directories(test_entrada_seed PRIVATE
 						${CMAKE_SOURCE_DIR}/src/frontend/src)
+	endif()
+
+	# Aceptación lenta del centro real con Educación Física (018 T5): siembra, compone la
+	# entrada desde la base y resuelve. Etiqueta `slow` y fuera de la suite normal.
+	if(TARGET seed AND TARGET backend_solver)
+		add_qtest(test_solver_centro_real frontend/test_solver_centro_real.cpp
+						frontend seed backend_solver Qt6::Sql)
+		target_include_directories(test_solver_centro_real PRIVATE
+						${CMAKE_SOURCE_DIR}/src/frontend/src)
+		set_tests_properties(test_solver_centro_real PROPERTIES LABELS "slow"
+						ENVIRONMENT "QTEST_FUNCTION_TIMEOUT=900000")
 	endif()
 endif()
 

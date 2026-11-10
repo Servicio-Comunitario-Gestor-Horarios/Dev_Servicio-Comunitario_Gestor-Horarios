@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
 #include <QHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSet>
 #include <QString>
 #include <QVector>
 
 #include "backend/solver/config/contrato_solver.hpp"
 #include "backend/solver/config/solver_config.hpp"
+#include "common/aforo_aula.hpp"
 
 /// Tests de las funciones puras de demanda y capacidad por tipo de aula (RF-6, T11).
 ///
@@ -57,6 +61,30 @@ SolverConfig configBase() {
 
 QString claveGeneral() { return claveTipo(QStringLiteral("Aula de estudio")); }
 QString claveLaboratorio() { return claveTipo(QStringLiteral("Laboratorio")); }
+
+/// Configuración **aparte** con una cancha (aforo 2) y un turno de 8 franjas cortado tras la
+/// segunda (1 + 3 = 4 posiciones de par por día). No se toca `configBase()`: sus aserciones
+/// exigen `franjasDelTipo(«Cancha»)` vacía.
+SolverConfig configConCancha() {
+    SolverConfig config;
+    config.aula_fija = false;
+    config.dimensiones.num_dias = 1;
+    config.dimensiones.num_slots_dia = 8;
+    config.franja_horaria.duracion_minutos = 40;
+
+    TurnoConfig manana;
+    manana.nombre = QStringLiteral("Mañana");
+    manana.slot = {0, 1, 2, 3, 4, 5, 6, 7};
+    config.turnos.turnos = {manana};
+    config.eventos = {EventoConfig{QStringLiteral("Receso"), QStringLiteral("Mañana"), 2, 1, 10,
+                                   QString(), QString()}};
+
+    config.materias = {{QStringLiteral("Educación Física 1º"), QStringLiteral("Cancha")}};
+    config.aulas = {{QStringLiteral("Cancha"), QStringLiteral("Cancha"), 88}};
+    config.planes = {{QStringLiteral("A"), {{0, 1, 2}}}};
+    config.cursos = {{1, QStringLiteral("A"), QStringLiteral("Mañana"), 40, QStringLiteral("A"), -1}};
+    return config;
+}
 
 }  // namespace
 
@@ -156,3 +184,84 @@ TEST(TestCapacidadTipo, tipoGeneralAula_esAulaDeEstudioPorClave) {
     EXPECT_EQ(claveTipo(tipoGeneralAula()), claveTipo(QStringLiteral("\tAula de Estudio\t")));
     EXPECT_NE(claveTipo(tipoGeneralAula()), claveTipo(QStringLiteral("Laboratorio")));
 }
+
+// ── 018 T1: aforo en un solo punto, capacidad con aforo y posiciones de par ──────────────
+
+TEST(TestCapacidadTipo, aforoDelTipo_canchaDosYelRestoUno) {
+    // RF-1/RF-2: el tipo se reconoce por su clave normalizada, no por el texto exacto.
+    EXPECT_EQ(aforo_aula::claveCancha(), claveTipo(QStringLiteral("Cancha")));
+    EXPECT_EQ(aforoDelTipo(claveTipo(QStringLiteral("Cancha"))), 2);
+    EXPECT_EQ(aforoDelTipo(claveTipo(QStringLiteral("  CANCHA "))), 2);
+    EXPECT_EQ(aforoDelTipo(claveTipo(QStringLiteral("Campo"))), 1);
+    EXPECT_EQ(aforoDelTipo(claveGeneral()), 1);
+    EXPECT_EQ(aforoDelTipo(claveLaboratorio()), 1);
+    EXPECT_EQ(aforoDelTipo(QString()), 1);
+}
+
+TEST(TestCapacidadTipo, aforoDelAula_indiceInvalidoEsUno) {
+    const SolverConfig config = configConCancha();
+
+    EXPECT_EQ(aforoDelAula(config, 0), 2);    // la cancha
+    EXPECT_EQ(aforoDelAula(config, -1), 1);   // índice ausente
+    EXPECT_EQ(aforoDelAula(config, 1), 1);    // índice fuera de rango
+
+    // En la configuración base no hay cancha: todas sus aulas tienen aforo 1.
+    const SolverConfig base = configBase();
+    EXPECT_EQ(aforoDelAula(base, 0), 1);
+    EXPECT_EQ(aforoDelAula(base, 2), 1);
+}
+
+TEST(TestCapacidadTipo, capacidadDelTipo_multiplicaPorElAforo) {
+    const SolverConfig config = configConCancha();
+
+    // Aulas × franjas × aforo: 1 × 8 franjas del día × 2 = 16 (RF-6).
+    EXPECT_EQ(aulasDelTipo(config, claveTipo(QStringLiteral("Cancha"))), 1);
+    EXPECT_EQ(franjasDelTipo(config, claveTipo(QStringLiteral("Cancha"))).size(), 8);
+    EXPECT_EQ(capacidadDelTipo(config, claveTipo(QStringLiteral("Cancha"))), 1 * 8 * 2);
+
+    // Un tipo de aforo 1 conserva la cuenta anterior (aulas × franjas).
+    const SolverConfig base = configBase();
+    EXPECT_EQ(capacidadDelTipo(base, claveGeneral()), 2 * 6);
+    EXPECT_EQ(capacidadDelTipo(base, claveLaboratorio()), 1 * 4);
+}
+
+TEST(TestCapacidadTipo, posicionesDePar_cuatroPorDiaYveintePorTurno) {
+    const SolverConfig config = configConCancha();
+    const TurnoConfig& manana = config.turnos.turnos[0];
+
+    // Segmentos [0,1] y [2..7]: 1 + 3 = 4 posiciones alineadas por día.
+    EXPECT_EQ(posicionesDePar(manana, config.eventos), 4);
+
+    // El turno completo son 5 días: 20 posiciones (RF-5).
+    EXPECT_EQ(5 * posicionesDePar(manana, config.eventos), 20);
+
+    // Un turno sin eventos es un único segmento: 8 / 2 = 4 posiciones.
+    TurnoConfig sinReceso = manana;
+    EXPECT_EQ(posicionesDePar(sinReceso, {}), 4);
+
+    // Un segmento de longitud impar no ofrece posición para su última franja.
+    TurnoConfig tresFranjas;
+    tresFranjas.nombre = QStringLiteral("Corto");
+    tresFranjas.slot = {0, 1, 2};
+    EXPECT_EQ(posicionesDePar(tresFranjas, {}), 1);
+
+    // Un turno sin franjas no tiene posiciones.
+    TurnoConfig vacio;
+    EXPECT_EQ(posicionesDePar(vacio, {}), 0);
+}
+
+TEST(TestCapacidadTipo, toJson_noViajaElAforo) {
+    // RNF-8: el aforo es regla del motor y no viaja en el contrato. Una config con cancha
+    // se serializa sin la clave «aforo», ni en el aula ni en la raíz.
+    const SolverConfig config = configConCancha();
+    const QJsonObject obj = config.toJson();
+
+    EXPECT_FALSE(obj.contains(QStringLiteral("aforo")));
+    const QJsonArray aulas = obj.value(QStringLiteral("aulas")).toArray();
+    ASSERT_EQ(aulas.size(), 1);
+    EXPECT_FALSE(aulas.at(0).toObject().contains(QStringLiteral("aforo")));
+
+    const QByteArray json = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+    EXPECT_FALSE(json.contains("\"aforo\"")) << json.toStdString();
+}
+

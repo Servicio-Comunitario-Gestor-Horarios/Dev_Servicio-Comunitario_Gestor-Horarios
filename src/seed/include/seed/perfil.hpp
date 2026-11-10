@@ -91,12 +91,27 @@ struct Recuentos {
     int planes = 0;            ///< filas de PlanEstudio (2)
     int planMaterias = 0;      ///< filas de PlanEstudio_Materia (95)
     int cursos = 0;            ///< filas de Cursos (24)
-    int docentes = 0;          ///< filas de Profesores (32)
+    int docentes = 0;          ///< filas de Profesores (33)
     int asignaciones = 0;      ///< filas de Profesor_Materia (272)
-    int disponibilidades = 0;  ///< filas de Disponibilidad_Profesor (160)
+    int disponibilidades = 0;  ///< filas de Disponibilidad_Profesor (165)
     int preferencias = 0;      ///< filas de Preferencia_Profesor (0: el conjunto no las siembra)
     int duracionMinutos = 0;   ///< duración efectiva de la hora académica (40)
     int configuraciones = 0;   ///< filas de ConfiguracionHoraria (1)
+};
+
+/// Aritmética del aforo de la cancha para el informe del conjunto (018, RF-8). Es **de
+/// cursos simultáneos** (aforo 2), no la capacidad física del aula (88 alumnos).
+struct CapacidadCancha {
+    int aulas = 0;                  ///< aulas del tipo de clave `cancha` (1)
+    int aforo = 0;                  ///< aforo del tipo (2)
+    int franjasPorTurno = 0;        ///< 5 días × franjas del turno (40)
+    int plazasPorTurno = 0;         ///< franjas por turno × aforo (80)
+    int plazasSemana = 0;           ///< plazas por turno × turnos (160)
+    int posicionesParPorTurno = 0;  ///< posiciones de par del turno (20)
+    int plazasParPorTurno = 0;      ///< posiciones de par × aforo (40)
+    int paresEfPorTurno = 0;        ///< clases de EF del turno / 2 (24)
+    int clasesEfPorTurno = 0;       ///< clases de Educación Física del turno (48)
+    int clasesEfSemana = 0;         ///< clases de Educación Física de la semana (96)
 };
 
 /// Identidad: 1 hora académica = 1 bloque (sin conversión ni redondeo). Pura.
@@ -108,13 +123,19 @@ int horasDeAnio(const PlanDef& plan, int anio);
 /// Suma de bloques (coinciden con las horas) de un plan en un año; -1 si no tiene ese año. Pura.
 int bloquesDeAnio(const PlanDef& plan, int anio);
 
-/// Tipo de aula que pide una materia por su área: Educación Física exige «Cancha»; el resto,
-/// el tipo general del esquema (RF-3). Pura.
+/// Tipo de aula que pide una materia por su área: Educación Física exige el tipo de la cancha
+/// (nombre visible canónico); el resto, el tipo general del esquema (RF-3). Pura.
 QString tipoEspecializadoDeMateria(const QString& nombre);
 
-/// Tipo final de una materia: el especializado de su área si el conjunto tiene al menos un
-/// aula de ese tipo; en caso contrario, el tipo general (RF-3). Pura.
+/// Tipo final de una materia: el **nombre declarado** del tipo especializado de su área si el
+/// conjunto tiene al menos un aula de ese tipo (comparado por clave normalizada); en caso
+/// contrario, el tipo general (RF-3, 018 RF-2). Pura.
 QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas);
+
+/// Aritmética de la cancha con su aforo simultáneo (018, RF-8): aulas, aforo, franjas y plazas
+/// por turno y semana, posiciones y plazas de par, y pares de Educación Física. Las posiciones
+/// de par salen de `posicionesDePar` (el ⌊|segmento|/2⌋ existe una sola vez). Pura.
+CapacidadCancha capacidadCancha(const Perfil& perfil);
 
 /// Horas académicas de un curso: suma de las cargas del plan del curso en su año; -1 si el
 /// perfil no declara ese plan (plan §5.1). Pura.
@@ -137,10 +158,11 @@ bool areaConCursosEnTurno(const Perfil& perfil, const QString& area, const QStri
 /// declara un plan inexistente. Pura.
 int demandaDeAreaPorTurno(const Perfil& perfil, const QString& area, const QString& turno);
 
-/// Motivo por el que el conjunto **no se declara generable** (RF-9, plan §5.5): la Educación
-/// Física de cada turno necesita más clases que franjas de cancha con aforo 1. Devuelve el
-/// primer turno que no cabe, con sus cifras, o "" si el conjunto cabría. No es validación:
-/// la aplicación no falla por esto. Pura.
+/// Motivo por el que el conjunto **no se declara generable** (RF-8, plan §5.5): la Educación
+/// Física de cada turno necesita más plazas de cancha que las que ofrece su aforo simultáneo
+/// (018: aforo 2). Devuelve el primer turno que no cabe, con sus cifras, o "" si el conjunto
+/// cabría (el centro real: 48 ≤ 80 por turno). No es validación: la aplicación no falla por
+/// esto. Pura.
 QString motivoNoGenerable(const Perfil& perfil);
 
 /// Perfil por defecto, construido una sola vez e inmutable. No lee reloj, disco ni configuración.

@@ -137,6 +137,58 @@ namespace
         }
     };
 
+    /// 018 (RF-5/RF-7): la cancha no admite **pares cruzados**. Recorre los segmentos del turno
+    /// del curso con sus pares alineados al inicio del segmento y marca la franja de cancha que
+    /// no tiene su pareja. Con aforo 1 en todas las aulas, `canchaSlots` queda vacío y el bloque
+    /// no añade nada.
+    void comprobarParesCancha(const HorarioSalida& horario, const SolverConfig& config,
+                              AnalisisSalida& analisis)
+    {
+        for (auto it = horario.horarios.constBegin(); it != horario.horarios.constEnd(); ++it)
+        {
+            const QString& clave = it.key();
+            const int curso = indiceCurso(config, clave);
+            if (curso < 0) continue;
+
+            const TurnoConfig* turno = nullptr;
+            for (const TurnoConfig& t : config.turnos.turnos)
+                if (t.nombre == config.cursos[curso].turno)
+                {
+                    turno = &t;
+                    break;
+                }
+            if (turno == nullptr) continue;   // sin turno no se inventan segmentos
+
+            const QVector<QVector<int>> segmentos = segmentosTurno(*turno, config.eventos);
+            if (segmentos.isEmpty()) continue;
+
+            for (const DiaOutput& dia : it.value().dias)
+            {
+                QSet<int> canchaSlots;
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                    if (asignacion.aula >= 0 && aforoDelAula(config, asignacion.aula) > 1)
+                        canchaSlots.insert(asignacion.slot);
+
+                if (canchaSlots.isEmpty()) continue;
+
+                for (const QVector<int>& segmento : segmentos)
+                    for (int k = 0; k + 1 < segmento.size(); k += 2)
+                    {
+                        const int inicio = segmento[k];
+                        const int fin = segmento[k + 1];
+                        if (canchaSlots.contains(inicio) != canchaSlots.contains(fin))
+                            analisis.conflictos.append(
+                                QStringLiteral("El curso «%1» ocupa la cancha en una sola franja "
+                                               "del bloque %2–%3 (día %4).")
+                                    .arg(clave)
+                                    .arg(inicio)
+                                    .arg(fin)
+                                    .arg(dia.dia));
+                    }
+            }
+        }
+    }
+
 } // namespace
 
 AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverConfig& config)
@@ -144,9 +196,10 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
     AnalisisSalida analisis;
 
     // Ocupación de cada recurso en cada franja para detectar solapamientos (P4): las claves
-    // incluyen el docente / el aula, no solo el día y el slot.
+    // incluyen el docente / el aula, no solo el día y el slot. El aula se **cuenta**: dos clases
+    // solo son conflicto si superan el aforo del aula (018, RF-7).
     QMap<ClaveOcupacion, QString> ocupacionProfesor;  // -> nombre de curso
-    QMap<ClaveOcupacion, QString> ocupacionAula;
+    QMap<ClaveOcupacion, int> conteoAula;             // -> nº de clases en la franja
 
     // Conteo para P2: índice de profesor -> asignaciones.
     QMap<int, int> horasPorProfesor;
@@ -198,14 +251,15 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                     }
                 }
 
-                // P4: aula en dos sitios a la vez. Un aula sin asignar (índice negativo) no
-                // ocupa la franja. Un índice positivo fuera de rango se indexa tal cual: no
-                // choca con las aulas del catálogo, pero dos clases que informan la misma
-                // aula inexistente sí colisionan y se nombran como desconocida.
+                // P4: aula por encima de su aforo. Un aula sin asignar (índice negativo) no
+                // ocupa la franja ni crea ni alivia conflictos: queda fuera de la cuenta. Un
+                // índice fuera de rango o un tipo no reconocido tiene aforo 1 (RF-7).
                 if (asig.aula >= 0)
                 {
                     const ClaveOcupacion clave{asig.aula, dia.dia, asig.slot};
-                    if (ocupacionAula.contains(clave))
+                    const int cuenta = ++conteoAula[clave];
+                    const int aforo = aforoDelAula(config, asig.aula);
+                    if (cuenta > aforo)
                     {
                         const int idx = asig.aula;
                         const QString nombreAula =
@@ -213,14 +267,13 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                                 ? config.aulas[idx].nombre
                                 : QStringLiteral("(desconocida)");
                         analisis.conflictos.append(
-                            QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
+                            QStringLiteral("El aula «%1» tiene %2 clases en la misma franja (día %3, "
+                                           "slot %4) y su aforo es %5.")
                                 .arg(nombreAula)
+                                .arg(cuenta)
                                 .arg(dia.dia)
-                                .arg(asig.slot));
-                    }
-                    else
-                    {
-                        ocupacionAula[clave] = nombreCurso;
+                                .arg(asig.slot)
+                                .arg(aforo));
                     }
                 }
 
@@ -233,6 +286,9 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
 
     // P4 ampliado (014): bloque de 1, materia mal alineada o dos aulas en un bloque.
     comprobarBloques(horario, config, analisis);
+
+    // P4 con aforo (018): la cancha no admite pares cruzados.
+    comprobarParesCancha(horario, config, analisis);
 
     // P2: ningún profesor excede sus horas requeridas. Es el único aviso que queda (005 I2):
     // las horas no cubiertas (P1) y la capacidad de aula (P3) se retiraron.

@@ -95,11 +95,12 @@ TEST(TestSolverCentroSinEf, fixtureDeAceptacion) {
               analisisReferencia.incumplimientosSeparacion);
 
     // Techo de tiempo. Se mide en Release: con los valores por defecto (60/20/10 y 8 workers)
-    // la resolución completa tarda ~172,6 s en este host, por debajo del plazo de 300 s del
-    // servicio. El techo del test es holgado (200 s) para no quedar por debajo de lo medido;
-    // en Debug es aún mayor.
+    // la resolución completa tarda ~150-230 s en este host según la carga, por debajo del plazo
+    // de 300 s del servicio (RNF-2). El techo del test se alinea con ese plazo (300 s) en vez de
+    // usar un margen más estricto que la spec: con 8 workers sobre 4 núcleos la varianza del host
+    // hace frágil cualquier techo por debajo del criterio. En Debug es aún mayor.
 #ifdef NDEBUG
-    constexpr double kTechoMs = 200000.0;
+    constexpr double kTechoMs = 300000.0;
 #else
     constexpr double kTechoMs = 1200000.0;
 #endif

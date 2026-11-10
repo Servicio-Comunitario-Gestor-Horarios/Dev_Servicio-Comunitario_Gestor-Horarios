@@ -283,17 +283,23 @@ QString resumenTexto(const Perfil& perfil, const Recuentos& r) {
                   .arg(matricula31059)
                   .arg(matricula31060);
 
-    // Capacidad docente y demanda por turno (RF-8): 16 docentes × 36 h por turno frente a la
-    // demanda de clases de cada turno.
+    // Capacidad docente y demanda por turno (RF-8, 018): 16 docentes × 36 h en la mañana y 17 ×
+    // 36 en la tarde (576 + 612 = 1188) frente a la demanda de clases de cada turno.
     const QVector<DocenteDef> docentes = docentesDelCentro(perfil);
     int docentesManana = 0;
+    int docentesTarde = 0;
     int topeHorasAula = 0;
     for (const DocenteDef& docente : docentes) {
         if (perfil.turnos.size() >= 1 && docente.turno == perfil.turnos[0].nombre) {
             ++docentesManana;
         }
+        if (perfil.turnos.size() >= 2 && docente.turno == perfil.turnos[1].nombre) {
+            ++docentesTarde;
+        }
         topeHorasAula = docente.horasAula;
     }
+    const int capacidadManana = docentesManana * topeHorasAula;
+    const int capacidadTarde = docentesTarde * topeHorasAula;
     const QString demandaManana =
         perfil.turnos.size() >= 1
             ? QString::number(demandaPorTurno(perfil, perfil.turnos[0].nombre))
@@ -302,14 +308,38 @@ QString resumenTexto(const Perfil& perfil, const Recuentos& r) {
         perfil.turnos.size() >= 2
             ? QString::number(demandaPorTurno(perfil, perfil.turnos[1].nombre))
             : QStringLiteral("0");
-    lineas << QStringLiteral("Capacidad docente: %1 por turno (%2 × %3)   Demanda: %4 Mañana · "
+    lineas << QStringLiteral("Capacidad docente: %1 (%2 + %3)   Demanda: %4 Mañana · "
                              "%5 Tarde")
-                  .arg(docentesManana * topeHorasAula)
-                  .arg(docentesManana)
-                  .arg(topeHorasAula)
+                  .arg(capacidadManana + capacidadTarde)
+                  .arg(capacidadManana)
+                  .arg(capacidadTarde)
                   .arg(demandaManana, demandaTarde);
 
-    // «No generable» (RF-9): la causa y la acción, sin fallar la aplicación.
+    // Aforo simultáneo de la cancha (018, RF-8): capacidad física (88 alumnos) y aforo de
+    // cursos (2) son cifras distintas. Las posiciones de par salen del contrato.
+    const CapacidadCancha cancha = capacidadCancha(perfil);
+    lineas << QStringLiteral("Cancha: %1 %2 · %3 franjas por turno · aforo %4 → %5 plazas por "
+                             "turno · %6 en la semana")
+                  .arg(cancha.aulas)
+                  .arg(cancha.aulas == 1 ? QStringLiteral("aula") : QStringLiteral("aulas"))
+                  .arg(cancha.franjasPorTurno)
+                  .arg(cancha.aforo)
+                  .arg(cancha.plazasPorTurno)
+                  .arg(cancha.plazasSemana);
+    lineas << QStringLiteral("Educación Física: %1 clases por turno · %2 en la semana → %3 pares "
+                             "por turno · %4 en la semana")
+                  .arg(cancha.clasesEfPorTurno)
+                  .arg(cancha.clasesEfSemana)
+                  .arg(cancha.paresEfPorTurno)
+                  .arg(cancha.clasesEfSemana / 2);
+    lineas << QStringLiteral("Pares de cancha: %1 posiciones por turno · %2 plazas de par → %3 ≤ "
+                             "%4 por turno")
+                  .arg(cancha.posicionesParPorTurno)
+                  .arg(cancha.plazasParPorTurno)
+                  .arg(cancha.paresEfPorTurno)
+                  .arg(cancha.plazasParPorTurno);
+
+    // «Generable» (018, RF-8): el centro ya cabe con el aforo 2; sin motivo no se informa causa.
     const QString motivo = motivoNoGenerable(perfil);
     lineas << (motivo.isEmpty() ? QStringLiteral("Generable: sí")
                                 : QStringLiteral("Generable: no — %1").arg(motivo));
@@ -331,7 +361,7 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         return fallo(EstadoAplicacion::PerfilIncoherente, errorPerfil);
     }
 
-    // 3. La plantilla de docentes (32) debe cumplir tope, turnos, disponibilidad y
+    // 3. La plantilla de docentes (33) debe cumplir tope, turnos, disponibilidad y
     //    asignaciones, y cubrir todas las materias de todos los cursos en su turno (RF-6).
     const QVector<DocenteDef> docentes = docentesDelCentro(perfil);
     QString errorDocentes;

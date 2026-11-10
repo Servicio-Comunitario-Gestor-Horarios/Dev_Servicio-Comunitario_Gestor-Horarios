@@ -5,6 +5,9 @@
 
 #include "backend/services/calculo_eventos.hpp"
 #include "backend/services/duracion_horaria.hpp"
+#include "backend/solver/config/contrato_solver.hpp"
+#include "backend/solver/config/solver_config.hpp"
+#include "common/aforo_aula.hpp"
 #include "common/tipo_general.hpp"
 
 namespace seed {
@@ -35,9 +38,6 @@ int bloquesDeAnio(const PlanDef& plan, int anio) {
 }
 
 namespace {
-
-/// Tipo de aula propio del centro (RF-5): la cancha. El tipo general lo aporta el esquema.
-const char* const kTipoCancha = "Cancha";
 
 /// Área de formación de un plan con sus horas académicas semanales por año
 /// (índice 0 = 1.º, … 4 = 5.º; -1 = no se cursa en ese año).
@@ -169,23 +169,23 @@ struct AulaTabla {
     int capacidad;
     const char* edificio;
     const char* piso;
-    const char* tipo;   // nullptr = tipo general del esquema
+    bool cancha;   // false = tipo general del esquema
 };
 
 const AulaTabla kAulas[] = {
-    {"Aula 01", 44, "A", "Planta baja", nullptr},
-    {"Aula 02", 44, "A", "Planta baja", nullptr},
-    {"Aula 03", 44, "A", "Planta baja", nullptr},
-    {"Aula 04", 44, "A", "Piso 1", nullptr},
-    {"Aula 05", 44, "B", "Planta baja", nullptr},
-    {"Aula 06", 44, "B", "Planta baja", nullptr},
-    {"Aula 07", 44, "B", "Planta baja", nullptr},
-    {"Aula 08", 44, "B", "Piso 1", nullptr},
-    {"Aula 09", 44, "C", "Planta baja", nullptr},
-    {"Aula 10", 44, "C", "Planta baja", nullptr},
-    {"Aula 11", 44, "C", "Piso 1", nullptr},
-    {"Aula 12", 44, "C", "Piso 1", nullptr},
-    {"Cancha", 88, "Patio", "Descubierto", kTipoCancha},
+    {"Aula 01", 44, "A", "Planta baja", false},
+    {"Aula 02", 44, "A", "Planta baja", false},
+    {"Aula 03", 44, "A", "Planta baja", false},
+    {"Aula 04", 44, "A", "Piso 1", false},
+    {"Aula 05", 44, "B", "Planta baja", false},
+    {"Aula 06", 44, "B", "Planta baja", false},
+    {"Aula 07", 44, "B", "Planta baja", false},
+    {"Aula 08", 44, "B", "Piso 1", false},
+    {"Aula 09", 44, "C", "Planta baja", false},
+    {"Aula 10", 44, "C", "Planta baja", false},
+    {"Aula 11", 44, "C", "Piso 1", false},
+    {"Aula 12", 44, "C", "Piso 1", false},
+    {"Cancha", 88, "Patio", "Descubierto", true},
 };
 
 /// Evento del turno (plan §4.5): nombre, posición, orden, duración y horario en reloj.
@@ -253,7 +253,7 @@ const Perfil& perfilPorDefecto() {
 
         // Catálogo declarado de tipos de aula (RF-3, RF-5): solo la cancha; el tipo general
         // lo garantiza la creación de la base.
-        p.tiposAula = {QString::fromUtf8(kTipoCancha)};
+        p.tiposAula = {aforo_aula::tipoCancha()};
 
         // Duración de la hora académica (RF-7): 40 min, valor que el sembrador escribe en la
         // configuración global.
@@ -339,8 +339,8 @@ const Perfil& perfilPorDefecto() {
             p.aulas.append(AulaDef{QString::fromUtf8(aula.nombre), aula.capacidad,
                                    QString::fromUtf8(aula.edificio),
                                    QString::fromUtf8(aula.piso),
-                                   aula.tipo ? QString::fromUtf8(aula.tipo)
-                                             : tipo_general::nombre()});
+                                   aula.cancha ? aforo_aula::tipoCancha()
+                                               : tipo_general::nombre()});
         }
 
         // Cursos (RF-4, plan §4.3): 24, con su plan y su turno en el perfil y aula de
@@ -358,17 +358,81 @@ const Perfil& perfilPorDefecto() {
 }
 
 QString tipoEspecializadoDeMateria(const QString& nombre) {
-    // Educación Física se imparte en la cancha (RF-3); el resto, en el aula de estudio.
+    // Educación Física se imparte en la cancha (RF-3): se devuelve el nombre visible canónico
+    // del tipo. El reconocimiento del tipo declarado se hace por clave en `tipoFinalDeMateria`.
     if (nombre.startsWith(QStringLiteral("Educación Física "))) {
-        return QString::fromUtf8(kTipoCancha);
+        return aforo_aula::tipoCancha();
     }
     return tipo_general::nombre();
 }
 
 QString tipoFinalDeMateria(const QString& nombre, const QSet<QString>& tiposDeAulas) {
-    const QString especializado = tipoEspecializadoDeMateria(nombre);
-    return tiposDeAulas.contains(especializado) ? especializado
-                                                : tipo_general::nombre();
+    // 018 (RF-2): el tipo se resuelve por CLAVE normalizada y se devuelve el nombre declarado
+    // (puede ser «CANCHA», «cancha »…), para que el sembrador siga casando `idTipoAula` por
+    // nombre. Si el conjunto no declara un aula de ese tipo, la materia cae al tipo general.
+    const QString clave = tipo_general::claveNormalizada(tipoEspecializadoDeMateria(nombre));
+    for (const QString& declarado : tiposDeAulas) {
+        if (tipo_general::claveNormalizada(declarado) == clave) {
+            return declarado;
+        }
+    }
+    // El tipo general lo aporta el esquema aunque el perfil no lo declare.
+    return tipo_general::nombre();
+}
+
+CapacidadCancha capacidadCancha(const Perfil& perfil) {
+    CapacidadCancha capacidad;
+    for (const AulaDef& aula : perfil.aulas) {
+        if (tipo_general::claveNormalizada(aula.tipo) == aforo_aula::claveCancha()) {
+            ++capacidad.aulas;
+        }
+    }
+    capacidad.aforo = aforo_aula::aforoDeClave(aforo_aula::claveCancha());
+
+    const int dias = 5;
+    capacidad.franjasPorTurno =
+        perfil.turnos.isEmpty() ? 0 : dias * perfil.turnos[0].numSlots;
+    capacidad.plazasPorTurno =
+        capacidad.aulas * capacidad.franjasPorTurno * capacidad.aforo;
+    capacidad.plazasSemana = capacidad.plazasPorTurno * perfil.turnos.size();
+
+    if (!perfil.turnos.isEmpty()) {
+        const TurnoDef& turnoDef = perfil.turnos[0];
+        TurnoConfig turno;
+        turno.nombre = turnoDef.nombre;
+        for (int s = 0; s < turnoDef.numSlots; ++s) {
+            turno.slot.append(s);
+        }
+        turno.inicio = turnoDef.inicio.toString(QStringLiteral("HH:mm"));
+        turno.fin = turnoDef.fin.toString(QStringLiteral("HH:mm"));
+
+        QVector<EventoConfig> eventos;
+        for (const EventoDef& eventoDef : turnoDef.eventos) {
+            EventoConfig evento;
+            evento.nombre = eventoDef.nombre;
+            evento.turno = turnoDef.nombre;
+            evento.despues_de_slot = eventoDef.despuesDeSlot;
+            evento.orden = eventoDef.orden;
+            evento.duracion = eventoDef.duracion;
+            evento.inicio = eventoDef.inicio.toString(QStringLiteral("HH:mm"));
+            evento.fin = eventoDef.fin.toString(QStringLiteral("HH:mm"));
+            eventos.append(evento);
+        }
+
+        // Las posiciones de par NO se recalculan aquí: se delegan en el contrato.
+        capacidad.posicionesParPorTurno = dias * posicionesDePar(turno, eventos);
+        capacidad.clasesEfPorTurno = demandaDeAreaPorTurno(
+            perfil, QStringLiteral("Educación Física"), turnoDef.nombre);
+    }
+    capacidad.plazasParPorTurno =
+        capacidad.aulas * capacidad.posicionesParPorTurno * capacidad.aforo;
+    capacidad.paresEfPorTurno = capacidad.clasesEfPorTurno / 2;
+
+    for (const TurnoDef& turno : perfil.turnos) {
+        capacidad.clasesEfSemana +=
+            demandaDeAreaPorTurno(perfil, QStringLiteral("Educación Física"), turno.nombre);
+    }
+    return capacidad;
 }
 
 int horasDeCurso(const Perfil& perfil, const CursoDef& curso) {
@@ -451,34 +515,28 @@ int demandaDeAreaPorTurno(const Perfil& perfil, const QString& area, const QStri
 
 QString motivoNoGenerable(const Perfil& perfil) {
     // La Educación Física se imparte en la cancha (D-5): sin ella no hay dónde ubicarla.
-    bool hayCancha = false;
-    for (const AulaDef& aula : perfil.aulas) {
-        if (aula.tipo == QString::fromUtf8(kTipoCancha)) {
-            hayCancha = true;
-            break;
-        }
-    }
-    if (!hayCancha) {
-        return QStringLiteral("el centro no tiene ninguna aula de tipo «Cancha» para la "
-                              "Educación Física.");
+    const CapacidadCancha capacidad = capacidadCancha(perfil);
+    if (capacidad.aulas == 0) {
+        return QStringLiteral("el centro no tiene ninguna aula de tipo «%1» para la "
+                              "Educación Física.")
+            .arg(aforo_aula::tipoCancha());
     }
 
-    // Sin aforo simultáneo, una cancha atiende una clase por franja: 5 días × 8 franjas = 40
-    // plazas por turno frente a las 48 clases de Educación Física de cada turno (plan §5.5).
-    const int dias = 5;
-    const int aforo = 1;
+    // Con aforo 2, la cancha ofrece `franjasPorTurno × aforo` plazas por turno: en el centro,
+    // 40 × 2 = 80 frente a las 48 clases de Educación Física (018, RF-8).
     for (const TurnoDef& turno : perfil.turnos) {
-        const int plazas = dias * turno.numSlots * aforo;
+        const int plazas = capacidad.aulas * 5 * turno.numSlots * capacidad.aforo;
         const int demanda = demandaDeAreaPorTurno(perfil, QStringLiteral("Educación Física"),
                                                   turno.nombre);
         if (demanda > plazas) {
-            return QStringLiteral("«%1»: %2 clases de Educación Física frente a %3 franjas de "
-                                  "cancha (aforo %4). Pendiente el aforo simultáneo (dos cursos), "
-                                  "que lo resolverá su spec.")
+            return QStringLiteral("«%1»: %2 clases de Educación Física frente a %3 plazas de "
+                                  "cancha (%4 aulas × %5 franjas × aforo %6).")
                 .arg(turno.nombre)
                 .arg(demanda)
                 .arg(plazas)
-                .arg(aforo);
+                .arg(capacidad.aulas)
+                .arg(5 * turno.numSlots)
+                .arg(capacidad.aforo);
         }
     }
     return QString();
@@ -646,6 +704,33 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
     // 4. Aulas (RF-5): exactamente 13, nombre único, 12 generales de capacidad ≥ 44 y una
     //    cancha de capacidad ≥ 88.
     {
+        // 018 (RF-2, D-3): la cancha declarada se identifica por su **nombre** y su tipo se
+        // clasifica por **clave**. Una cancha cuyo tipo no se normalice a `cancha` se rechaza
+        // de forma explícita (tipo recibido, clave esperada y acción), sin aplicar el aforo 1
+        // en silencio.
+        const AulaDef* canchaDeclarada = nullptr;
+        for (const AulaDef& aula : perfil.aulas) {
+            if (aula.nombre == aforo_aula::tipoCancha()) {
+                canchaDeclarada = &aula;
+                break;
+            }
+        }
+        if (canchaDeclarada == nullptr) {
+            return falla(QStringLiteral("El perfil debe declarar el aula «%1».")
+                             .arg(aforo_aula::tipoCancha()));
+        }
+        const QString claveDeclarada = tipo_general::claveNormalizada(canchaDeclarada->tipo);
+        if (claveDeclarada != aforo_aula::claveCancha()) {
+            return falla(QStringLiteral("La cancha «%1» declara el tipo «%2» (clave «%3»); la "
+                                        "clave esperada es «%4»: el tipo de la cancha debe "
+                                        "llamarse «%5». Corrija el tipo del aula o del catálogo.")
+                             .arg(canchaDeclarada->nombre)
+                             .arg(canchaDeclarada->tipo)
+                             .arg(claveDeclarada)
+                             .arg(aforo_aula::claveCancha())
+                             .arg(aforo_aula::tipoCancha()));
+        }
+
         QSet<QString> nombres;
         int generales = 0;
         int canchas = 0;
@@ -657,7 +742,8 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
                 return falla(QStringLiteral("El aula «%1» está duplicada.").arg(aula.nombre));
             }
             nombres.insert(aula.nombre);
-            if (aula.tipo == tipo_general::nombre()) {
+            const QString clave = tipo_general::claveNormalizada(aula.tipo);
+            if (clave == tipo_general::clave()) {
                 ++generales;
                 if (aula.capacidad < 44) {
                     return falla(QStringLiteral("El aula «%1» tiene capacidad %2 (las generales "
@@ -665,7 +751,7 @@ bool validarPerfil(const Perfil& perfil, QString* error) {
                                      .arg(aula.nombre)
                                      .arg(aula.capacidad));
                 }
-            } else if (aula.tipo == QString::fromUtf8(kTipoCancha)) {
+            } else if (clave == aforo_aula::claveCancha()) {
                 ++canchas;
                 if (aula.capacidad < 88) {
                     return falla(QStringLiteral("La cancha «%1» tiene capacidad %2 (debe cubrir "

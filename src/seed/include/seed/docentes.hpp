@@ -30,21 +30,22 @@ struct DocenteDef {
     int horasAula = 0;         ///< tope de horas académicas de aula (36)
 };
 
-/// Los 32 docentes del conjunto (30 posiciones del centro con nombres ficticios y 2
-/// añadidos para las materias sin carga de D-4), deterministas y en orden fijo (P001…P032).
+/// Los 33 docentes del conjunto (30 posiciones del centro con nombres ficticios, 2 añadidos
+/// para las materias sin carga de D-4 y el apoyo de idiomas de la tarde de la 018),
+/// deterministas y en orden fijo (P001…P033).
 /// Aplica la regla de asignación del plan §5.4: todas las materias-año del área de cada
 /// posición, una sola vez, sin filtrar por año y solo si el área tiene cursos en el turno
 /// del docente. Pura: no lee reloj, disco ni configuración.
 QVector<DocenteDef> docentesDelCentro(const Perfil& perfil);
 
 /// Recuentos esperados del conjunto aplicado (plan §4.8): 2 turnos, 3 eventos, 2 tipos de
-/// aula (general + cancha), 13 aulas, 85 materias, 2 planes, 95 cargas, 24 cursos, 32
-/// docentes, 272 asignaciones, 160 disponibilidades, 0 preferencias, duración 40 y 1 fila
+/// aula (general + cancha), 13 aulas, 85 materias, 2 planes, 95 cargas, 24 cursos, 33
+/// docentes, 272 asignaciones, 165 disponibilidades, 0 preferencias, duración 40 y 1 fila
 /// de configuración. Determinista y pura: contrasta lo escrito en la base (RF-8).
 Recuentos recuentosEsperados(const Perfil& perfil);
 
-/// Valida la plantilla de docentes (RF-6, plan §6.10): 32 docentes, identidades y contactos
-/// únicos, tope de 36 horas de aula, turno declarado y 16 por turno, 5 filas de
+/// Valida la plantilla de docentes (RF-6, plan §6.10): 33 docentes, identidades y contactos
+/// únicos, tope de 36 horas de aula, turno declarado y 16/17 por turno (018), 5 filas de
 /// disponibilidad en los días 1–5 dentro de la ventana de su turno y 272 asignaciones a
 /// materias del catálogo. Deja en `error` el primer problema encontrado, en español.
 bool validarDocentes(const Perfil& perfil, const QVector<DocenteDef>& docentes, QString* error);

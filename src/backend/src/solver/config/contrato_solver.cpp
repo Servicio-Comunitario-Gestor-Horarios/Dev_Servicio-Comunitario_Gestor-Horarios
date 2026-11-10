@@ -1,6 +1,7 @@
 #include "backend/solver/config/contrato_solver.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
+#include "common/aforo_aula.hpp"
 #include "common/tipo_general.hpp"
 
 namespace {
@@ -114,8 +115,27 @@ int aulasDelTipo(const SolverConfig& config, const QString& clave) {
     return aulas;
 }
 
+int aforoDelTipo(const QString& clave) {
+    return aforo_aula::aforoDeClave(clave);
+}
+
+int aforoDelAula(const SolverConfig& config, int indice) {
+    // Índice inválido → 1 (RF-7): un aula que no existe no puede tener aforo mayor.
+    if (indice < 0 || indice >= config.aulas.size()) return 1;
+    return aforoDelTipo(claveTipo(config.aulas[indice].tipo));
+}
+
+int posicionesDePar(const TurnoConfig& turno, const QVector<EventoConfig>& eventos) {
+    int total = 0;
+    for (const QVector<int>& segmento : segmentosTurno(turno, eventos))
+        total += segmento.size() / 2;   // ⌊|segmento|/2⌋
+    return total;
+}
+
 int capacidadDelTipo(const SolverConfig& config, const QString& clave) {
-    return aulasDelTipo(config, clave) * franjasDelTipo(config, clave).size();
+    // RF-6 (018): capacidad = aulas × franjas × aforo del tipo.
+    return aulasDelTipo(config, clave) * franjasDelTipo(config, clave).size()
+           * aforoDelTipo(clave);
 }
 
 bool docenteOptaPorMateria(const ProfesorSolverConfig& prof, int materiaIDx) {

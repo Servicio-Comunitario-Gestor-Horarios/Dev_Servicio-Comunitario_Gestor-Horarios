@@ -584,9 +584,9 @@ private slots:
         QCOMPARE(esperados.planes, 2);
         QCOMPARE(esperados.planMaterias, 95);
         QCOMPARE(esperados.cursos, 24);
-        QCOMPARE(esperados.docentes, 32);
+        QCOMPARE(esperados.docentes, 33);
         QCOMPARE(esperados.asignaciones, 272);
-        QCOMPARE(esperados.disponibilidades, 160);
+        QCOMPARE(esperados.disponibilidades, 165);
         QCOMPARE(esperados.preferencias, 0);
         QCOMPARE(esperados.duracionMinutos, 40);
         QCOMPARE(esperados.configuraciones, 1);
@@ -661,21 +661,15 @@ private slots:
         QCOMPARE(demandaDeAreaPorTurno(perfil, QStringLiteral("Educación Física"),
                                        QStringLiteral("Noche")), -1);
 
-        // El motivo cita las 48 clases frente a las 40 franjas de cancha de un turno y la
-        // acción pendiente (el aforo simultáneo de su spec).
+        // 018 (RF-8): con el aforo 2 la cancha ofrece 80 plazas por turno frente a 48 clases,
+        // así que el centro **sí** es generable y no hay motivo.
         const QString motivo = motivoNoGenerable(perfil);
-        QVERIFY2(!motivo.isEmpty(), "el centro real no debe declararse generable");
-        QVERIFY2(motivo.contains(QStringLiteral("48")), qPrintable(motivo));
-        QVERIFY2(motivo.contains(QStringLiteral("40")), qPrintable(motivo));
-        QVERIFY2(motivo.contains(QStringLiteral("Educación Física")), qPrintable(motivo));
-        QVERIFY2(motivo.contains(QStringLiteral("cancha")), qPrintable(motivo));
-        QVERIFY2(motivo.contains(QStringLiteral("aforo simultáneo")), qPrintable(motivo));
-        QVERIFY2(motivo.contains(perfil.turnos[0].nombre), qPrintable(motivo));
+        QVERIFY2(motivo.isEmpty(), qPrintable(motivo));
 
-        // Sin cancha el motivo identifica la causa.
+        // Sin cancha el motivo identifica la causa (por clave, no por texto exacto).
         Perfil sinCancha = perfil;
         for (AulaDef& aula : sinCancha.aulas) {
-            if (aula.tipo == QStringLiteral("Cancha")) {
+            if (aula.nombre == QStringLiteral("Cancha")) {
                 aula.tipo = QStringLiteral("Aula de estudio");
             }
         }
@@ -689,21 +683,49 @@ private slots:
         QVERIFY2(motivoNoGenerable(sinCursos).isEmpty(), "sin cursos no debe haber motivo");
     }
 
+    /// 018 (RF-8): la aritmética del aforo de la cancha del centro.
+    void capacidadCanchaDelCentro()
+    {
+        const CapacidadCancha cancha = capacidadCancha(perfilPorDefecto());
+
+        QCOMPARE(cancha.aulas, 1);
+        QCOMPARE(cancha.aforo, 2);
+        QCOMPARE(cancha.franjasPorTurno, 40);       // 5 días × 8 franjas
+        QCOMPARE(cancha.plazasPorTurno, 80);        // 40 × 2
+        QCOMPARE(cancha.plazasSemana, 160);         // 80 × 2 turnos
+        QCOMPARE(cancha.posicionesParPorTurno, 20); // 4 por día × 5 días
+        QCOMPARE(cancha.plazasParPorTurno, 40);     // 20 × 2
+        QCOMPARE(cancha.paresEfPorTurno, 24);       // 48 clases / 2
+        QCOMPARE(cancha.clasesEfPorTurno, 48);
+        QCOMPARE(cancha.clasesEfSemana, 96);
+
+        // Con dos canchas cada una aporta su aforo a la capacidad del tipo (RF-6).
+        Perfil dosCanchas = perfilPorDefecto();
+        dosCanchas.aulas[12].nombre = QStringLiteral("Cancha 2");
+        dosCanchas.aulas.append(AulaDef{QStringLiteral("Cancha 3"), 88, QStringLiteral("Patio"),
+                                        QStringLiteral("Descubierto"),
+                                        QStringLiteral("Cancha")});
+        QCOMPARE(capacidadCancha(dosCanchas).aulas, 2);
+    }
+
     // ── Docentes (RF-6) ───────────────────────────────────────────────────
     void docentesDelCentroYAsignaciones()
     {
         const Perfil& perfil = perfilPorDefecto();
         const QVector<DocenteDef> docentes = docentesDelCentro(perfil);
 
-        QCOMPARE(docentes.size(), 32);
+        QCOMPARE(docentes.size(), 33);
         QCOMPARE(asignacionesDe(docentes), 272);
-        QCOMPARE(disponibilidadesDe(docentes), 160);
+        QCOMPARE(disponibilidadesDe(docentes), 165);
         QCOMPARE(asignacionesEnTurno(docentes, QStringLiteral("Mañana")), 147);
         QCOMPARE(asignacionesEnTurno(docentes, QStringLiteral("Tarde")), 125);
 
         QCOMPARE(docentes[0].id, QStringLiteral("P001"));
         QCOMPARE(docentes[31].id, QStringLiteral("P032"));
         QCOMPARE(docentes[31].email, QStringLiteral("p032@centro-de-prueba.edu.ve"));
+        QCOMPARE(docentes[32].id, QStringLiteral("P033"));
+        QCOMPARE(docentes[32].email, QStringLiteral("p033@centro-de-prueba.edu.ve"));
+        QCOMPARE(docentes[32].turno, QStringLiteral("Tarde"));
 
         QSet<QString> nombres;
         QSet<QString> emails;
@@ -723,7 +745,7 @@ private slots:
             }
         }
         QCOMPARE(manana, 16);
-        QCOMPARE(tarde, 16);
+        QCOMPARE(tarde, 17);
 
         // Tabla por área de la spec (plan §4.7).
         const struct {
@@ -764,7 +786,8 @@ private slots:
         QCOMPARE(suma, 272);
 
         // Anclas de la spec: P029 solo «Biología, Ambiente y Tecnología» (5, no Biología),
-        // P012/P013/P015 reciben Biología (3 cada una) y P028 suma 10.
+        // P012/P013/P015 reciben Biología (3 cada una) y el reparto de idiomas de la 018:
+        // P028 se queda con Inglés (5) y P033 recibe Idiomas (5).
         const QSet<QString> bat =
             materiasDelArea(perfil, QStringLiteral("Biología, Ambiente y Tecnología"));
         const QSet<QString> biologia = materiasDelArea(perfil, QStringLiteral("Biología"));
@@ -784,8 +807,25 @@ private slots:
             }
             QCOMPARE(n, 3);
         }
+
+        // 018 (T4b): P028 (Inglés) y P033 (Idiomas) reparten las 10 asignaciones que antes
+        // tenía una sola docente, que acumulaba 48 clases en un turno de 40 franjas.
+        const QSet<QString> ingles =
+            materiasDelArea(perfil, QStringLiteral("Inglés y otras lenguas extranjeras"));
+        const QSet<QString> idiomas = materiasDelArea(perfil, QStringLiteral("Idiomas"));
         QCOMPARE(docentes[27].id, QStringLiteral("P028"));
-        QCOMPARE(docentes[27].materias.size(), 10);
+        QCOMPARE(docentes[27].materias.size(), 5);
+        for (const QString& materia : docentes[27].materias) {
+            QVERIFY2(ingles.contains(materia), qPrintable(materia));
+            QVERIFY2(!idiomas.contains(materia), qPrintable(materia));
+        }
+        QCOMPARE(docentes[32].id, QStringLiteral("P033"));
+        QCOMPARE(docentes[32].turno, QStringLiteral("Tarde"));
+        QCOMPARE(docentes[32].materias.size(), 5);
+        for (const QString& materia : docentes[32].materias) {
+            QVERIFY2(idiomas.contains(materia), qPrintable(materia));
+            QVERIFY2(!ingles.contains(materia), qPrintable(materia));
+        }
 
         // Los 2 añadidos (P031 y P032): 5 materias de Participación en la mañana y 1 de
         // Ciencias de la Tierra en la tarde, sin carga en ningún plan.
@@ -857,12 +897,25 @@ private slots:
         QVERIFY2(validarDocentes(perfil, docentes, &error), qPrintable(error));
         QVERIFY2(coberturaDelCentro(perfil, docentes, &error), qPrintable(error));
 
-        // 31 docentes.
+        // 32 docentes (falta P033).
         {
             QVector<DocenteDef> recortados = docentes;
             recortados.removeLast();
             QVERIFY(!validarDocentes(perfil, recortados, &error));
-            QVERIFY2(error.contains(QStringLiteral("32")), qPrintable(error));
+            QVERIFY2(error.contains(QStringLiteral("33")), qPrintable(error));
+        }
+
+        // Reparto por turno (018): 16 en la mañana y 17 en la tarde. Mover P032 a la mañana
+        // (con su disponibilidad en la ventana de ese turno) deja 17/16 y se rechaza.
+        {
+            QVector<DocenteDef> copia = docentes;
+            copia[31].turno = QStringLiteral("Mañana");
+            for (FranjaDef& franja : copia[31].disponibilidad) {
+                franja.inicio = QTime(7, 0);
+                franja.fin = QTime(12, 40);
+            }
+            QVERIFY(!validarDocentes(perfil, copia, &error));
+            QVERIFY2(error.contains(QStringLiteral("se esperan 16")), qPrintable(error));
         }
 
         // Identificador duplicado.
@@ -1116,6 +1169,52 @@ private slots:
             QString error;
             QVERIFY(!validarPerfil(perfil, &error));
             QVERIFY2(error.contains(QStringLiteral("24")), qPrintable(error));
+        }
+    }
+
+    /// 018 (RF-2, D-3): la guarda de la cancha se resuelve por **clave normalizada** y falla
+    /// con tipo recibido, clave esperada y acción cuando el tipo declarado no es la cancha.
+    void validarPerfilGuardaLaCanchaPorClave()
+    {
+        // Tipo de otra clave: fallo explícito, nunca aforo 1 en silencio.
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.tiposAula = {QStringLiteral("Campo")};
+            perfil.aulas[12].tipo = QStringLiteral("Campo");
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("Campo")), qPrintable(error));       // recibido
+            QVERIFY2(error.contains(QStringLiteral("cancha")), qPrintable(error));      // esperada
+            QVERIFY2(error.contains(QStringLiteral("debe llamarse")), qPrintable(error)); // acción
+        }
+
+        // Sin el aula declarada «Cancha».
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.aulas[12].nombre = QStringLiteral("Patio deportivo");
+            QString error;
+            QVERIFY(!validarPerfil(perfil, &error));
+            QVERIFY2(error.contains(QStringLiteral("declarar el aula «Cancha»")), qPrintable(error));
+        }
+
+        // Nombre visible distinto y misma clave: válido. Las materias de Educación Física
+        // apuntan al **tipo declarado** («CANCHA»), no al literal del código.
+        {
+            Perfil perfil = perfilPorDefecto();
+            perfil.tiposAula = {QStringLiteral("CANCHA")};
+            perfil.aulas[12].tipo = QStringLiteral("CANCHA");
+            QString error;
+            QVERIFY2(validarPerfil(perfil, &error), qPrintable(error));
+
+            QSet<QString> tipos = tiposDeAulasDe(perfil);
+            QCOMPARE(tipoFinalDeMateria(QStringLiteral("Educación Física 1º"), tipos),
+                     QStringLiteral("CANCHA"));
+            for (const MateriaAnio& materia : perfil.materias) {
+                if (materia.nombre.startsWith(QStringLiteral("Educación Física "))) {
+                    QCOMPARE(tipoFinalDeMateria(materia.nombre, tipos),
+                             QStringLiteral("CANCHA"));
+                }
+            }
         }
     }
 

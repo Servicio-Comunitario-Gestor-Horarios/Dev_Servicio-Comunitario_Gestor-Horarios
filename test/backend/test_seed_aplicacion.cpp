@@ -142,8 +142,8 @@ private slots:
         QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
         QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
 
-        // Recuentos del conjunto (plan §4.8): 85/95/24/13/3/2 y 32 docentes con 272
-        // asignaciones y 160 disponibilidades (32 × 5).
+        // Recuentos del conjunto (plan §4.8, 018): 85/95/24/13/3/2 y 33 docentes con 272
+        // asignaciones y 165 disponibilidades (33 × 5).
         QCOMPARE(resultado.recuentos.turnos, 2);
         QCOMPARE(resultado.recuentos.eventos, 3);
         QCOMPARE(resultado.recuentos.tiposAula, 2);
@@ -152,9 +152,9 @@ private slots:
         QCOMPARE(resultado.recuentos.planes, 2);
         QCOMPARE(resultado.recuentos.planMaterias, 95);
         QCOMPARE(resultado.recuentos.cursos, 24);
-        QCOMPARE(resultado.recuentos.docentes, 32);
+        QCOMPARE(resultado.recuentos.docentes, 33);
         QCOMPARE(resultado.recuentos.asignaciones, 272);
-        QCOMPARE(resultado.recuentos.disponibilidades, 160);
+        QCOMPARE(resultado.recuentos.disponibilidades, 165);
 
         // El conjunto no siembra preferencias (spec 012): recuento 0 y tabla vacía.
         QCOMPARE(resultado.recuentos.preferencias, 0);
@@ -523,9 +523,9 @@ private slots:
         QCOMPARE(contar(db, QStringLiteral("Materias")), 85);
         QCOMPARE(contar(db, QStringLiteral("PlanEstudio_Materia")), 95);
         QCOMPARE(contar(db, QStringLiteral("Cursos")), 24);
-        QCOMPARE(contar(db, QStringLiteral("Profesores")), 32);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 33);
         QCOMPARE(contar(db, QStringLiteral("Profesor_Materia")), 272);
-        QCOMPARE(contar(db, QStringLiteral("Disponibilidad_Profesor")), 160);
+        QCOMPARE(contar(db, QStringLiteral("Disponibilidad_Profesor")), 165);
         cerrarInspeccion(db);
     }
 
@@ -703,9 +703,9 @@ private slots:
                  qPrintable(errorRespaldo));
 
         // Recuentos correctos tras el reemplazo (plan §4.8).
-        QCOMPARE(resultado.recuentos.docentes, 32);
+        QCOMPARE(resultado.recuentos.docentes, 33);
         QCOMPARE(resultado.recuentos.asignaciones, 272);
-        QCOMPARE(resultado.recuentos.disponibilidades, 160);
+        QCOMPARE(resultado.recuentos.disponibilidades, 165);
         QCOMPARE(resultado.recuentos.planMaterias, 95);
         QCOMPARE(resultado.recuentos.eventos, 3);
         QCOMPARE(resultado.recuentos.tiposAula, 2);
@@ -810,7 +810,7 @@ private slots:
 
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
-        QCOMPARE(contar(db, QStringLiteral("Profesores")), 32);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 33);
         QCOMPARE(contar(db, QStringLiteral("PlanEstudio_Materia")), 95);
         cerrarInspeccion(db);
     }
@@ -851,7 +851,7 @@ private slots:
         QVERIFY2(resumen.contains(QStringLiteral("Cursos: 24")), qPrintable(resumen));
     }
 
-    void resumenTexto_informaClasesMatriculaCapacidadYNoGenerable()
+    void resumenTexto_informaClasesMatriculaCapacidadYGenerable()
     {
         const Perfil& perfil = perfilPorDefecto();
         const QString resumen = resumenTexto(perfil, recuentosEsperados(perfil));
@@ -871,19 +871,27 @@ private slots:
                  qPrintable(resumen));
 
         QVERIFY2(resumen.contains(QStringLiteral("Matrícula: 889 (579 + 310)")), qPrintable(resumen));
-        QVERIFY2(resumen.contains(QStringLiteral("Capacidad docente: 576 por turno (16 × 36)")),
+        QVERIFY2(resumen.contains(QStringLiteral("Capacidad docente: 1188 (576 + 612)")),
                  qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("Demanda: 414 Mañana · 462 Tarde")),
                  qPrintable(resumen));
 
-        // «No generable» con la causa y la acción (RF-9); no es un rechazo de la aplicación.
-        QVERIFY2(resumen.contains(QStringLiteral("Generable: no — ")), qPrintable(resumen));
-        QVERIFY2(resumen.contains(QStringLiteral("48 clases de Educación Física")),
+        // 018 (RF-8): el aforo 2 de la cancha hace generable el conjunto. El informe distingue
+        // la capacidad física (88 alumnos) del aforo de cursos (2) y cuenta los pares.
+        QVERIFY2(resumen.contains(QStringLiteral("Cancha: 1 aula · 40 franjas por turno · aforo 2 "
+                                                 "→ 80 plazas por turno · 160 en la semana")),
                  qPrintable(resumen));
-        QVERIFY2(resumen.contains(QStringLiteral("40 franjas de cancha")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Educación Física: 48 clases por turno · 96 en la "
+                                                 "semana → 24 pares por turno · 48 en la semana")),
+                 qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Pares de cancha: 20 posiciones por turno · 40 "
+                                                 "plazas de par → 24 ≤ 40 por turno")),
+                 qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Generable: sí")), qPrintable(resumen));
+        QVERIFY2(!resumen.contains(QStringLiteral("Generable: no")), qPrintable(resumen));
     }
 
-    void informeTrasAplicarNoFallaYMuestraElMotivo()
+    void informeTrasAplicarNoFallaYDeclaraGenerable()
     {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
@@ -894,10 +902,10 @@ private slots:
         const ResultadoAplicacion resultado = aplicar(opciones);
         QVERIFY2(resultado.ok(), qPrintable(resultado.detalle));
 
-        // El informe sale de los recuentos leídos de la base y no convierte el «no generable»
-        // en un fallo de la aplicación (RF-9).
+        // El informe sale de los recuentos leídos de la base y declara generable el conjunto
+        // (018, RF-8): el «generable» no cambia los datos ni el estado de la aplicación.
         const QString resumen = resumenTexto(perfilPorDefecto(), resultado.recuentos);
-        QVERIFY2(resumen.contains(QStringLiteral("Generable: no — ")), qPrintable(resumen));
+        QVERIFY2(resumen.contains(QStringLiteral("Generable: sí")), qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("876")), qPrintable(resumen));
         QVERIFY2(resumen.contains(QStringLiteral("889")), qPrintable(resumen));
         QCOMPARE(resultado.estado, EstadoAplicacion::Ok);
@@ -927,7 +935,7 @@ private slots:
         QSqlDatabase db = abrirInspeccion(ruta, m_contador);
         QVERIFY(db.isOpen());
         QCOMPARE(contar(db, QStringLiteral("Preferencia_Profesor")), 0);
-        QCOMPARE(contar(db, QStringLiteral("Profesores")), 32);
+        QCOMPARE(contar(db, QStringLiteral("Profesores")), 33);
         cerrarInspeccion(db);
     }
 
@@ -949,7 +957,7 @@ private slots:
                            "FROM PlanEstudio_Materia");
         const QStringList profesoresAntes =
             filasDe(antes, "SELECT id, nombre, email, telefono FROM Profesores");
-        QCOMPARE(contar(antes, QStringLiteral("Profesores")), 32);
+        QCOMPARE(contar(antes, QStringLiteral("Profesores")), 33);
         QCOMPARE(contar(antes, QStringLiteral("PlanEstudio_Materia")), 95);
         cerrarInspeccion(antes);
 
@@ -968,7 +976,7 @@ private slots:
 
         QSqlDatabase despues = abrirInspeccion(ruta, m_contador);
         QVERIFY(despues.isOpen());
-        QCOMPARE(contar(despues, QStringLiteral("Profesores")), 32);
+        QCOMPARE(contar(despues, QStringLiteral("Profesores")), 33);
         QCOMPARE(contar(despues, QStringLiteral("PlanEstudio_Materia")), 95);
         const QStringList planMateriasDespues =
             filasDe(despues, "SELECT codigo_PlanEstudio, id_Materia, curso, horas "

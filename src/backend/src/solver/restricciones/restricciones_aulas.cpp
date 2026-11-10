@@ -36,11 +36,13 @@ QString claveMateria(const SolverConfig& config, int m) {
 
 }  // namespace
 
-// D8 — un aula no aloja dos clases a la vez. Con la `y` de TODOS los cursos, la exclusividad
-// cubre también las clases desplazadas a otra aula (RF-3, spec 010).
+// D8 — un aula no aloja más clases a la vez que su aforo (018, RF-1/RF-2: cancha 2, resto 1).
+// Con la `y` de TODOS los cursos, la exclusividad cubre también las clases desplazadas a otra
+// aula (RF-3, spec 010). El grupo se construye siempre completo: el aforo es un máximo sobre
+// todas las clases de la franja, no sobre las de un curso.
 void restriccionAulaNoSolapada(
     CpModelBuilder& model,
-    [[maybe_unused]] const SolverConfig& config,
+    const SolverConfig& config,
     const VariablesSolver& vars
 ) {
     QMap<std::tuple<int, int, int>, std::vector<BoolVar>> yPorFranjaAula;   // (d, s, a)
@@ -51,8 +53,18 @@ void restriccionAulaNoSolapada(
         yPorFranjaAula[{d, s, a}].push_back(it.value());
     }
 
-    for (auto it = yPorFranjaAula.begin(); it != yPorFranjaAula.end(); ++it)
-        if (it.value().size() > 1) model.AddAtMostOne(it.value());
+    for (auto it = yPorFranjaAula.begin(); it != yPorFranjaAula.end(); ++it) {
+        if (it.value().size() <= 1) continue;
+
+        const int aula = std::get<2>(it.key());
+        const int aforo = aforoDelAula(config, aula);
+        if (aforo <= 1) {
+            // Aforo 1: comportamiento vigente, idéntico al de la 005/010.
+            model.AddAtMostOne(it.value());
+            continue;
+        }
+        model.AddLessOrEqual(LinearExpr::Sum(it.value()), aforo);
+    }
 }
 
 // D9 ampliada — una clase ocupa exactamente un aula, en los dos modos (fijos y móviles):

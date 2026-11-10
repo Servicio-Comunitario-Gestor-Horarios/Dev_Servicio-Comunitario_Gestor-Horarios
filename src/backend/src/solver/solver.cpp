@@ -131,12 +131,16 @@ QString causaSaturacionPorTipo(const SolverConfig& config) {
         const int demanda = demandaDelTipo(config, it.key());
         const int capacidad = capacidadDelTipo(config, it.key());
         if (demanda > capacidad) {
+            // 018 (RF-6): la capacidad se explica con sus tres factores y el aforo del tipo.
+            const int franjas = franjasDelTipo(config, it.key()).size();
             return QStringLiteral("Causa (2) conflicto de aula: el tipo «%1» necesita %2 bloques y "
-                                  "sus %3 aulas ofrecen %4 franjas.")
+                                  "sus %3 aulas ofrecen %4 plazas (%5 franjas × aforo %6).")
                 .arg(it.value())
                 .arg(demanda)
                 .arg(aulas)
-                .arg(capacidad);
+                .arg(capacidad)
+                .arg(franjas)
+                .arg(aforoDelTipo(it.key()));
         }
     }
     return {};

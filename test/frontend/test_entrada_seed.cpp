@@ -37,11 +37,11 @@ const seed::CursoDef* cursoDePerfil(const seed::Perfil& perfil, int anio,
 /// Verificación de integración del centro real **sin resolver**: siembra el conjunto,
 /// compone la entrada del solver con `construirEntrada` (plan, turno y matrícula de cada
 /// curso del perfil) y comprueba que es una entrada válida del contrato, que el preset
-/// hace ida y vuelta y que el informe declara el conjunto como no generable.
+/// hace ida y vuelta y que el informe declara el conjunto como **generable** (018).
 ///
-/// Sustituye al antiguo test de generación del seed (017-T4): con 48 clases de Educación Física
-/// por turno frente a 40 franjas de cancha, el conjunto aún no genera; esa verificación se hará
-/// al cerrar el aforo simultáneo (RF-9, RNF-2).
+/// Sustituye al antiguo test de generación del seed (017-T4). Con el aforo 2 de la cancha
+/// (48 clases de Educación Física ≤ 80 plazas por turno) el conjunto ya cabe; la generación
+/// real se verifica en el test lento `test_solver_centro_real` (018, RF-9).
 class TestEntradaSeed : public QObject
 {
     Q_OBJECT
@@ -122,7 +122,7 @@ private slots:
             QCOMPARE(config.dimensiones.num_dias, 5);
             QCOMPARE(config.dimensiones.num_slots_dia, 16);
             QCOMPARE(config.cursos.size(), 24);
-            QCOMPARE(config.profesores.size(), 32);
+            QCOMPARE(config.profesores.size(), 33);
             QCOMPARE(config.planes.size(), 2);
             QCOMPARE(config.materias.size(), 85);
             QCOMPARE(config.aulas.size(), 13);
@@ -150,7 +150,7 @@ private slots:
             }
 
             // Ida y vuelta del preset: el mismo JSON guardado y recargado con el cargador de
-            // «Cargar preset…» conserva los 24 cursos, 32 docentes y la hora de 40 min.
+            // «Cargar preset…» conserva los 24 cursos, 33 docentes y la hora de 40 min.
             const QString rutaPreset = dir.filePath(QStringLiteral("preset.json"));
             {
                 QFile archivo(rutaPreset);
@@ -163,7 +163,7 @@ private slots:
                 CargadorConfiguracionSolver::cargar(rutaPreset);
             QVERIFY2(recargado.ok, qPrintable(recargado.mensajeError));
             QCOMPARE(recargado.valor.cursos.size(), 24);
-            QCOMPARE(recargado.valor.profesores.size(), 32);
+            QCOMPARE(recargado.valor.profesores.size(), 33);
             QCOMPARE(recargado.valor.franja_horaria.duracion_minutos, 40);
             for (const CursoSolverConfig& curso : recargado.valor.cursos) {
                 const seed::CursoDef* delPerfil =
@@ -175,20 +175,28 @@ private slots:
                 QCOMPARE(curso.num_estudiantes, delPerfil->matricula);
             }
 
-            // El informe declara el conjunto como no generable, con la causa y la acción
-            // (RF-9): 48 clases de Educación Física por turno frente a 40 franjas de cancha.
+            // El informe declara el conjunto como **generable** con el aforo 2 (018, RF-8):
+            // 48 clases de Educación Física ≤ 80 plazas y 24 pares ≤ 40 plazas de par por turno.
             const QString resumen = seed::resumenTexto(perfil, sembrado.recuentos);
-            QVERIFY2(resumen.contains(QStringLiteral("Generable: no — ")), qPrintable(resumen));
-            QVERIFY2(resumen.contains(QStringLiteral("48 clases de Educación Física")),
+            QVERIFY2(resumen.contains(QStringLiteral("Generable: sí")), qPrintable(resumen));
+            QVERIFY2(resumen.contains(QStringLiteral("Cancha: 1 aula · 40 franjas por turno · "
+                                                     "aforo 2 → 80 plazas por turno · 160 en la "
+                                                     "semana")),
                      qPrintable(resumen));
-            QVERIFY2(resumen.contains(QStringLiteral("40 franjas de cancha")), qPrintable(resumen));
+            QVERIFY2(resumen.contains(QStringLiteral("Educación Física: 48 clases por turno · 96 "
+                                                     "en la semana → 24 pares por turno · 48 en la "
+                                                     "semana")),
+                     qPrintable(resumen));
+            QVERIFY2(resumen.contains(QStringLiteral("Pares de cancha: 20 posiciones por turno · "
+                                                     "40 plazas de par → 24 ≤ 40 por turno")),
+                     qPrintable(resumen));
             QVERIFY2(resumen.contains(QStringLiteral("Clases: 876 (EF 96; 48 por turno)")),
                      qPrintable(resumen));
             QVERIFY2(resumen.contains(QStringLiteral("Matrícula: 889 (579 + 310)")),
                      qPrintable(resumen));
 
             // No se resuelve: esta prueba termina en la validación del contrato. La
-            // generación real se exigirá al cerrar el aforo simultáneo (RNF-2).
+            // generación real se exige en el test lento del centro real (018, RF-9).
         }
         QSqlDatabase::removeDatabase(conexion);
     }
