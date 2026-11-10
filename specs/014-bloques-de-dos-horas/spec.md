@@ -2,6 +2,11 @@
 
 Estado: implementada (2026-11-07)
 
+> **Supersesión por la 018 (2026-11-10).** «La cancha compartida y el aforo simultáneo son una spec
+> futura» queda **superado**: la **018** hace **exigible** el aforo **2** de la cancha (dos cursos con
+> docentes distintos, en las mismas dos franjas) y el conjunto real **genera** con la Educación Física en la
+> cancha. El **fixture sin EF** de esta spec se **conserva** como comparación.
+
 > **Alcance.** Esta spec define **cómo se reparten las horas de cada curso en bloques de dos horas**,
 > **cada cuántos días puede repetirse una materia** y **dónde quedan las franjas libres**. En cada
 > **(curso, día, segmento)** las franjas ocupadas se agrupan en **pares adyacentes**; un par puede ser

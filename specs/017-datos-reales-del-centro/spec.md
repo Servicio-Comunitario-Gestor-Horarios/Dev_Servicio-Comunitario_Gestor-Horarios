@@ -2,10 +2,24 @@
 
 Estado: implementada (2026-11-09)
 
+> **Corrección de datos (2026-11-10).** El centro real **no generaba**: en la tarde, **P028** era la única
+> docente habilitada de **Idiomas** (36 clases de 31060) **e Inglés de 2.º** (12 de 31059) —**48 clases en un
+> turno de 40 franjas**— y el motor devolvía `INFEASIBLE` incluso sin Educación Física. Se **añade un docente
+> de apoyo, P033** (tarde), con **Idiomas** de 31060; **P028 conserva Inglés** de 31059 2.º. Con eso,
+> **P033 = 36 clases** y **P028 = 12** (ambos ≤ 40 franjas). Los recuentos pasan a **33 docentes**,
+> **165 disponibilidades** y **272 asignaciones** (las 5 filas de Idiomas pasan de P028 a P033: la suma no
+> cambia); la capacidad docente es **1188** (**576** mañana + **612** tarde). El resto de la spec no cambia.
+
+> **Supersesión por la 018 (2026-11-10).** Quedan **superados** el **RF-9** (el conjunto se declara «no
+> generable»), el **RF-10** en lo que toca a la **aceptación diferida** y **D-5/D-9** (EF en la cancha con el
+> aforo como spec futura): con el **aforo 2** de la 018 y la **corrección de datos P033** (2026-11-10) el
+> informe pasa a **«Generable: sí»** y la aceptación se hace con el **test lento** de la 018 (876 clases,
+> desvío 0, < 300 s). El resto de la 017 sigue vigente.
+
 > **Alcance.** Esta spec define el **conjunto de datos de desarrollo con el centro real** del periodo
 > **2026/2027**, que **sustituye** al conjunto sintético de la 008: dos planes (**31059** Media General y
 > **31060** Ciencias y Tecnología), **24 cursos** repartidos en **dos turnos**, **12 aulas de uso general
-> + 1 cancha**, **32 docentes** (30 del centro y 2 añadidos) y la matrícula del centro (**889 alumnos**)
+> + 1 cancha**, **33 docentes** (30 del centro, 2 añadidos y 1 de apoyo) y la matrícula del centro (**889 alumnos**)
 > documentada en el perfil. El conjunto **puebla una base de pruebas**; **no se declara generable** hasta
 > que exista el aforo simultáneo de la cancha (spec futura).
 >
@@ -92,7 +106,7 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 ## Historias de usuario
 
 - HU-1. Como dirección del liceo, quiero que la aplicación traiga **mi centro** (dos planes, 24 cursos,
-  12 aulas y una cancha, 32 docentes) para trabajar con datos reales.
+  12 aulas y una cancha, 33 docentes) para trabajar con datos reales.
 - HU-2. Como usuario académico, quiero poder **leer en el informe del conjunto y en la guía de datos de
   prueba** qué falta para generar mi horario (el aforo de la cancha), en lugar de encontrarme un fallo sin
   explicación.
@@ -229,20 +243,22 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 
 ### Docentes
 
-- **32 docentes:** las **30 posiciones** del documento (15 y 15, **sin cruzar turnos**) con **nombres
+- **33 docentes:** las **30 posiciones** del documento (15 y 15, **sin cruzar turnos**) con **nombres
   ficticios** (D-13) y **mismas áreas y mismos turnos**, más **2 añadidos** para las materias sin carga de
-  D-4 (uno por turno). El **tope sembrado es 36 horas académicas**; las 40 h/36 h del documento son su
-  **contrato**, no el tope.
-- **Tope:** **36 horas académicas** en los 32 (D-3). Capacidad total **1152**; por turno, **576**
-  (16 × 36) frente a **414** (mañana) y **462** (tarde).
+  D-4 (uno por turno) y **1 de apoyo** (P033, tarde) para **Idiomas**, añadido en la **corrección de datos
+  del 2026-11-10** (ver la nota tras el estado). El **tope sembrado es 36 horas académicas**; las 40 h/36 h
+  del documento son su **contrato**, no el tope.
+- **Tope:** **36 horas académicas** en los 33 (D-3). Capacidad total **1188**: **576** en la mañana
+  (16 × 36) frente a **414** de demanda, y **612** en la tarde (17 × 36) frente a **462**.
 - **Regla de asignación (fijada):** cada docente recibe **todas las materias-año del catálogo de las áreas
   que el documento le declara**, contando **una sola vez** las compartidas y **sin filtrar por año**; una
   materia se asigna a un docente **solo si su área tiene cursos en el turno de ese docente**. «BIOLOGÍA»
   habilita para **Biología** (31059, solo mañana) y para **Biología, Ambiente y Tecnología** (31060, solo
   tarde): por la regla, la primera va a los **tres** docentes de biología de la mañana y la segunda
   **solo a P029**, la única de BAT en la tarde. Las **materias de 5.º de 31060** (sin cursos) **sí cuentan**,
-  porque su área tiene cursos en la tarde; los **2 añadidos** cuentan con sus **6** materias sin carga.
-  **Total: 272 asignaciones**, derivables de la tabla siguiente (docentes habilitados × materias del área).
+  porque su área tiene cursos en la tarde; los **2 añadidos** cuentan con sus **6** materias sin carga y
+  **P033** con las **5** de Idiomas. **Total: 272 asignaciones**, derivables de la tabla siguiente
+  (docentes habilitados × materias del área).
 - **Mapeo de áreas del documento al catálogo** (nombres del documento → área sembrada):
 
 | Documento | Área del catálogo |
@@ -268,6 +284,10 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 - **Los 2 añadidos:** uno imparte «Participación en los Grupos…» (5 materias-año sin carga) y el otro
   «Ciencias de la Tierra» (1 materia-año sin carga); **no** dan clase en ningún curso sembrado y **sí
   cuentan** en las asignaciones (5 + 1).
+- **El docente de apoyo (P033, corrección del 2026-11-10):** **tarde**, área **Idiomas** (5 materias-año);
+  **P028** pasa a **Inglés** (5). Reparto: **P033 = 36 clases** (las 9 secciones de 31060) y **P028 = 12**
+  (Inglés de 2.º), ambos **por debajo de las 40 franjas** del turno. No se tocan horas ni el resto de la
+  plantilla.
 - **Derivación del total (272):**
 
 | Área (materias-año) | Docentes habilitados | Asignaciones |
@@ -286,7 +306,7 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 | Formación para la Soberanía Nacional (2) | 1 | 2 |
 | Orientación y Convivencia (5) | 8 | 40 |
 | Lengua y Literatura (5) | 2 | 10 |
-| Idiomas (5) | 1 | 5 |
+| Idiomas (5) | 1 (P033, tarde) | 5 |
 | Geografía, Historia y Soberanía Nacional (5) | 2 | 10 |
 | Orientación Vocacional (5) | 3 | 15 |
 | Innovación Tecnológica y Productividad (5) | 2 | 10 |
@@ -300,7 +320,8 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
   mañana. Dato válido, no un error.
 - **Turno del docente (no persistido):** el turno es del **perfil** y se **materializa en la
   disponibilidad** (un rango por día dentro de la ventana de ese turno); el modelo de docentes no tiene
-  turno. «15 y 15» se comprueba en el perfil.
+  turno. La plantilla queda en **16 en la mañana y 17 en la tarde** (los 30 del centro + 2 añadidos +
+  P033), y se comprueba en el perfil.
 - **Cobertura por turno:** las **12 áreas** de 31059 en la mañana y las **8** de 2.º más las **10** de
   31060 en la tarde tienen al menos un docente habilitado en su turno.
 - **Disponibilidad:** **un rango por día, de lunes a viernes**, que cubre la **ventana completa del turno**
@@ -320,9 +341,9 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 | Planes de estudio | 2 |
 | Cargas plan-materia | 95 |
 | Cursos | 24 |
-| Docentes | 32 |
+| Docentes | 33 |
 | Materias asignadas | 272 |
-| Disponibilidades (32 × 5 días) | 160 |
+| Disponibilidades (33 × 5 días) | 165 |
 | Preferencias | 0 |
 
 ## Requisitos funcionales
@@ -412,8 +433,9 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 
 ### RF-6. Docentes, materias y cobertura
 
-- **EL SISTEMA sembrará 32 docentes:** las **30 posiciones** del centro con **nombres ficticios**, las
-  **mismas áreas y los mismos turnos** y **2 docentes añadidos** para las materias sin carga.
+- **EL SISTEMA sembrará 33 docentes:** las **30 posiciones** del centro con **nombres ficticios**, las
+  **mismas áreas y los mismos turnos**, **2 docentes añadidos** para las materias sin carga y **1 de apoyo**
+  (P033, tarde) para **Idiomas** (corrección del 2026-11-10).
 - **EL SISTEMA asignará a cada posición del centro las áreas que el documento le declara**, mediante el
   mapeo de esta spec y la **regla de turno**: la materia se asigna **solo si su área tiene cursos en el
   turno del docente**. «Biología» habilita para las dos áreas biológicas; por la regla, **Biología** va a
@@ -424,8 +446,8 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 - **EL SISTEMA declarará el tope de horas de aula en 36 horas académicas** para todos los docentes y lo
   informará en el perfil (el **contrato** del centro es 40 h, y 36 h en dos docentes; el tope sembrado es
   36 para todos).
-- **EL SISTEMA dará a los 30 docentes del centro su turno** (15 y 15, sin cruzar turnos) y a los 2
-  añadidos **uno por turno**. El turno **no se persiste**: es del perfil y se **materializa en la
+- **EL SISTEMA dará a los 30 docentes del centro su turno** (15 y 15, sin cruzar turnos), a los 2
+  añadidos uno por turno y a **P033 la tarde** (16 en la mañana y 17 en la tarde en total). El turno **no se persiste**: es del perfil y se **materializa en la
   disponibilidad**; «15 y 15» se comprueba en el perfil.
 - **EL SISTEMA declarará la disponibilidad como la ventana completa del turno** (07:00–12:40 o
   12:40–18:10), **un rango por día de lunes a viernes**.
@@ -528,10 +550,10 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
   aplicaciones son equivalentes salvo las marcas de auditoría.
 - **RNF-5. Mensajes en español:** todo rechazo identifica la entidad, el parámetro o la regla incumplida
   con el valor recibido y, cuando exista, la acción disponible.
-- **RNF-6. Datos personales ficticios:** ningún nombre, correo ni teléfono real; los 32 docentes usan
+- **RNF-6. Datos personales ficticios:** ningún nombre, correo ni teléfono real; los 33 docentes usan
   identidades ficticias con la estructura del centro (constitución §5).
 - **RNF-7. Coherencia aritmética verificada:** la paridad de las horas, el total de clases (876), la
-  demanda por turno (414/462), la capacidad docente (1152), la demanda de EF (96), las **272 materias
+  demanda por turno (414/462), la capacidad docente (1188), la demanda de EF (96), las **272 materias
   asignadas** (contrastadas con la tabla por área) y la **duración de 40 min** se comprueban de forma
   automática; una cifra que no cuadre es un fallo.
 - **RNF-8. Trazabilidad:** cada RF tendrá al menos una comprobación verificable en las tareas.
@@ -544,10 +566,10 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
   materias usadas por curso (RF-2).
 - **Materia del catálogo sin carga (6):** válida y documentada; no entra en las horas ni en las clases, y
   un docente puede tenerla asignada sin dar clase (RF-3, RF-6).
-- **Materia con un único docente habilitado en el turno y carga por encima de sus 36 h:** el exceso es
-  **blando** (prioridad S1) y se informa; no vuelve infactible el conjunto. Ocurre en la **tarde** con
-  **Inglés + Idiomas**: una sola docente habilitada (**P028**, la única de Inglés+Idiomas en la tarde),
-  **48** clases y **12** de exceso (RF-6, RF-8).
+- **Materia con un único docente habilitado en el turno:** **Idiomas** queda con **P033** (36 clases = su
+  tope exacto) e **Inglés de 2.º** con **P028** (12). Antes, una sola docente acumulaba **48** clases en la
+  tarde (**> 40 franjas**) y el conjunto **no generaba**; la **corrección de datos del 2026-11-10** lo
+  resolvió con el docente de apoyo, sin tocar horas (RF-6, RF-8).
 - **Materia asignada de un año que no tiene cursos en el turno del docente:** la regla asigna por **área** y
   turno, no por año, así que puede ocurrir (Arte 1.º a un docente de la tarde); es válida, no es
   ejercitable y no rompe la cobertura. Las **18** de 5.º de 31060 son el caso mayor (RF-6).
@@ -593,11 +615,11 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 ## Criterios de finalización
 
 1. Aplicar el conjunto por defecto sobre una base vacía deja **los dos planes reales** con sus áreas y
-   horas, **24 cursos con turno y aula**, **12 aulas + 1 cancha**, **32 docentes** con sus materias, **2
+   horas, **24 cursos con turno y aula**, **12 aulas + 1 cancha**, **33 docentes** con sus materias, **2
    turnos con 3 eventos** y la **duración de la hora académica en 40 min** (RF-1 … RF-7).
 2. La aritmética cuadra y se verifica: **34/34/34/36/34** y **40/40/40/40/40** (todas pares);
    **8/8/9/10/10** y **10/10/10/10/10** áreas por año; **876 clases** (96 de EF); **889 alumnos**;
-   demanda **414/462** por turno y capacidad docente **1152** (RF-2, RNF-7).
+   demanda **414/462** por turno y capacidad docente **1188** (RF-2, RNF-7).
 3. El catálogo tiene **85 materias** (**79 con carga**, 16 compartidas entre planes, y **6 sin carga**
    documentadas) y **95 cargas plan-materia**; no hay materias duplicadas (RF-3).
 4. Las 24 parejas año+sección son **únicas** gracias a las letras libres de 31060, todas de **un
@@ -606,8 +628,8 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
    pueden compartirla; la cancha no es referencia de nadie; las capacidades son 44 y 88 (RF-5).
 6. La cobertura por turno se cumple **a nivel de datos** para las 12 áreas de 31059 en la mañana y las 8 de
    2.º más las 10 de 31060 en la tarde; las **272** materias asignadas coinciden con la derivación por área
-   (**Biología solo en la mañana**, «Biología, Ambiente y Tecnología» **solo a P029**) y los 2 docentes
-   añadidos tienen sus **6** materias sin carga (RF-6, RNF-7).
+   (**Biología solo en la mañana**, «Biología, Ambiente y Tecnología» **solo a P029**, **Idiomas a P033** e
+   **Inglés de 2.º a P028**) y los 2 docentes añadidos tienen sus **6** materias sin carga (RF-6, RNF-7).
 7. Los turnos encajan: mañana **8 × 40 + 20** y tarde **8 × 40 + 10**, con receso en ambos y acto cívico en
    la mañana (RF-7).
 8. El informe coincide con el perfil —recuentos, horas por año, **clases por plan (31059 516 · 31060 360)**,
@@ -630,4 +652,5 @@ persisten** (viven en el perfil; el turno se materializa en la disponibilidad), 
 es **configuración** que el conjunto deja aplicada, el tope sembrado es **36** aunque el contrato del
 centro sea 40/36, las **272** asignaciones se derivan de la regla de área **y turno** con su tabla, la
 **ventana de la mañana cierra a las 12:40** por los dos eventos (desfase 20/10), y **ninguna verificación
-genera** con este conjunto.
+genera** con este conjunto. La **corrección de datos del 2026-11-10** (P033, 33 docentes, 165
+disponibilidades, capacidad 1188) está en la nota tras el estado y solo cambia cifras y una posición.

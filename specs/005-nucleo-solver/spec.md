@@ -2,6 +2,11 @@
 
 Estado: implementada (2026-10-17)
 
+> **Supersesión por la 018 (2026-11-10).** La invariante **D8** («ni un aula tiene dos clases a la vez»)
+> pasa a **exclusividad por aforo**: un aula admite hasta su **aforo simultáneo** de clases en la misma
+> franja —**cancha 2**, resto **1**—, regla del motor por tipo y hardcodeada. Detalle en
+> `specs/018-aforo-simultaneo-cancha/` y en `docs/constitution.md` §7.1.3/§7.1.5.
+
 > **Cierre.** Implementada y aprobada por el reviewer (`VEREDICTO: APROBADO`, 2026-10-17): la
 > rectificación se hizo en **T11**. La **T10 se cerró el 2026-10-29** con **RF-13** y la **cobertura de
 > RNF-4** (`7e3ee0b`, `70ea509`, `7354c7a`; suite 54/54), documentados en `estado.md` y `MEMORY.md`.

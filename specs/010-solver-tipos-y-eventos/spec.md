@@ -2,6 +2,12 @@
 
 Estado: implementada (2026-10-27)
 
+> **Supersesión por la 018 (2026-11-10).** Quedan superados: la **D8** (exclusividad por aforo), la
+> **capacidad de un tipo** (ahora `aulas × franjas × aforo`), el mensaje de la **causa (2)** (cita las
+> **cuatro cifras**: demanda, aulas, franjas y aforo) y la **comprobación de salida** (P4 cuenta por aforo y
+> rechaza **pares cruzados** en la cancha: dos clases simultáneas solo si ocupan exactamente las mismas dos
+> franjas). El contrato **2.0** no cambia.
+
 > **Anotado por la 015 (2026-11-05).** Quedan supersedidas la parte de «sin cambio de esquema» y la de «el
 > nombre que debe usar la semilla»: la existencia y el nombre los garantiza la base y la siembra los
 > reutiliza. Se mantienen la convención, la regla del aula de referencia y el contrato 2.0 (015).

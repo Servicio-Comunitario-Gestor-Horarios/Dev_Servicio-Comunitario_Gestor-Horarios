@@ -1,16 +1,44 @@
 # Estado 017
 
-Fase: **cerrada** (implementación T1–T10, validación **APROBADA** y cierre el **2026-11-09**)
+Fase: **cerrada** · **corrección de datos (2026-11-10)** (docente de apoyo **P033**; desbloquea la T5 de la
+018)
 Aprobaciones: **spec 2026-11-08** · **plan/tareas 2026-11-08** (QA del plan aplicado) · **exceso de
 duración de T1/T4/T5 aceptado por el usuario el 2026-11-08** · **implementación 2026-11-09** · **validación
-2026-11-09** (CAMBIOS NECESARIOS → 6 hallazgos + 3 residuales aplicados y verificados)
+2026-11-09** (CAMBIOS NECESARIOS → 6 hallazgos + 3 residuales aplicados y verificados) · **corrección de
+datos 2026-11-10** (decisión del usuario)
 Base: `b5844b580d495397903e5d3bfd8756aa41d98f05` (**sha real de `HEAD`**, verificado con `git rev-parse
 HEAD` el 2026-11-08; la `Base` del encargo, `b5844b515a0c6ac9f0e0d4a6b3c1e5f7a9b2c3d4`, **no existe**: solo
 coincidía el prefijo corto `b5844b5`).
 Dudas abiertas: **ninguna**.
-Siguiente paso: **nada pendiente en esta spec.** Después: **aforo simultáneo por aula (cancha ×2, fijado en
-2)**, **rendimiento/descomposición** y **decidir los commits** de la 017 (hoy en el árbol, sin commitear).
+Siguiente paso: **nada pendiente en esta spec**; la **corrección del 2026-11-10** la aplica la **018 en
+T4b** (P033 + recuentos 33/165/272 en los tests). Después: **aforo simultáneo (018)**, **rendimiento** y
+**decidir los commits** de la 017 y la 018.
 Veredicto: **APROBADO (2026-11-09)**.
+
+## Cambio de datos (2026-11-10)
+
+**Motivo.** El conjunto **no generaba**: en la tarde, **P028** era la única docente habilitada de
+**Idiomas** (36 clases de 31060) **e Inglés de 2.º** (12 de 31059) → **48 clases en un turno de 40
+franjas**, `INFEASIBLE` incluso sin Educación Física (T5 de la 018, bloqueada).
+
+**Decisión del usuario:** **añadir un docente de apoyo** (no repartir con otros existentes, no tocar horas).
+**Reparto:** **P033** (tarde) → **Idiomas** (5 materias-año); **P028** → **Inglés** (5). Cada uno queda muy
+por debajo de las 40 franjas: **P033 36 clases** (las 9 secciones de 31060) y **P028 12** (Inglés de 2.º).
+
+**Recuentos nuevos (sustituyen a los del 2026-11-07):**
+
+| Concepto | Antes | Ahora |
+|---|---|---|
+| Docentes | 32 (30 + 2 añadidos) | **33** (30 + 2 añadidos + **1 de apoyo**) |
+| Docentes por turno | 16 / 16 | **16 mañana / 17 tarde** |
+| Materias asignadas | 272 | **272** (las 5 filas de Idiomas pasan de P028 a P033; la suma no cambia) |
+| Disponibilidades | 160 | **165** (33 × 5) |
+| Capacidad docente | 1152 | **1188** (576 mañana + **612** tarde) |
+| Clases | 876 | **876** (sin cambio) |
+| «18» de 5.º de 31060 | 18 | **18** (Idiomas 5.º sigue con un solo docente) |
+
+Lo demás —planes, 85 materias, 95 cargas, 24 cursos, 13 aulas, 3 eventos, 40 min, matrícula 889— **no
+cambia**.
 
 ## Decisiones cerradas (2026-11-07)
 
@@ -30,14 +58,14 @@ Veredicto: **APROBADO (2026-11-09)**.
 | D-12 | Los cursos de 31060 que chocan usan **letras libres** del año (documentado); la **identidad (año, sección, plan)** es **spec propia**. |
 | D-13 | **Nombres ficticios** con la misma estructura (30 posiciones, **mismas áreas y turnos**) y **tope de aula 36**. |
 
-## Cifras verificadas (2026-11-07, tras el QA)
+## Cifras verificadas (2026-11-07, tras el QA; **docentes y disponibilidades superadas el 2026-11-10**)
 
 - **Horas por año:** 31059 **34/34/34/36/34** (todas **pares**); 31060 **40/40/40/40/40**.
 - **Áreas por año:** 31059 **8/8/9/10/10**; 31060 **10/10/10/10/10**.
 - **Clases:** **876** en el conjunto sembrado; **96** de EF (**48 por turno**) y **780** sin EF; el plan
   real completo (con las dos áreas excluidas) daría **944**.
-- **Demanda por turno:** mañana **414**, tarde **462**. **Capacidad docente:** 32 × 36 = **1152**
-  (576 por turno).
+- **Demanda por turno:** mañana **414**, tarde **462**. **Capacidad docente:** 33 × 36 = **1188**
+  (576 mañana + 612 tarde; antes de la corrección del 2026-11-10: 32 × 36 = 1152).
 - **Catálogo:** **85** materias = **79 con carga** (16 compartidas entre planes) + **6 sin carga**;
   **95** cargas plan-materia.
 - **Cursos:** **24** (12 mañana 31059; 12 tarde = 31059 2.º + 31060). Parejas año+sección **únicas** con
@@ -46,7 +74,8 @@ Veredicto: **APROBADO (2026-11-09)**.
 - **Aulas:** **13** (12 generales de capacidad 44 + 1 cancha de 88). **Tipos:** 2 leídos de la base
   (general + cancha), 1 declarado por el conjunto.
 - **Docentes:** **32** (30 del centro + 2 añadidos); **272** materias asignadas; **160** disponibilidades
-  (32 × 5); **0** preferencias; **3** eventos.
+  (32 × 5); **0** preferencias; **3** eventos. *(Superado el 2026-11-10: **33** docentes y **165**
+  disponibilidades; ver «Cambio de datos».)*
 - **Duración de la hora académica (configuración):** **40 min** (el valor de fábrica es 35).
 - **Huecos del centro (futuro):** 12 cursos con **6**, 3 con **4** y 9 con **0** → **84**.
 
@@ -156,7 +185,7 @@ Una línea por tarea; la evidencia completa está en `journal.md`.
 
 | Tarea | Qué quedó |
 |---|---|
-| **T1** | **Centro real sembrado**: 2 planes (31059 34/34/34/36/34 y 31060 40×5), **85 materias** (79 con carga + 6 sin carga), **95 cargas**, **24 cursos con turno** (12 + 12; letras libres en 31060) y **matrícula 889** (579 + 310), **13 aulas** (12 de 44 compartidas entre turnos + **cancha** de 88), **32 docentes** (30 + 2 añadidos), **272 asignaciones**, **160 disponibilidades**, tope **36 h**, **40 min**, **3 eventos** y **876 clases** (96 de EF, 48 por turno). Fuera variantes, planes derivados, conmutación y `--variante`/`--solo-docentes`. |
+| **T1** | **Centro real sembrado**: 2 planes (31059 34/34/34/36/34 y 31060 40×5), **85 materias** (79 con carga + 6 sin carga), **95 cargas**, **24 cursos con turno** (12 + 12; letras libres en 31060) y **matrícula 889** (579 + 310), **13 aulas** (12 de 44 compartidas entre turnos + **cancha** de 88), **33 docentes** (30 + 2 añadidos + **1 de apoyo, P033**), **272 asignaciones**, **165 disponibilidades**, tope **36 h**, **40 min**, **3 eventos** y **876 clases** (96 de EF, 48 por turno). Fuera variantes, planes derivados, conmutación y `--variante`/`--solo-docentes`. |
 | **T2** | Informe con `Centro`, `Clases: 876 (EF 96; 48 por turno)`, **`Clases por plan: 31059 516 · 31060 360`**, **`Clases por año: 31059 68/102/102/108/136 · 31060 120/80/80/80`** (el 5.º de 31060, sin cursos, no se imprime), `Matrícula: 889 (579 + 310)`, capacidad 576 / demanda 414–462 y **`Generable: no`** con `motivoNoGenerable` (**48** clases de EF frente a **40** franjas de cancha por turno). **V3 aplicado** (informe y tests). |
 | **T3** | **CLI sin variantes**: ayuda con el centro real y aviso de que no genera; `--variante` y `--solo-docentes` → **código 1**; código 6 retirado. |
 | **T4** | **`test_entrada_seed`**: compone con `construirEntrada` los 24 cursos (`numEstudiantes = matricula`), valida **V1–V19** y hace ida y vuelta del preset (24 cursos, 32 docentes, 40 min) **sin resolver**. |
@@ -178,7 +207,7 @@ Una línea por tarea; la evidencia completa está en `journal.md`.
 | Aplicación del seed sobre base nueva | **0,089 s** (0,089–0,18 s en las ejecuciones; límite 15 s) |
 | `ctest --preset backend` | **61/61** (verificado el 2026-11-09 tras V3) |
 | `ctest --preset full-release` | **66/66** (sin `test_generacion_seed`, con `test_entrada_seed`) |
-| Semilla (base nueva) | 85 materias · 24 cursos · 32 docentes · 272 asignaciones · 160 disponibilidades · 13 aulas · 3 eventos · 95 cargas · 2 tipos · **40 min** · matrícula **889** |
+| Semilla (base nueva) | 85 materias · 24 cursos · **33 docentes** · 272 asignaciones · **165** disponibilidades · 13 aulas · 3 eventos · 95 cargas · 2 tipos · **40 min** · matrícula **889** (tras la corrección del 2026-11-10) |
 | Informe del conjunto | `Clases por plan: 31059 516 · 31060 360` y `Clases por año: 31059 68/102/102/108/136 · 31060 120/80/80/80`; `Generable: no` (48 > 40) |
 
 **Línea base:** **61** (`backend`) y **66** (`full-release`), medida el 2026-11-08 (el QA del plan anotaba
@@ -209,16 +238,17 @@ marcadas. Sin pendientes para el veredicto.
 
 ## Deudas y notas
 
-- **El conjunto no genera** hasta el **aforo simultáneo** de la cancha: **48** clases de EF por turno frente
-  a **40** franjas (con aforo ×2: **96 ≤ 160** y **48 ≤ 80**). La generación y su medición se harán en esa
-  spec.
+- **El conjunto no generaba** hasta el **aforo simultáneo**: **48** clases de EF por turno frente a **40**
+  franjas (con aforo ×2: **96 ≤ 160** y **48 ≤ 80**). La **018** ya implementó el aforo (T1–T4) y la
+  **corrección del 2026-11-10** (P033) elimina el otro cuello de botella (48 clases de idiomas en la tarde);
+  la **T5 lenta de la 018** verifica la generación (876 clases, desvío 0, < 300 s).
 - **Paquete demo:** `GESTOR_PACK_DEMO`/`datos-demo/` **no se regenera** con el centro real; sigue con el
   conjunto sintético o se retira en otra spec.
 - **«No generable» no es función de interfaz** en esta entrega: vive en el informe del conjunto, la CLI y
   las guías. La UI (y la mención al `NoFactible` «en la vista» de la guía del frontend) es **deuda del
   aforo**.
 - **`seed.md`** sigue versionado con **nombres reales**; el conjunto derivado usa **ficticios**
-  (`P001`–`P032`) y no se amplía el documento.
+  (`P001`–`P033`) y no se amplía el documento.
 - **Specs futuras:** la **identidad (año, sección, plan)** y el **aforo simultáneo por aula**.
 - **`CMAKE_GUIDE.md`** conserva los recuentos del conjunto sintético en su apartado del **paquete demo**
   (por eso queda **excluido** del grep de T9).
@@ -303,3 +333,11 @@ marcadas. Sin pendientes para el veredicto.
   `spec.md` pasa a **`implementada (2026-11-09)`** y `Veredicto: APROBADO (2026-11-09)`. El parche de
   `MEMORY.md` se entrega al coordinator. Deudas en «Deudas y notas»; siguiente: **aforo (cancha ×2),
   rendimiento y commits**.
+- **2026-11-10 — corrección de datos (P033).** La T5 de la **018** quedó bloqueada: la tarde era
+  `INFEASIBLE` porque **P028** acumulaba **48 clases** (Idiomas 36 + Inglés de 2.º 12) en un turno de **40
+  franjas**. Por decisión del usuario se **añade el docente de apoyo P033** (tarde, **Idiomas**) y **P028**
+  pasa a **Inglés**: **P033 36** y **P028 12**. Recuentos: **33 docentes** (16 mañana / 17 tarde), **165
+  disponibilidades**, **272 asignaciones** (sin cambio de suma), capacidad **1188**; lo demás no cambia.
+  La spec y este estado recogen el cambio en la nota tras el estado y en «Cambio de datos»; la **018**
+  actualiza T4b y ejecuta **T5** después. La spec sigue **`implementada`** (corrección de datos, no
+  reapertura).

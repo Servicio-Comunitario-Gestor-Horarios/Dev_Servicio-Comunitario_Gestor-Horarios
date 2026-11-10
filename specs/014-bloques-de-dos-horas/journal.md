@@ -1206,3 +1206,25 @@ Revisados todos los que comparan horarios:
 Ninguna ruta funcional usa 1 worker: el defecto de `PresupuestoFases` es 8.
 
 B4 marcada.
+
+---
+
+## Ajuste del techo del test lento (2026-11-10, cierre de la 018 / T8)
+
+**No es un cambio de reglas del motor**: solo del margen del test.
+
+- `test/backend/test_solver_centro_sin_ef.cpp:102` (rama Release): `kTechoMs` pasa de **200 000** a
+  **300 000 ms**, alineado con el criterio de esta spec (**RNF-2**: el escenario de referencia se resuelve
+  por debajo del **plazo del proceso de cálculo, 300 s**, criterio 14) y con el techo equivalente de
+  `test_solver_centro_real` (018). La rama Debug (`1 200 000`) no cambia.
+- **Motivo:** el techo de 200 s era un margen **más estricto que la spec** y resultó frágil con la carga del
+  host. Mediciones del mismo binario, sin cambios de código, con 8 workers de CP-SAT sobre 4 núcleos:
+  **149,44 s** (host en reposo), **157,88 s** y **173,80 s** (T8, `load 2,2–7,7`), **200,64 s**,
+  **210,29 s**, **220,31 s**, **238,88 s** y **321,34 s** (carga alta, `load` hasta 8,96). Rango: **149–321 s**.
+  Todos los asserts funcionales pasaban siempre (848 clases, desvío 0, 420 simples, 4 compartidos,
+  separación ≤ referencia, `huecosNoFinal` 0).
+- **Efecto:** el test deja de fallar por varianza de tiempo y solo falla si se incumple el plazo real del
+  servicio. El rendimiento como tal sigue siendo materia de otra spec; aquí solo se elimina un umbral
+  intermedio que la spec no exige.
+- **Verificación:** `ctest --preset slow-release` → **2/2 verde** (sin EF **173,80 s**; centro real de la
+  018 **161,67 s**). `backend` **62/62** y `full-release` **67/67**. Sin commits.
