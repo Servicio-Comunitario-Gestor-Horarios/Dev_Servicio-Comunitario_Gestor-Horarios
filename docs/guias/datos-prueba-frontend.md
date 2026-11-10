@@ -54,7 +54,7 @@ Referencias: `docs/interfaz-frontend.md` §2.4.2 y §2.4.4 · `specs/005-nucleo-
 | Turnos | 2 | Mañana 07:00–12:40 · Tarde 12:40–18:10; **8 franjas de 40 min** |
 | Eventos | 3 | receso 08:20–08:30 y acto cívico 08:30–08:40 (mañana); receso 14:00–14:10 (tarde) |
 | Tipos de aula | 2 | general del esquema (`Aula de estudio`) + `Cancha`; toda aula y materia referencia uno |
-| Docentes | 32 | 272 materias asignadas y 160 disponibilidades; tope de 36 horas académicas |
+| Docentes | 33 | 272 materias asignadas y 165 disponibilidades; tope de 36 horas académicas; 16 en la mañana y 17 en la tarde |
 | Matrícula | 889 | 579 de 31059 + 310 de 31060; 32–44 por curso (44 en 4.º A y 4.º B) |
 | Preferencias | 0 | el conjunto no siembra preferencias |
 | Clases | 876 | 96 de Educación Física (48 por turno); 414 de mañana y 462 de tarde |
@@ -154,25 +154,29 @@ Los **24 cursos se siembran con su `turno`** (12 Mañana y 12 Tarde) y su aula d
 
 ---
 
-## 5. Un solo profesorado y un conjunto que todavía no genera
+## 5. Un solo profesorado y un conjunto que genera
 
 - **No hay profesorados alternativos ni conjuntos de ejemplo inválidos.** La plantilla es única:
-  **32 docentes** (30 posiciones del centro + 2 añadidos) con **272 materias asignadas**, tope de
-  **36** horas académicas y disponibilidad de lunes a viernes en la ventana de su turno. La
-  clasificación de errores V13 por conjuntos inválidos ya no aplica.
-- **El conjunto no es generable todavía** (D-5, D-9). La Educación Física de cada turno son **48
-  clases** frente a **40 franjas** de cancha (aforo 1); con el aforo simultáneo cabría (48 ≤ 80 por
-  turno), pero es una spec posterior. **Esto no es una función de interfaz en esta entrega (RF-9):**
-  `src/frontend/src` no se ha tocado y **no se exige** a la vista informar ni bloquear nada. Queda
-  como **comportamiento futuro / deuda** para cuando la spec del aforo simultáneo habilite la
-  generación: entonces el resultado se informará como `NoFactible` (no como error de validación) con
-  la causa y no se ofrecerá guardar el horario. La aceptación de generación se hará al cerrar el
-  aforo.
-- **Exceso blando conocido:** en la tarde, Inglés + Idiomas suman 48 clases con una sola docente
-  habilitada (12 h por encima del tope). Es información, no un error de la interfaz.
+  **33 docentes** (30 posiciones del centro + 2 añadidos + el apoyo de idiomas **P033**) con **272
+  materias asignadas** y **165 disponibilidades**, tope de **36** horas académicas y disponibilidad
+  de lunes a viernes en la ventana de su turno (16 en la mañana y 17 en la tarde). La clasificación
+  de errores V13 por conjuntos inválidos ya no aplica.
+- **El conjunto es generable (018).** La cancha tiene **aforo 2**: dos cursos con docentes distintos
+  pueden compartirla si su bloque de dos horas ocupa **las mismas dos franjas** (nunca pares
+  cruzados). La Educación Física de cada turno son **48 clases** frente a **80 plazas** de cancha
+  (40 franjas × 2) y **96 ≤ 160** en la semana; en pares completos, **24 ≤ 40 plazas de par**. El
+  informe del seed declara **«Generable: sí»** y la aceptación lenta
+  (`test_solver_centro_real`) resuelve **876 clases** en menos de 300 s (medido: 232 s).
+- **La vista de horario y su estimación de ocupación quedan fuera del alcance de la 018.** No es
+  deuda de esta entrega: `src/frontend/src` no se toca y no se exige a la vista pintar dos cursos en
+  la misma aula y franja ni informar del aforo 2 de la cancha. El aforo es **regla del motor** (no
+  viaja en el DTO ni en el contrato) y la generación no cambia por ello.
+- **Sin exceso de idiomas (018):** P028 (Inglés, **12 clases**) y P033 (Idiomas, **36 clases**)
+  reparten las 48 clases que antes recaía en una sola docente; ambos quedan por debajo de las 40
+  franjas del turno y de las 36 h de aula. Es información, no un error de la interfaz.
 - **Lo que sí debe validarse:** la composición de la entrada con el contrato (V1–V19). El test
   `test_entrada_seed` compone los **24 cursos** con plan, turno y matrícula, valida y hace ida y
-  vuelta del preset **sin resolver**.
+  vuelta del preset; la generación real la cubre `test_solver_centro_real` (018, etiqueta `slow`).
 
 ---
 
@@ -195,13 +199,13 @@ Los **24 cursos se siembran con su `turno`** (12 Mañana y 12 Tarde) y su aula d
 - [ ] **Aula fija global:** el aula ya viene de la base y el modo es global (activo por defecto); no
       pedir aula por curso al usuario del preset. Las 12 aulas se comparten entre turnos.
 - [ ] **No hay profesorados alternativos** ni opciones de recarga parcial de docentes.
-- [ ] **Generación diferida (futuro):** con este conjunto no se genera hasta el aforo; cuando el
-      aforo simultáneo lo habilite, la vista deberá informar `NoFactible` con la causa y no ofrecer
-      guardar. En esta entrega **no** es un requisito de interfaz (RF-9; `src/frontend/src` no se
-      toca).
+- [ ] **Generación real (018):** el conjunto genera con el **aforo 2** de la cancha; la aceptación
+      está en `test_solver_centro_real` (etiqueta `slow`). La vista de horario y su estimación de
+      ocupación quedan **fuera del alcance de la 018**: no es deuda de esta entrega y
+      `src/frontend/src` no se toca.
 - [ ] **Usar los recuentos para las pruebas:** 2 planes (31059/31060), 85 materias, 95 cargas,
-      **24 cursos**, **32 docentes**, 13 aulas, 2 turnos/3 eventos, 2 tipos de aula, 272
-      asignaciones, 160 disponibilidades, 40 min y matrícula 889.
+      **24 cursos**, **33 docentes**, 13 aulas, 2 turnos/3 eventos, 2 tipos de aula, 272
+      asignaciones, 165 disponibilidades, 40 min y matrícula 889.
 - [ ] **Enlazar la documentación:** remitir a `docs/guias/datos-prueba.md` (uso del seed) y a
       `docs/interfaz-frontend.md` (contrato del solver).
 
@@ -211,10 +215,11 @@ Los **24 cursos se siembran con su `turno`** (12 Mañana y 12 Tarde) y su aula d
 
 | Cambio | Archivos/alcance |
 |---|---|
-| 017 — el centro real sustituye al conjunto sintético: 2 planes (31059/31060), 85 materias, 95 cargas, 24 cursos con turno, 13 aulas (12 + cancha), 32 docentes, 272 asignaciones y 160 disponibilidades | `src/seed/` (`perfil`, `docentes`, `sembrador`, `main`), CLI `gestor-horarios-seed` |
+| 017 — el centro real sustituye al conjunto sintético: 2 planes (31059/31060), 85 materias, 95 cargas, 24 cursos con turno, 13 aulas (12 + cancha), 33 docentes, 272 asignaciones y 165 disponibilidades | `src/seed/` (`perfil`, `docentes`, `sembrador`, `main`), CLI `gestor-horarios-seed` |
 | Hora académica de **40 min** (configuración global) y **3 eventos** (receso ×2 + acto cívico) | `src/seed/src/perfil.cpp`; configuración `ConfiguracionHoraria` |
 | Los cursos **ya traen turno**; el plan y la matrícula viven en el perfil/preset | `src/seed/src/perfil.cpp`; preset (spec 005) |
 | Sin profesorados alternativos ni conjuntos inválidos de ejemplo | `src/seed/` (se retiraron) |
 | `test_generacion_seed` se retira; `test_entrada_seed` compone y valida **sin resolver** | `test/frontend/test_entrada_seed.cpp`, `test/CMakeLists.txt` |
-| Conjunto **no generable** hasta el aforo simultáneo (48 > 40 por turno) | informe del seed (RNF-2, RF-9) y esta guía |
-| Guías de datos de prueba actualizadas al centro real | `docs/guias/datos-prueba.md`, `docs/guias/datos-prueba-frontend.md` |
+| **018** — aforo 2 de la cancha (**1** en el resto de tipos): capacidad `aulas × franjas × aforo`, sin campo en el contrato; el conjunto pasa a **«Generable: sí»** (48 ≤ 80, 96 ≤ 160, 24 ≤ 40 pares) | `src/common/include/common/aforo_aula.hpp`, `backend_solver`, `ValidadorSalidaSolver`, `src/seed/` |
+| **018** — docente de apoyo **P033** (Idiomas) y P028 con Inglés: **33 docentes / 165 disponibilidades**, 16 mañana y 17 tarde | `src/seed/src/docentes.cpp`; guías de datos |
+| **018** — aceptación lenta `test_solver_centro_real` (876 clases, EF en cancha, 0 pares cruzados, desvío 0, < 300 s) | `test/frontend/test_solver_centro_real.cpp`, `test/CMakeLists.txt` |

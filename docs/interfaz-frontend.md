@@ -694,6 +694,18 @@ cambia. La huella (`huellaDatos(datos, D, intervinientes)`) detecta «datos ante
 el catálogo de tipos de aula**: solo la identidad que referencia cada aula o materia (`idTipoAula`), no
 el nombre visible del tipo.
 
+> **Aforo del motor (spec 018).** El **aforo de la cancha** (2) frente al resto de tipos (1) es una
+> **regla del motor**: **no hay campo en el DTO** (`AulaDTO` sigue con nombre, capacidad, edificio,
+> piso y tipo), **no** viaja en el contrato ni en el preset y **no** entra en la huella de datos. La
+> **causa (2)** de un `NoFactible` cita ahora **demanda, aulas, franjas y aforo**: «Causa (2) conflicto
+> de aula: el tipo «‹tipo›» necesita ‹demanda› bloques y sus ‹aulas› aulas ofrecen ‹capacidad› plazas
+> (‹franjas› franjas × aforo ‹aforo›).». El frontend **no** calcula ni muestra el aforo: solo presenta
+> el mensaje.
+>
+> **Fuera de alcance de la 018:** la **vista de horario** y su **estimación de ocupación** (pintar dos
+> cursos en la misma aula y franja, o avisar del aforo en la rejilla) **no** forman parte de esta
+> entrega y **no son deuda** de la misma: `src/frontend/src` no se toca.
+
 **Preferencias en la generación (013).** El frontend pasa a `generar` el **diagnóstico** de
 preferencias no aplicadas (`Composicion::preferenciasNoAplicadas`, con su motivo) y lee
 `ResultadoGeneracion::cumplimiento` (`respetadas`, `incumplidas`, `noAplicadas`, más el estado de cada
@@ -870,11 +882,12 @@ El conversor `aFormatoVisualizacion` está cubierto por el test `test_frontend_c
 `test_cuadricula_horario` (`test/frontend/test_cuadricula_horario.cpp`).
 
 La integración del centro real (sembrar la base, componer la entrada desde el frontend con el
-plan, el turno y la matrícula de cada curso, y validarla **sin resolver**) está cubierta por
-`test_entrada_seed` (`test/frontend/test_entrada_seed.cpp`, añadido cuando existen `frontend` y
-`seed`). El conjunto **no se declara generable** hasta el aforo simultáneo de la cancha (48 clases
-de Educación Física por turno frente a 40 franjas), así que no se resuelve; el antiguo
-`test_generacion_seed` se retiró en la 017.
+plan, el turno y la matrícula de cada curso, y validarla) está cubierta por `test_entrada_seed`
+(`test/frontend/test_entrada_seed.cpp`) y, con **generación real**, por `test_solver_centro_real`
+(etiqueta `slow`, spec 018). El conjunto **se declara generable** con el aforo 2 de la cancha
+(48 clases de Educación Física por turno ≤ 80 plazas y 24 pares ≤ 40 plazas de par): el test lento
+resuelve **876 clases** en menos de 300 s y lo comprueba. El antiguo `test_generacion_seed` se retiró
+en la 017.
 
 
 ---
@@ -1008,7 +1021,18 @@ firmas nuevas. El equipo de interfaz debe migrar:
 > **160** disponibilidades, tope 36), **40 min** de hora académica y **3 eventos**; matrícula **889**
 > (579 + 310). **No hay profesorados alternativos** ni conjuntos inválidos de ejemplo. Los cursos
 > **ya traen su turno** en la base y la configuración no lo sobrescribe (D-8; sobrescribirlo es
-> capacidad futura de la spec 006). El conjunto **no se declara generable** hasta el aforo simultáneo
-> de la cancha (**48 > 40** por turno); `test_generacion_seed` se retiró y su sustituto
+> capacidad futura de la spec 006). En la 017 el conjunto quedó **sin declarar generable** por el
+> aforo de la cancha (**48 > 40** por turno); `test_generacion_seed` se retiró y su sustituto
 > `test_entrada_seed` compone y valida **sin resolver** (ver §3.6). Verificado con
 > `ctest --preset backend` (**61/61**) y `ctest --preset full-release` (**66/66**).
+>
+> **Actualización 2026-11-10 (spec 018).** El **aforo de la cancha** es una **regla del motor** (cancha
+> → **2**, resto → **1**) y **no viaja en el contrato ni en el DTO**: no hay campo nuevo en `AulaDTO`,
+> en el preset ni en la huella. La **causa (2)** de un `NoFactible` cita demanda, aulas, franjas y
+> aforo (ver §3.1). La plantilla pasa a **33 docentes** (P033 de apoyo en Idiomas; P028 con Inglés) y
+> **165 disponibilidades**, con **16 mañana / 17 tarde**. El conjunto **se declara generable**
+> (48 ≤ 80 y 96 ≤ 160 por turno; 24 ≤ 40 pares) y `test_solver_centro_real` (lento) resuelve **876
+> clases** con la EF en la cancha, 0 pares cruzados, desvío 0 y huecos al final en **232 s**. La
+> **vista de horario y su estimación de ocupación quedan fuera del alcance de la 018** (no son deuda).
+> Verificado con `ctest --preset backend` (**62/62**), `ctest --preset full-release` (**67/67**) y
+> `ctest --preset slow-release` (**2/2**).

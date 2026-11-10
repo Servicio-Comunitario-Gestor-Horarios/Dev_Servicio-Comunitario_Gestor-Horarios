@@ -2,12 +2,13 @@
 
 > Herramienta de **desarrollo** que puebla una base de datos con el **centro real del Liceo
 > Nacional Robert Serra** (periodo **2026/2027**): **2 planes** de estudio, **24 cursos** en dos
-> turnos, **12 aulas** de uso general y **una cancha**, **32 docentes** y la **matrícula del centro**.
+> turnos, **12 aulas** de uso general y **una cancha**, **33 docentes** y la **matrícula del centro**.
 > Es un **conjunto único**: no hay profesorados alternativos, planes derivados ni selección de perfil.
 > El módulo vive en `src/seed/`.
 >
-> Solo puebla la **base de datos**. **No genera horarios ni presets del solver** (ver §6) y **no se
-> declara generable** hasta que exista el aforo simultáneo de la cancha.
+> Solo puebla la **base de datos**. **No genera horarios ni presets del solver** (ver §6); el
+> conjunto **sí se declara generable** con el **aforo 2 de la cancha** (spec 018): 48 clases de
+> Educación Física ≤ 80 plazas por turno y 96 ≤ 160 en la semana.
 
 ---
 
@@ -24,12 +25,13 @@
 | Planes de estudio (31059 y 31060) | 2 |
 | Cargas plan-materia | **95 cargas** |
 | Cursos (12 de mañana + 12 de tarde, **con turno**) | **24 cursos** |
-| Docentes (30 posiciones del centro + 2 añadidos) | **32 docentes** |
+| Docentes (30 posiciones del centro + 2 añadidos + 1 apoyo de idiomas) | **33 docentes** |
 | Materias asignadas | **272** |
-| Disponibilidades (32 docentes × 5 días) | **160** |
+| Disponibilidades (33 docentes × 5 días) | **165** |
 | Preferencias (no se siembran) | 0 |
 | Matrícula total declarada en el perfil (579 de 31059 + 310 de 31060) | **889** |
 | Clases del conjunto (96 de Educación Física; 48 por turno) | **876** |
+| Aforo de la cancha (cursos a la vez) | **2** |
 
 ### Planes
 
@@ -143,7 +145,7 @@ Base: /tmp/centro.db
 Centro: Liceo Nacional Robert Serra (2026/2027)
 Hora académica: 40 min (configuraciones: 1)
 Turnos: 2   Eventos: 3   Aulas: 13   Materias: 85   Planes: 2   Materias de plan: 95
-Cursos: 24 (12 Mañana · 12 Tarde)   Docentes: 32   Materias asignadas: 272   Disponibilidades: 160   Tipos de aula: 2
+Cursos: 24 (12 Mañana · 12 Tarde)   Docentes: 33   Materias asignadas: 272   Disponibilidades: 165   Tipos de aula: 2
 Preferencias: 0
 Clases: 876 (EF 96; 48 por turno)
 Clases por plan: 31059 516 · 31060 360
@@ -152,8 +154,11 @@ Materias por año: 31059 8/8/9/10/10 · 31060 10/10/10/10/10
 31059  Media General         34/34/34/36/34 h académicas
 31060  Ciencias y Tecnología 40/40/40/40/40 h académicas
 Matrícula: 889 (579 + 310)
-Capacidad docente: 576 por turno (16 × 36)   Demanda: 414 Mañana · 462 Tarde
-Generable: no — «Mañana»: 48 clases de Educación Física frente a 40 franjas de cancha (aforo 1). Pendiente el aforo simultáneo (dos cursos), que lo resolverá su spec.
+Capacidad docente: 1188 (576 + 612)   Demanda: 414 Mañana · 462 Tarde
+Cancha: 1 aula · 40 franjas por turno · aforo 2 → 80 plazas por turno · 160 en la semana
+Educación Física: 48 clases por turno · 96 en la semana → 24 pares por turno · 48 en la semana
+Pares de cancha: 20 posiciones por turno · 40 plazas de par → 24 ≤ 40 por turno
+Generable: sí
 Respaldo: no aplica
 ok
 ```
@@ -163,27 +168,29 @@ RNF-1: 15 s).
 
 ## 4. Profesorado del centro y tope de horas
 
-- **32 docentes** con identidad ficticia `P001`…`P032` (nombres, correos y teléfonos inventados,
+- **33 docentes** con identidad ficticia `P001`…`P033` (nombres, correos y teléfonos inventados,
   RNF-6): las **30 posiciones** del centro con sus mismas áreas y turnos, más **2 añadidos** para las
-  materias sin carga (uno por turno).
+  materias sin carga (uno por turno) y el **apoyo de idiomas de la tarde (P033)** de la 018.
 - **Tope de 36 horas académicas de aula** para todos (D-3): las 40 h del contrato del centro
   incluyen actividades «fuera de aula» (planificación, CRP, atención familiar, coordinación…) que se
   descuentan y **no se programan**.
-- **Turnos:** **16 docentes por turno** (15 del centro + 1 añadido). El turno vive en el perfil y
-  **no se persiste**: se materializa en la disponibilidad, con **un rango por día de lunes a
-  viernes** y la ventana completa del turno en reloj (07:00–12:40 / 12:40–18:10).
+- **Turnos:** **16 docentes en la mañana** (15 del centro + 1 añadido) y **17 en la tarde** (15 + 1
+  añadido + P033). El turno vive en el perfil y **no se persiste**: se materializa en la
+  disponibilidad, con **un rango por día de lunes a viernes** y la ventana completa del turno en reloj
+  (07:00–12:40 / 12:40–18:10).
 - **Regla de asignación:** cada docente recibe **todas las materias-año del catálogo de sus áreas**,
   contando **una sola vez** las compartidas, **sin filtrar por año** y **solo si el área tiene cursos
   en su turno**. «Biología» y «Biología, Ambiente y Tecnología» son áreas distintas: la primera queda
   en la mañana y la segunda **solo** en la tarde. Las materias de **5.º de 31060** (año sin cursos)
   cuentan porque su área tiene cursos en la tarde.
-- **272 materias asignadas** y **160 disponibilidades**. Los dos añadidos suman **6** materias sin
-  carga (5 de Participación y 1 de Ciencias de la Tierra).
+- **272 materias asignadas** y **165 disponibilidades**. Los dos añadidos suman **6** materias sin
+  carga (5 de Participación y 1 de Ciencias de la Tierra); **P033** aporta **5 de Idiomas** y **P028**
+  se queda con **5 de Inglés** (spec 018). La suma de asignaciones no cambia: se mueven, no se crean.
 - **Cobertura por turno:** cada materia de cada curso tiene al menos un docente habilitado en el
   turno de ese curso; si faltara, la aplicación se rechazaría identificando área, año y turno.
-- **Exceso blando conocido:** en la tarde, **Inglés + Idiomas** suman 48 clases con una sola docente
-  habilitada: 12 h por encima del tope. Es un aviso (S1), no una infactibilidad; el horario no se
-  genera en esta entrega de todos modos (§6).
+- **Sin exceso de idiomas (018):** P028 (Inglés, **12 clases** de 31059 2.º) y P033 (Idiomas, **36
+  clases** de 31060) reparten las 48 clases que antes recaían en una sola docente. Ambos quedan por
+  debajo de las 40 franjas del turno y de las 36 h de aula, y el conjunto **genera**.
 
 ## 5. Seguridad (protección de la base)
 
@@ -199,18 +206,20 @@ RNF-1: 15 s).
 
 ## 6. Límites y fuera de alcance
 
-- **El conjunto no es generable todavía (D-5, D-9).** Con la exclusividad de aula vigente, la
-  Educación Física de cada turno son **48 clases** frente a **40 franjas** de cancha (5 días × 8
-  franjas, aforo 1): **48 > 40**. Con el aforo simultáneo (dos cursos en la cancha con docentes
-  distintos) cabría (**96 ≤ 160** en la semana y **48 ≤ 80** por turno), pero eso es una spec
-  posterior. Hasta entonces:
-  - El **informe** de la aplicación y esta guía lo declaran con la causa y la acción
-    («aforo simultáneo pendiente»).
-  - **Ninguna verificación genera** un horario con este conjunto; la aceptación de generación
-    (876 clases, desvío 0, separación y huecos informados, < 300 s) se hará al cerrar el aforo.
-  - El conjunto es la **base de ese escenario**: la spec del aforo solo añadirá la capacidad.
-- **Educación Física en la cancha:** 96 clases en la semana y 48 por turno; la capacidad de la
-  cancha (88, dos grupos) es condición necesaria, **no prueba** de que exista horario.
+- **El conjunto es generable (018, RF-8) con el aforo 2 de la cancha.** La Educación Física de cada
+  turno son **48 clases** y la cancha, con **aforo 2** (dos cursos con docentes distintos en la
+  **misma posición de par**), ofrece **80 plazas por turno** (40 franjas × 2) y **160 en la semana**:
+  **48 ≤ 80** y **96 ≤ 160**. En pares completos hay **20 posiciones de par por turno** y **40 plazas
+  de par** frente a **24 pares** de Educación Física: **24 ≤ 40**.
+  - El **informe** de la aplicación y esta guía lo declaran **«Generable: sí»** con esas cifras.
+  - La aceptación de generación es el test lento **`test_solver_centro_real`** (etiqueta `slow`):
+    siembra, compone la entrada desde la base y resuelve **876 clases** con la EF en la cancha,
+    desvío 0, huecos al final y **0 pares cruzados** en menos de **300 s** (medido: **232 s**).
+  - La cancha no admite **más de dos cursos** a la vez ni **pares cruzados**; el resto de tipos
+    conserva **una clase por franja**.
+- **Educación Física en la cancha:** 96 clases en la semana y 48 por turno, todas en el aula de clave
+  `cancha`. La **capacidad física** del aula (88 alumnos) es un dato distinto del **aforo 2** (cursos
+  simultáneos) y no prueba por sí sola que exista horario: eso lo verifica el test lento de aceptación.
 - **La duración no cambia la carga:** 1 hora académica = 1 bloque; cada año suma
   34/34/34/36/34 (31059) o 40×5 (31060) horas académicas. Los **40 minutos** son la duración real de
   la franja (rejilla, eventos y disponibilidad): 34 bloques × 40 min = 1360 min (22 h 40) en 1.º–3.º
@@ -250,6 +259,6 @@ Aplicación real y comprobación del informe:
 
 ```bash
 build-backend/src/seed/gestor-horarios-seed --db /tmp/centro.db
-# esperado: 85 materias, 24 cursos (12/12), 32 docentes, 272 asignaciones,
-#           160 disponibilidades, 13 aulas, 3 eventos, 40 min y «Generable: no»
+# esperado: 85 materias, 24 cursos (12/12), 33 docentes, 272 asignaciones,
+#           165 disponibilidades, 13 aulas, 3 eventos, 40 min y «Generable: sí»
 ```

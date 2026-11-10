@@ -74,6 +74,11 @@ El objeto **`meta` no es una sección del contrato**: es un objeto tolerado que 
 la entrada (descripción y fecha de modificación) y que cualquier lector ignora. Las secciones son las
 de la tabla.
 
+> **El aforo no viaja en el contrato (spec 018).** El **aforo simultáneo** de un tipo de aula es una
+> **regla del motor**: **cancha → 2** y **cualquier otro tipo → 1**, fija y hardcodeada. Un aula
+> declara **nombre, tipo y capacidad** (la capacidad es un dato informativo de alumnos); el aforo
+> **no** es un campo del JSON, **no** se declara en los presets y **no** entra en la huella de datos.
+
 ### 2.1 `dimensiones`
 
 ```json
@@ -369,12 +374,17 @@ docente**. Si ninguna aplica, informa **causa no atribuible**.
   capacidad(t) = nº de aulas del tipo t × nº de días
                  × nº de franjas (slots) distintas de la unión de los turnos
                    de los cursos con al menos una materia que requiere t
+                 × aforo(t)          ← 2 para el tipo de la cancha; 1 para el resto
   ```
 
-  Las unidades son **celdas `(aula, día, franja)`**: `capacidad(t)` ya incluye los días. Si
-  `demanda(t) > capacidad(t)`, la causa es conflicto de aula. El conteo **no descuenta** las franjas que
-  un desplazamiento deja bloqueadas en el aula de referencia, y **no** cuenta la ocupación de un aula de
-  referencia concreta.
+  Las unidades son **celdas `(aula, día, franja)`**: `capacidad(t)` ya incluye los días y el aforo.
+  Si `demanda(t) > capacidad(t)`, la causa es conflicto de aula. El mensaje cita **las cuatro cifras**
+  —demanda, aulas, franjas y aforo—:
+  «Causa (2) conflicto de aula: el tipo «‹tipo›» necesita ‹demanda› bloques y sus ‹aulas› aulas
+  ofrecen ‹capacidad› plazas (‹franjas› franjas × aforo ‹aforo›).», donde
+  `capacidad = aulas × franjas × aforo`. El conteo **no descuenta** las franjas que un desplazamiento
+  deja bloqueadas en el aula de referencia, y **no** cuenta la ocupación de un aula de referencia
+  concreta. La capacidad es **necesaria y no prueba** de generabilidad.
 - **Causa no atribuible.** El conteo es **necesario, no suficiente**: hay horarios imposibles que no
   salen de él (dos cursos que comparten un aula de referencia y no caben en ella, ventanas de turno que
   no se componen, o la disponibilidad de docentes cuando es de otra categoría). En esos casos el mensaje
@@ -413,9 +423,13 @@ verdad**, también en modo de aula fija (fragmento; la raíz del archivo lleva a
   quien muestra (la interfaz y el CSV).
 - Las validaciones posteriores (`ValidadorSalidaSolver`) operan sobre ese **aula real**, no sobre el
   aula declarada del curso: **P2 exceso de horas** del docente → `avisos` y **P4 solapamientos** →
-  `conflictos` (no presentable). Los avisos **P1 horas no cubiertas** y **P3 capacidad de aula** están
-  **retirados por la 005 (decisión I2) hasta nuevo aviso**; la `capacidad` sigue siendo un dato del
-  aula, pero ya no produce aviso.
+  `conflictos` (no presentable). Con el aforo de la 018, P4 **cuenta** las clases por (aula, día,
+  franja): dos clases en un aula solo son conflicto si **superan su aforo** (cancha **2**, resto **1**;
+  un índice inválido o un tipo no reconocido cuentan como **aforo 1**) y las clases **sin aula**
+  (índice negativo) **no ocupan** franja. La cancha tampoco admite **pares cruzados**: una franja de
+  cancha sin su pareja de bloque se informa como conflicto. Los avisos **P1 horas no cubiertas** y **P3
+  capacidad de aula** están **retirados por la 005 (decisión I2) hasta nuevo aviso**; la `capacidad`
+  sigue siendo un dato del aula, pero ya no produce aviso.
 - El contrato de salida **no** incluye el estado de las preferencias: el backend lo calcula sobre el
   horario y la proyección ya calculada y lo expone en el resultado de la generación (spec 013, RF-8).
 
