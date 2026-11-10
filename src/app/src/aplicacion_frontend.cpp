@@ -186,7 +186,7 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
 #if defined(GESTOR_TIENE_BACKEND)
     ventana.setNucleoDatos(&contexto.nucleo());
 #endif
-    ventana.show();
+    ventana.showMaximized();
 
     // 5. Enfoque de la instancia existente (RF-5): si otra instancia pide activar,
     //    traer esta ventana al frente. La detección sigue activa durante toda la
@@ -195,7 +195,8 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
     {
         QObject::connect(instanciaUnica, &InstanciaUnica::activarSolicitada, &ventana,
                          [&ventana]() {
-                             ventana.showNormal();
+                             if (ventana.isMinimized())
+                                 ventana.showNormal();
                              ventana.raise();
                              ventana.activateWindow();
                          });

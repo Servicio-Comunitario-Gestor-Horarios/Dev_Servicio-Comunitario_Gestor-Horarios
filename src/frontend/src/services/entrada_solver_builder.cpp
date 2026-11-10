@@ -10,6 +10,7 @@
 
 #include <QDateTime>
 #include <QJsonArray>
+#include <QSet>
 
 namespace GeneracionSolver {
 namespace {
@@ -243,6 +244,19 @@ Composicion construirEntrada(const NucleoDatos& nucleo, const OpcionesUI& opcion
             const int idx = indiceMateriaPorNombre(datos.materias, nombreSuplente);
             if (idx >= 0) p.materias_suplente.append(MateriaSuplente{idx, 1});
         }
+
+        // Si el preset no trae suplentes, se usan los guardados en la ficha del
+        // docente (#95). Así la configuración del generador refleja la base.
+        if (p.materias_suplente.isEmpty()) {
+            QSet<int> agregadas;
+            for (const MateriaAsignadaDTO& suplente : d.materiasSuplentes) {
+                const int idx = indiceMateriaPorNombre(datos.materias, suplente.nombre);
+                if (idx >= 0 && !agregadas.contains(idx)) {
+                    agregadas.insert(idx);
+                    p.materias_suplente.append(MateriaSuplente{idx, 1});
+                }
+            }
+        }
         preset.profesores.append(p);
     }
 
@@ -327,8 +341,18 @@ QMap<QString, int> horasSugeridasPorDocente(
             continue;
 
         QVector<QPair<int, int>> materiasDelAnio; // (idMateria, horas)
+        QSet<int> cursosPlan;
         for (const CargaHorariaDTO& ch : cargaR.valor)
-            if (ch.curso == c.anio)
+            cursosPlan.insert(ch.curso);
+
+        // Plan global: todas las materias se guardan en un único curso y se
+        // replican en los años 1–5 al componer la entrada del solver.
+        const bool planGlobal = cursosPlan.size() == 1
+                                && *cursosPlan.constBegin() >= 1
+                                && *cursosPlan.constBegin() <= 5;
+
+        for (const CargaHorariaDTO& ch : cargaR.valor)
+            if (planGlobal || ch.curso == c.anio)
                 materiasDelAnio.append(qMakePair(ch.idMateria, ch.horas));
         if (materiasDelAnio.isEmpty())
             continue;

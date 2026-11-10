@@ -11,12 +11,17 @@
 #include <QPainterPath>
 #include <QAction>
 #include <QStyle>
+#include <QScreen>
 
 LoginDialog::LoginDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle("Liceo Nacional Robert Serra - Acceso");
-    resize(1280, 800);
+    // Tamano acotado al area util: en portatiles y con escalado, 1280x800
+    // dejaba el dialogo por debajo y por los lados de la pantalla.
+    const QRect areaUtil = screen() ? screen()->availableGeometry()
+                                    : QRect(0, 0, 1280, 800);
+    resize(qMin(1280, areaUtil.width()), qMin(800, areaUtil.height()));
 
     QFont modernFont("Segoe UI", 10);
     modernFont.setStyleHint(QFont::SansSerif);

@@ -119,12 +119,14 @@ void BotonMateriasSuplentes::refrescarTexto()
 
 SelectorMateriasDialog::SelectorMateriasDialog(const QStringList& disponibles,
                                                const QStringList& seleccionadas,
-                                               QWidget* parent)
+                                               QWidget* parent,
+                                               const QString& titulo,
+                                               const QString& ayuda)
     : QDialog(parent)
 {
     const ScheduleTheme::Palette p = ScheduleTheme::current();
 
-    setWindowTitle(QStringLiteral("Materias suplentes"));
+    setWindowTitle(titulo.isEmpty() ? QStringLiteral("Materias suplentes") : titulo);
     setModal(true);
     resize(700, 480);
 
@@ -138,17 +140,21 @@ SelectorMateriasDialog::SelectorMateriasDialog(const QStringList& disponibles,
     cuerpo->setContentsMargins(24, 20, 24, 20);
     cuerpo->setSpacing(12);
 
-    auto* titulo = new QLabel(QStringLiteral("Materias suplentes"), tarjeta);
-    titulo->setObjectName(QStringLiteral("selTitulo"));
-    cuerpo->addWidget(titulo);
+    auto* tituloLabel = new QLabel(titulo.isEmpty() ? QStringLiteral("Materias suplentes")
+                                                    : titulo,
+                                   tarjeta);
+    tituloLabel->setObjectName(QStringLiteral("selTitulo"));
+    cuerpo->addWidget(tituloLabel);
 
-    auto* ayuda = new QLabel(
-        QStringLiteral("Marca las materias que este docente puede cubrir como suplente. "
-                       "Las asignadas se muestran en la columna «Materias asignadas»."),
+    auto* ayudaLabel = new QLabel(
+        ayuda.isEmpty()
+            ? QStringLiteral("Marca las materias que este docente puede cubrir como suplente. "
+                             "Las asignadas se muestran en la columna «Materias asignadas».")
+            : ayuda,
         tarjeta);
-    ayuda->setObjectName(QStringLiteral("selAyuda"));
-    ayuda->setWordWrap(true);
-    cuerpo->addWidget(ayuda);
+    ayudaLabel->setObjectName(QStringLiteral("selAyuda"));
+    ayudaLabel->setWordWrap(true);
+    cuerpo->addWidget(ayudaLabel);
 
     auto* contador = new QLabel(tarjeta);
     contador->setObjectName(QStringLiteral("selContador"));

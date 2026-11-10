@@ -14,7 +14,7 @@ namespace gestor::frontend::forms {
 
 SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Asignatura");
-    resize(400, 260);
+    resize(400, 220);
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -38,10 +38,6 @@ SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     m_campoNombre = new QLineEdit(this);
     m_campoNombre->setStyleSheet(inputStyle);
     m_campoNombre->setPlaceholderText("Nombre de la asignatura");
-
-    m_campoRequisitos = new QLineEdit(this);
-    m_campoRequisitos->setStyleSheet(inputStyle);
-    m_campoRequisitos->setPlaceholderText("Requisitos (Opcional)");
 
     m_comboTipoAula = new QComboBox(this);
     // El catálogo real lo aporta `cargarTiposAula` (tabla TiposAula, spec 009).
@@ -91,7 +87,6 @@ SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     QString labelStyle = QString("<span style='font-weight:bold; color:%1; font-size: 13px;'>").arg(labelColor);
 
     formLayout->addRow(labelStyle + "Nombre:</span>", m_campoNombre);
-    formLayout->addRow(labelStyle + "Requisitos:</span>", m_campoRequisitos);
     formLayout->addRow(labelStyle + "Tipo de aula:</span>", m_comboTipoAula);
 
     QHBoxLayout *botonesLayout = new QHBoxLayout();
@@ -143,8 +138,7 @@ void SubjectFormDialog::guardarMateria() {
         return;
     }
 
-    emit materiaGuardada(m_campoNombre->text().trimmed(),
-                         m_campoRequisitos->text().trimmed(), idTipoAula);
+    emit materiaGuardada(m_campoNombre->text().trimmed(), m_requisitos, idTipoAula);
     accept();
 }
 
@@ -164,7 +158,9 @@ void SubjectFormDialog::cargarTiposAula(const QVector<TipoAulaDTO>& tipos, int i
 void SubjectFormDialog::cargarDatos(const QString& nombre, const QString& requisitos,
                                     int idTipoAula) {
     m_campoNombre->setText(nombre);
-    m_campoRequisitos->setText(requisitos);
+    // Los requisitos ya no se editan en el formulario, pero se conservan para
+    // no borrarlos de las asignaturas existentes al guardar.
+    m_requisitos = requisitos;
     if (idTipoAula > 0) {
         const int indice = m_comboTipoAula->findData(idTipoAula);
         if (indice >= 0)

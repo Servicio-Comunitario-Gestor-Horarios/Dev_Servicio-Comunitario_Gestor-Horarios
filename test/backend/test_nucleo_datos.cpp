@@ -110,6 +110,7 @@ private slots:
         QVERIFY(tablaExiste(QStringLiteral("Turnos")));
         QVERIFY(tablaExiste(QStringLiteral("Eventos")));
         QVERIFY(tablaExiste(QStringLiteral("TiposAula")));
+        QVERIFY(tablaExiste(QStringLiteral("Profesor_Materia_Suplente")));
         QVERIFY(!tablaExiste(QStringLiteral("Recesos")));       // retirada (RF-9)
     }
 
@@ -549,6 +550,113 @@ private slots:
         cerrarBase();
         abrirBase();
         QVERIFY(m_nucleo->listarDocentes().valor.isEmpty());
+    }
+
+    // ─── Ficha completa del docente (#94, #95) ────────────────────────────
+
+    void docentes_guardarFichaCompleta_persisteTodo()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+        auto mat1 = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
+        auto mat2 = m_nucleo->crearMateria("Física", QString(), m_idTipoAula);
+        QVERIFY(mat1.ok && mat2.ok);
+
+        QVector<FranjaHoraria> disponibilidad;
+        disponibilidad.append(franja(1, 7, 0, 8, 0));
+        disponibilidad.append(franja(2, 9, 0, 10, 0));
+
+        PreferenciaDTO preferencia;
+        preferencia.idProfesor = "P1";
+        preferencia.franja = franja(3, 11, 0, 12, 0);
+        preferencia.sentido = SentidoPreferencia::Preferida;
+
+        QVector<PreferenciaDTO> preferencias;
+        preferencias.append(preferencia);
+
+        QVector<int> titulares;
+        titulares.append(mat1.valor.id);
+        QVector<int> suplentes;
+        suplentes.append(mat2.valor.id);
+
+        QString error;
+        QVERIFY2(m_nucleo->guardarFichaDocente("P1", disponibilidad, preferencias,
+                                               titulares, suplentes, &error),
+                 qPrintable(error));
+
+        auto guardado = m_nucleo->obtenerDocente("P1");
+        QVERIFY(guardado.ok);
+        QCOMPARE(guardado.valor.disponibilidad.size(), 2);
+        QCOMPARE(guardado.valor.preferencias.size(), 1);
+        QCOMPARE(guardado.valor.materias.size(), 1);
+        QCOMPARE(guardado.valor.materiasSuplentes.size(), 1);
+        QCOMPARE(m_nucleo->listarDocentes().valor.first().materiasSuplentes.size(), 1);
+
+        // La ficha sobrevive al cierre y reapertura de la base.
+        cerrarBase();
+        abrirBase();
+        const auto reabierto = m_nucleo->obtenerDocente("P1");
+        QVERIFY(reabierto.ok);
+        QCOMPARE(reabierto.valor.disponibilidad.size(), 2);
+        QCOMPARE(reabierto.valor.preferencias.size(), 1);
+        QCOMPARE(reabierto.valor.materias.size(), 1);
+        QCOMPARE(reabierto.valor.materiasSuplentes.size(), 1);
+
+        // Un segundo guardado con listas vacías deja la ficha limpia.
+        QVERIFY2(m_nucleo->guardarFichaDocente("P1", {}, {}, {}, {}, &error),
+                 qPrintable(error));
+        guardado = m_nucleo->obtenerDocente("P1");
+        QVERIFY(guardado.valor.disponibilidad.isEmpty());
+        QVERIFY(guardado.valor.preferencias.isEmpty());
+        QVERIFY(guardado.valor.materias.isEmpty());
+        QVERIFY(guardado.valor.materiasSuplentes.isEmpty());
+    }
+
+    void docentes_guardarFichaInvalida_noCambiaNada()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
+        QVERIFY(materia.ok);
+
+        QVector<FranjaHoraria> validas;
+        validas.append(franja(1, 7, 0, 8, 0));
+        QVector<int> titulares;
+        titulares.append(materia.valor.id);
+
+        QString error;
+        QVERIFY2(m_nucleo->guardarFichaDocente("P1", validas, {}, titulares, {}, &error),
+                 qPrintable(error));
+
+        // Una franja con inicio >= fin debe abortar sin tocar lo ya guardado.
+        QVector<FranjaHoraria> invalidas;
+        invalidas.append(franja(1, 10, 0, 9, 0));
+        QVERIFY(!m_nucleo->guardarFichaDocente("P1", invalidas, {}, {}, {}, &error));
+        QVERIFY(!error.isEmpty());
+
+        const auto despues = m_nucleo->obtenerDocente("P1");
+        QVERIFY(despues.ok);
+        QCOMPARE(despues.valor.disponibilidad.size(), 1);
+        QCOMPARE(despues.valor.disponibilidad.first().franja.inicio, QTime(7, 0));
+        QCOMPARE(despues.valor.materias.size(), 1);
+    }
+
+    void docentes_materiaTitularYSuplenteALaVez_falla()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
+        QVERIFY(materia.ok);
+
+        QVector<int> ids;
+        ids.append(materia.valor.id);
+
+        QString error;
+        QVERIFY(!m_nucleo->guardarFichaDocente("P1", {}, {}, ids, ids, &error));
+        QVERIFY(error.contains(QStringLiteral("titular y suplente")));
+
+        // No se aplicó nada (tampoco la lista vacía de disponibilidad).
+        const auto despues = m_nucleo->obtenerDocente("P1");
+        QVERIFY(despues.ok);
+        QVERIFY(despues.valor.materias.isEmpty());
+        QVERIFY(despues.valor.materiasSuplentes.isEmpty());
     }
 };
 

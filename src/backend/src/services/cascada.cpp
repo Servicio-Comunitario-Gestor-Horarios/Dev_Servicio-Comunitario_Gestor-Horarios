@@ -50,6 +50,13 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("id_Materia"), QStringLiteral("rowid"),
             QStringLiteral("id_Profesor"), QStringLiteral("Docente que imparte la materia"),
             false));
+
+        relaciones.append(relacion(
+            QStringLiteral("profesor_materia_suplente"),
+            QStringLiteral("Profesor_Materia_Suplente"),
+            QStringLiteral("id_Materia"), QStringLiteral("rowid"),
+            QStringLiteral("id_Profesor"), QStringLiteral("Docente que puede suplir la materia"),
+            false));
     }
     else if (dominio == QStringLiteral("profesor"))
     {
@@ -57,6 +64,13 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("profesor_materia"), QStringLiteral("Profesor_Materia"),
             QStringLiteral("id_Profesor"), QStringLiteral("rowid"),
             QStringLiteral("id_Materia"), QStringLiteral("Materia del docente"), false));
+
+        relaciones.append(relacion(
+            QStringLiteral("profesor_materia_suplente"),
+            QStringLiteral("Profesor_Materia_Suplente"),
+            QStringLiteral("id_Profesor"), QStringLiteral("rowid"),
+            QStringLiteral("id_Materia"), QStringLiteral("Materia suplente del docente"),
+            false));
 
         relaciones.append(relacion(
             QStringLiteral("disponibilidad"), QStringLiteral("Disponibilidad_Profesor"),

@@ -129,17 +129,20 @@ private slots:
     void dependenciasDe_describeRelacionesPorDominio()
     {
         const auto materia = dependenciasDe(QStringLiteral("materia"));
-        QCOMPARE(materia.size(), 2);
+        QCOMPARE(materia.size(), 3);
 
         bool apuntaAProfesor = false;
         bool apuntaACurso = false;
         bool apuntaAPlan = false;
+        bool apuntaASuplente = false;
         for (const RelacionCascada& rel : materia) {
             if (rel.tabla == QStringLiteral("Profesor_Materia")) apuntaAProfesor = true;
+            if (rel.tabla == QStringLiteral("Profesor_Materia_Suplente")) apuntaASuplente = true;
             if (rel.tabla == QStringLiteral("Curso_Materia"))    apuntaACurso = true;
             if (rel.tabla == QStringLiteral("PlanEstudio_Materia")) apuntaAPlan = true;
         }
         QVERIFY(apuntaAProfesor);
+        QVERIFY(apuntaASuplente);
         QVERIFY(!apuntaACurso);   // Curso_Materia se retiro (RF-5)
         QVERIFY(apuntaAPlan);
 
@@ -147,7 +150,7 @@ private slots:
         QCOMPARE(dependenciasDe(QStringLiteral("curso")).size(), 0); // ya no arrastra nada
         QCOMPARE(dependenciasDe(QStringLiteral("turno")).size(), 2);
         QCOMPARE(dependenciasDe(QStringLiteral("plan")).size(), 1);  // sin plan -> cursos
-        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 3);
+        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 4);
 
         QVERIFY(dependenciasDe(QStringLiteral("inexistente")).isEmpty());
         QVERIFY(!dominioValido(QStringLiteral("inexistente")));

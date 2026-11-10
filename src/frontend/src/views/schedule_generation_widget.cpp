@@ -107,6 +107,84 @@ QLabel* crearAyuda(const QString& texto, QWidget* padre)
     return ayuda;
 }
 
+/// Paleta de la ventana de generación. En oscuro usa el mismo fondo que el
+/// tema global de la ventana principal para que la página no desentone (las
+/// tarjetas conservan su superficie elevada).
+ScheduleTheme::Palette paletaGeneracion()
+{
+    ScheduleTheme::Palette p = ScheduleTheme::current();
+    if (p.dark)
+        p.bg = QStringLiteral("#121212");
+    return p;
+}
+
+/**
+ * Estiliza un desplegable y, sobre todo, su lista emergente.
+ *
+ * El popup de un QComboBox es una ventana aparte: si solo se estiliza el combo
+ * cerrado, la lista puede acabar usando la paleta del sistema (fondo oscuro con
+ * texto oscuro en modo claro). Por eso se fija tanto la paleta como una hoja de
+ * estilo propia de la vista, con colores concretos para ítem normal, hover y
+ * seleccionado.
+ */
+void estilizarCombo(QComboBox* combo, const ScheduleTheme::Palette& p)
+{
+    if (!combo)
+        return;
+
+    combo->setStyleSheet(QStringLiteral(
+        "QComboBox { background-color: %1; color: %2; border: 1px solid %3;"
+        " border-radius: 8px; padding: 3px 8px; min-height: 24px; }"
+        "QComboBox:focus { border-color: %5; }"
+        "QComboBox::drop-down { border: none; width: 20px; }"
+        "QComboBox QAbstractItemView { background-color: %4; color: %2;"
+        " border: 1px solid %3; selection-background-color: %5;"
+        " selection-color: #FFFFFF; outline: none; }"
+        "QComboBox QAbstractItemView::item { background-color: %4; color: %2;"
+        " padding: 4px 8px; min-height: 22px; }"
+        "QComboBox QAbstractItemView::item:selected { background-color: %5;"
+        " color: #FFFFFF; }")
+        .arg(p.surface2, p.text, p.border, p.surface, p.accent));
+
+    QAbstractItemView* vista = combo->view();
+    if (!vista)
+        return;
+
+    const QColor fondo(p.surface);
+    const QColor texto(p.text);
+    const QColor resalte(p.accent);
+
+    QPalette paleta = vista->palette();
+    paleta.setColor(QPalette::Base, fondo);
+    paleta.setColor(QPalette::Window, fondo);
+    paleta.setColor(QPalette::Text, texto);
+    paleta.setColor(QPalette::WindowText, texto);
+    paleta.setColor(QPalette::ButtonText, texto);
+    paleta.setColor(QPalette::Highlight, resalte);
+    paleta.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#FFFFFF")));
+    vista->setPalette(paleta);
+    vista->viewport()->setPalette(paleta);
+    vista->setAutoFillBackground(true);
+
+    vista->setStyleSheet(QStringLiteral(
+        "QAbstractItemView { background-color: %1; color: %2; border: 1px solid %3;"
+        " selection-background-color: %4; selection-color: #FFFFFF; outline: none; }"
+        "QAbstractItemView::item { background-color: %1; color: %2;"
+        " padding: 4px 8px; min-height: 22px; }"
+        "QAbstractItemView::item:hover { background-color: %5; color: %2; }"
+        "QAbstractItemView::item:selected { background-color: %4; color: #FFFFFF; }")
+        .arg(p.surface, p.text, p.border, p.accent, p.surface3));
+}
+
+/// Aplica el estilo a todos los combos presentes (incluidos los de las tablas).
+void estilizarCombos(QWidget* raiz, const ScheduleTheme::Palette& p)
+{
+    if (!raiz)
+        return;
+    for (QComboBox* combo : raiz->findChildren<QComboBox*>())
+        estilizarCombo(combo, p);
+}
+
 } // namespace
 
 ScheduleGenerationWidget::ScheduleGenerationWidget(QWidget* parent)
@@ -434,7 +512,7 @@ void ScheduleGenerationWidget::construirUi()
 
 void ScheduleGenerationWidget::aplicarEstilo()
 {
-    const ScheduleTheme::Palette p = ScheduleTheme::current();
+    const ScheduleTheme::Palette p = paletaGeneracion();
 
     QString qss = QStringLiteral(R"QSS(
 QWidget#genRoot, QWidget#genContenedor { background: %BG%; }
@@ -452,8 +530,13 @@ QHeaderView::section { background: %SURFACE2%; color: %MUTED%; border: none;
   border-bottom: 1px solid %BORDER_STRONG%; padding: 6px 8px; font-weight: 600; }
 QComboBox, QSpinBox, QLineEdit { background: %SURFACE2%; color: %TEXT%;
   border: 1px solid %BORDER%; border-radius: 8px; padding: 3px 8px; min-height: 24px; }
-QComboBox QAbstractItemView { background: %SURFACE%; color: %TEXT%;
-  selection-background-color: %ACCENT%; }
+QComboBox QAbstractItemView { background-color: %SURFACE%; color: %TEXT%;
+  border: 1px solid %BORDER%; selection-background-color: %ACCENT%;
+  selection-color: #FFFFFF; outline: none; }
+QComboBox QAbstractItemView::item { background-color: %SURFACE%; color: %TEXT%;
+  padding: 4px 8px; min-height: 22px; }
+QComboBox QAbstractItemView::item:selected { background-color: %ACCENT%;
+  color: #FFFFFF; }
 QCheckBox { color: %TEXT%; }
 QPushButton { background: %SURFACE2%; color: %TEXT%; border: 1px solid %BORDER%;
   border-radius: 8px; padding: 6px 14px; }
@@ -490,25 +573,10 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 
     setStyleSheet(qss);
 
-    // El popup de un QComboBox es una ventana aparte: hereda la paleta del árbol
-    // y, dentro de estas tarjetas, queda sin fondo (QBrush nulo), de modo que el
-    // delegado pinta los ítems en negro. Se fija aquí la paleta del tema para
-    // que la lista se vea clara en modo claro y oscura en modo oscuro.
-    const QColor fondo(p.surface), texto(p.text), resalte(p.accent);
-    for (QComboBox* combo : findChildren<QComboBox*>()) {
-        QAbstractItemView* vista = combo->view();
-        if (!vista)
-            continue;
-        QPalette paleta = vista->palette();
-        paleta.setColor(QPalette::Base, fondo);
-        paleta.setColor(QPalette::Window, fondo);
-        paleta.setColor(QPalette::Text, texto);
-        paleta.setColor(QPalette::WindowText, texto);
-        paleta.setColor(QPalette::ButtonText, texto);
-        paleta.setColor(QPalette::Highlight, resalte);
-        paleta.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#FFFFFF")));
-        vista->setPalette(paleta);
-    }
+    // Los popups de los QComboBox son ventanas aparte y no siempre heredan la
+    // hoja de estilo del contenedor. Se les fija paleta y estilo propios para
+    // que en modo claro se vean blancos con texto oscuro y en oscuro al revés.
+    estilizarCombos(this, p);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -593,6 +661,10 @@ void ScheduleGenerationWidget::poblarCursos()
         auto* spin = crearSpin(m_tablaCursos, 1, 500, 30);
         m_tablaCursos->setCellWidget(fila, 3, spin);
     }
+
+    // Los combos se acaban de crear: aplicarles ya el tema evita que su lista
+    // emergente quede con la paleta del sistema.
+    estilizarCombos(this, paletaGeneracion());
 }
 
 void ScheduleGenerationWidget::poblarDocentes()
@@ -666,6 +738,10 @@ void ScheduleGenerationWidget::poblarDocentes()
         connect(comboAnios, &ComboMultiple::seleccionCambiada, this,
                 [this, idDocente]() { m_docentesAjustados.insert(idDocente); });
     }
+
+    // Igual que en cursos: los combos recién creados necesitan el estilo del
+    // popup antes de que el usuario los abra.
+    estilizarCombos(this, paletaGeneracion());
 }
 
 void ScheduleGenerationWidget::sincronizarDocentes()

@@ -397,3 +397,51 @@ techo del test 300 s) · suites **62/62**, **67/67**, **2/2**.
 
 Sin cambios en `src/backend/src/database/` ni en `src/frontend/src/` (`git status` de ambas rutas → **0**
 entradas). `specs/018-…/` sigue sin seguimiento y fuera del control de alcance. Sin commits.
+
+## Ensamblado front/back: merge de `origin/feat/frontend-generacion` (2026-11-10)
+
+Fase de **ensamblado** posterior al cierre de la 018: `git merge --no-commit --no-ff origin/feat/frontend-generacion`
+(9 commits del frontend: #94/#95 disponibilidad, preferencias y materias de docentes; #97 CRUD de planes;
+#96 cédula estricta; #98 menú sin cuenta). **Sin abortar el merge y sin commitear** (`MERGE_HEAD` =
+`8785f53`, `HEAD` = `81faa98` antes y después de resolver).
+
+### Conflictos (3)
+
+| Archivo | Resolución |
+|---|---|
+| `src/seed/src/sembrador.cpp` | Nuestra versión íntegra (017/018: centro real, sin `--variante`/`--solo-docentes`, sin `soloDocentes`, guarda del tipo general, informe) **+** `Profesor_Materia_Suplente` en la lista de borrado del reemplazo total, antes de `Profesor_Materia`/`Materias`/`Profesores`. |
+| `src/frontend/src/views/subject_list_widget.cpp` | Su rama de pestaña de plan (`m_tabs->currentIndex() == 1 → abrirFormularioPlanNuevo()`) **+** nuestro 016: `listarTiposAula()` con fallo → aviso y salida; `TiposAulaUI::idTipoGeneral(...)` sin general → aviso y salida, nunca otro tipo. |
+| `src/frontend/src/views/teacher_list_widget.cpp` | Su señal nueva de 4 argumentos (sin `materias`), `setDocentesExistentes` y gestión de materias en el panel. Nuestro 016 queda **sin disparador** en esta vista: #94/#95 retiró del formulario el alta de materias por texto libre, así que no hay materia que crear antes de escribir el docente (la comprobación estricta sigue en el alta de asignaturas y en el aula). |
+
+### Divergencia detectada: `Profesor_Materia_Suplente`
+
+Su `ServicioProfesor` crea `Profesor_Materia_Suplente` **en tiempo de ejecución** (fuera de la migración y
+de `version_esquema`); el esquema v6 no la tiene y las tablas de más se toleran (015). El reemplazo total
+del seed ahora la vacía **antes** de `Profesores` para no romper sus claves foráneas, y **la omite si la
+base no la tiene** (`existeTabla()` sobre `sqlite_master`), porque un `DELETE FROM` sobre una tabla
+inexistente haría fallar el reemplazo en cualquier base del esquema v6.
+
+Verificación manual (base sembrada + tabla auxiliar con una fila y FK activas):
+
+- `gestor-horarios-seed --db /tmp/opencode/merge-seed-check.db` → `ok`; añadida `Profesor_Materia_Suplente`
+  con `(id_Profesor, id_Materia)` y 1 fila → `--reemplazar --si` → `ok`, respaldo
+  `merge-seed-check.db.respaldo-20261110-191255`.
+- Tras el reemplazo: `suplentes: 0`, `docentes: 33`, `prof_materia: 272`, `tipos: 2` (general + cancha).
+
+### Ajustes de API front→back y tests
+
+- **Ningún** desajuste de API: su frontend ya usa el contrato vigente (`GeneracionSolver::huellaActual(nucleo,
+  opciones)`, `construirEntradaCompleta(...)` con `noAplicadas`, `Resultado<int>` de `TiposAulaUI::idTipoGeneral`).
+- **Un test adaptado** (`test/backend/test_servicio_generacion.cpp`): `huellaDatos_cambiaConLasMateriasSuplentes`
+  llamaba a la firma antigua de dos argumentos; ahora pasa la proyección vacía (`huellaDatos(..., 35, {})`).
+  La intención se conserva: `huellaDatos` emite `sup:<id>` por materia suplente y la huella cambia.
+
+### Suites (ambas, verdes, tras resolver)
+
+| Suite | Comando | Resultado |
+|---|---|---|
+| backend | `cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend` | **62/62 verde** (19,76 s) |
+| full-release | `cmake --preset full-release && cmake --build build-rel --parallel && ctest --preset full-release` | **67/67 verde** (15,60 s) |
+
+Árbol: `git diff --name-only --diff-filter=U` → **0**; sin marcadores de conflicto ni `.orig`/`.rej` en
+`src/`/`test/`. **Sin commits**: el merge queda resuelto en el índice, listo para revisar y confirmar.

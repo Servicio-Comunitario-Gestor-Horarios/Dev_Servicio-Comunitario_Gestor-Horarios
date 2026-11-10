@@ -290,6 +290,7 @@ private slots:
         auto materia = m_servicioMaterias->crearMateria("Materia Cascada", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-900", materia.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-900", materia.valor.id));
 
         QVERIFY(m_servicio->eliminarProfesor("P-900"));
 
@@ -302,6 +303,11 @@ private slots:
         QCOMPARE(q.value(0).toInt(), 0);
 
         q.prepare("SELECT COUNT(*) FROM Profesor_Materia WHERE id_Profesor = :id");
+        q.bindValue(":id", "P-900");
+        QVERIFY(q.exec() && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+
+        q.prepare("SELECT COUNT(*) FROM Profesor_Materia_Suplente WHERE id_Profesor = :id");
         q.bindValue(":id", "P-900");
         QVERIFY(q.exec() && q.next());
         QCOMPARE(q.value(0).toInt(), 0);
@@ -750,6 +756,68 @@ private slots:
         auto resultado = m_servicio->obtenerProfesorParaSolver("NO-EXISTE");
         QVERIFY(!resultado.ok);
         QCOMPARE(resultado.codigoError, -3);
+    }
+
+    void reemplazarDisponibilidad_exitoso() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2700", "Dr. Reemplazo", "r@uni.edu").ok);
+
+        QVector<FranjaHoraria> franjas;
+        franjas.append(franja(1, 7, 0, 8, 0));
+        franjas.append(franja(2, 9, 0, 10, 0));
+
+        QString error;
+        QVERIFY(m_servicio->reemplazarDisponibilidad("P-2700", franjas, error));
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+
+        auto obtenido = m_servicio->obtenerProfesor("P-2700");
+        QVERIFY(obtenido.ok);
+        QCOMPARE(obtenido.valor.disponibilidad.size(), 2);
+
+        QVERIFY(m_servicio->reemplazarDisponibilidad("P-2700", {}, error));
+        QVERIFY(m_servicio->obtenerProfesor("P-2700").valor.disponibilidad.isEmpty());
+    }
+
+    void reemplazarDisponibilidad_franjaInvalida_falla() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2701", "Dr. Inválido", "inv@uni.edu").ok);
+
+        QVector<FranjaHoraria> franjas;
+        franjas.append(franja(1, 10, 0, 9, 0));
+
+        QString error;
+        QVERIFY(!m_servicio->reemplazarDisponibilidad("P-2701", franjas, error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(m_servicio->obtenerProfesor("P-2701").valor.disponibilidad.isEmpty());
+    }
+
+    void materiasSuplentes_crudYSeCarganEnObtenerProfesor() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2800", "Dr. Suplente", "sup@uni.edu").ok);
+        auto mat1 = m_servicioMaterias->crearMateria("Historia", QString(), m_idTipoAula);
+        auto mat2 = m_servicioMaterias->crearMateria("Geografía", QString(), m_idTipoAula);
+        QVERIFY(mat1.ok && mat2.ok);
+
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat1.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat2.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat1.valor.id)); // idempotente
+
+        auto obtenido = m_servicio->obtenerProfesor("P-2800");
+        QVERIFY(obtenido.ok);
+        QCOMPARE(obtenido.valor.materiasSuplentes.size(), 2);
+        QVERIFY(obtenido.valor.materias.isEmpty());
+
+        QVector<int> ids;
+        ids.append(mat1.valor.id);
+        QString error;
+        QVERIFY(m_servicio->reemplazarMateriasSuplentes("P-2800", ids, error));
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        obtenido = m_servicio->obtenerProfesor("P-2800");
+        QCOMPARE(obtenido.valor.materiasSuplentes.size(), 1);
+        QCOMPARE(obtenido.valor.materiasSuplentes.first().nombre, QString("Historia"));
+
+        QVERIFY(m_servicio->limpiarMateriasSuplentes("P-2800"));
+        QVERIFY(m_servicio->obtenerProfesor("P-2800").valor.materiasSuplentes.isEmpty());
     }
 
 private:

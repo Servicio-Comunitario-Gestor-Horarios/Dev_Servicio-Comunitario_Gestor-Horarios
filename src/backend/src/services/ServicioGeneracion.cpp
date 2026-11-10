@@ -59,6 +59,8 @@ QString huellaDatos(const DatosDominio& datos, int duracionMinutos,
                               disp.franja.fin.toString(QStringLiteral("HH:mm")));
         for (const MateriaAsignadaDTO& m : d.materias)
             canon += QStringLiteral("mat:%1;").arg(m.id);
+        for (const MateriaAsignadaDTO& m : d.materiasSuplentes)
+            canon += QStringLiteral("sup:%1;").arg(m.id);
     }
     for (const AulaDTO& a : datos.aulas)
         canon += QStringLiteral("A:%1|%2|%3|%4;")

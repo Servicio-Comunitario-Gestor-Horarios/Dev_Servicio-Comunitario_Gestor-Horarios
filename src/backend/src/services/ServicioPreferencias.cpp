@@ -396,3 +396,26 @@ Resultado<int> ServicioPreferencias::limpiar(const QString& idProfesor)
 
     return Resultado<int>::exito(query.numRowsAffected());
 }
+
+Resultado<bool> ServicioPreferencias::reemplazar(const QString& idProfesor,
+                                                 const QVector<PreferenciaDTO>& preferencias)
+{
+    const auto limpieza = limpiar(idProfesor);
+    if (!limpieza.ok)
+        return Resultado<bool>::error(limpieza.mensajeError, limpieza.codigoError);
+
+    for (const PreferenciaDTO& preferencia : preferencias)
+    {
+        if (!sentidoValido(preferencia.sentido))
+        {
+            return Resultado<bool>::error(
+                QStringLiteral("El sentido de una preferencia no es válido."));
+        }
+
+        const auto alta = agregar(idProfesor, preferencia.franja, preferencia.sentido);
+        if (!alta.ok)
+            return Resultado<bool>::error(alta.mensajeError, alta.codigoError);
+    }
+
+    return Resultado<bool>::exito(true);
+}

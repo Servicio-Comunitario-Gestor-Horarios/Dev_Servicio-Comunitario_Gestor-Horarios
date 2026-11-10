@@ -40,10 +40,14 @@ void ClassroomListWidget::setupUi() {
 
     QLabel *titulo = new QLabel("Gestión de Aulas", this);
     titulo->setObjectName("ClassroomTitle");
+    titulo->setWordWrap(true);
+    titulo->setMinimumWidth(0);
     titulo->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827; border: none;");
 
     QLabel *subtitulo = new QLabel("Administra los espacios físicos, laboratorios y su capacidad", this);
     subtitulo->setObjectName("ClassroomSub");
+    subtitulo->setWordWrap(true);
+    subtitulo->setMinimumWidth(0);
     subtitulo->setStyleSheet("font-size: 14px; color: #6b7280; border: none;");
 
     textLayout->addWidget(titulo);
@@ -98,7 +102,8 @@ void ClassroomListWidget::setupUi() {
 
     // 2. Configuración del Panel de Resumen (Lado Derecho)
     QFrame *rightPanel = new QFrame(this);
-    rightPanel->setFixedWidth(320);
+    rightPanel->setMinimumWidth(220);
+    rightPanel->setMaximumWidth(340);
     rightPanel->setStyleSheet("QFrame#ContenedorResumen { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
     rightPanel->setObjectName("ContenedorResumen");
 

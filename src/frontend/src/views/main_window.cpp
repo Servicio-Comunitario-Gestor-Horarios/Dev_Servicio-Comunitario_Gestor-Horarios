@@ -33,6 +33,10 @@
 #include <QJsonObject>
 #include <QVariant>
 #include <QSettings>
+#include <QEvent>
+#include <QLayout>
+#include <QScreen>
+#include <QTimer>
 
 void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 {
@@ -57,7 +61,13 @@ void MainWindow::setNucleoDatos(NucleoDatos* nucleo)
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("Liceo Nacional Robert Serra - Gestión");
-    resize(1280, 720);
+    // Tamano inicial acotado al area disponible: 1280x720 fijos se salian por
+    // los laterales en portatiles y con escalado de pantalla. El arranque real
+    // muestra la ventana maximizada (ver aplicacion_frontend.cpp).
+    const QRect disponible = screen() ? screen()->availableGeometry()
+                                      : QRect(0, 0, 1280, 720);
+    resize(qBound(640, disponible.width() - 40, 1280),
+           qBound(480, disponible.height() - 40, 720));
 
     QWidget *centralWidget = new QWidget(this);
     centralWidget->setObjectName("FondoPrincipal");
@@ -109,6 +119,49 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     bool darkMode = settings.value("darkMode", false).toBool();
     aplicarTemaGlobal(darkMode);
     mostrarInicio();
+}
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    QMainWindow::changeEvent(event);
+    if (event && event->type() == QEvent::WindowStateChange)
+        programarReajuste();
+}
+
+void MainWindow::programarReajuste()
+{
+    if (m_reajustePendiente)
+        return;
+    m_reajustePendiente = true;
+    // Windows comunica el cambio de estado antes de aplicar el area cliente
+    // definitiva. Reajustar en el siguiente ciclo del bucle de eventos evita
+    // que algunos paneles conserven el tamano anterior hasta restaurar y
+    // volver a maximizar.
+    QTimer::singleShot(0, this, [this]() {
+        m_reajustePendiente = false;
+        reajustarDisposicion();
+    });
+}
+
+void MainWindow::reajustarDisposicion()
+{
+    if (QWidget* central = centralWidget()) {
+        if (QLayout* lay = central->layout())
+            lay->activate();
+    }
+
+    if (m_contenedorVistas) {
+        if (QLayout* lay = m_contenedorVistas->layout())
+            lay->activate();
+        if (QWidget* actual = m_contenedorVistas->currentWidget()) {
+            if (QLayout* lay = actual->layout())
+                lay->activate();
+            actual->updateGeometry();
+        }
+        m_contenedorVistas->updateGeometry();
+    }
+
+    update();
 }
 
 void MainWindow::setupSidebar() {
@@ -176,49 +229,16 @@ void MainWindow::setupCentralArea() {
     btnMenuRayas->setStyleSheet("QPushButton { font-size: 20px; border: none; background: transparent; padding-left: 15px; }"
                                 "QPushButton::menu-indicator { image: none; }");
 
+    // El programa no usa cuentas: el menú solo ofrece Configuración (#98).
     QMenu *menuOpciones = new QMenu(this);
-
-    QWidget *headerWidget = new QWidget(this);
-    headerWidget->setObjectName("WidgetMenuCorreo");
-    QVBoxLayout *menuHeaderLayout = new QVBoxLayout(headerWidget);
-    menuHeaderLayout->setContentsMargins(20, 10, 20, 10);
-    menuHeaderLayout->setSpacing(2);
-
-    QLabel *lblRole = new QLabel("Administrador", headerWidget);
-    lblRole->setObjectName("LblRoleMenu");
-    lblRole->setStyleSheet("font-weight: bold; font-size: 15px; background: transparent;");
-
-    QLabel *lblEmail = new QLabel("admin@liceorobertserra.com", headerWidget);
-    lblEmail->setObjectName("LblEmailMenu");
-    lblEmail->setStyleSheet("font-size: 13px; background: transparent;");
-
-    menuHeaderLayout->addWidget(lblRole);
-    menuHeaderLayout->addWidget(lblEmail);
-
-    QWidgetAction *headerAction = new QWidgetAction(menuOpciones);
-    headerAction->setDefaultWidget(headerWidget);
-
-    QAction *accionPerfil = new QAction("👤  Mi Perfil", this);
     QAction *accionConfig = new QAction("⚙️  Configuración", this);
-    QAction *accionCerrarSesion = new QAction("🚪  Cerrar Sesión", this);
-
-    menuOpciones->addAction(headerAction);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionPerfil);
     menuOpciones->addAction(accionConfig);
-    menuOpciones->addSeparator();
-    menuOpciones->addAction(accionCerrarSesion);
 
     btnMenuRayas->setMenu(menuOpciones);
     connect(accionConfig, &QAction::triggered, this, &MainWindow::abrirConfiguracion);
 
-    QLabel *userProfile = new QLabel("A  Header Subhead", topHeader);
-    userProfile->setObjectName("UserProfileText");
-    userProfile->setStyleSheet("border: none; background: transparent; padding-right: 15px;");
-
     headerLayout->addWidget(btnMenuRayas);
     headerLayout->addStretch();
-    headerLayout->addWidget(userProfile);
 
     m_contenedorVistas = new QStackedWidget(this);
     m_contenedorVistas->setObjectName("ContenedorVistas");
@@ -326,12 +346,17 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
             // Cajas de texto y selects en los formularios
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; border-radius: 6px; padding: 6px; }"
             "QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }"
+            // Lista emergente de los desplegables (es una ventana aparte y, sin
+            // esto, puede conservar la paleta oscura del sistema con texto oscuro)
+            "QComboBox QAbstractItemView { background-color: #2a2a2a; color: #ffffff; border: 1px solid #444444; selection-background-color: #3b82f6; selection-color: #ffffff; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: #2a2a2a; color: #ffffff; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #3b82f6; color: #ffffff; }"
 
             // Excepciones estructurales
             "#FondoPrincipal { background-color: #121212; border: none; }"
             "#Sidebar { background-color: #121212; border-right: 1px solid #333333; border-radius: 0px; }"
             "#TopHeader { background-color: #121212; border-bottom: 1px solid #333333; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             // Textos
             "QLabel { background: transparent; color: #ffffff; border: none; }"
@@ -356,11 +381,16 @@ void MainWindow::aplicarTemaGlobal(bool modoOscuro) {
 
             "QFrame, QMenu, QTableWidget, QTableView, QScrollArea, QStackedWidget { background-color: white; color: #334155; border: 1px solid #e0e0e0; border-radius: 8px; }"
             "QLineEdit, QComboBox, QTextEdit, QSpinBox { background-color: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; }"
+            // Lista emergente de los desplegables: fondo blanco y texto oscuro
+            // en modo claro, para que la selección siempre sea legible.
+            "QComboBox QAbstractItemView { background-color: white; color: #334155; border: 1px solid #cbd5e1; selection-background-color: #dbeafe; selection-color: #0f172a; outline: none; }"
+            "QComboBox QAbstractItemView::item { background-color: white; color: #334155; padding: 4px 8px; }"
+            "QComboBox QAbstractItemView::item:selected { background-color: #dbeafe; color: #0f172a; }"
 
             "#FondoPrincipal { background-color: #f4f5f7; border: none; }"
             "#Sidebar { background-color: white; border: none; border-right: 1px solid #e0e0e0; border-radius: 0px; }"
             "#TopHeader { background-color: white; border: none; border-bottom: 1px solid #e0e0e0; border-radius: 0px; }"
-            "#RightContainer, #WidgetMenuCorreo, #ContenedorVistas { background: transparent; border: none; }"
+            "#RightContainer, #ContenedorVistas { background: transparent; border: none; }"
 
             "QLabel { background: transparent; color: #334155; border: none; }"
             "QHeaderView::section { background-color: white; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"

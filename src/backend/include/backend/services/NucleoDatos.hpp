@@ -38,6 +38,7 @@ public:
     // ─── Docentes ─────────────────────────────────────────────────────────
 
     Resultado<QVector<ProfesorDTO>> listarDocentes() const;
+    Resultado<ProfesorDTO> obtenerDocente(const QString& id) const;
     Resultado<ProfesorDTO> crearDocente(const QString& id, const QString& nombre,
                                         const QString& email,
                                         const QString& telefono = QString());
@@ -49,6 +50,20 @@ public:
     // NUEVO: Manejo de materias asignadas a un docente
     bool asignarMateriaPorNombre(const QString& idProfesor, const QString& nombreMateria);
     bool limpiarMaterias(const QString& idProfesor);
+
+    /**
+     * @brief Guarda de forma atómica la ficha completa de un docente.
+     *
+     * Reemplaza disponibilidad, preferencias, materias titulares y materias
+     * suplentes. Si cualquier parte falla, no se aplica nada. Es la operación
+     * que usa el panel de docentes para los botones Guardar/Descartar.
+     */
+    bool guardarFichaDocente(const QString& idProfesor,
+                             const QVector<FranjaHoraria>& disponibilidad,
+                             const QVector<PreferenciaDTO>& preferencias,
+                             const QVector<int>& materiasTitulares,
+                             const QVector<int>& materiasSuplentes,
+                             QString* error = nullptr);
 
     // ─── Aulas ────────────────────────────────────────────────────────────
 
@@ -88,6 +103,18 @@ public:
                                  const QString& descripcion = QString());
     Resultado<PlanDTO> actualizarPlan(const QString& codigo, const QString& nombre,
                                       const QString& descripcion = QString());
+    Resultado<PlanDTO> obtenerPlan(const QString& codigo) const;
+
+    /// Alta atómica de un plan con sus materias, años y horas semanales.
+    Resultado<PlanDTO> crearPlanCompleto(const QString& codigo, const QString& nombre,
+                                         const QString& descripcion,
+                                         const QVector<PlanMateriaDTO>& materias);
+
+    /// Edición atómica del plan y reemplazo de sus materias (el código no cambia).
+    Resultado<PlanDTO> actualizarPlanCompleto(const QString& codigo, const QString& nombre,
+                                              const QString& descripcion,
+                                              const QVector<PlanMateriaDTO>& materias);
+
     bool eliminarPlan(const QString& codigo);
 
     /// Carga horaria (materias con sus horas y año) de un plan de estudio.

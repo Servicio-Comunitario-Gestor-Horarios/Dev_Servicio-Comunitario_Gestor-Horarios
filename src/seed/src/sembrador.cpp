@@ -40,6 +40,16 @@ int contarFilas(QSqlDatabase& db, const QString& tabla) {
     return q.next() ? q.value(0).toInt() : -1;
 }
 
+/// ¿La base tiene esta tabla? Sirve para las tablas auxiliares que crea el frontend
+/// bajo demanda y que no forman parte del esquema versionado (v6).
+bool existeTabla(QSqlDatabase& db, const QString& tabla) {
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :nombre"));
+    q.bindValue(QStringLiteral(":nombre"), tabla);
+    return q.exec() && q.next();
+}
+
 /// Filas de `TiposAula` que no son el tipo general: la fila que garantiza el esquema
 /// (015 RF-1) no convierte una base recién creada en «base con datos». -1 si falla.
 int contarTiposAulaDeDominio(QSqlDatabase& db) {
@@ -525,10 +535,16 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
         // Orden FK-seguro: Eventos antes que Turnos; Cursos antes que Turnos y Aulas;
         // Preferencia_Profesor/PlanEstudio_Materia/Profesor_Materia/Disponibilidad_Profesor
         // antes de sus padres; Aulas y Materias antes que TiposAula; Profesores al final.
+        //
+        // `Profesor_Materia_Suplente` no forma parte del esquema v6: la crea bajo demanda el
+        // servicio de docentes del frontend (#95). Si la base la tiene, se vacía antes de
+        // `Profesores` (y de `Materias`) para no romper sus claves foráneas; si no existe, se
+        // omite, porque el esquema tolera tablas de más (015).
         for (const char* tabla :
              {"Eventos", "Preferencia_Profesor", "Disponibilidad_Profesor",
-              "Profesor_Materia", "Cursos", "PlanEstudio_Materia", "PlanEstudio",
-              "Materias", "Turnos", "Aulas", "TiposAula", "Profesores"}) {
+              "Profesor_Materia_Suplente", "Profesor_Materia", "Cursos",
+              "PlanEstudio_Materia", "PlanEstudio", "Materias", "Turnos", "Aulas",
+              "TiposAula", "Profesores"}) {
             const QString nombre = QString::fromLatin1(tabla);
             bool borrado = false;
             if (nombre == QStringLiteral("TiposAula")) {
@@ -539,6 +555,10 @@ ResultadoAplicacion aplicar(const OpcionesAplicacion& opciones) {
                     "DELETE FROM TiposAula WHERE clave <> :clave"));
                 borrarTipos.bindValue(QStringLiteral(":clave"), tipo_general::clave());
                 borrado = borrarTipos.exec();
+            } else if (nombre == QStringLiteral("Profesor_Materia_Suplente") &&
+                       !existeTabla(db, nombre)) {
+                // Tabla auxiliar opcional: en una base del esquema v6 no existe.
+                continue;
             } else {
                 borrado = borrarTabla(nombre);
             }

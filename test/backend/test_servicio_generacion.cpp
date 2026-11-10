@@ -436,6 +436,20 @@ private slots:
         QCOMPARE(huellaDatos(soloMateria, 35, {}), h1);
     }
 
+    void huellaDatos_cambiaConLasMateriasSuplentes()
+    {
+        const QString h1 = huellaDatos(dominio(), 35, {});
+
+        DatosDominio conSuplente = dominio();
+        QVERIFY(!conSuplente.docentes.isEmpty());
+        MateriaAsignadaDTO suplente;
+        suplente.id = 99;
+        suplente.nombre = QStringLiteral("Materia suplente");
+        conSuplente.docentes[0].materiasSuplentes.append(suplente);
+
+        QVERIFY(huellaDatos(conSuplente, 35, {}) != h1);
+    }
+
     void huellaDatos_cambiaConLosEventos()
     {
         EventoDTO evento;
