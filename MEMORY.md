@@ -5,10 +5,10 @@
 ## Fase actual
 
 - **Fase:** **018 (aforo simultáneo de la cancha)** **implementada y cerrada (2026-11-10)** con la validación **APROBADA**; la **017** cerrada el 2026-11-09 con **corrección de datos (2026-11-10, P033)**; la **014** cerrada el 2026-11-07 (`b5844b5`) y la **013** el 2026-11-06 (`2eb45ec`); 015/016 cerradas en `c7b9427` (esquema **v6**). Suites **62/62** (`backend`), **67/67** (`full-release`) y **2/2** (lento) en el host.
-- **Fecha:** 2026-11-10
-- **Rama:** `feat/Motor`, `HEAD` = `dfe529f`. La **018** está **en el árbol, sin commitear** (spec, estado, plan, tareas, journal, motor, seed y tests).
-- **Specs en curso:** **ninguna**. Siguiente: **rendimiento/descomposición**.
-- **Siguiente paso:** **decidir los commits** de la 017 y la 018; después la spec de **rendimiento/descomposición** (el centro real mide **161–264 s** frente a un techo de **300 s**, con una corrida de 369,7 s). La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
+- **Fecha:** 2026-11-11
+- **Rama:** `feat/Motor`, `HEAD` = `e8d4e24` (merge de `feat/frontend-generacion` con el backend 013–018) más los commits SDD de la 019; el merge local se publica en `origin/feat/Motor` el **2026-11-11**.
+- **Specs en curso:** **019 (integración frontend/backend)** **aprobada el 2026-11-10**; **plan y tareas aplazados a mañana** (decisión del usuario). Tras la 019: **rendimiento/descomposición**.
+- **Siguiente paso:** **escribir el `plan.md` y las `tasks.md` de la 019 y pasar el QA del plan**; después, implementación tarea a tarea. Suites verificadas el **2026-11-11**: **62/62** (`backend`), **67/67** (`full-release`) y **2/2** (lento; centro real **281,05 s**, techo **300 s**). Después de la 019: spec de **rendimiento/descomposición**. La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
 
 ## Specs activas
 
@@ -30,6 +30,7 @@
 | 016-tipo-general-comprobacion-y-cierre | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T9; APROBADO; T8 del planner) |
 | 017-datos-reales-del-centro | aprobada (2026-11-08) | **implementada y cerrada (2026-11-09)** (T1–T10; APROBADO 2026-11-09) · **corrección de datos (2026-11-10): P033, 33 docentes, 165 disponibilidades** |
 | 018-aforo-simultaneo-cancha | aprobada (2026-11-10) | **implementada y cerrada (2026-11-10)** (T1–T8 + T4b; APROBADO 2026-11-10; sin commits) |
+| 019-integracion-frontend-backend | aprobada (2026-11-10) | **plan y tareas pendientes** (H1, H2, H3, H4, H6 y H8 + formalización H5; esquema **v7**; deuda H7 y H9–H16 salvo las partes de H10 cédula y H14 causas, más 002 RF-5) |
 
 > Épico **solver** (numeración real del trabajo): **004 → 005 → 008 → 009 → 010 → 011 → 012 (cerradas)** → **015 (tipo general en el esquema, cerrada el 2026-11-05, esquema v6)** → **016 (comprobación y cierre, cerrada el 2026-11-05)**; **013** (preferencias en el solver) aprobada y **re-baseada a v6**, sin implementar; **014** (materias en bloques de dos horas) planificada y sin escribir. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado**; la 007 queda además **descartada/diferida** por decisión del usuario (2026-11-04).
 
