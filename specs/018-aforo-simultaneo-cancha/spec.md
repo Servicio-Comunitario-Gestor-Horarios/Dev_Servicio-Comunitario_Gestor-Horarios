@@ -408,6 +408,12 @@ pares cruzados y, si una salida los tuviera, la comprobación los marca.
   del centro real.
 - **La interfaz de usuario**: no hay pantallas nuevas; se actualiza la documentación de la interfaz y se
   retira la promesa del aforo pendiente.
+
+> **Anotado por la 019 (2026-11-10).** La **vista de horario y la detección de conflictos al mover
+> clases**, que aquí quedaban fuera de alcance, **pasan a la 019** (RF-8/RF-9): el aforo se declara en el
+> documento de visualización y la detección lo respeta (dos cursos distintos con docentes distintos en el
+> mismo bloque de la cancha no son conflicto; tres clases, una franja suelta o un aula de aforo 1 sí). La
+> **estimación de ocupación** no forma parte de esta nota: es **H12**, deuda de la 019.
 - **El preset maestro del centro** como archivo entregable: la aceptación compone la entrada desde la
   base (D-10).
 - **La generación parcial, los turnos automáticos y la cobertura de emergencia** (antiguas 006/007).

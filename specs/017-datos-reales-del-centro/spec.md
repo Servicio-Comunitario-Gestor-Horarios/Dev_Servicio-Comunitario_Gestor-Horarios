@@ -458,6 +458,12 @@ no cambia el motor, el esquema ni el contrato de configuración, y no modela el 
 - **EL SISTEMA no programará las actividades «fuera de aula»** en el horario ni las convertirá en clases.
 - **EL SISTEMA no declarará suplentes.**
 
+> **Anotado por la 019 (2026-11-10).** El **tope sembrado de 36 horas académicas** deja de ser un tope
+> único y pasa a ser el **valor de referencia editable** de las horas en aula: el usuario puede ajustarlo
+> por **convenio** por encima o por debajo y **no se impone como inicio de la tabla** (las dos columnas de
+> horas arrancan con las horas sugeridas). El **valor sembrado no cambia** (36 h), el **cálculo no se
+> modifica** y el exceso solo se informa.
+
 ### RF-7. Turnos, franjas y eventos
 
 - **EL SISTEMA sembrará dos turnos de 8 franjas, 5 días de semana y 40 minutos por franja**, con estas

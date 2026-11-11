@@ -265,6 +265,12 @@ nueva de administración, ni la sustitución de los datos de prueba por los real
   lo vigila: no puede quedar una base con la marca nueva y una descripción antigua del catálogo.
 - **Los momentos y las consecuencias de aplicar esta validez son de la spec 016.**
 
+> **Anotado por la 019 (2026-11-10).** La **versión de esquema vigente pasa a 7** por la 019 (materias
+> suplentes en el esquema). La **política sin migración**, el **catálogo de estructura esperada** y la
+> **guardia** de esta spec **no cambian**: se sigue exigiendo lo mismo (tablas, columnas, índice, los dos
+> disparadores y exactamente una fila del tipo general) y una base de la versión anterior se rechaza al
+> abrir.
+
 ### RF-7. Servicios, mensajes y coherencia documental
 
 - **EL SISTEMA conservará las operaciones actuales del catálogo** (crear, listar, renombrar, eliminar)

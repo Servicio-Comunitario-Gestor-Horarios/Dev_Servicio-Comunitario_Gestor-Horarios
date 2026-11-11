@@ -130,6 +130,12 @@ administración.
 - **EL SISTEMA no dará por válida una base a la que se le haya quitado el tipo o la protección por una
   escritura ajena al producto**, tampoco en los caminos de generación y guardado.
 
+> **Anotado por la 019 (2026-11-10).** La **versión de esquema vigente pasa a 7** por la 019 (materias
+> suplentes). Se mantiene todo lo de esta spec: la comprobación única de solo lectura, los **tres
+> momentos** (abrir, generar y guardar), el **mensaje de versión** que ofrece crear una base nueva y
+> advierte de que restaurar un respaldo anterior volverá a fallar, y la política **sin migración**. La 019
+> fija ese mismo comportamiento para una **base v6**.
+
 ### RF-2. La interfaz no sustituye el tipo general
 
 - **CUANDO la interfaz prepare un alta que necesite el tipo general y no lo encuentre en el catálogo,

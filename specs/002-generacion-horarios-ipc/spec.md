@@ -65,6 +65,12 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 > siguen en 5 s.** El plazo del **proceso de cálculo** es el de esta spec; los presupuestos internos de las
 > fases del motor son de la 014b.
 
+> **Anotado por la 019 (2026-11-10).** La 019 **cierra la parte de interfaz de RF-1 y RF-4**: al terminar
+> el cálculo **no se escribe ningún archivo**, el guardado es una **acción explícita** del usuario y un
+> resultado marcado como **«datos anteriores»** exige **confirmación** antes de guardarse. **RF-5** (aviso
+> al cerrar con un horario sin guardar) **sigue abierta** y queda como **arrastre declarado** de la 019:
+> al quitar el guardado automático pasa a ser relevante y no se implementa allí.
+
 ### RF-2. Delimitación entre lado cliente y proceso de cálculo
 
 - EL SISTEMA garantiza que solo el lado cliente lee y escribe el archivo de la base de datos; el proceso de cálculo nunca lo accede.
