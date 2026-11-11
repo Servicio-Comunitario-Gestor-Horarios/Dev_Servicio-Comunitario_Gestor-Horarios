@@ -166,7 +166,9 @@ if(TARGET backend_solver)
 	# Aceptación del centro sin EF (014 T7). Es lento: etiqueta `slow` y fuera de la suite normal.
 	add_gtest(test_solver_centro_sin_ef backend/test_solver_centro_sin_ef.cpp
 					fixture_centro backend_solver)
-	set_tests_properties(test_solver_centro_sin_ef PROPERTIES LABELS "slow")
+	if(GTest_FOUND)
+		set_tests_properties(test_solver_centro_sin_ef PROPERTIES LABELS "slow")
+	endif()
 	add_qtest(test_solver_benchmark backend/test_solver_benchmark.cpp backend_solver)
 	# Objetivo con preferencias: referencia, anclaje estructural y deduplicación (013 T5).
 	add_gtest(test_solver_preferencias backend/test_solver_preferencias.cpp backend_solver)
