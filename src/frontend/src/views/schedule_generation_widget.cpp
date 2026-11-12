@@ -42,6 +42,7 @@
 #include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
+#include "dialogs/gestion_cursos_dialog.hpp"
 #include "dialogs/schedule_theme.hpp"
 #include "services/entrada_solver_builder.hpp"
 #include "services/preferencias_docente_ui.hpp"
@@ -254,6 +255,35 @@ void ScheduleGenerationWidget::recargarDesdeNucleo()
     aplicarEstilo();
 }
 
+void ScheduleGenerationWidget::refrescarCursos()
+{
+    poblarCatalogos();
+    poblarCursos();
+
+    // Actualizar las opciones de años de los docentes sin rehacer la tabla:
+    // las horas, el turno y el plan ya elegidos se conservan.
+    QStringList textosAnios;
+    QVariantList datosAnios;
+    for (int anio : m_aniosDisponibles) {
+        textosAnios << QString::number(anio);
+        datosAnios << anio;
+    }
+
+    for (int fila = 0; fila < m_tablaDocentes->rowCount(); ++fila) {
+        auto* combo = qobject_cast<ComboMultiple*>(m_tablaDocentes->cellWidget(fila, 5));
+        if (!combo)
+            continue;
+        const QVariantList seleccion = combo->datosSeleccionados();
+        combo->clear();
+        combo->setTextoVacio(QStringLiteral("Todos"));
+        combo->agregarOpciones(textosAnios, datosAnios);
+        if (!seleccion.isEmpty())
+            combo->setSeleccionDatos(seleccion);
+    }
+
+    estilizarCombos(this, paletaGeneracion());
+}
+
 void ScheduleGenerationWidget::recargarConfiguracionAvanzada()
 {
     if (m_nucleo) {
@@ -364,7 +394,8 @@ void ScheduleGenerationWidget::construirUi()
         contenido->addWidget(crearAyuda(
             QStringLiteral("Elige el turno, el plan de estudio y el número de estudiantes de "
                            "cada curso. El solver exige turno y plan; los datos de prueba "
-                           "sembrados dejan el turno sin asignar."),
+                           "sembrados dejan el turno sin asignar. Los años y las secciones se "
+                           "crean y eliminan con «Gestionar años y secciones»."),
             tarjeta));
 
         m_tablaCursos = new QTableWidget(tarjeta);
@@ -385,6 +416,18 @@ void ScheduleGenerationWidget::construirUi()
         contenido->addWidget(m_tablaCursos);
 
         auto* botones = new QHBoxLayout();
+        auto* btnGestionar = new QPushButton(QStringLiteral("Gestionar años y secciones…"), tarjeta);
+        btnGestionar->setCursor(Qt::PointingHandCursor);
+        connect(btnGestionar, &QPushButton::clicked, this, [this]() {
+            if (!m_nucleo)
+                return;
+            GestionCursosDialog dialog(m_nucleo, this);
+            connect(&dialog, &GestionCursosDialog::cursosCambiados,
+                    this, &ScheduleGenerationWidget::refrescarCursos);
+            dialog.exec();
+        });
+        botones->addWidget(btnGestionar);
+
         auto* btnRecargar = new QPushButton(QStringLiteral("Recargar desde la base"), tarjeta);
         btnRecargar->setCursor(Qt::PointingHandCursor);
         connect(btnRecargar, &QPushButton::clicked, this, &ScheduleGenerationWidget::recargarDesdeNucleo);

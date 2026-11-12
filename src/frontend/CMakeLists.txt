@@ -19,6 +19,7 @@ set(FRONTEND_SOURCES
 				src/dialogs/schedule_grid_dialog.cpp
 				src/dialogs/teacher_schedule_dialog.cpp
 				src/dialogs/student_schedule_dialog.cpp
+				src/dialogs/gestion_cursos_dialog.cpp
 				src/forms/settings_dialog.cpp
 				src/views/schedule_generation_widget.cpp
 				src/widgets/combo_multiple.cpp
@@ -28,6 +29,7 @@ set(FRONTEND_SOURCES
 # === CABECERAS DEL FRONTEND ===
 set(FRONTEND_HEADERS
 				include/frontend/toggle_switch.hpp
+				include/frontend/preferencias_generacion.hpp
 				src/logindialog.h
 				src/views/main_window.hpp
 				src/views/teacher_list_widget.hpp
@@ -42,6 +44,7 @@ set(FRONTEND_HEADERS
 				src/views/schedule_visualization_widget.hpp
 				src/dialogs/teacher_schedule_dialog.hpp
 				src/dialogs/student_schedule_dialog.hpp
+				src/dialogs/gestion_cursos_dialog.hpp
 				src/dialogs/schedule_grid_dialog.hpp
 				src/dialogs/schedule_model.hpp
 				src/dialogs/schedule_theme.hpp

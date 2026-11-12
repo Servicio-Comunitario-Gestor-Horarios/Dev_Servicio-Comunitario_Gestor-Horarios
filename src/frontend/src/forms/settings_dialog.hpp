@@ -7,6 +7,7 @@
 class NucleoDatos;
 class QSpinBox;
 class QCheckBox;
+class QComboBox;
 
 class SettingsDialog : public QDialog {
     Q_OBJECT
@@ -29,6 +30,7 @@ private:
     ToggleSwitch *m_darkModeSwitch;
     QSpinBox *m_spinDuracion = nullptr;
     QSpinBox *m_spinDias = nullptr;
+    QComboBox *m_comboMaxAnios = nullptr;
     QCheckBox *m_checkAulaFija = nullptr;
 
     NucleoDatos* m_nucleo = nullptr;

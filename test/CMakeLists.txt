@@ -196,6 +196,12 @@ if(TARGET frontend AND TARGET backend)
 	target_include_directories(test_tipos_aula_ui PRIVATE
 					${CMAKE_SOURCE_DIR}/src/frontend/src)
 
+	# Diálogo de gestión de años y secciones: agrupación, alta y baja de cursos.
+	add_qtest(test_gestion_cursos_dialog frontend/test_gestion_cursos_dialog.cpp
+					frontend Qt6::Sql Qt6::Widgets)
+	target_include_directories(test_gestion_cursos_dialog PRIVATE
+					${CMAKE_SOURCE_DIR}/src/frontend/src)
+
 	# Selectores de la vista de generación (años como desplegable múltiple y
 	# materias suplentes en rejilla) y los ajustes visuales de sus tablas.
 	if(TARGET seed)
