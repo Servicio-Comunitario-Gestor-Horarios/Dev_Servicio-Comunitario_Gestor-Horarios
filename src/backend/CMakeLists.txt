@@ -40,6 +40,7 @@ target_sources(backend PRIVATE
 				src/services/ServicioPlanesEstudio.cpp
 				src/services/ServicioCargaHoraria.cpp
 				src/services/ServicioComposicionPlan.cpp
+				src/services/ServicioCapacidadHoraria.cpp
 				src/services/ServicioExportacion.cpp
 				src/services/ServicioHorarioSalida.cpp
 				src/services/ServicioConsultaHorario.cpp

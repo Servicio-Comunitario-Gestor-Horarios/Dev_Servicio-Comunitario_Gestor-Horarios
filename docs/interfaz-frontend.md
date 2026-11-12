@@ -267,6 +267,12 @@ public:
     // Código vacío → error; plan sin materias → vector vacío (no es error).
     Resultado<QVector<CargaHorariaDTO>> listarCargaDePlan(const QString& codigoPlan) const;
 
+    // Capacidad horaria (horas disponibles frente a necesarias; ver §2.4.6).
+    Resultado<QVector<HorasPlanAnioMateriaDTO>> horasPorPlanAnioMateria() const;
+    Resultado<ResumenCapacidadHorariaDTO> resumenCapacidadHoraria(
+        const QMap<QString, int>& horasAulaPorDocente = {},
+        const QMap<QString, QString>& planPorCurso = {}) const;
+
     // Cursos (identidad ano+seccion; turno y aula opcionales)
     Resultado<QVector<CursoDTO>> listarCursos() const;
     Resultado<CursoDTO>      crearCurso(int anio, const QString& seccion,
@@ -489,6 +495,52 @@ referencian por `idTipoAula`, así que renombrar un tipo se propaga sin reescrib
   cinco operaciones de `NucleoDatos`, separar preferencias de disponibilidad y mostrar el día con su
   nombre. Los cambios de firma son **aditivos**: el DTO gana el campo y `NucleoDatos` gana
   métodos; no rompen la compilación.
+
+#### 2.4.6 Capacidad horaria (`ServicioCapacidadHoraria`)
+
+`src/backend/include/backend/services/ServicioCapacidadHoraria.hpp`. Servicio **de solo lectura** que
+compara las horas de aula disponibles entre los docentes con las horas necesarias para cubrir los
+cursos, y detalla las horas de cada materia en cada año de cada plan. No cambia datos ni interviene
+en la generación.
+
+- **Qué calcula.**
+  - `horasDisponibles`: Σ de las horas de aula de los docentes.
+  - `horasNecesarias`: Σ, para cada curso con plan, de las horas del plan en el **año** de ese curso.
+  - `detalle`: todas las filas de `PlanEstudio_Materia` de todos los planes, ordenadas por plan,
+    año y materia (`HorasPlanAnioMateriaDTO{codigoPlan, nombrePlan, anio, idMateria, nombreMateria,
+    horas}`).
+- **Datos que aporta el frontend.** La base **no persiste** las horas de aula por docente (el 36 es
+  política del perfil) ni el plan de cada curso (`Cursos` guarda año/sección/turno, no plan). Por eso
+  `resumen()` recibe dos mapas:
+  - `horasAulaPorDocente`: clave **nombre del docente**, valor horas semanales. Si llega **vacío**, se
+    usan **36 horas por docente** y se añade un aviso. Un nombre que no exista en la base se ignora
+    con aviso.
+  - `planPorCurso`: clave **nombre del curso** tal como `nombreCurso(anio, seccion)` («1ro A»),
+    valor código de plan. Si llega **vacío**, `horasNecesarias = 0` y se avisa de que faltan planes;
+    el `detalle` por plan/año/materia se calcula igual. Un curso sin plan o con un plan inexistente
+    se omite con aviso.
+- **Errores y avisos.** `Resultado` solo es error si falla una lectura de la base. Los datos
+  incompletos (sin mapa de horas, sin mapa de planes, curso/plan/docente desconocido) van en
+  `avisos` (`QStringList`), en español.
+- **Fachada.** `NucleoDatos::horasPorPlanAnioMateria()` y
+  `NucleoDatos::resumenCapacidadHoraria(horasAulaPorDocente, planPorCurso)` delegan en el servicio.
+
+```cpp
+// El frontend arma los mapas con lo que muestra su tabla de generación/preset.
+QMap<QString, int>    horasAula;   // «Ana Pérez» → 30
+QMap<QString, QString> planes;     // «1ro A»     → «31059»
+horasAula.insert(QStringLiteral("Ana Pérez"), 30);
+planes.insert(nombreCurso(1, QStringLiteral("A")), QStringLiteral("31059"));
+
+const auto resumen = nucleo->resumenCapacidadHoraria(horasAula, planes);
+if (!resumen.ok) {
+    // error de lectura: mostrar resumen.mensajeError
+} else {
+    // resumen.valor.docentes / horasDisponibles / cursos / horasNecesarias
+    // resumen.valor.detalle  (95 filas con el centro del seed)
+    // resumen.valor.avisos   (datos incompletos, nunca un error)
+}
+```
 
 ### 2.5 Estado por registro y cambios pendientes (implementado)
 

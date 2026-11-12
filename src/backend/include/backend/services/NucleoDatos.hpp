@@ -19,6 +19,7 @@
 #include "backend/database/comprobacion_validez.hpp"
 #include "backend/services/GestorPendientes.hpp"
 #include "backend/services/ServicioAula.hpp"
+#include "backend/services/ServicioCapacidadHoraria.hpp"
 #include "backend/services/ServicioCargaHoraria.hpp"
 #include "backend/services/ServicioComposicionPlan.hpp"
 #include "backend/services/ServicioConfiguracionHoraria.hpp"
@@ -129,6 +130,24 @@ public:
     /// (en la entrada) los planes referenciados por los cursos (RF-1).
     /// Devuelve error si el plan no existe o no tiene materias.
     Resultado<PlanEstudio> componerPlanCompleto(const QString& codigoPlan) const;
+
+    // ─── Capacidad horaria (horas disponibles frente a necesarias) ────────
+
+    /// Detalle de horas por plan, año y materia de todos los planes.
+    Resultado<QVector<HorasPlanAnioMateriaDTO>> horasPorPlanAnioMateria() const;
+
+    /**
+     * @brief Resume las horas disponibles (docentes) y necesarias (planes de los cursos).
+     *
+     * La base no persiste las horas de aula por docente ni el plan de cada curso: los aporta
+     * el frontend. `horasAulaPorDocente` va por **nombre** de docente y `planPorCurso` por
+     * **nombre** de curso (`nombreCurso(anio, seccion)`). Sin mapa de horas se usan 36 horas
+     * por docente; sin mapa de planes no se calculan las horas necesarias. Ambos casos y las
+     * entradas ignoradas se informan en `avisos`, no como error.
+     */
+    Resultado<ResumenCapacidadHorariaDTO> resumenCapacidadHoraria(
+        const QMap<QString, int>& horasAulaPorDocente = {},
+        const QMap<QString, QString>& planPorCurso = {}) const;
 
     // ─── Cursos ───────────────────────────────────────────────────────────
 
@@ -245,6 +264,7 @@ private:
     ServicioTiposAula m_tipos;
     ServicioPlanesEstudio m_planes;
     ServicioCargaHoraria m_carga;
+    ServicioCapacidadHoraria m_capacidad;
     ServicioComposicionPlan m_composicion;
     ServicioCursos m_cursos;
     ServicioTurnosEventos m_turnos;

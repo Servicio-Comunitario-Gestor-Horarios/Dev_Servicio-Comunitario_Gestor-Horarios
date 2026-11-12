@@ -145,6 +145,13 @@ endif()
 if(TARGET seed)
 	add_qtest(test_seed_perfil backend/test_seed_perfil.cpp seed)
 	add_qtest(test_seed_aplicacion backend/test_seed_aplicacion.cpp seed Qt6::Sql)
+
+	# Capacidad horaria: horas disponibles, horas necesarias y detalle por plan/año/materia
+	# sobre la base sembrada del centro.
+	add_gtest(test_servicio_capacidad_horaria
+					backend/test_servicio_capacidad_horaria.cpp
+					backend seed Qt6::Sql
+	)
 endif()
 
 # ============================================================

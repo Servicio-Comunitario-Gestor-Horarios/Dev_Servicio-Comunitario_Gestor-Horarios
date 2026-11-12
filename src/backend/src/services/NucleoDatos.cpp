@@ -64,6 +64,7 @@ NucleoDatos::NucleoDatos(QSqlDatabase& db)
       m_tipos(db),
       m_planes(db),
       m_carga(db),
+      m_capacidad(db),
       m_composicion(db),
       m_cursos(db),
       m_turnos(db),
@@ -370,6 +371,18 @@ Resultado<QVector<CargaHorariaDTO>> NucleoDatos::listarCargaDePlan(
 
 Resultado<PlanEstudio> NucleoDatos::componerPlanCompleto(const QString& codigoPlan) const {
     return m_composicion.componerPlanCompleto(codigoPlan);
+}
+
+// ─── Capacidad horaria ─────────────────────────────────────────────────────
+
+Resultado<QVector<HorasPlanAnioMateriaDTO>> NucleoDatos::horasPorPlanAnioMateria() const {
+    return m_capacidad.horasPorPlanAnioMateria();
+}
+
+Resultado<ResumenCapacidadHorariaDTO> NucleoDatos::resumenCapacidadHoraria(
+    const QMap<QString, int>& horasAulaPorDocente,
+    const QMap<QString, QString>& planPorCurso) const {
+    return m_capacidad.resumen(horasAulaPorDocente, planPorCurso);
 }
 
 // ─── Cursos ────────────────────────────────────────────────────────────────
