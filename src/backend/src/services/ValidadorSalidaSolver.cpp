@@ -308,5 +308,67 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
         }
     }
 
+    // 020 (RF-5): reparto por docente con clases y comprobación del tope duro (P5). El exceso de
+    // tope NO es un solapamiento: va a `excesosTopeHoras` y hace el resultado no presentable.
+    for (int p = 0; p < config.profesores.size(); ++p)
+    {
+        const int asignadas = horasPorProfesor.value(p, 0);
+        if (asignadas <= 0)
+            continue;   // el reparto solo lista a los docentes con clases
+
+        LineaHorasDocente linea;
+        linea.profesor = p;
+        linea.nombre = config.profesores[p].nombre;
+        linea.horasAsignadas = asignadas;
+        linea.horasAula = config.profesores[p].horas_aula > 0
+                              ? config.profesores[p].horas_aula
+                              : 0;
+        analisis.reparto.append(linea);
+        analisis.totalHorasAsignadas += asignadas;
+
+        if (asignadas > linea.horasAula)
+            analisis.excesosTopeHoras.append(
+                QStringLiteral("El docente «%1» tiene %2 h asignadas y su tope de horas de aula es"
+                               " %3 h.")
+                    .arg(linea.nombre)
+                    .arg(asignadas)
+                    .arg(linea.horasAula));
+    }
+    analisis.totalHorasAula = 0;
+    for (const ProfesorSolverConfig& prof : config.profesores)
+        analisis.totalHorasAula += prof.horas_aula > 0 ? prof.horas_aula : 0;
+
+    // 020 (RF-1/RF-5): docentes sin capacidad (tope 0 declarado o ausente). Se informan para que
+    // no sea un deshabilitado silencioso; no convierten el resultado en no presentable.
+    for (int p = 0; p < config.profesores.size(); ++p)
+    {
+        if (config.profesores[p].horas_aula > 0)
+            continue;
+        const QString nombre = config.profesores[p].nombre.trimmed();
+        analisis.docentesSinCapacidad.append(
+            nombre.isEmpty() ? QStringLiteral("docente %1").arg(p) : nombre);
+    }
+
     return analisis;
+}
+
+QString AnalisisSalida::repartoTexto() const
+{
+    QStringList lineas;
+    for (const LineaHorasDocente& linea : reparto)
+        lineas.append(QStringLiteral("%1: %2/%3 h")
+                          .arg(linea.nombre)
+                          .arg(linea.horasAsignadas)
+                          .arg(linea.horasAula));
+
+    if (!reparto.isEmpty())
+        lineas.append(QStringLiteral("Total del centro: %1/%2 h")
+                          .arg(totalHorasAsignadas)
+                          .arg(totalHorasAula));
+
+    if (!docentesSinCapacidad.isEmpty())
+        lineas.append(QStringLiteral("Sin capacidad (tope 0): %1.")
+                          .arg(docentesSinCapacidad.join(QStringLiteral(", "))));
+
+    return lineas.join(QLatin1Char('\n'));
 }

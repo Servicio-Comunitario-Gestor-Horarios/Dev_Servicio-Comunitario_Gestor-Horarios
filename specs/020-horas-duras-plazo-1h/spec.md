@@ -1,6 +1,6 @@
 # Spec 020 - Experimento: tope duro de horas del docente y plazo de una hora
 
-Estado: aprobada (2026-11-12)
+Estado: implementada (2026-11-12)
 
 > **Naturaleza del cambio.** Esta spec **no** es una evolución del producto: es un **experimento
 > aislado** para responder una pregunta concreta —«¿se obtiene horario con el centro real si el tope de

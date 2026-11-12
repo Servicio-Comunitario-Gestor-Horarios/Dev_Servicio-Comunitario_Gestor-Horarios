@@ -5,6 +5,11 @@
 #include "backend/data/horario_salida.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "services/entrada_solver_builder.hpp"
+#include "services/puerto_solver_ipc.hpp"
+
+#if defined(GESTOR_TIENE_BACKEND)
+#include <middleware/messages.h>
+#endif
 
 /// Tests de la traducción `HorarioSalida` → formato de visualización (RF-1).
 ///
@@ -222,6 +227,48 @@ private slots:
         QCOMPARE(meta.value(QStringLiteral("total_asignaciones")).toInt(), 7);
         QCOMPARE(meta.value(QStringLiteral("cursos_generados")).toInt(), 3);
     }
+
+    // ── 020 T3: desenlaces del puerto del solver (RF-2, RF-3) ────────────────
+
+#if defined(GESTOR_TIENE_BACKEND)
+    /// D6: el mapeo de código IPC a desenlace es puro y distingue los desenlaces del cálculo.
+    /// Un socket caído o un plazo agotado NO son «respuesta inválida»; una respuesta sin `code`
+    /// tampoco es NoFactible.
+    void desenlaceParaCodigo_mapeaCodigosDelSolver()
+    {
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_EXITO) == DesenlaceSolver::Exito);
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_SIN_SOLUCION) == DesenlaceSolver::Infactible);
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_NO_CONCLUYENTE) ==
+                DesenlaceSolver::NoConcluyente);
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_INVALIDO) == DesenlaceSolver::ErrorContrato);
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_ERROR) == DesenlaceSolver::SinRespuesta);
+        QVERIFY(desenlaceParaCodigo(Middleware::RESP_TIEMPO_AGOTADO) ==
+                DesenlaceSolver::SinRespuesta);
+        // Respuesta sin `code`: contrato incumplido, nunca NoFactible.
+        QVERIFY(desenlaceParaCodigo(std::nullopt) == DesenlaceSolver::ErrorContrato);
+        QVERIFY(desenlaceParaCodigo(std::nullopt) != DesenlaceSolver::Infactible);
+    }
+
+    /// RF-3: sin conexión con el proceso de cálculo el puerto informa «sin respuesta», no un
+    /// contrato incumplido, y no presenta horario.
+    void puertoSolver_sinConexion_esSinRespuesta()
+    {
+        PuertoSolverIpc puerto(static_cast<InternalClient*>(nullptr));
+        int llamadas = 0;
+        RespuestaSolver recibida;
+        puerto.resolver(QJsonObject{}, [&recibida, &llamadas](const RespuestaSolver& r) {
+            recibida = r;
+            ++llamadas;
+        });
+
+        QCOMPARE(llamadas, 1);
+        QVERIFY(recibida.desenlace == DesenlaceSolver::SinRespuesta);
+        QVERIFY(!recibida.ok);
+        QVERIFY(!recibida.factible);
+        QVERIFY(!recibida.error.isEmpty());
+        QVERIFY(recibida.error.contains(QStringLiteral("No hay conexión")));
+    }
+#endif
 };
 
 QTEST_APPLESS_MAIN(TestConversionEntrada)

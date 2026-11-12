@@ -26,7 +26,6 @@ using namespace operations_research::sat;
  * - aulaAssignment     (y): aula REAL de cada clase, para TODOS los cursos (fijos y móviles);
  *                          solo se crean las aulas de los tipos que el curso requiere
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
- * - exceso             (e): bloques por encima del tope de horas de aula (S1)
  * - ocupada            (o): el curso tiene clase en (c,d,s) (R1)
  * - par                (p): par de franjas (s, s+1) emparejado; solo dentro del segmento (R2)
  * - materiaEnFranja    (u): la materia tiene clase en (m,c,d,s) (R3)
@@ -36,7 +35,6 @@ struct VariablesSolver {
     QMap<std::tuple<int, int, int, int, int>, BoolVar> assignment;          ///< [p][m][c][d][s]
     QMap<std::tuple<int, int, int, int>, BoolVar> aulaAssignment;           ///< [c][d][s][a]
     QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;               ///< z: [p][c][m]
-    QMap<int, IntVar> exceso;                                              ///< e[p]
 
     // ── Emparejamiento en bloques de dos horas (014, R1–R3) ──
     QMap<std::tuple<int, int, int>, BoolVar> ocupada;          ///< [c][d][s]

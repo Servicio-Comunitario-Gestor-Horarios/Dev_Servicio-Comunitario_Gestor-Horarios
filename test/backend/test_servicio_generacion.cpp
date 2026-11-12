@@ -116,6 +116,22 @@ private:
         return resultado.valor;
     }
 
+    /// La entrada válida con el primer docente sin capacidad: `horas_aula = 0` declarado o el
+    /// campo ausente (020, RF-1). El resto de la entrada no cambia.
+    QJsonObject entradaSinHorasAula(bool quitarElCampo) const
+    {
+        QJsonObject j = entradaValida();
+        QJsonArray profesores = j[QStringLiteral("profesores")].toArray();
+        QJsonObject profesor = profesores[0].toObject();
+        if (quitarElCampo)
+            profesor.remove(QStringLiteral("horas_aula"));
+        else
+            profesor[QStringLiteral("horas_aula")] = 0;
+        profesores[0] = profesor;
+        j[QStringLiteral("profesores")] = profesores;
+        return j;
+    }
+
     /// Una preferencia ya proyectada, para fijar qué entra en la huella (013, RF-6).
     static PreferenciaProyectada interviniente(int docente, int dia, const QVector<int>& slot,
                                                SentidoPreferencia sentido)
@@ -207,9 +223,25 @@ private:
         h.horarios[claveCurso(1, QStringLiteral("A"))] = curso;
 
         RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::Exito;
         r.ok = true;
         r.factible = true;
         r.salida = h.toJson();
+        return r;
+    }
+
+    /// Salida válida con la metadata `fases_sin_optimalidad` inyectada (020, D8).
+    RespuestaSolver respuestaFactibleConFases(const QStringList& fases) const
+    {
+        RespuestaSolver r = respuestaFactible();
+        QJsonObject salida = r.salida;
+        QJsonObject metadata = salida.value(QStringLiteral("metadata")).toObject();
+        QJsonArray lista;
+        for (const QString& fase : fases)
+            lista.append(fase);
+        metadata[QStringLiteral("fases_sin_optimalidad")] = lista;
+        salida[QStringLiteral("metadata")] = metadata;
+        r.salida = salida;
         return r;
     }
 
@@ -298,17 +330,135 @@ private slots:
         QCOMPARE(puerto.llamadas, 1);
     }
 
-    void noFactible()
+    void noFactible_conservaElTextoDelMotor()
     {
         PuertoFalso puerto;
         ServicioGeneracion servicio(puerto, 0);
         servicio.generar(entradaValida(), QStringLiteral("h"));
 
-        RespuestaSolver r; r.ok = true; r.factible = false;
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::Infactible;
+        r.ok = true;
+        r.factible = false;
+        r.error = QStringLiteral("Causa (4) conflicto de asignación de docente: la materia «Matemática»"
+                                 " de 1|A no tiene ningún docente elegible.");
         puerto.responder(r);
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::NoFactible);
         QVERIFY(!servicio.ultimoResultado().presentable);
+        QVERIFY(!servicio.ultimoResultado().datosAnteriores);
+        // H3 mínimo (RF-2): se conserva el texto del motor, nunca el mensaje genérico.
+        QCOMPARE(servicio.ultimoResultado().mensaje, r.error);
+        QVERIFY2(!servicio.ultimoResultado().mensaje.contains(
+                     QStringLiteral("No existe una solución factible")),
+                 qPrintable(servicio.ultimoResultado().mensaje));
+    }
+
+    /// RF-2: sin diagnóstico del motor, se declara que no hay causa atribuible (no un texto
+    /// genérico de «no existe solución»).
+    void noFactibleSinTexto_informaQueNoHayCausaAtribuible()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::Infactible;
+        r.ok = true;
+        r.factible = false;
+        puerto.responder(r);
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::NoFactible);
+        QVERIFY2(servicio.ultimoResultado().mensaje.contains(QStringLiteral("causa atribuible")),
+                 qPrintable(servicio.ultimoResultado().mensaje));
+    }
+
+    /// RF-1: el NoFactible informa de los docentes sin capacidad, tanto con `horas_aula = 0`
+    /// declarado como con el campo ausente, para que no sea un deshabilitado silencioso.
+    void docenteSinHorasAula_apareceEnElMensaje()
+    {
+        for (const bool quitarElCampo : {false, true})
+        {
+            PuertoFalso puerto;
+            ServicioGeneracion servicio(puerto, 0);
+            servicio.generar(entradaSinHorasAula(quitarElCampo), QStringLiteral("h"));
+            QVERIFY2(servicio.enCurso(),
+                     "la falta de capacidad no invalida la entrada (V13 intacta)");
+
+            RespuestaSolver r;
+            r.desenlace = DesenlaceSolver::Infactible;
+            r.ok = true;
+            r.factible = false;
+            puerto.responder(r);
+
+            const QString mensaje = servicio.ultimoResultado().mensaje;
+            QCOMPARE(servicio.ultimoResultado().estado, Estado::NoFactible);
+            QVERIFY2(mensaje.contains(QStringLiteral("causa atribuible")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("sin capacidad")), qPrintable(mensaje));
+            QVERIFY2(mensaje.contains(QStringLiteral("Ana")), qPrintable(mensaje));
+        }
+    }
+
+    /// RF-3: un presupuesto agotado sin prueba es «no concluyente», no NoFactible, y conserva
+    /// el texto del motor.
+    void noConcluyente_esDistintoDeNoFactible()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::NoConcluyente;
+        r.ok = true;
+        r.factible = false;
+        r.error = QStringLiteral("El solver no determinó la factibilidad (UNKNOWN).");
+        puerto.responder(r);
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::NoConcluyente);
+        QVERIFY(!servicio.ultimoResultado().presentable);
+        QVERIFY(servicio.ultimoResultado().horario.horarios.isEmpty());
+        QCOMPARE(servicio.ultimoResultado().mensaje, r.error);
+        QVERIFY2(!servicio.ultimoResultado().mensaje.contains(QStringLiteral("No existe una solución")),
+                 qPrintable(servicio.ultimoResultado().mensaje));
+    }
+
+    /// RF-3: la pérdida de comunicación es «sin respuesta», no una respuesta inválida ni
+    /// NoFactible, y no presenta horario.
+    void sinRespuesta_noEsContratoNiNoFactible()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::SinRespuesta;
+        r.error = QStringLiteral("Se perdió la comunicación con el proceso de cálculo.");
+        puerto.responder(r);
+
+        const ResultadoGeneracion& resultado = servicio.ultimoResultado();
+        QCOMPARE(resultado.estado, Estado::SinRespuesta);
+        QVERIFY(!resultado.presentable);
+        QVERIFY(resultado.mensaje.contains(QStringLiteral("perdió la comunicación")));
+        QVERIFY2(!resultado.mensaje.contains(QStringLiteral("contrato")),
+                 qPrintable(resultado.mensaje));
+    }
+
+    /// RF-3: un modelo inválido o una respuesta fuera de contrato se informa como error de
+    /// entrada/contrato, con su causa.
+    void errorDeContrato_conservaSuCausa()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::ErrorContrato;
+        r.error = QStringLiteral("El modelo CP-SAT no es válido (MODEL_INVALID).");
+        puerto.responder(r);
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::ContratoInvalido);
+        QVERIFY(!servicio.ultimoResultado().presentable);
+        QCOMPARE(servicio.ultimoResultado().mensaje, r.error);
     }
 
     void contratoInvalido()
@@ -317,7 +467,11 @@ private slots:
         ServicioGeneracion servicio(puerto, 0);
         servicio.generar(entradaValida(), QStringLiteral("h"));
 
-        RespuestaSolver r; r.ok = true; r.factible = true; r.salida = QJsonObject{};
+        RespuestaSolver r;
+        r.desenlace = DesenlaceSolver::Exito;
+        r.ok = true;
+        r.factible = true;
+        r.salida = QJsonObject{};
         puerto.responder(r);
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::ContratoInvalido);
@@ -333,6 +487,90 @@ private slots:
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::CalculoFallido);
         QVERIFY(!servicio.ultimoResultado().presentable);
+    }
+
+    /// 020 (RF-5): P4 (solapamientos) y P5 (exceso de horas de aula) son fallos distintos; el
+    /// mensaje de solapamiento no se usa para un exceso de tope.
+    void calculoFallidoPorSolapamiento_noSeConfundeConTope()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        puerto.responder(respuestaConSolapamiento());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::CalculoFallido);
+        QVERIFY(r.analisis.hayConflictoSolapamiento());
+        QVERIFY(r.analisis.excesosTopeHoras.isEmpty());
+        QVERIFY2(r.mensaje.contains(QStringLiteral("solapamiento")), qPrintable(r.mensaje));
+        QVERIFY2(!r.mensaje.contains(QStringLiteral("tope")), qPrintable(r.mensaje));
+    }
+
+    /// 020 (RF-5): un exceso de tope de horas de aula no se presenta como horario y su mensaje
+    /// es distinto del de solapamiento.
+    void calculoFallidoPorTopeDeHorasAula_mensajeDistinto()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        // El docente tiene 0 h de aula declaradas y la salida le asigna 2 clases.
+        servicio.generar(entradaSinHorasAula(false), QStringLiteral("h"));
+        QVERIFY(servicio.enCurso());
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::CalculoFallido);
+        QVERIFY(!r.presentable);
+        QVERIFY(!r.analisis.excesosTopeHoras.isEmpty());
+        QVERIFY(!r.analisis.hayConflictoSolapamiento());
+        QVERIFY2(r.mensaje.contains(QStringLiteral("tope")), qPrintable(r.mensaje));
+        QVERIFY2(!r.mensaje.contains(QStringLiteral("solapamiento")), qPrintable(r.mensaje));
+    }
+
+    /// 020 (RF-5): el resultado lleva el reparto (una línea por docente y totales) para que la
+    /// vista lo presente sin recalcular nada.
+    void reparto_enElResultado()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.analisis.reparto.size(), 1);
+        QCOMPARE(r.analisis.reparto[0].horasAsignadas, 2);
+        QCOMPARE(r.analisis.reparto[0].horasAula, 8);
+        QCOMPARE(r.analisis.totalHorasAsignadas, 2);
+        QCOMPARE(r.analisis.totalHorasAula, 8);
+        const QString reparto = r.analisis.repartoTexto();
+        QVERIFY2(reparto.contains(QStringLiteral("Ana: 2/8 h")), qPrintable(reparto));
+        QVERIFY2(reparto.contains(QStringLiteral("Total del centro: 2/8 h")), qPrintable(reparto));
+    }
+
+    /// 020 (RF-3, D8): la optimalidad por fase llega en la metadata de la salida y se expone en
+    /// el resultado; sin fases marcadas no se califica de no óptima la asignación.
+    void fasesNoOptimas_enElResultado()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+        puerto.responder(respuestaFactibleConFases({QStringLiteral("referencia")}));
+
+        const ResultadoGeneracion& conFases = servicio.ultimoResultado();
+        QCOMPARE(conFases.estado, Estado::Listo);
+        QVERIFY(conFases.presentable);
+        QCOMPARE(conFases.fasesNoOptimas, QStringList{QStringLiteral("referencia")});
+
+        PuertoFalso puerto2;
+        ServicioGeneracion servicio2(puerto2, 0);
+        servicio2.generar(entradaValida(), QStringLiteral("h"));
+        puerto2.responder(respuestaFactible());
+
+        const ResultadoGeneracion& optimo = servicio2.ultimoResultado();
+        QCOMPARE(optimo.estado, Estado::Listo);
+        QVERIFY(optimo.fasesNoOptimas.isEmpty());
     }
 
     void ok_presentable()
@@ -370,7 +608,9 @@ private slots:
         QVERIFY(r.presentable);
     }
 
-    void timeout_abandonaEignoraRespuestaTardia()
+    /// 020 (RF-3/RNF-2): con un plazo corto inyectado el desenlace es «plazo agotado» (no
+    /// NoFactible) y una respuesta tardía se ignora. No se espera la hora real.
+    void plazoCortoInyectado_informaPlazoAgotado()
     {
         PuertoFalso puerto;
         ServicioGeneracion servicio(puerto, 50);
@@ -383,12 +623,22 @@ private slots:
         QCOMPARE(servicio.ultimoResultado().estado, Estado::TiempoAgotado);
         QVERIFY(!servicio.ultimoResultado().presentable);
         QVERIFY(!servicio.enCurso());
+        QVERIFY2(!servicio.ultimoResultado().mensaje.contains(
+                     QStringLiteral("No existe una solución")),
+                 qPrintable(servicio.ultimoResultado().mensaje));
 
         // Una respuesta posterior se ignora: el estado no cambia.
         puerto.responder(respuestaFactible());
         QTest::qWait(20);
         QCOMPARE(servicio.ultimoResultado().estado, Estado::TiempoAgotado);
         QCOMPARE(spy.count(), 1);
+    }
+
+    /// 020 (RF-3): el plazo por defecto del proceso es de una hora de reloj (60 min).
+    void plazoPorDefecto_esUnaHora()
+    {
+        QCOMPARE(PLAZO_MS_POR_DEFECTO, 60 * 60 * 1000);
+        QCOMPARE(PLAZO_MS_POR_DEFECTO, 3600000);
     }
 
     void huellaDatos_esDeterministaYcambiaConLosDatos()

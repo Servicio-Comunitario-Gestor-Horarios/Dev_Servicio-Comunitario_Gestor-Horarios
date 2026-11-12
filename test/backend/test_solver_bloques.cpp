@@ -670,9 +670,9 @@ TEST(TestSolverBloques, separacionInformadaIgualAlRecalculoYNoPeorQueLaReferenci
         configAlineacion({{QStringLiteral("Matemática"), 6}}, /*dias=*/5, /*franjas=*/2);
     Solver solver;
 
-    // Referencia: la fase 2a agotada devuelve el resultado de la fase 1.
+    // Referencia: sin fase 2a (020, D4: la escalera se prueba con los flags, sin reloj).
     Solver::PresupuestoFases sinSeparacion;
-    sinSeparacion.separacionHuecos = 0.0;
+    sinSeparacion.ejecutarSeparacionHuecos = false;
     const auto referencia = solver.resolver(config, sinSeparacion);
     const auto optimo = solver.resolver(config);
 
@@ -693,10 +693,10 @@ TEST(TestSolverBloques, escalera2aDevuelveLaReferenciaSinError) {
         configAlineacion({{QStringLiteral("Matemática"), 6}}, /*dias=*/5, /*franjas=*/2);
     Solver solver;
 
-    // Presupuesto 0: la fase 2a no llega a explorar y se devuelve la referencia de la fase 1.
-    Solver::PresupuestoFases agotado;
-    agotado.separacionHuecos = 0.0;
-    const auto conPresupuesto = solver.resolver(config, agotado);
+    // Sin presupuesto para la fase 2a: no se ejecuta y se devuelve la referencia de la fase 1.
+    Solver::PresupuestoFases sin2a;
+    sin2a.ejecutarSeparacionHuecos = false;
+    const auto conPresupuesto = solver.resolver(config, sin2a);
 
     ASSERT_TRUE(conPresupuesto.exito) << conPresupuesto.errores.join("\n").toStdString();
     // La escalera devuelve la referencia (puede tener incumplimientos de separación).
@@ -755,7 +755,7 @@ TEST(TestSolverBloques, sinPreferenciasSeOmiteLa2b) {
 
     const auto normal = solver.resolver(config);
     Solver::PresupuestoFases sin2b;
-    sin2b.preferencias = 0.0;   // irrelevante: sin preferencias la 2b no se ejecuta
+    sin2b.ejecutarPreferencias = false;   // irrelevante: sin preferencias la 2b no se ejecuta
     const auto conPresupuesto = solver.resolver(config, sin2b);
 
     ASSERT_TRUE(normal.exito) << normal.errores.join("\n").toStdString();
@@ -768,7 +768,8 @@ TEST(TestSolverBloques, sinPreferenciasSeOmiteLa2b) {
 }
 
 TEST(TestSolverBloques, escalera2bDevuelveLa2a) {
-    // Preferencia que no puede mejorar la 2a; con la 2b agotada se devuelve la 2a, no un error.
+    // Preferencia que no puede mejorar la 2a; con la 2b desactivada se devuelve la 2a, no un
+    // error (020: las fases blandas comparten el deadline y la escalera se prueba por flags).
     SolverConfig config =
         configAlineacion({{QStringLiteral("Matemática"), 6}}, /*dias=*/5, /*franjas=*/2);
     config.preferencias = {preferencia(0, 0, {0, 1}, QStringLiteral("preferida"))};
@@ -776,10 +777,9 @@ TEST(TestSolverBloques, escalera2bDevuelveLa2a) {
     Solver solver;
     const auto dosA = solver.resolver(config);
 
-    Solver::PresupuestoFases agotado;
-    agotado.separacionHuecos = 6.0;
-    agotado.preferencias = 0.0;
-    const auto conPresupuesto = solver.resolver(config, agotado);
+    Solver::PresupuestoFases sin2b;
+    sin2b.ejecutarPreferencias = false;
+    const auto conPresupuesto = solver.resolver(config, sin2b);
 
     ASSERT_TRUE(dosA.exito) << dosA.errores.join("\n").toStdString();
     ASSERT_TRUE(conPresupuesto.exito) << conPresupuesto.errores.join("\n").toStdString();
@@ -789,12 +789,24 @@ TEST(TestSolverBloques, escalera2bDevuelveLa2a) {
     EXPECT_EQ(dias, (QVector<int>{0, 2, 4}));
 }
 
-TEST(TestSolverBloques, presupuestoPorDefectoDeLa014b) {
+TEST(TestSolverBloques, presupuestoPorDefectoDeLa020) {
+    // 020 (RF-3): 55 min de reloj para todo el solver; los 5 hasta la hora son reserva del
+    // servicio. 8 workers se mantienen (014b) y seed 0 no cambia.
     const Solver::PresupuestoFases presupuesto;
-    EXPECT_DOUBLE_EQ(presupuesto.referencia, 60.0);
-    EXPECT_DOUBLE_EQ(presupuesto.separacionHuecos, 20.0);
-    EXPECT_DOUBLE_EQ(presupuesto.preferencias, 10.0);
+    EXPECT_DOUBLE_EQ(presupuesto.totalSegundos, 3300.0);
     EXPECT_EQ(presupuesto.workers, 8);
+    EXPECT_TRUE(presupuesto.ejecutarSeparacionHuecos);
+    EXPECT_TRUE(presupuesto.ejecutarPreferencias);
+}
+
+TEST(TestSolverBloques, restanteDeReloj_nuncaEsNegativo) {
+    // 020 (D15): el presupuesto de cada fase es `max(0, deadline − ahora)`; con 0 no se llama
+    // al motor (en CP-SAT 0 s significa SIN límite).
+    EXPECT_EQ(restanteMs(3300000, 0), 3300000);
+    EXPECT_EQ(restanteMs(3300000, 3300000), 0);
+    EXPECT_EQ(restanteMs(3300000, 4000000), 0);
+    EXPECT_DOUBLE_EQ(restanteSegundos(1500, 0), 1.5);
+    EXPECT_DOUBLE_EQ(restanteSegundos(1500, 2000), 0.0);
 }
 
 // ─── Tamaño del modelo representativo ───────────────────────────────────────

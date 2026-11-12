@@ -1,5 +1,6 @@
 #include "backend/solver/solver.hpp"
 #include "backend/solver/config/solver_config.hpp"
+#include "backend/solver/desenlace_solver_backend.hpp"
 #include "backend/solver/variables.hpp"
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
@@ -240,72 +241,114 @@ Solver::ResultadoSolver Solver::resolver(const SolverConfig& config,
     ResultadoSolver resultado;
     resultado.exito = false;
 
-    // FASE 1 — referencia: el modelo de S1 + S2. Es la generación de referencia contra la que
-    // se exige la igualdad de reparto y de exceso.
+    // Deadline ÚNICO de reloj para todas las fases (020, D3): la referencia puede consumirlo
+    // entero y las blandas usan solo lo que quede. Los 5 min de reserva del servicio (extracción
+    // y comunicación) quedan FUERA de este presupuesto.
+    const qint64 deadlineMs = static_cast<qint64>(presupuesto.totalSegundos * 1000.0);
+
+    // Guarda del camino de 0 s (D15): en CP-SAT un límite de tiempo 0 significa SIN límite, no
+    // «sin tiempo». Sin presupuesto no se llama al motor: el desenlace es no concluyente (no hay
+    // prueba de infactibilidad), no NoFactible.
+    if (restanteSegundos(deadlineMs, timer.elapsed()) <= 0.0) {
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.desenlace = DesenlaceSolver::NoConcluyente;
+        resultado.errores = {QStringLiteral(
+            "No se ejecutó el cálculo: el presupuesto de reloj del solver se agotó antes de "
+            "empezar (0 s); no se puede afirmar que no exista solución.")};
+        return resultado;
+    }
+
+    // FASE 1 — referencia: el modelo con el tope duro de horas y S2. Es la generación de
+    // referencia contra la que se exige la igualdad de reparto de docentes.
     prepararModelo(config);
     construirObjetivo(config);
-    const CpSolverResponse referencia = ejecutar(presupuesto.referencia, presupuesto.workers);
+    const CpSolverResponse referencia =
+        ejecutar(restanteSegundos(deadlineMs, timer.elapsed()), presupuesto.workers);
 
     if (!esFactible(referencia.status())) {
+        // Infactible / no concluyente / error de contrato: el mapeo distingue los desenlaces.
         resultado.tiempo_ms = timer.elapsed();
+        resultado.desenlace = desenlaceDesdeEstado(referencia.status());
         resultado.errores = analizarFallo(referencia, config);
         return resultado;
     }
+    // La referencia no probó optimalidad de la asignación de docentes: se marca su fase.
+    if (!pruebaOptimalidad(referencia.status()))
+        resultado.fasesNoOptimas.append(QStringLiteral("referencia"));
 
     // Se extrae AHORA: `vars` corresponde todavía a esta respuesta (con otro modelo, los
     // índices de variable no valdrían para leerla).
     HorarioSalida horario = extraerSolucion(referencia, config);
-
-    // FASE 2a — separación y huecos con z* y e* FIJADOS por igualdad (RF-7/RF-8). La garantía
-    // estructural se mantiene: el reparto de docentes y el exceso son los de la referencia, y
-    // los términos blandos solo deciden DÓNDE caen las clases.
     const AnclajeEstructural anclaje = extraerAnclaje(referencia);
-    prepararModelo(config);
-    fijarAnclaje(anclaje);
-    model.Minimize(expresionSeparacionViernes(config));
-    const CpSolverResponse fase2a = ejecutar(presupuesto.separacionHuecos, presupuesto.workers);
 
+    // FASE 2a — separación y huecos con z* FIJADO por igualdad (RF-7/RF-8). La garantía
+    // estructural se mantiene: el reparto de docentes es el de la referencia y los términos
+    // blandos solo deciden DÓNDE caen las clases (el tope de horas ya es duro en ambas fases).
+    // Solo se ejecuta si queda presupuesto de reloj; si no, se devuelve la referencia.
     bool hayFase2a = false;
     int64_t valorFase2a = 0;
-    if (esFactible(fase2a.status())) {
-        horario = extraerSolucion(fase2a, config);
-        hayFase2a = true;
-        // `expresionSeparacionViernes` es entera: se redondea para fijarla por igualdad en 2b.
-        valorFase2a = static_cast<int64_t>(std::llround(fase2a.objective_value()));
-    } else if (fase2a.status() == CpSolverStatus::INFEASIBLE ||
-               fase2a.status() == CpSolverStatus::UNKNOWN) {
-        // Escalera 2a→referencia: se devuelve la referencia (P7). La separación y los huecos son
-        // blandos y nunca convierten en infactible un horario que la referencia ya resolvía.
-    } else {
-        // MODEL_INVALID y otros errores internos se propagan como fallo.
-        resultado.tiempo_ms = timer.elapsed();
-        resultado.errores = analizarFallo(fase2a, config);
-        return resultado;
+    if (presupuesto.ejecutarSeparacionHuecos
+        && restanteSegundos(deadlineMs, timer.elapsed()) > 0.0) {
+        prepararModelo(config);
+        fijarAnclaje(anclaje);
+        model.Minimize(expresionSeparacionViernes(config));
+        const CpSolverResponse fase2a =
+            ejecutar(restanteSegundos(deadlineMs, timer.elapsed()), presupuesto.workers);
+
+        if (esFactible(fase2a.status())) {
+            horario = extraerSolucion(fase2a, config);
+            hayFase2a = true;
+            // `expresionSeparacionViernes` es entera: se redondea para fijarla por igualdad en 2b.
+            valorFase2a = static_cast<int64_t>(std::llround(fase2a.objective_value()));
+            // La 2a no probó optimalidad de la separación y los huecos: se marca su fase.
+            if (!pruebaOptimalidad(fase2a.status()))
+                resultado.fasesNoOptimas.append(QStringLiteral("separacion"));
+        } else if (fase2a.status() == CpSolverStatus::INFEASIBLE ||
+                   fase2a.status() == CpSolverStatus::UNKNOWN) {
+            // Escalera 2a→referencia: se devuelve la referencia (P7). La separación y los huecos
+            // son blandos y nunca convierten en infactible un horario que la referencia resolvía.
+        } else {
+            // MODEL_INVALID y otros errores internos se propagan como fallo de contrato.
+            resultado.tiempo_ms = timer.elapsed();
+            resultado.desenlace = desenlaceDesdeEstado(fase2a.status());
+            resultado.errores = analizarFallo(fase2a, config);
+            return resultado;
+        }
     }
 
     // FASE 2b — preferencia con el valor de la 2a FIJADO por igualdad. Así la preferencia no
-    // puede empeorar la separación ni los huecos (RF-8). Sin preferencias se omite.
-    if (hayFase2a && !config.preferencias.isEmpty()) {
+    // puede empeorar la separación ni los huecos (RF-8). Se omite sin preferencias, si la 2a no
+    // produjo solución o si el deadline del solver ya se agotó.
+    const bool hayTiempoPara2b =
+        restanteSegundos(deadlineMs, timer.elapsed()) > 0.0;
+    if (hayFase2a && presupuesto.ejecutarPreferencias && !config.preferencias.isEmpty()
+        && hayTiempoPara2b) {
         prepararModelo(config);
         fijarAnclaje(anclaje);
         model.AddEquality(expresionSeparacionViernes(config), valorFase2a);
         model.Minimize(expresionPreferencias(config));
-        const CpSolverResponse fase2b = ejecutar(presupuesto.preferencias, presupuesto.workers);
+        const CpSolverResponse fase2b =
+            ejecutar(restanteSegundos(deadlineMs, timer.elapsed()), presupuesto.workers);
 
         if (esFactible(fase2b.status())) {
             horario = extraerSolucion(fase2b, config);
+            // La 2b no probó optimalidad de la preferencia: se marca su fase.
+            if (!pruebaOptimalidad(fase2b.status()))
+                resultado.fasesNoOptimas.append(QStringLiteral("preferencias"));
         } else if (fase2b.status() == CpSolverStatus::INFEASIBLE ||
                    fase2b.status() == CpSolverStatus::UNKNOWN) {
             // Escalera 2b→2a: se queda la solución de la 2a (P7).
         } else {
-            // MODEL_INVALID y otros errores internos sí se propagan como fallo.
+            // MODEL_INVALID y otros errores internos sí se propagan como fallo de contrato.
             resultado.tiempo_ms = timer.elapsed();
+            resultado.desenlace = desenlaceDesdeEstado(fase2b.status());
             resultado.errores = analizarFallo(fase2b, config);
             return resultado;
         }
     }
 
     resultado.exito = true;
+    resultado.desenlace = DesenlaceSolver::Exito;
     resultado.tiempo_ms = timer.elapsed();
     horario.metadata.tiempo_ejecucion_ms = static_cast<int>(resultado.tiempo_ms);
     resultado.resultado = horario;
@@ -323,13 +366,16 @@ void Solver::prepararModelo(const SolverConfig& config) {
     agregarRestricciones(config);
 }
 
-CpSolverResponse Solver::ejecutar(double presupuesto, int workers) {
-    // Parámetros de búsqueda: seed 0 y presupuesto determinista. El defecto de producción es
-    // 8 workers (PresupuestoFases::workers, 014b); la prueba de aceptación puede ajustarlo.
+CpSolverResponse Solver::ejecutar(double segundos, int workers) {
+    // 020 (D2): el presupuesto es **tiempo de reloj** (`max_time_in_seconds`), no determinista.
+    // El deadline es único y cada fase recibe lo que queda; nunca se llama con 0 s porque en
+    // CP-SAT 0 significa SIN límite (el camino de 0 s se resuelve antes de llegar aquí).
+    Q_ASSERT(segundos > 0.0);
+
     SatParameters params;
     params.set_num_search_workers(workers > 0 ? workers : 1);
     params.set_random_seed(0);
-    params.set_max_deterministic_time(presupuesto);
+    params.set_max_time_in_seconds(segundos);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
@@ -343,10 +389,6 @@ Solver::AnclajeEstructural Solver::extraerAnclaje(const CpSolverResponse& respon
         anclaje.docentePorMateria.insert(it.key(),
                                          SolutionBooleanValue(response, it.value()) ? 1 : 0);
     }
-    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
-        anclaje.excesoPorDocente.insert(
-            it.key(), static_cast<int>(SolutionIntegerValue(response, it.value())));
-    }
     return anclaje;
 }
 
@@ -354,9 +396,6 @@ void Solver::fijarAnclaje(const AnclajeEstructural& anclaje) {
     for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd();
          ++it) {
         model.AddEquality(it.value(), anclaje.docentePorMateria.value(it.key(), 0));
-    }
-    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
-        model.AddEquality(it.value(), anclaje.excesoPorDocente.value(it.key(), 0));
     }
 }
 
@@ -422,13 +461,9 @@ LinearExpr Solver::expresionPreferencias(const SolverConfig& config) const {
 void Solver::construirObjetivo(const SolverConfig& config) {
     LinearExpr objetivo = LinearExpr(0);
 
-    // S1: exceso de horas de aula
-    for (int p = 0; p < config.dimensiones.num_profesores; ++p) {
-        const auto eIt = vars.exceso.constFind(p);
-        if (eIt != vars.exceso.constEnd()) {
-            objetivo = objetivo + LinearExpr::Term(*eIt, ContratoSolver::PESO_HORAS);
-        }
-    }
+    // S1 (exceso de horas de aula) queda RETIRADO (020, RF-1): el tope es una invariante dura
+    // y no hay exceso que penalizar. `ContratoSolver::PESO_HORAS` se conserva solo como
+    // histórico del comportamiento anterior.
 
     // S2: coste fijo por asignar a un SUPLENTE
     for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd(); ++it) {
@@ -528,12 +563,27 @@ QStringList Solver::analizarFallo(const CpSolverResponse& response, const Solver
             if (!causa.isEmpty())
                 errores.append(causa);
             else
+            {
                 errores.append(QStringLiteral("Causa: no atribuible. Ninguna categoría de (1) a (5) "
                                               "explica el fallo; revise la capacidad de los tipos de "
                                               "aula, las franjas de los turnos y la disponibilidad de "
                                               "los docentes, y el diagnóstico de bloques (apariciones "
                                               "frente a días no consecutivos, restos sin pareja del "
                                               "mismo tipo y huecos que no caben al final)."));
+
+                // 020 (RF-2): si la demanda supera la suma de los topes duros, las horas son la
+                // explicación. No se inventa categoría: se añaden las dos cifras como diagnóstico.
+                const int demanda = demandaTotalHoras(config);
+                const int topes = sumaTopesHorasAula(config);
+                if (demanda > topes)
+                    errores.append(
+                        QStringLiteral("Horas: la demanda total es %1 h y la suma de los topes de "
+                                       "horas de aula es %2 h; %3 h de demanda no caben en los "
+                                       "topes duros de los docentes.")
+                            .arg(demanda)
+                            .arg(topes)
+                            .arg(demanda - topes));
+            }
 
             errores.append(QStringLiteral("Entorno: %1 docentes, %2 cursos, %3 materias, %4 aulas.")
                 .arg(config.profesores.size())

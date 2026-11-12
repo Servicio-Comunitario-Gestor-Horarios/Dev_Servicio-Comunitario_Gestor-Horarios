@@ -17,6 +17,10 @@
 
 // Constantes del motor
 namespace ContratoSolver {
+    /// HISTÓRICO (020, RF-1): peso de S1 (exceso de horas de aula) del comportamiento
+    /// anterior. El tope de horas es ahora una invariante DURA y S1 no aporta al objetivo:
+    /// la constante y su `static_assert` se conservan solo para no romper referencias y
+    /// dejar documentada la jerarquía retirada.
     constexpr int PESO_HORAS = 1000;
     constexpr int COSTE_SUPLENTE = 100;
     constexpr int COSTE_MAX_SUPLENTE = 100;
@@ -24,10 +28,11 @@ namespace ContratoSolver {
     /// No viaja en la configuración: es una constante del motor.
     constexpr int PESO_PREFERENCIA = 25;
 
-    // Jerarquía por unidad: S1 > S2 > preferencia (RF-5). La igualdad de S1/S2 la garantiza
-    // la fase 2 por anclaje (el orden por unidad no basta con un objetivo aditivo).
+    // Jerarquía por unidad: S1 (histórico) > S2 > preferencia (RF-5). La igualdad de S2 entre
+    // fases la garantiza la fase 2 por anclaje (el orden por unidad no basta con un objetivo
+    // aditivo). Con el tope duro, S2 y la preferencia son los únicos términos activos.
     static_assert(PESO_HORAS > COSTE_SUPLENTE,
-                  "S1 (PESO_HORAS) debe pesar más que S2 (COSTE_SUPLENTE)");
+                  "S1 (PESO_HORAS, histórico) debe pesar más que S2 (COSTE_SUPLENTE)");
     static_assert(COSTE_SUPLENTE > PESO_PREFERENCIA,
                   "la preferencia (PESO_PREFERENCIA) debe quedar por debajo de S2 (COSTE_SUPLENTE)");
 }
@@ -99,6 +104,15 @@ int posicionesDePar(const TurnoConfig& turno, const QVector<EventoConfig>& event
 
 /// Capacidad del tipo `clave`: `aulasDelTipo × |franjasDelTipo| × aforoDelTipo` (018, RF-6).
 int capacidadDelTipo(const SolverConfig& config, const QString& clave);
+
+/// Demanda total de horas académicas del centro (020, RF-2): Σ bloques de las materias del plan
+/// de todos los cursos. Una hora académica = un bloque; la duración de la franja no interviene.
+int demandaTotalHoras(const SolverConfig& config);
+
+/// Suma de los topes duros de horas de aula del centro (020, RF-2): Σ `bloquesAula(horas_aula)`
+/// de todos los docentes. Un docente sin capacidad (tope 0, declarado o ausente) suma 0, y un
+/// tope negativo no resta.
+int sumaTopesHorasAula(const SolverConfig& config);
 
 /// Tipo de aula general/ordinario del centro, por la convención de nombre única:
 /// el tipo general. La definición del literal vive en `common/tipo_general.hpp`.

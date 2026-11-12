@@ -205,7 +205,7 @@ void ScheduleGenerationWidget::setClient(InternalClient* client)
         // La huella incluye la duración efectiva (spec 011): si el dominio o D
         // cambian durante el cálculo, el resultado se marca «datos anteriores».
         m_servicio = new ServicioGeneracion(
-            *m_puerto, 300000,
+            *m_puerto, PLAZO_MS_POR_DEFECTO,
             [this]() {
                 return m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo, leerOpciones())
                                 : QString();
@@ -1063,7 +1063,7 @@ void ScheduleGenerationWidget::onGenerarClicked()
 
     m_btnGenerar->setEnabled(false);
     m_progreso->setVisible(true);
-    establecerEstado(QStringLiteral("Generando horarios… puede tardar unos segundos."));
+    establecerEstado(QStringLiteral("Generando horarios… el cálculo puede tardar hasta una hora."));
     // Huella de la instantánea que se envía: el servicio la compara al recibir la
     // respuesta para decidir si los datos quedaron obsoletos (spec 011, RF-6; la 013 añade
     // las preferencias intervinientes). Mismo camino de composición y mismas opciones.
@@ -1071,6 +1071,30 @@ void ScheduleGenerationWidget::onGenerarClicked()
         m_nucleo ? GeneracionSolver::huellaActual(*m_nucleo, opciones) : QString();
     m_servicio->generar(m_entradaActual, huella, m_preferenciasNoAplicadas);
 }
+
+namespace {
+
+/// Texto de la optimalidad por fase (020, RF-3): se refiere solo a las fases que no se probaron
+/// óptimas. La asignación de docentes solo se menciona si la fase de referencia quedó `FEASIBLE`.
+QString textoFasesNoOptimas(const QStringList& fases)
+{
+    QStringList lineas;
+    for (const QString& fase : fases) {
+        if (fase == QLatin1String("referencia")) {
+            lineas << QStringLiteral("La asignación de docentes (fase de referencia) no está "
+                                     "probada como óptima.");
+        } else if (fase == QLatin1String("separacion")) {
+            lineas << QStringLiteral("La separación y los huecos no están probados como óptimos.");
+        } else if (fase == QLatin1String("preferencias")) {
+            lineas << QStringLiteral("Las preferencias horarias no están probadas como óptimas.");
+        } else {
+            lineas << QStringLiteral("La fase «%1» no está probada como óptima.").arg(fase);
+        }
+    }
+    return lineas.join(QLatin1Char('\n'));
+}
+
+} // namespace
 
 void ScheduleGenerationWidget::onGeneracionFinalizada()
 {
@@ -1109,6 +1133,17 @@ void ScheduleGenerationWidget::onGeneracionFinalizada()
         "«Visualización de Horarios», donde puedes revisarlo y editarlo.");
     if (!ruta.isEmpty())
         mensaje += QStringLiteral("\n\nArchivo: %1").arg(QDir::toNativeSeparators(ruta));
+
+    // 020 (RF-3): la no optimalidad se declara por fase y solo para las fases que no se
+    // probaron óptimas; si la referencia fue óptima no se califica de no óptima la asignación.
+    if (!resultado.fasesNoOptimas.isEmpty())
+        mensaje += QLatin1String("\n\n") + textoFasesNoOptimas(resultado.fasesNoOptimas);
+
+    // 020 (RF-5): reparto observable en el diálogo existente — una línea por docente con sus
+    // horas y su tope, los totales y los docentes sin capacidad. La vista no recalcula nada.
+    const QString reparto = resultado.analisis.repartoTexto();
+    if (!reparto.isEmpty())
+        mensaje += QLatin1String("\n\nHoras por docente:\n") + reparto;
 
     ScheduleTheme::showStyledMessage(this, QStringLiteral("Horario generado"), mensaje, false);
     emit horarioGenerado(datos, ruta);

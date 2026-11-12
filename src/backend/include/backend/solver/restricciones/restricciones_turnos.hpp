@@ -13,7 +13,7 @@ void restriccionUnoPorTurno(
     const VariablesSolver& vars
 );
 
-/// S1: tope de horas de aula del profesor + exceso penalizado (tope + e[p]).
+/// S1 (020, RF-1): tope DURO de horas de aula del profesor: Σ clases ≤ horas_aula, sin exceso.
 void restriccionTopeHorasProfesor(
     CpModelBuilder& model,
     const SolverConfig& config,

@@ -15,10 +15,10 @@
 
 /// Tests del objetivo con preferencias del docente (spec 013, RF-1, RF-4, RF-5).
 ///
-/// Laserarquía es ESTRUCTURAL: la fase 1 es el modelo de hoy (referencia) y la fase 2 fija por
-/// igualdad la asignación de docente por materia-curso (z*) y el exceso por docente (e*), de modo
-/// que la preferencia solo decide DÓNDE caen las clases. El exceso se calcula en el test desde las
-/// clases y `horas_aula` (P14): no se amplía la API del motor.
+/// La jerarquía es ESTRUCTURAL: la fase 1 es la referencia y la fase 2 fija por igualdad la
+/// asignación de docente por materia-curso (z*), de modo que la preferencia solo decide DÓNDE
+/// caen las clases. El exceso por docente (e*) ya no existe (020): el tope de horas es duro y la
+/// comprobación se calcula en el test desde las clases y `horas_aula` (debe valer 0).
 namespace {
 
 QVector<Disponibilidad> dispCompleta(int dias, int franjas)
@@ -34,7 +34,7 @@ QVector<Disponibilidad> dispCompleta(int dias, int franjas)
 }
 
 /// Un curso de 1|A con una materia de 2 h en 2 días × 4 franjas. La fase 1 reparte las clases
-/// con S1+S2; hay sitio de sobra para moverlas.
+/// con S2 (S1 se retiró en la 020); hay sitio de sobra para moverlas.
 SolverConfig configDosDias()
 {
     SolverConfig config;
@@ -181,7 +181,8 @@ QMap<QString, QSet<int>> asignacionDocente(const HorarioSalida& horario)
     return asignacion;
 }
 
-/// Exceso de horas de aula por docente, calculado desde las clases y `horas_aula` (P14).
+/// Exceso de horas de aula por docente, calculado desde las clases y `horas_aula`. Bajo el tope
+/// duro (020) siempre debe ser 0: es la comprobación independiente de RF-1.
 QMap<int, int> excesoPorDocente(const HorarioSalida& horario, const SolverConfig& config)
 {
     QMap<int, int> clasesPorDocente;
@@ -230,7 +231,7 @@ TEST(TestSolverPreferencias, mismasPreferencias_mismaAsignacionDocenteYExceso)
     ASSERT_TRUE(sinPreferencias.exito) << sinPreferencias.errores.join("\n").toStdString();
 
     // Se prefiere el día en el que la referencia NO tiene todas las clases: el horario debe
-    // moverse (control) sin tocar el reparto de docentes ni el exceso.
+    // moverse (control) sin tocar el reparto de docentes ni las horas por docente.
     bool todasEnDia1 = true;
     for (auto it = sinPreferencias.resultado.horarios.constBegin();
          it != sinPreferencias.resultado.horarios.constEnd(); ++it)
@@ -369,7 +370,7 @@ TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaSuplente)
 
 TEST(TestSolverPreferencias, evitadaAcumulada_noProvocaExceso)
 {
-    // La misma acumulación no crea exceso de horas (S1 intacto): el titular tiene 4 h de aula.
+    // La misma acumulación no supera el tope duro de horas (RF-1): el titular tiene 4 h de aula.
     SolverConfig config = configSuplente();
     for (int dia = 0; dia < 5; ++dia)
         config.preferencias.append(preferencia(0, dia, {0}, QStringLiteral("evitada")));
@@ -496,11 +497,11 @@ TEST(TestSolverPreferencias, preferenciaEligeLasFranjasPreferidas)
 
 // ─── Fallback a la referencia (P6/P7) ───────────────────────────────────────
 
-TEST(TestSolverPreferencias, fase2SinSolucion_devuelveLaReferencia)
+TEST(TestSolverPreferencias, fasesBlandasDesactivadas_devuelvenLaReferencia)
 {
-    // Con el anclaje por igualdad la fase 2 es factible por construcción (la solución de la
-    // referencia la satisface); el caso alcanzable es que el presupuesto de la fase 2 se agote
-    // (UNKNOWN). Entonces se devuelve la referencia, no un error.
+    // Con las fases blandas desactivadas se devuelve la referencia, no un error (P6/P7). La 020
+    // reparte un único deadline de reloj (55 min) entre las fases y prueba la escalera con los
+    // flags, sin depender del reloj de la máquina.
     Solver solver;
     const auto referencia = solver.resolver(configDosDias(), unSoloWorker());
     ASSERT_TRUE(referencia.exito) << referencia.errores.join("\n").toStdString();
@@ -509,11 +510,11 @@ TEST(TestSolverPreferencias, fase2SinSolucion_devuelveLaReferencia)
     config.preferencias = {preferencia(0, 0, {0, 1}, QStringLiteral("preferida"))};
 
     Solver::PresupuestoFases presupuesto;
-    presupuesto.referencia = 6.0;
-    presupuesto.preferencias = 1e-9;   // agota la fase 2 antes de encontrar solución
+    presupuesto.ejecutarSeparacionHuecos = false;
+    presupuesto.ejecutarPreferencias = false;
     presupuesto.workers = 1;           // comparación exacta de horario (test)
-    const auto conFase2Agotada = solver.resolver(config, presupuesto);
+    const auto sinFasesBlandas = solver.resolver(config, presupuesto);
 
-    ASSERT_TRUE(conFase2Agotada.exito) << conFase2Agotada.errores.join("\n").toStdString();
-    EXPECT_EQ(resumenDeSalida(conFase2Agotada), resumenDeSalida(referencia));
+    ASSERT_TRUE(sinFasesBlandas.exito) << sinFasesBlandas.errores.join("\n").toStdString();
+    EXPECT_EQ(resumenDeSalida(sinFasesBlandas), resumenDeSalida(referencia));
 }

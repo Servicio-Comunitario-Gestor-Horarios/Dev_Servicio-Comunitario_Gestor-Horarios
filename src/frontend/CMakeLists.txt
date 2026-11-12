@@ -81,9 +81,15 @@ add_library(frontend STATIC)
 target_sources(frontend PRIVATE ${FRONTEND_SOURCES} ${FRONTEND_HEADERS} resources/resources.qrc)
 
 # AQUÍ ESTÁ LA CLAVE: Hacemos PUBLIC la ruta del backend
+# `src/common/include` va aquí y no solo por herencia del backend: con
+# BUILD_BACKEND=OFF no existe el target `backend`, y la vista usa tipos compartidos
+# (`common/tipo_general.hpp`) a través de `src/services/tipos_aula_ui.hpp`. PUBLIC
+# mantiene la ruta para los consumidores que incluyen cabeceras privadas del frontend
+# (p. ej. `test_tipos_aula_ui`), igual que la ruta del backend.
 target_include_directories(frontend PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src/backend/include
+    ${CMAKE_SOURCE_DIR}/src/common/include
 )
 
 target_include_directories(frontend PRIVATE

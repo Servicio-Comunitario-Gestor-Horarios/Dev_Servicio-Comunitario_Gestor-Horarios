@@ -637,6 +637,22 @@ private slots:
         QVERIFY(resultado.mensajeError.contains(QStringLiteral("V13")));
     }
 
+    /// RF-6 (020): la capacidad de horas NO filtra la elegibilidad. Un docente con
+    /// `horas_aula = 0` —declarado o ausente— sigue siendo candidato y la entrada pasa; la
+    /// infactibilidad por horas aparece al resolver, no como rechazo previo de la entrada.
+    void v13_noFiltraPorCapacidadDeHoras()
+    {
+        const auto declaradoCero = validarEntradaSolver(conProfesor(jsonValido(), [](QJsonObject& p) {
+            p[QStringLiteral("horas_aula")] = 0;
+        }));
+        QVERIFY2(declaradoCero.ok, qPrintable(declaradoCero.mensajeError));
+
+        const auto ausente = validarEntradaSolver(conProfesor(jsonValido(), [](QJsonObject& p) {
+            p.remove(QStringLiteral("horas_aula"));
+        }));
+        QVERIFY2(ausente.ok, qPrintable(ausente.mensajeError));
+    }
+
     /// V14: un curso cuyas horas académicas superan sus franjas útiles se rechaza.
     /// 1 hora académica = 1 bloque (sin ×60 ni redondeo): 41 h > 40 franjas útiles.
     void v14_masHorasQueFranjas_falla()

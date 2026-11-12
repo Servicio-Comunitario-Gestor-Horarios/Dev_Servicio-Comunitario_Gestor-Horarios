@@ -36,12 +36,28 @@ int ejecutarAplicacionBackend(int argc, char *argv[])
     servidor.registerRoute(Middleware::OP_RESOLVER_HORARIO,
         [&servidor](const QJsonObject& payload, QLocalSocket* socket) {
             const RespuestaSolver respuesta = resolverEntradaSolver(payload);
-            if (!respuesta.ok) {
-                servidor.responder(socket, Middleware::RESP_INVALIDO, respuesta.error);
-            } else if (!respuesta.factible) {
-                servidor.responder(socket, Middleware::RESP_SIN_SOLUCION, respuesta.error);
-            } else {
-                servidor.responder(socket, Middleware::RESP_EXITO, respuesta.salida);
+
+            // 020 (RF-2/RF-3): cada desenlace tiene su código; NoFactible y no concluyente no
+            // se confunden, y un error de entrada/contrato no se presenta como NoFactible.
+            switch (respuesta.desenlace) {
+                case DesenlaceSolver::Exito:
+                    servidor.responder(socket, Middleware::RESP_EXITO, respuesta.salida);
+                    break;
+                case DesenlaceSolver::Infactible:
+                    servidor.responder(socket, Middleware::RESP_SIN_SOLUCION, respuesta.error);
+                    break;
+                case DesenlaceSolver::NoConcluyente:
+                    servidor.responder(socket, Middleware::RESP_NO_CONCLUYENTE, respuesta.error);
+                    break;
+                case DesenlaceSolver::ErrorContrato:
+                    servidor.responder(socket, Middleware::RESP_INVALIDO, respuesta.error);
+                    break;
+                case DesenlaceSolver::SinRespuesta:
+                default:
+                    // El proceso que responde siempre tiene un desenlace propio; una pérdida de
+                    // comunicación la marca el puerto del cliente, no este lado.
+                    servidor.responder(socket, Middleware::RESP_ERROR, respuesta.error);
+                    break;
             }
         });
 #else

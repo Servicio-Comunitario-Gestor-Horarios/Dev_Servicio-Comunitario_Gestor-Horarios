@@ -5,7 +5,7 @@
  * @brief Orquestación de una generación de horarios (RF-1, RF-3, RF-5).
  *
  * Construye/valida la entrada, la envía al proceso de cálculo por un puerto
- * inyectable, espera con un plazo (300 s en producción) y analiza la salida.
+ * inyectable, espera con un plazo (60 min de reloj en producción) y analiza la salida.
  * Marca «datos anteriores» si la instantánea de dominio cambió durante el
  * cálculo. Es UI-free: los desenlaces se exponen por `finalizada()` y por
  * `ultimoResultado()`, que consume el frontend.
@@ -25,6 +25,7 @@
 #include "backend/services/analisis_bloques.hpp"
 #include "backend/services/preferencias_cumplimiento.hpp"
 #include "backend/services/proyeccion_preferencias.hpp"
+#include "backend/solver/desenlace_solver.hpp"   ///< enum limpio, sin OR-Tools (020, D5)
 
 /// Huella determinista de una instantánea de dominio, de la duración efectiva de la hora
 /// académica y de la proyección de las preferencias intervinientes (para detectar «datos
@@ -42,12 +43,18 @@ QString huellaDatos(const DatosDominio& datos, int duracionMinutos,
 HorarioSalida estamparFechaGeneracion(const HorarioSalida& horario, const QDateTime& ahora);
 
 /// Respuesta del proceso de cálculo (abstraída del transporte IPC).
+///
+/// `desenlace` es la verdad de la respuesta (020, RF-2/RF-3). `ok`/`factible` se conservan
+/// como campos derivados de compatibilidad, que el productor rellena a partir de `desenlace`:
+/// `ok` = respuesta válida y procesable (`Exito`, `Infactible`, `NoConcluyente`) y `factible`
+/// = hay horario (`Exito`). El servicio decide por `desenlace`, no por ellos.
 struct RespuestaSolver
 {
-    bool ok = false;          ///< El proceso respondió de forma válida.
-    bool factible = false;    ///< Existe solución.
-    QJsonObject salida;       ///< HorarioSalida JSON (válido solo si `ok && factible`).
-    QString error;            ///< Motivo si `!ok`.
+    DesenlaceSolver desenlace = DesenlaceSolver::SinRespuesta;
+    QJsonObject salida;       ///< HorarioSalida JSON (válido solo con `DesenlaceSolver::Exito`).
+    QString error;            ///< Texto del motor o del transporte, según el desenlace.
+    bool ok = false;          ///< Compatibilidad: `Exito`, `Infactible` o `NoConcluyente`.
+    bool factible = false;    ///< Compatibilidad: `Exito`.
 };
 
 /// Puerto hacia el proceso de cálculo. El transporte real (IPC) lo implementa
@@ -70,10 +77,12 @@ struct ResultadoGeneracion
         Calculando,       ///< En curso.
         Listo,            ///< Solución presentable.
         DatosAnteriores,  ///< Solución válida pero la instantánea cambió; requiere confirmación.
-        NoFactible,       ///< El proceso indicó que no hay solución.
-        ContratoInvalido, ///< La respuesta no corresponde al contrato.
+        NoFactible,       ///< El proceso indicó que no hay solución (infactibilidad demostrada).
+        NoConcluyente,    ///< Presupuesto agotado sin prueba: **no** es NoFactible (RF-3).
+        SinRespuesta,     ///< Pérdida de comunicación con el proceso (RF-3); no es contrato.
+        ContratoInvalido, ///< Modelo o respuesta inválidos: error de entrada/contrato.
         CalculoFallido,   ///< La validación posterior (P4) detectó solapamientos.
-        TiempoAgotado,    ///< Se superó el plazo o se perdió la comunicación.
+        TiempoAgotado,    ///< Se superó el plazo de espera del proceso.
         EntradaInvalida,  ///< La entrada no superó las validaciones previas.
         BaseInvalida      ///< La base no es válida: no se valida la entrada ni se envía.
     };
@@ -81,8 +90,12 @@ struct ResultadoGeneracion
     Estado        estado = Estado::Inactivo;
     QString       mensaje;
     bool          datosAnteriores = false;
+    /// 020 (RF-3, D8): fases que devolvieron una solución sin probarse óptimas ("referencia",
+    /// "separacion", "preferencias"). Llega en la metadata de la salida y se presenta por fase:
+    /// vacía = la resolución está probada óptima (o no hay horario).
+    QStringList   fasesNoOptimas;
     HorarioSalida horario;      ///< Válido si `presentable`.
-    AnalisisSalida analisis;    ///< Avisos P1–P3 y conflictos P4.
+    AnalisisSalida analisis;    ///< Reparto, avisos P1–P3 y conflictos P4/P5.
     bool          presentable = false;
     /// Estado por preferencia y cumplimiento agregado (013, RF-8). Aditivo: no viaja en el
     /// contrato de salida del solver, se calcula aquí sobre el horario y la proyección.
@@ -92,6 +105,11 @@ struct ResultadoGeneracion
     AnalisisBloques bloques;
 };
 
+/// Plazo por defecto del proceso de cálculo (020, RF-3): **60 minutos de reloj**. El solver
+/// dispone de 55 min en total (fase de referencia + blandas) y los 5 restantes son reserva
+/// fija de extracción y comunicación. Los tests inyectan un plazo corto.
+inline constexpr int PLAZO_MS_POR_DEFECTO = 3'600'000;
+
 /// Orquesta una generación. Una sola en curso a la vez.
 class ServicioGeneracion : public QObject
 {
@@ -99,7 +117,7 @@ class ServicioGeneracion : public QObject
 
 public:
     /// @param puerto       Transporte hacia el proceso de cálculo (no se posee).
-    /// @param plazoMs      Plazo de espera (300 s en producción; corto en tests).
+    /// @param plazoMs      Plazo de espera (60 min en producción; corto en tests).
     /// @param huellaActual Devuelve la huella de la instantánea actual; si al
     ///                     recibir la respuesta difiere de la enviada, el
     ///                     resultado se marca «datos anteriores». Vacío = nunca.
@@ -110,7 +128,7 @@ public:
     ///                     antes de `padre` para que olvidar el cableado no compile.
     /// @param padre        Objeto Qt padre.
     explicit ServicioGeneracion(PuertoSolver& puerto,
-                                int plazoMs = 300000,
+                                int plazoMs = PLAZO_MS_POR_DEFECTO,
                                 std::function<QString()> huellaActual = {},
                                 std::function<QDateTime()> reloj = {},
                                 std::function<QString()> revisarBase = {},

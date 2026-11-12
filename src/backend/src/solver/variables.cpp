@@ -116,11 +116,8 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
                 }
     }
 
-    // ── e[p]  (exceso sobre el tope, S1) ──
-    const int cotaExceso = dim.num_dias * dim.num_slots_dia;
-    for (int p = 0; p < dim.num_profesores; ++p)
-        vars.exceso[p] = model.NewIntVar(operations_research::Domain(0, cotaExceso))
-                             .WithName("exceso_" + std::to_string(p));
+    // El tope de horas de aula es una invariante dura: no se crea `e[p]` (no hay holgura que
+    // relaje el tope). Ver `restriccionTopeHorasProfesor`.
 
     return vars;
 }

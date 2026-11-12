@@ -164,7 +164,7 @@ private slots:
         }
 
         QVERIFY(resultado.exito);
-        QVERIFY(elapsed < 60000); // techo histórico del benchmark (no es el plazo del servicio: 300 s)
+        QVERIFY(elapsed < 60000); // techo histórico del benchmark (no es el plazo del servicio: una hora en la 020)
     }
 
     void benchmark_SolverGrandeConPreferencias() {
@@ -195,8 +195,8 @@ private slots:
         QCOMPARE(segunda.resultado.metadata.total_asignaciones,
                  primera.resultado.metadata.total_asignaciones);
 
-        // Techo histórico del benchmark: 60 s (no es el plazo del servicio, 300 s). El +50 %
-        // se documenta, no se aserta: depende de la máquina.
+        // Techo histórico del benchmark: 60 s (no es el plazo del servicio, que en la 020 es de
+        // una hora). El +50 % se documenta, no se aserta: depende de la máquina.
         QVERIFY2(msPrimera < 60000,
                  qPrintable(QStringLiteral("la primera ejecución tardó %1 ms").arg(msPrimera)));
         QVERIFY2(msSegunda < 60000,

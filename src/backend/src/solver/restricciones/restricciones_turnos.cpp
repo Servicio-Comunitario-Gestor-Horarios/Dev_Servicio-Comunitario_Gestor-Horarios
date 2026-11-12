@@ -24,7 +24,8 @@ void restriccionUnoPorTurno(
     }
 }
 
-// S1 — tope de horas de aula del profesor + exceso penalizado (sustituye la igualdad dura).
+// S1 — tope de horas de aula del profesor (invariante dura, RF-1): Σ clases ≤ horas_aula.
+// No hay variable de exceso ni relajación: un docente a tope no recibe más clases.
 void restriccionTopeHorasProfesor(
     [[maybe_unused]] CpModelBuilder& model,
     [[maybe_unused]] const SolverConfig& config,
@@ -38,12 +39,9 @@ void restriccionTopeHorasProfesor(
             if (std::get<0>(it.key()) == p) xDe.push_back(it.value());
         if (xDe.empty()) continue;
 
-        const auto excesoIt = vars.exceso.constFind(p);
-        if (excesoIt == vars.exceso.constEnd()) continue;
-
+        // Un tope de 0 (declarado o ausente) deja al docente sin ninguna clase.
         const int tope = bloquesAula(config.profesores[p].horas_aula, dur);
-        model.AddLessOrEqual(LinearExpr::Sum(xDe),
-                             LinearExpr(*excesoIt) + tope);
+        model.AddLessOrEqual(LinearExpr::Sum(xDe), tope);
     }
 }
 

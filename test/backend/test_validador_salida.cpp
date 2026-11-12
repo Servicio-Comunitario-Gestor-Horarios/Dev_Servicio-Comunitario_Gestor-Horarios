@@ -101,8 +101,8 @@ private:
         SolverConfig config = configBase();
         ProfesorSolverConfig beto;
         beto.nombre = QStringLiteral("Beto");
-        beto.horas_requeridas = -1;  // sin tope de horas
-        beto.horas_aula = -1;
+        beto.horas_requeridas = -1;  // sin horas requeridas (P2 no aplica)
+        beto.horas_aula = 8;         // tope duro con capacidad para sus 2 clases
         config.profesores.append(beto);
         return config;
     }
@@ -191,7 +191,7 @@ private:
         ProfesorSolverConfig p;
         p.nombre = nombre;
         p.horas_requeridas = -1;
-        p.horas_aula = -1;
+        p.horas_aula = 8;   // tope duro con capacidad para sus 2 clases
         return p;
     }
 
@@ -199,7 +199,9 @@ private:
     /// Todos los mensajes del análisis, solo para el diagnóstico de un fallo.
     static QString texto(const AnalisisSalida& a)
     {
-        return conflictos(a) + QLatin1Char('\n') + a.avisos.join(QLatin1Char('\n'));
+        return conflictos(a) + QLatin1Char('\n') + a.avisos.join(QLatin1Char('\n'))
+               + QLatin1Char('\n') + a.excesosTopeHoras.join(QLatin1Char('\n'))
+               + QLatin1Char('\n') + a.repartoTexto();
     }
 
 private slots:
@@ -305,6 +307,169 @@ private slots:
         const AnalisisSalida a = analizarSalidaSolver(h, configBase());
         QVERIFY(a.presentable());
         QVERIFY2(a.avisos.isEmpty(), qPrintable(texto(a)));
+    }
+
+    /// El análisis informa de los docentes sin capacidad (020, RF-1): tope 0 declarado y tope
+    /// ausente (el parser lo lee como 0). Es un dato informativo: no altera la presentabilidad.
+    void docentesSinCapacidad_incluyeTopeCeroDeclaradoYAusente()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_aula = 0;   // «Ana», tope 0 declarado
+
+        ProfesorSolverConfig ausente;
+        ausente.nombre = QStringLiteral("Beto");
+        ausente.horas_requeridas = 4;
+        // `horas_aula` sin declarar: el defecto es 0 (ausente = sin capacidad).
+        config.profesores.append(ausente);
+
+        ProfesorSolverConfig conCapacidad;
+        conCapacidad.nombre = QStringLiteral("Carla");
+        conCapacidad.horas_aula = 4;
+        config.profesores.append(conCapacidad);
+
+        // Las clases son de Carla (con capacidad): Ana y Beto quedan sin clases y sin capacidad.
+        HorarioSalida h = horarioValido();
+        for (DiaOutput& dia : h.horarios[claveCurso(1, QStringLiteral("A"))].dias)
+            for (AsignacionOutput& asig : dia.asignaciones)
+                asig.profesor = 2;
+
+        const AnalisisSalida a = analizarSalidaSolver(h, config);
+
+        QVERIFY2(a.docentesSinCapacidad.contains(QStringLiteral("Ana")), qPrintable(texto(a)));
+        QVERIFY2(a.docentesSinCapacidad.contains(QStringLiteral("Beto")), qPrintable(texto(a)));
+        QVERIFY2(!a.docentesSinCapacidad.contains(QStringLiteral("Carla")), qPrintable(texto(a)));
+        QCOMPARE(a.docentesSinCapacidad.size(), 2);
+        QVERIFY(a.presentable());
+    }
+
+    /// 020 (RF-5): el reparto lista a los docentes **con clases** con sus horas asignadas y su
+    /// tope; los totales comparan las horas asignadas del centro con la suma de todos los topes.
+    void repartoPorDocenteYtotales()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_aula = 4;
+        ProfesorSolverConfig sinClases;
+        sinClases.nombre = QStringLiteral("Beto");
+        sinClases.horas_aula = 2;   // sin clases: no aparece en el reparto, pero suma tope
+        config.profesores.append(sinClases);
+
+        const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
+
+        QCOMPARE(a.reparto.size(), 1);
+        QCOMPARE(a.reparto[0].profesor, 0);
+        QCOMPARE(a.reparto[0].nombre, QStringLiteral("Ana"));
+        QCOMPARE(a.reparto[0].horasAsignadas, 2);
+        QCOMPARE(a.reparto[0].horasAula, 4);
+        QCOMPARE(a.totalHorasAsignadas, 2);
+        QCOMPARE(a.totalHorasAula, 6);   // 4 de Ana + 2 de Beto
+        QVERIFY(a.excesosTopeHoras.isEmpty());
+        QVERIFY(a.presentable());
+    }
+
+    /// 020 (RF-5): un docente por encima de su tope de horas de aula hace el resultado no
+    /// presentable, y **no** se etiqueta como solapamiento (P4) sino como exceso de tope (P5).
+    void excesoDeTopeDeHorasAula_noEsPresentable()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_aula = 1;        // 2 asignadas
+        config.profesores[0].horas_requeridas = -1; // sin P2 de por medio
+
+        const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
+
+        QVERIFY2(!a.excesosTopeHoras.isEmpty(), qPrintable(texto(a)));
+        QVERIFY(!a.presentable());
+        QVERIFY2(a.conflictos.isEmpty(), qPrintable(texto(a)));
+        QVERIFY(!a.hayConflictoSolapamiento());
+        QCOMPARE(a.reparto[0].horasAsignadas, 2);
+        QCOMPARE(a.reparto[0].horasAula, 1);
+        QVERIFY2(!texto(a).contains(QStringLiteral("solapamiento")), qPrintable(texto(a)));
+    }
+
+    /// 020 (RF-5): `presentable()` sigue siendo falso por solapamiento, y `hayConflictoSolapamiento`
+    /// se conserva (lo usan los consumidores para distinguir P4 de P5).
+    void presentable_conservaHayConflictoSolapamiento()
+    {
+        const AnalisisSalida limpio = analizarSalidaSolver(horarioValido(), configBase());
+        QVERIFY(limpio.presentable());
+        QVERIFY(!limpio.hayConflictoSolapamiento());
+
+        HorarioSalida h = horarioValido();
+        CursoOutput otro;
+        otro.turno = QStringLiteral("manana");
+        DiaOutput dia;
+        dia.dia = 0;
+        dia.asignaciones = {AsignacionOutput{0, 0, -1, 0}};   // misma aula 0, mismo slot
+        otro.dias = {dia};
+        h.horarios[claveCurso(1, QStringLiteral("B"))] = otro;
+
+        const AnalisisSalida conConflicto = analizarSalidaSolver(h, configBase());
+        QVERIFY(!conConflicto.presentable());
+        QVERIFY(conConflicto.hayConflictoSolapamiento());
+    }
+
+    /// 020 (RF-5): `hayConflictoSolapamiento` distingue P4 de P5 sin depender de `presentable()`.
+    void hayConflictoSolapamiento_seConserva()
+    {
+        SolverConfig conExceso = configBase();
+        conExceso.profesores[0].horas_aula = 1;
+        const AnalisisSalida soloTope = analizarSalidaSolver(horarioValido(), conExceso);
+        QVERIFY(!soloTope.presentable());
+        QVERIFY(!soloTope.hayConflictoSolapamiento());
+    }
+
+    /// 020 (RF-5): P2 mide contra `horas_requeridas` y **no** es la comprobación del tope: un
+    /// docente puede estar por encima de sus horas requeridas y dentro de sus horas de aula.
+    void p2YElTopeDeHorasAulaSonComprobacionesDistintas()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_requeridas = 1;   // P2: 2 asignadas > 1
+        config.profesores[0].horas_aula = 4;         // P5: 2 asignadas ≤ 4
+
+        const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
+        QVERIFY2(!a.avisos.isEmpty(), qPrintable(texto(a)));
+        QVERIFY2(a.excesosTopeHoras.isEmpty(), qPrintable(texto(a)));
+        QVERIFY(a.presentable());
+
+        // Y al revés: tope superado sin P2 (horas requeridas ausentes).
+        SolverConfig soloTope = configBase();
+        soloTope.profesores[0].horas_aula = 1;
+        soloTope.profesores[0].horas_requeridas = -1;
+        const AnalisisSalida b = analizarSalidaSolver(horarioValido(), soloTope);
+        QVERIFY2(b.avisos.isEmpty(), qPrintable(texto(b)));
+        QVERIFY(!b.excesosTopeHoras.isEmpty());
+    }
+
+    /// 020 (RF-5): P2 sigue comparando `horas_requeridas` aunque haya tope de horas de aula.
+    void p2SigueComparandoHorasRequeridas()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_requeridas = 1;
+        config.profesores[0].horas_aula = 4;
+
+        const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
+        QCOMPARE(a.avisos.size(), 1);
+        QVERIFY2(a.avisos[0].contains(QStringLiteral("horas")), qPrintable(texto(a)));
+    }
+
+    /// 020 (RF-5): el reparto en texto —una línea por docente, totales y sin capacidad— es
+    /// estable y no incluye a docentes con tope 0 en las líneas de horas.
+    void repartoTexto_incluyeSinCapacidad()
+    {
+        SolverConfig config = configBase();
+        config.profesores[0].horas_aula = 4;
+        ProfesorSolverConfig sinCapacidad;
+        sinCapacidad.nombre = QStringLiteral("Beto");
+        sinCapacidad.horas_aula = 0;
+        config.profesores.append(sinCapacidad);
+
+        const AnalisisSalida a = analizarSalidaSolver(horarioValido(), config);
+        const QString reparto = a.repartoTexto();
+
+        QVERIFY2(reparto.contains(QStringLiteral("Ana: 2/4 h")), qPrintable(reparto));
+        QVERIFY2(reparto.contains(QStringLiteral("Total del centro: 2/4 h")), qPrintable(reparto));
+        QVERIFY2(reparto.contains(QStringLiteral("Sin capacidad (tope 0): Beto")),
+                 qPrintable(reparto));
+        QVERIFY2(!reparto.contains(QStringLiteral("Beto: ")), qPrintable(reparto));
     }
 
     void excesoDeHorasDeProfesor_generaAviso()

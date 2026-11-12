@@ -5,10 +5,30 @@
 #include "backend/services/preferencias.hpp"
 
 #include <QCryptographicHash>
+#include <QJsonArray>
 #include <QStringList>
 #include <QTimer>
 
 #include <algorithm>
+
+namespace
+{
+    /// Docentes sin capacidad —tope duro 0, declarado o ausente (el parser lo lee como 0)— para
+    /// informarlos en el mensaje de NoFactible (020, RF-1). Nunca deben deshabilitarse en
+    /// silencio.
+    QStringList nombresSinCapacidad(const SolverConfig& config)
+    {
+        QStringList nombres;
+        for (int p = 0; p < config.profesores.size(); ++p)
+        {
+            if (config.profesores[p].horas_aula > 0)
+                continue;
+            const QString nombre = config.profesores[p].nombre.trimmed();
+            nombres.append(nombre.isEmpty() ? QStringLiteral("docente %1").arg(p) : nombre);
+        }
+        return nombres;
+    }
+} // namespace
 
 QString huellaDatos(const DatosDominio& datos, int duracionMinutos,
                     const QVector<PreferenciaProyectada>& intervinientes)
@@ -209,26 +229,70 @@ void ServicioGeneracion::alResponder(const RespuestaSolver& respuesta)
 {
     m_enCurso = false;
 
-    if (!respuesta.ok)
+    // 020 (RF-2/RF-3): el desenlace del cálculo es la verdad; `ok`/`factible` son derivados.
+    switch (respuesta.desenlace)
     {
-        m_ultimo = ResultadoGeneracion{};
-        m_ultimo.estado  = ResultadoGeneracion::Estado::ContratoInvalido;
-        m_ultimo.mensaje = respuesta.error.isEmpty()
-                               ? QStringLiteral("El proceso de cálculo devolvió una respuesta"
-                                                " inválida.")
-                               : respuesta.error;
-        emit finalizada();
-        return;
-    }
+        case DesenlaceSolver::Infactible:
+        {
+            // H3 mínimo (D-5): se conserva la causa del motor; nunca un texto genérico. Sin
+            // diagnóstico, se declara que no hay causa atribuible.
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado = ResultadoGeneracion::Estado::NoFactible;
+            QString mensaje = respuesta.error.isEmpty()
+                                  ? QStringLiteral("El motor demostró que no hay solución y no hay"
+                                                   " una causa atribuible.")
+                                  : respuesta.error;
 
-    if (!respuesta.factible)
-    {
-        m_ultimo = ResultadoGeneracion{};
-        m_ultimo.estado  = ResultadoGeneracion::Estado::NoFactible;
-        m_ultimo.mensaje = QStringLiteral(
-            "No existe una solución factible para los datos y la configuración actuales.");
-        emit finalizada();
-        return;
+            // 020 (RF-1): se informa también de qué docentes quedan sin capacidad para que no
+            // sea un deshabilitado silencioso.
+            const QStringList sinCapacidad = nombresSinCapacidad(m_config);
+            if (!sinCapacidad.isEmpty())
+                mensaje += QStringLiteral("\nDocentes sin capacidad (horas de aula 0 o ausentes): %1.")
+                               .arg(sinCapacidad.join(QStringLiteral(", ")));
+
+            m_ultimo.mensaje = mensaje;
+            emit finalizada();
+            return;
+        }
+
+        case DesenlaceSolver::NoConcluyente:
+            // Presupuesto agotado sin prueba: distinto de NoFactible y sin horario.
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado = ResultadoGeneracion::Estado::NoConcluyente;
+            m_ultimo.mensaje = respuesta.error.isEmpty()
+                                   ? QStringLiteral("El cálculo agotó el presupuesto sin encontrar"
+                                                    " solución y sin demostrar que no exista: el"
+                                                    " resultado no es concluyente.")
+                                   : respuesta.error;
+            emit finalizada();
+            return;
+
+        case DesenlaceSolver::SinRespuesta:
+            // Pérdida de comunicación: no es una respuesta inválida ni NoFactible.
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado = ResultadoGeneracion::Estado::SinRespuesta;
+            m_ultimo.mensaje = respuesta.error.isEmpty()
+                                   ? QStringLiteral("No hubo respuesta del proceso de cálculo: se"
+                                                    " perdió la comunicación. No se puede afirmar"
+                                                    " que no exista solución.")
+                                   : respuesta.error;
+            emit finalizada();
+            return;
+
+        case DesenlaceSolver::ErrorContrato:
+            // Modelo inválido, error interno o respuesta fuera de contrato: camino propio.
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado = ResultadoGeneracion::Estado::ContratoInvalido;
+            m_ultimo.mensaje = respuesta.error.isEmpty()
+                                   ? QStringLiteral("El proceso de cálculo devolvió una respuesta o"
+                                                    " un modelo inválido (error de entrada o de"
+                                                    " contrato).")
+                                   : respuesta.error;
+            emit finalizada();
+            return;
+
+        case DesenlaceSolver::Exito:
+            break;   // sigue el análisis del horario
     }
 
     if (!respuesta.salida.value(QStringLiteral("horarios")).isObject())
@@ -245,21 +309,41 @@ void ServicioGeneracion::alResponder(const RespuestaSolver& respuesta)
         estamparFechaGeneracion(HorarioSalida::fromJson(respuesta.salida), ahora());
     const AnalisisSalida analisis = analizarSalidaSolver(horario, m_config);
 
+    // 020 (D8): la optimalidad por fase llega en la metadata de la salida (la inyecta
+    // `servicio_solver`); ausente = todas las fases ejecutadas se probaron óptimas.
+    QStringList fasesNoOptimas;
+    const QJsonArray fasesJson =
+        respuesta.salida.value(QStringLiteral("metadata")).toObject()
+            .value(QStringLiteral("fases_sin_optimalidad")).toArray();
+    for (const QJsonValue& fase : fasesJson)
+        if (fase.isString())
+            fasesNoOptimas.append(fase.toString());
+
     m_ultimo = ResultadoGeneracion{};
     m_ultimo.horario  = horario;
     m_ultimo.analisis = analisis;
+    m_ultimo.fasesNoOptimas = fasesNoOptimas;
     // 013, RF-8: estado por preferencia y agregado, sobre el horario y la proyección ya
     // calculada. No cambia el contrato de salida del solver.
     m_ultimo.cumplimiento = analizarPreferencias(m_config, horario, m_noAplicadas);
     // 014, RF-12: informe aditivo de bloques, desvío, huecos y separación sobre el horario.
     m_ultimo.bloques = analizarBloques(horario, m_config);
 
-    // P4: conflictos de solapamiento ⇒ el cálculo falló.
+    // 020 (RF-5): P4 (solapamientos) y P5 (exceso del tope de horas de aula) son fallos
+    // distintos. Un exceso de tope NUNCA se informa como solapamiento.
     if (!analisis.presentable())
     {
-        m_ultimo.estado  = ResultadoGeneracion::Estado::CalculoFallido;
-        m_ultimo.mensaje = QStringLiteral("El cálculo produjo conflictos de solapamiento; el"
-                                          " resultado no es válido.");
+        m_ultimo.estado = ResultadoGeneracion::Estado::CalculoFallido;
+        if (analisis.hayConflictoSolapamiento())
+            m_ultimo.mensaje = QStringLiteral("El cálculo produjo conflictos de solapamiento; el"
+                                              " resultado no es válido.");
+        else if (!analisis.excesosTopeHoras.isEmpty())
+            m_ultimo.mensaje = QStringLiteral("El cálculo superó el tope de horas de aula de algún"
+                                              " docente; el resultado no es presentable.")
+                                   + QLatin1Char('\n')
+                                   + analisis.excesosTopeHoras.join(QLatin1Char('\n'));
+        else
+            m_ultimo.mensaje = QStringLiteral("El cálculo produjo un resultado no presentable.");
         emit finalizada();
         return;
     }

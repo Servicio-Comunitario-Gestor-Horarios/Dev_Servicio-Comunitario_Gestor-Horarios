@@ -5,6 +5,7 @@
 
 #include <backend/solver/config/contrato_solver.hpp>
 #include <backend/solver/config/solver_config.hpp>
+#include <backend/solver/desenlace_solver.hpp>
 
 /// Tests de las funciones puras, las constantes y la forma del contrato 2.0 (RF-1, RF-3, RF-5).
 class TestContratoSolver : public QObject
@@ -149,10 +150,45 @@ private slots:
 
     void bloquesAula_esIdentidad()
     {
-        // El tope del docente se mide en bloques = horas_aula (S1), sin ×60 ni redondeo.
+        // El tope duro del docente (020) se mide en bloques = horas_aula, sin ×60 ni redondeo.
         QCOMPARE(bloquesAula(8, 45), 8);
         QCOMPARE(bloquesAula(8, 0), 0);
         QCOMPARE(bloquesAula(8, 45), bloques(8, 45));
+    }
+
+    /// RF-1 (020): si `horas_aula` falta en el JSON se lee como 0 —el docente queda sin
+    /// capacidad y no recibe clases—; el informe de quién queda sin capacidad lo completa la
+    /// validación de salida.
+    void horasAulaAusente_seLeeComoCero()
+    {
+        QJsonObject o = config2_0();
+        QJsonArray profesores = o[QStringLiteral("profesores")].toArray();
+        QJsonObject profesor = profesores[0].toObject();
+        QVERIFY(profesor.contains(QStringLiteral("horas_aula")));
+        profesor.remove(QStringLiteral("horas_aula"));
+        profesores[0] = profesor;
+        o[QStringLiteral("profesores")] = profesores;
+
+        const auto config = SolverConfig::fromJson(o);
+        QVERIFY2(config.ok, qPrintable(config.mensajeError));
+        QCOMPARE(config.valor.profesores.size(), 1);
+        QCOMPARE(config.valor.profesores[0].horas_aula, 0);
+    }
+
+    /// 020 (D5): el enum de desenlaces vive en un header **sin OR-Tools**. Este target enlaza
+    /// solo `backend` (sin OR-Tools), así que incluir aquí `desenlace_solver.hpp` —y usar el
+    /// enum— prueba que el header no arrastra el motor.
+    void desenlaceSolver_sinOrTools()
+    {
+        constexpr DesenlaceSolver todos[] = {
+            DesenlaceSolver::Exito, DesenlaceSolver::Infactible, DesenlaceSolver::NoConcluyente,
+            DesenlaceSolver::ErrorContrato, DesenlaceSolver::SinRespuesta};
+        for (const DesenlaceSolver desenlace : todos) {
+            int coincidencias = 0;
+            for (const DesenlaceSolver otro : todos)
+                if (desenlace == otro) ++coincidencias;
+            QCOMPARE(coincidencias, 1);   // cada desenlace es distinto de los demás
+        }
     }
 
     void claveCurso_canonicaYDeterminista()
@@ -163,22 +199,64 @@ private slots:
         QVERIFY(!claveCurso(1, QStringLiteral("A")).isEmpty());
     }
 
-    void constantes_jerarquiaDelObjetivo()
+    /// 020 (RF-2): demanda y topes se miden en horas académicas (una hora = un bloque). La
+    /// demanda es Σ horas del plan de todos los cursos; los topes son Σ `horas_aula`.
+    void demandaYTopesDeHoras_sonSumasEnHorasAcademicas()
     {
-        QVERIFY(ContratoSolver::PESO_HORAS > ContratoSolver::COSTE_SUPLENTE);
+        SolverConfig config;
+        config.franja_horaria = {40, 8};
+        config.turnos.turnos = {TurnoConfig{QStringLiteral("manana"), {0, 1, 2, 3}}};
+        config.materias = {{QStringLiteral("Matemática"), QStringLiteral("regular")},
+                           {QStringLiteral("Historia"), QStringLiteral("regular")}};
+        config.planes = {{QStringLiteral("Plan A"), {{0, 1, 4}, {1, 1, 2}}},
+                         {QStringLiteral("Plan B"), {{0, 2, 3}}}};
+        config.cursos = {
+            {1, QStringLiteral("A"), QStringLiteral("manana"), 20, QStringLiteral("Plan A"), 0},
+            {2, QStringLiteral("B"), QStringLiteral("manana"), 20, QStringLiteral("Plan B"), 0}};
+        config.profesores = {
+            {QStringLiteral("Ana"), 10, 8, QStringLiteral("manana"), QString(), {}, {0, 1}, {}, {}},
+            {QStringLiteral("Luis"), 3, 3, QStringLiteral("manana"), QString(), {}, {0}, {}, {}},
+            // Sin `horas_aula`: el defecto es 0 y no aporta capacidad.
+            ProfesorSolverConfig{QStringLiteral("Beto"), 4, 0, QStringLiteral("manana"),
+                                 QString(), {}, {0}, {}, {}}};
+
+        // 1|A = 4 + 2 = 6 h; 2|B = 3 h ⇒ demanda 9 h. Topes: 8 + 3 + 0 = 11 h.
+        QCOMPARE(demandaTotalHoras(config), 9);
+        QCOMPARE(sumaTopesHorasAula(config), 11);
+    }
+
+    /// 020 (RF-1): un docente sin capacidad (tope 0, declarado o ausente) no suma capacidad, y
+    /// un tope negativo no resta.
+    void sumaTopesHorasAula_noCuentaDocentesSinCapacidad()
+    {
+        SolverConfig config;
+        config.franja_horaria = {40, 8};
+        config.profesores.resize(3);
+        config.profesores[0].horas_aula = 4;
+        // profesores[1] queda con el defecto (0 = ausente).
+        config.profesores[2].horas_aula = -2;
+
+        QCOMPARE(sumaTopesHorasAula(config), 4);
+    }
+
+    /// 020 (D1): `PESO_HORAS` (S1) queda **histórico**. El tope de horas es una invariante dura
+    /// y S1 ya no aporta al objetivo: la constante y su `static_assert` se conservan para no
+    /// romper referencias, no como comportamiento activo.
+    void constantes_pesoHorasEsHistorico()
+    {
+        QCOMPARE(ContratoSolver::PESO_HORAS, 1000);
         QVERIFY(ContratoSolver::COSTE_SUPLENTE > 0);
     }
 
     // ─── Jerarquía de las constantes del objetivo ───
 
-    /// RF-5 (013): la preferencia pesa menos que un suplente y más que 0, con 25 como
-    /// constante del motor (no viaja en la configuración).
+    /// RF-5 (013) con la 020: la preferencia pesa menos que un suplente y más que 0, con 25 como
+    /// constante del motor (no viaja en la configuración). Es la única jerarquía **activa**.
     void constantes_jerarquiaConPreferencia()
     {
         using namespace ContratoSolver;
         QCOMPARE(PESO_PREFERENCIA, 25);
         QVERIFY(PESO_PREFERENCIA < COSTE_SUPLENTE);
-        QVERIFY(COSTE_SUPLENTE < PESO_HORAS);
     }
 
     // Helper: config de prueba con turnos y eventos reales

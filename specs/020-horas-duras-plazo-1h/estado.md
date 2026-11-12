@@ -1,14 +1,14 @@
 # Estado 020
 
-Fase: **implementacion**
-Aprobaciones: **spec 2026-11-12** · **plan/tareas 2026-11-12**
+Fase: **cerrada**
+Aprobaciones: **spec 2026-11-12** · **plan/tareas 2026-11-12** · **validación 2026-11-12**
 Base: `455ba7f651d59e46f633753ccbe8368f0a37c0f9` (`HEAD` de `experimento/horas-duras-plazo-1h`, creada
 desde `feat/Motor`; `455ba7f` = «fix(test): no fallar la configuracion si falta Google Test»)
 Dudas abiertas: **ninguna** (D-1…D-5 cerradas; la unidad del plazo y la premisa del health-check quedaron
 corregidas en la fase 2)
-Siguiente paso: **implementar T1–T8 con el implementer**; el cálculo lento lo ejecuta el usuario. Antes de
-T1, el coordinator **commitea la spec y el plan/tareas**; el `sha` se registra en `journal.md` (T8).
-Veredicto: **pendiente**
+Siguiente paso: **nada pendiente**; el experimento queda **aislado en la rama** y **no se fusiona sin
+decisión**.
+Veredicto: **APROBADO (2026-11-12)**
 Notas: experimento aislado. La rama **no** se fusiona ni toca `feat/Motor`. La spec fija el plazo en
 **tiempo de reloj** (60 min de proceso, 55 min de solver **en total**, 5 min de reserva fija para
 extracción y comunicación). **Las supersesiones propuestas están aprobadas como propuestas pero NO se
@@ -24,6 +24,25 @@ status` no lo prueba. No hay dudas abiertas.
 - Todo lo que aquí se implemente queda **fuera** de la rama de producto hasta una decisión posterior.
 - **Proceso:** la spec se commitea **antes** de implementar y el diff de la implementación se limita a
   los archivos del plan.
+
+## Resultado medido (2026-11-12)
+
+Corrida manual del usuario, con el centro real y el tope duro de 36 h:
+
+- **876 de 1188 h** declaradas (**73,7 %** de la capacidad). Quedan **240 h de holgura efectiva** si se
+  descuentan las **72 h** de los 2 docentes sin carga.
+- **31 docentes con clases:** **9 a 36/36 h** y **22 entre 12 y 34 h**.
+- **2 docentes sin clases:** **P031 Ramón Ñáñez** y **P032 Ángela Ñáñez**, por **materias sin carga del
+  seed**.
+- **El tope duro es factible con 36 h** y la corrida **terminó dentro de la hora**.
+
+## Notas y limitaciones de la validación
+
+- **La hora real no se cronometró:** se sabe que terminó dentro del plazo, no el tiempo exacto.
+- **No se ejecutaron** `test_solver_centro_real` ni `test_solver_centro_sin_ef` (etiqueta `slow`).
+- **`PESO_HORAS` y su `static_assert`** quedan **históricos** (S1 retirado en el experimento).
+- **Desfase documental:** `plan.md` habla de **7 tareas** y `tasks.md`/este estado de **8** (T1b de C3).
+- **El texto de `TiempoAgotado` aún no dice «una hora»** (deuda menor del mensaje).
 
 ## Decisiones cerradas (2026-11-12)
 
@@ -198,3 +217,15 @@ Detalle y redacción en `spec.md` → «Propuesta de supersesiones». Resumen:
   implementer**; antes de T1 el coordinator commitea la spec y el plan/tareas y el `sha` se registra en
   `journal.md` (T8). El cálculo lento lo ejecuta el usuario. **No** se ha tocado `spec.md`, `plan.md`,
   `tasks.md` ni código en este paso.
+- **2026-11-12 — CIERRE: validación APROBADA.** El reviewer emite **`VEREDICTO: APROBADO
+  (2026-11-12)`** con la corrida manual del usuario. `spec.md` pasa a **`implementada (2026-11-12)`**;
+  este estado a **`Fase: cerrada`**, con `Aprobaciones: spec 2026-11-12 · plan/tareas 2026-11-12 ·
+  validación 2026-11-12`. **Resultado medido:** **876/1188 h (73,7 %)**, **240 h de holgura efectiva**
+  descontando las 72 h de los 2 docentes sin carga; **31 docentes con clases** (9 a 36/36 y 22 entre 12 y
+  34) y **2 sin clases** (**P031 Ramón Ñáñez** y **P032 Ángela Ñáñez**) por materias sin carga del seed.
+  **El tope duro es factible con 36 h** y la corrida terminó **dentro de la hora**. **Limitaciones
+  declaradas:** la hora real no se cronometró; los tests lentos (`test_solver_centro_real`,
+  `test_solver_centro_sin_ef`) no se ejecutaron; `PESO_HORAS`/`static_assert` quedan históricos;
+  `plan.md` dice 7 tareas y `tasks.md`/estado 8 (T1b de C3); el texto de `TiempoAgotado` aún no dice
+  «una hora». **Las supersesiones siguen aprobadas como propuestas y NO aplicadas**: el experimento queda
+  **aislado en la rama** y **no se fusiona sin decisión**.

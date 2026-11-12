@@ -138,6 +138,26 @@ int capacidadDelTipo(const SolverConfig& config, const QString& clave) {
            * aforoDelTipo(clave);
 }
 
+int demandaTotalHoras(const SolverConfig& config) {
+    // 020 (RF-2): Σ horas del plan de TODOS los cursos. Una hora académica = un bloque.
+    int total = 0;
+    const int dur = config.franja_horaria.duracion_minutos;
+    for (const CursoSolverConfig& curso : config.cursos)
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso))
+            total += bloques(mc.horasSemanales, dur);
+    return total;
+}
+
+int sumaTopesHorasAula(const SolverConfig& config) {
+    // 020 (RF-1/RF-2): Σ de los topes duros. Un tope 0 (declarado o ausente) no aporta y un
+    // tope negativo no resta capacidad.
+    int total = 0;
+    const int dur = config.franja_horaria.duracion_minutos;
+    for (const ProfesorSolverConfig& prof : config.profesores)
+        total += bloquesAula(prof.horas_aula > 0 ? prof.horas_aula : 0, dur);
+    return total;
+}
+
 bool docenteOptaPorMateria(const ProfesorSolverConfig& prof, int materiaIDx) {
     if (prof.materias_asignadas.contains(materiaIDx)) return true;
     for (const MateriaSuplente& s : prof.materias_suplente)

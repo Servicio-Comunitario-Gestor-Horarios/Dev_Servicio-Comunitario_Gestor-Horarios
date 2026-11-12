@@ -33,9 +33,9 @@ private slots:
     {
         const QVector<Estado> estados = {
             Estado::Inactivo,        Estado::Calculando,      Estado::Listo,
-            Estado::DatosAnteriores, Estado::NoFactible,      Estado::ContratoInvalido,
-            Estado::CalculoFallido,  Estado::TiempoAgotado,   Estado::EntradaInvalida,
-            Estado::BaseInvalida};
+            Estado::DatosAnteriores, Estado::NoFactible,      Estado::NoConcluyente,
+            Estado::SinRespuesta,    Estado::ContratoInvalido, Estado::CalculoFallido,
+            Estado::TiempoAgotado,   Estado::EntradaInvalida, Estado::BaseInvalida};
 
         QSet<int> unicos;
         for (Estado e : estados)

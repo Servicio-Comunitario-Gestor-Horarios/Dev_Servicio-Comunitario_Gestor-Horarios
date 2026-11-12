@@ -2,10 +2,14 @@
 #include <QSet>
 #include <QPair>
 #include <QMap>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <backend/solver/config/contrato_solver.hpp>
 #include <backend/data/horario_salida.hpp>
 #include <backend/solver/config/solver_config.hpp>
+#include <backend/solver/servicio_solver.hpp>
 #include <backend/solver/solver.hpp>
+#include <backend/solver/desenlace_solver_backend.hpp>
 
 /// Tests del solver CP-SAT con el contrato nuevo (spec 005).
 /// El curso se identifica por anio+seccion; sus materias salen del plan.
@@ -501,12 +505,12 @@ private slots:
         QCOMPARE(total, 4);
     }
 
-    // ── Rectificación: D3 asigna exactamente horas_m bloques y S1 compara con horas_aula ──
+    // ── Rectificación: D3 asigna exactamente horas_m bloques y el tope compara con horas_aula ──
     // Con duracion_minutos = 45, la conversión antigua pediría ceil(2×60/45) = 3 bloques y
     // ceil(2×60/45) = 3 de tope, volviendo el problema infeasible (solo hay 2 franjas).
     // Con la identidad (1 hora académica = 1 bloque), una materia de 2 horas ocupa exactamente
     // 2 bloques y el tope del docente es 2 (sin ×60), luego hay solución con 2 bloques.
-    void solver_d3_bloquesSonHoras_s1_topeSinConversion() {
+    void solver_d3_bloquesSonHoras_topeDuroSinConversion() {
         SolverConfig config;
         config.version = "2.0";
         config.aula_fija = true;
@@ -564,11 +568,11 @@ private slots:
         QCOMPARE(slotsB, 4);
     }
 
-    // ── S1: el exceso sobre horas_aula es la válvula cuando no hay capacidad ──
-    void solver_excesoDeHorasEsLaValvulaSinCapacidad() {
-        // Misma configuración salvo la capacidad del docente: con 4 h cubre los 4 bloques sin
-        // exceso; con 2 h el exceso se permite y el horario sigue siendo factible. La
-        // penalización (PESO_HORAS) la demuestra S2 (`solver_titularAlTope_usaAlSuplente`).
+    // ── RF-1: el tope de horas de aula es duro; sin capacidad el modelo es infactible ──
+    void solver_topeDuroSinCapacidadEsInfactible() {
+        // Misma configuración salvo la capacidad del docente: con 4 h cubre los 4 bloques; con
+        // 2 h el modelo ya no admite exceso, así que la materia-curso se queda sin cubrir y el
+        // desenlace es INFEASIBLE (nunca un horario con un docente por encima de su tope).
         const auto resolverConCapacidad = [](int horasAula) {
             SolverConfig config;
             config.version = "2.0";
@@ -594,12 +598,46 @@ private slots:
             clasesSuficiente += dia.asignaciones.size();
         QCOMPARE(clasesSuficiente, 4);
 
-        const auto justa = resolverConCapacidad(2);
-        QVERIFY2(justa.exito, qPrintable(justa.errores.join("\n")));
-        int clasesJusta = 0;
-        for (const auto& dia : justa.resultado.horarios[claveCurso(1, "A")].dias)
-            clasesJusta += dia.asignaciones.size();
-        QCOMPARE(clasesJusta, 4);
+        // Con 2 h de aula para 4 bloques no hay solución: el exceso no es una válvula.
+        const auto sinCapacidad = resolverConCapacidad(2);
+        QVERIFY2(!sinCapacidad.exito, "el tope duro no admite exceso de horas");
+        QVERIFY(sinCapacidad.resultado.horarios.isEmpty());
+        const QString texto = sinCapacidad.errores.join("\n");
+        QVERIFY2(texto.contains(QStringLiteral("INFEASIBLE")), qPrintable(texto));
+    }
+
+    // ── RF-1: un docente con tope cero no recibe ninguna clase ──
+    void solver_topeCeroNoRecibeClases() {
+        // Dos candidatos de la misma materia-curso: el titular con `horas_aula = 0` y un
+        // suplente con capacidad. El tope cero no lo elimina como candidato (V13 y las variables
+        // no filtran por capacidad), pero no puede dar clase: todo el reparto va al suplente.
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {2, 1, 1, 1, 3, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica", "regular"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        config.profesores = {
+            {"Prof Cero", 4, 0, "manana", "Plan General", {}, {0}, {}, dispCompleta()},
+            {"Prof Suplente", 4, 4, "manana", "Plan General", {}, {}, {{0, 10}},
+             dispCompleta()}};
+
+        Solver solver;
+        const auto resultado = solver.resolver(config);
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+
+        int delCero = 0, delSuplente = 0;
+        for (const auto& dia : resultado.resultado.horarios[claveCurso(1, "A")].dias)
+            for (const auto& asig : dia.asignaciones) {
+                if (asig.profesor == 0) ++delCero;
+                if (asig.profesor == 1) ++delSuplente;
+            }
+        QCOMPARE(delCero, 0);
+        QCOMPARE(delSuplente, 4);
     }
 
     // ── S2: un titular con capacidad agotada deja la materia al suplente ──
@@ -615,7 +653,7 @@ private slots:
         config.planes = {{"Plan General", {{0, 1, 4}}}};
         config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
         config.profesores = {
-            // Titular con 2 h de aula para 4 bloques: cubrirlo costaría exceso (PESO_HORAS).
+            // Titular con 2 h de aula para 4 bloques: con el tope duro no puede cubrirlo.
             {"Prof Titular", 4, 2, "manana", "Plan General", {}, {0}, {}, dispCompleta()},
             // Suplente elegible con capacidad suficiente: cuesta COSTE_SUPLENTE una vez.
             {"Prof Suplente", 4, 4, "manana", "Plan General", {}, {}, {{0, 10}},
@@ -1446,6 +1484,153 @@ private slots:
         QCOMPARE(tercera.resultado.metadata.total_asignaciones,
                  primera.resultado.metadata.total_asignaciones);
         QCOMPARE(tercera.errores, primera.errores);
+    }
+
+    // ── 020 T2: desenlaces del cálculo y optimalidad por fase (RF-2, RF-3) ──────
+
+    /// El mapeo es puro: `FEASIBLE`/`OPTIMAL` → éxito, `INFEASIBLE` → Infactible,
+    /// `UNKNOWN` → NoConcluyente, `MODEL_INVALID` → ErrorContrato.
+    void desenlaceDesdeEstado_mapeaEstadosDelMotor() {
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::OPTIMAL) == DesenlaceSolver::Exito,
+                 "OPTIMAL debe ser Exito");
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::FEASIBLE) == DesenlaceSolver::Exito,
+                 "FEASIBLE al límite también se presenta: Exito");
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::INFEASIBLE) == DesenlaceSolver::Infactible,
+                 "INFEASIBLE es NoFactible demostrado");
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::UNKNOWN) == DesenlaceSolver::NoConcluyente,
+                 "UNKNOWN es no concluyente");
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::MODEL_INVALID) == DesenlaceSolver::ErrorContrato,
+                 "MODEL_INVALID es error de entrada/contrato");
+    }
+
+    /// RF-2/RF-3: sin prueba de infactibilidad no hay NoFactible; un modelo inválido tampoco.
+    void desenlaceDesdeEstado_unknownYModeloInvalidoNoSonInfactibles() {
+        QVERIFY(desenlaceDesdeEstado(CpSolverStatus::UNKNOWN) != DesenlaceSolver::Infactible);
+        QVERIFY(desenlaceDesdeEstado(CpSolverStatus::MODEL_INVALID) != DesenlaceSolver::Infactible);
+    }
+
+    /// RF-3: un `FEASIBLE` (solución al límite) se presenta, pero la fase que lo produjo no
+    /// queda probada como óptima. Solo `OPTIMAL` prueba optimalidad.
+    void desenlaceDesdeEstado_feasibleSePresentaYSuFaseNoEsOptima() {
+        QVERIFY2(desenlaceDesdeEstado(CpSolverStatus::FEASIBLE) == DesenlaceSolver::Exito,
+                 "un FEASIBLE se presenta");
+        QVERIFY2(!pruebaOptimalidad(CpSolverStatus::FEASIBLE),
+                 "FEASIBLE no prueba optimalidad: la fase se marca no óptima");
+        QVERIFY2(pruebaOptimalidad(CpSolverStatus::OPTIMAL), "OPTIMAL sí prueba optimalidad");
+        QVERIFY2(!pruebaOptimalidad(CpSolverStatus::UNKNOWN),
+                 "UNKNOWN tampoco prueba optimalidad");
+    }
+
+    /// Un fallo demostrado es `Infactible` (no `NoConcluyente`) y no presenta horario; la
+    /// marca por fase queda vacía porque no hubo fase presentada.
+    void solver_falloDemostrado_esInfactible() {
+        Solver solver;
+        const auto resultado = solver.resolver(configVentanasDeTurnoHall());
+
+        QVERIFY(!resultado.exito);
+        QVERIFY2(resultado.desenlace == DesenlaceSolver::Infactible,
+                 "INFEASIBLE se informa como NoFactible demostrado");
+        QVERIFY(resultado.resultado.horarios.isEmpty());
+        QVERIFY(resultado.fasesNoOptimas.isEmpty());
+    }
+
+    /// Presupuesto de reloj 0 (020, D15): **no** se llama al motor (en CP-SAT 0 = sin límite) y
+    /// el desenlace es `NoConcluyente`, no `Infactible`, sin horario.
+    void presupuestoCero_esNoConcluyenteSinEjecutar() {
+        Solver solver;
+        Solver::PresupuestoFases agotado;
+        agotado.totalSegundos = 0.0;
+
+        const auto resultado = solver.resolver(crearConfigMinima(), agotado);
+
+        QVERIFY(!resultado.exito);
+        QVERIFY2(resultado.desenlace == DesenlaceSolver::NoConcluyente,
+                 "sin tiempo ejecutado no hay prueba de infactibilidad");
+        QVERIFY(resultado.resultado.horarios.isEmpty());
+        QVERIFY(resultado.fasesNoOptimas.isEmpty());
+        QVERIFY(!resultado.errores.isEmpty());
+    }
+
+    /// Un horario probado óptimo declara `Exito` y no marca ninguna fase como no óptima; el
+    /// resultado expone la lista para la marca por fase.
+    void solver_exitoDeclaraDesenlaceYFasesNoOptimas() {
+        Solver solver;
+        const auto resultado = solver.resolver(crearConfigMinima());
+
+        QVERIFY2(resultado.exito, qPrintable(resultado.errores.join("\n")));
+        QVERIFY2(resultado.desenlace == DesenlaceSolver::Exito,
+                 "un horario se informa como Exito");
+        QVERIFY(!resultado.resultado.horarios.isEmpty());
+        QVERIFY2(resultado.fasesNoOptimas.isEmpty(),
+                 qPrintable("fases no óptimas: " + resultado.fasesNoOptimas.join(",")));
+    }
+
+    /// 020 T3: `resolverEntradaSolver` propaga el desenlace del cálculo; una entrada que no
+    /// es del contrato sale como error de entrada/contrato (no como NoFactible).
+    void resolverEntradaSolver_entradaInvalida_esErrorContrato() {
+        const RespuestaSolver respuesta = resolverEntradaSolver(QJsonObject{});
+
+        QVERIFY2(respuesta.desenlace == DesenlaceSolver::ErrorContrato,
+                 "una entrada inválida es error de entrada/contrato");
+        QVERIFY(!respuesta.ok);
+        QVERIFY(!respuesta.factible);
+        QVERIFY(!respuesta.error.isEmpty());
+    }
+
+    /// 020 (D8): la optimalidad por fase se inyecta en la metadata de la salida. Sin fases no se
+    /// añade la clave: no se califica de no óptima una resolución probada óptima.
+    void salidaConFasesSinOptimalidad_inyectaLaMetadata() {
+        const QJsonObject salida = HorarioSalida{}.toJson();
+
+        const QJsonObject conFases =
+            salidaConFasesSinOptimalidad(salida, {QStringLiteral("referencia")});
+        const QJsonArray inyectadas =
+            conFases.value(QStringLiteral("metadata")).toObject()
+                .value(QStringLiteral("fases_sin_optimalidad")).toArray();
+        QCOMPARE(inyectadas.size(), 1);
+        QCOMPARE(inyectadas.at(0).toString(), QStringLiteral("referencia"));
+
+        const QJsonObject sinFases = salidaConFasesSinOptimalidad(salida, {});
+        QVERIFY(!sinFases.value(QStringLiteral("metadata")).toObject()
+                     .contains(QStringLiteral("fases_sin_optimalidad")));
+
+        // No muta la salida de entrada.
+        QVERIFY(!salida.value(QStringLiteral("metadata")).toObject()
+                     .contains(QStringLiteral("fases_sin_optimalidad")));
+    }
+
+    /// 020 T4 (RF-2): si la única razón del fallo son las horas —la demanda supera la suma de
+    /// los topes y ninguna categoría (1)–(5) aplica— se informa «no atribuible» **con** la
+    /// demanda total y la suma de topes, sin inventar categoría.
+    void noFactibleSoloPorHoras_informaDemandaYTopes() {
+        SolverConfig config;
+        config.version = "2.0";
+        config.aula_fija = true;
+        config.dimensiones = {1, 1, 1, 1, 3, 4};
+        config.franja_horaria = {60, 4};
+        config.turnos.turnos = {{"manana", {0, 1, 2, 3}}};
+        config.materias = {{"Matematica", "regular"}};
+        config.aulas = {{"Aula 1", "regular", 30}};
+        config.planes = {{"Plan General", {{0, 1, 4}}}};
+        config.cursos = {{1, "A", "manana", 20, "Plan General", 0}};
+        // Un único docente con 2 h para 4 h de demanda: no cabe y no hay otra causa.
+        config.profesores = {
+            {"Prof A", 4, 2, "manana", "Plan General", {}, {0}, {}, dispCompleta()}};
+
+        QCOMPARE(demandaTotalHoras(config), 4);
+        QCOMPARE(sumaTopesHorasAula(config), 2);
+
+        Solver solver;
+        const auto resultado = solver.resolver(config);
+
+        QVERIFY(!resultado.exito);
+        QVERIFY(resultado.desenlace == DesenlaceSolver::Infactible);
+        const QString texto = resultado.errores.join("\n");
+        QVERIFY2(texto.contains(QStringLiteral("no atribuible")), qPrintable(texto));
+        QVERIFY2(texto.contains(QStringLiteral("demanda total es 4 h")), qPrintable(texto));
+        QVERIFY2(texto.contains(QStringLiteral("topes de horas de aula es 2 h")), qPrintable(texto));
+        QVERIFY2(!texto.contains(QStringLiteral("Causa (")),
+                 qPrintable("las horas no son categoría del catálogo: " + texto));
     }
 };
 

@@ -68,7 +68,8 @@ TEST(TestSolverCentroSinEf, fixtureDeAceptacion) {
     }
 
     Solver solver;
-    // Valores por defecto de la 014b: 60/20/10 s y 8 workers.
+    // Presupuesto por defecto de la 020: 55 min de reloj para todo el solver y 8 workers (la
+    // referencia puede consumir los 55). Este test está etiquetado `slow` y no se ejecuta en C1/C2.
     const auto primera = solver.resolver(config);
     ASSERT_TRUE(primera.exito) << primera.errores.join("\n").toStdString();
 
@@ -85,20 +86,20 @@ TEST(TestSolverCentroSinEf, fixtureDeAceptacion) {
     const AnalisisSalida validacion = analizarSalidaSolver(primera.resultado, config);
     EXPECT_TRUE(validacion.presentable()) << validacion.conflictos.join("\n").toStdString();
 
-    // Referencia (2a agotada): la separación informada no puede ser peor.
+    // Referencia (2a desactivada): la separación informada no puede ser peor.
     Solver::PresupuestoFases sinSeparacion;
-    sinSeparacion.separacionHuecos = 0.0;
+    sinSeparacion.ejecutarSeparacionHuecos = false;
     const auto referencia = solver.resolver(config, sinSeparacion);
     ASSERT_TRUE(referencia.exito) << referencia.errores.join("\n").toStdString();
     const AnalisisBloques analisisReferencia = analizarBloques(referencia.resultado, config);
     EXPECT_LE(analisis.incumplimientosSeparacion,
               analisisReferencia.incumplimientosSeparacion);
 
-    // Techo de tiempo. Se mide en Release: con los valores por defecto (60/20/10 y 8 workers)
-    // la resolución completa tarda ~150-230 s en este host según la carga, por debajo del plazo
-    // de 300 s del servicio (RNF-2). El techo del test se alinea con ese plazo (300 s) en vez de
-    // usar un margen más estricto que la spec: con 8 workers sobre 4 núcleos la varianza del host
-    // hace frágil cualquier techo por debajo del criterio. En Debug es aún mayor.
+    // Techo de tiempo **del test** (no es el plazo del servicio: la 020 lo fija en una hora, con
+    // 55 min de solver). Se mide en Release con el dato real y sirve de control de rendimiento del
+    // host: con el presupuesto de reloj de la 020 el motor puede usar hasta 55 min, así que este
+    // techo histórico de 300 s queda pendiente de revisar en la corrida manual del usuario (no se
+    // ejecuta aquí). En Debug el techo es mayor.
 #ifdef NDEBUG
     constexpr double kTechoMs = 300000.0;
 #else

@@ -17,10 +17,23 @@
 #include <QObject>
 
 #include <functional>
+#include <optional>
 
 #include "backend/services/ServicioGeneracion.hpp"
+#include "backend/solver/desenlace_solver.hpp"
 
 class InternalClient;
+
+/// Mapeo puro de un código IPC a un desenlace del cálculo (020, D6).
+///
+/// `RESP_EXITO` → `Exito`, `RESP_SIN_SOLUCION` → `Infactible`,
+/// `RESP_NO_CONCLUYENTE` → `NoConcluyente`, `RESP_INVALIDO` → `ErrorContrato`,
+/// `RESP_ERROR`/`RESP_TIEMPO_AGOTADO` → `SinRespuesta` (socket caído o plazo agotado, **no** un
+/// contrato incumplido). Una respuesta **sin `code`** no es válida → `ErrorContrato`.
+///
+/// Solo se aplica a la operación del solver; el resto de operaciones conserva el
+/// comportamiento global de `InternalClient`.
+DesenlaceSolver desenlaceParaCodigo(std::optional<int> codigo);
 
 class PuertoSolverIpc : public QObject, public PuertoSolver
 {

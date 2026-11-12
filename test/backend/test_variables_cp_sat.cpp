@@ -556,3 +556,19 @@ TEST_F(VariablesTest, ProfessorAvailableInSomeSlotsOnly) {
     // Assert: 5 días × 2 slots = 10
     EXPECT_EQ(vars.assignment.size(), 10);
 }
+
+TEST_F(VariablesTest, TopeCero_NoFiltraLasVariables) {
+    // RF-6 (020): la capacidad de horas no es una compuerta de elegibilidad. Un docente con
+    // `horas_aula = 0` conserva sus `x` y su `z`; el tope se impone al resolver (RF-1), no al
+    // crear variables ni en la validación previa.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.profesores[0].horas_aula = 0;
+    CpModelBuilder model;
+
+    // Act
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // Assert: mismas variables que con capacidad, sin filtro por horas.
+    EXPECT_EQ(vars.assignment.size(), 30);
+    EXPECT_TRUE(vars.asignacionDocente.contains({0, 0, 0}));
+}
