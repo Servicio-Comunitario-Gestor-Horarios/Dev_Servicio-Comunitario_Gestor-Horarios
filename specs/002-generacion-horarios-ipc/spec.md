@@ -55,8 +55,21 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 - CUANDO el proceso de cálculo devuelva un resultado conforme a la estructura del contrato, EL SISTEMA aplicará las validaciones posteriores (RF-3) y, si el resultado es presentable, lo mostrará como horario generado; EL SISTEMA solo guardará el horario como archivo cuando el usuario lo solicite.
 - CUANDO el proceso de cálculo indique que no existe solución factible, ENTONCES EL SISTEMA informará al usuario y no ofrecerá guardarlo.
 - SI el resultado recibido no corresponde al contrato (estructura inválida o corrupta), ENTONCES EL SISTEMA informará al usuario y no lo presentará como resultado válido.
-- SI el proceso de cálculo no está disponible, no responde en 60 segundos desde que se envió la petición, o pierde la comunicación después de enviarla, ENTONCES EL SISTEMA informará al usuario, dará la petición por abandonada y la aplicación seguirá operando con normalidad; si llegara un resultado posterior, EL SISTEMA lo ignorará.
+- SI el proceso de cálculo no está disponible, no responde en 300 segundos desde que se envió la petición, o pierde la comunicación después de enviarla, ENTONCES EL SISTEMA informará al usuario, dará la petición por abandonada y la aplicación seguirá operando con normalidad; si llegara un resultado posterior, EL SISTEMA lo ignorará.
 - SI mientras el proceso de cálculo trabaja el usuario modifica datos de los dominios que formaron parte de la petición, ENTONCES al recibir el resultado EL SISTEMA informará que corresponde a datos anteriores y pedirá confirmación antes de guardarlo.
+
+> **Superado por la 014b (2026-11-06; medición final 2026-11-07): el plazo del proceso de cálculo pasa de
+> 60 s a 300 s.** Con **8 workers**, el centro completo (**848 clases**) tarda **172,6 s** en Release, con
+> **desvío 0** y una **separación de 2**, y el **test lento 183,58 s**; con el plazo de 60 s la separación
+> empeoraba de **2 a 90**. **Salud y apagado
+> siguen en 5 s.** El plazo del **proceso de cálculo** es el de esta spec; los presupuestos internos de las
+> fases del motor son de la 014b.
+
+> **Anotado por la 019 (2026-11-10).** La 019 **cierra la parte de interfaz de RF-1 y RF-4**: al terminar
+> el cálculo **no se escribe ningún archivo**, el guardado es una **acción explícita** del usuario y un
+> resultado marcado como **«datos anteriores»** exige **confirmación** antes de guardarse. **RF-5** (aviso
+> al cerrar con un horario sin guardar) **sigue abierta** y queda como **arrastre declarado** de la 019:
+> al quitar el guardado automático pasa a ser relevante y no se implementa allí.
 
 ### RF-2. Delimitación entre lado cliente y proceso de cálculo
 
@@ -96,7 +109,7 @@ El objetivo es que la generación funcione sobre datos reales y que quede delimi
 - Dominios vacíos o insuficientes para construir el JSON de entrada (sin materias o sin profesores) → validación previa y no se envía la petición (RF-1). *(Un **curso sin estudiantes** ya no es dominio insuficiente: la spec 005 hace el número de estudiantes **opcional y sin regla**; ver Definiciones → «Número de estudiantes».)*
 - El proceso de cálculo devuelve que no hay solución → aviso al usuario y no se ofrece guardarlo (RF-1).
 - El proceso de cálculo devuelve un JSON de salida inválido o corrupto → aviso y no se presenta como resultado válido (RF-1).
-- El proceso de cálculo no responde en 60 segundos o pierde la comunicación tras la petición → aviso, la petición se da por abandonada y la aplicación sigue operando (RF-1).
+- El proceso de cálculo no responde en 300 segundos o pierde la comunicación tras la petición → aviso, la petición se da por abandonada y la aplicación sigue operando (RF-1).
 - El usuario edita datos enviados mientras el proceso de cálculo trabaja → el resultado se marca como de datos anteriores y requiere confirmación para guardarlo (RF-1).
 - El proceso de cálculo no está disponible al arrancar (no responde en 5 s) → aviso no bloqueante (RF-2).
 - El apagado del proceso de cálculo no responde en su plazo → se avisa y el cierre continúa (RF-2).

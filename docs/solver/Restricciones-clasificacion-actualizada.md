@@ -87,7 +87,7 @@ El modelo original usaba `receso[].slot_index` asumiendo que el receso "ocupaba"
 }
 ```
 
-Para el solver CP-SAT, el receso es irrelevante — el solver asigna clases a indices de slot (0-5 manana, 6-11 tarde) y el receso es metadata que la UI usa para mostrar el break. El solver NO necesita saber cuando hay receso.
+Para el solver CP-SAT, el receso **no ocupa un slot**, pero desde la spec 014 **define un corte de segmento**: las dos franjas a sus lados no forman un bloque de dos horas. La UI lo usa además para mostrar el break. (Nota histórica: antes de la 014 el solver lo ignoraba.)
 
 ---
 

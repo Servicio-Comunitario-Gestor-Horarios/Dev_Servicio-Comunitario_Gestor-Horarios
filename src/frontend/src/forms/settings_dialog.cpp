@@ -1,18 +1,34 @@
 #include "settings_dialog.hpp"
-#include <QVBoxLayout>
+
+#include <QApplication>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDir>
+#include <QFile>
+#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
-#include <QApplication>
 #include <QSettings>
-#include <QFile>
+#include <QSpinBox>
 #include <QStandardPaths>
-#include <QDir>
 #include <QTimer>
+#include <QVBoxLayout>
+
+#include <backend/services/NucleoDatos.hpp>
+#include <backend/services/calculo_eventos.hpp>
+
+#include "frontend/preferencias_generacion.hpp"
+
+namespace {
+const char* kOrganizacion = "LiceoRobertSerra";
+const char* kAplicacion = "GestorHorarios";
+} // namespace
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Configuración del Sistema");
-    setFixedSize(500, 350);
+    setFixedSize(560, 480);
 
     setWindowModality(Qt::ApplicationModal);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
@@ -30,6 +46,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     QTabWidget *tabWidget = new QTabWidget(this);
     tabWidget->setStyleSheet("QTabWidget::pane { border-top: 1px solid #e2e8f0; }");
 
+    // ── Preferencias generales ────────────────────────────────────────────
     QWidget *generalTab = new QWidget();
     QVBoxLayout *generalLayout = new QVBoxLayout(generalTab);
     generalLayout->setContentsMargins(10, 20, 10, 10);
@@ -49,7 +66,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     m_darkModeSwitch = new ToggleSwitch(this);
 
     // USAR QSettings PARA PERSISTIR EL TEMA
-    QSettings settings("LiceoRobertSerra", "GestorHorarios");
+    QSettings settings(kOrganizacion, kAplicacion);
     m_temaInicial = settings.value("darkMode", false).toBool();
     m_darkModeSwitch->setChecked(m_temaInicial);
 
@@ -80,8 +97,59 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     generalLayout->addLayout(themeRow);
     generalLayout->addStretch();
 
+    // ── Avanzado: generación de horarios ──────────────────────────────────
+    QWidget *avanzadoTab = new QWidget();
+    QVBoxLayout *avanzadoLayout = new QVBoxLayout(avanzadoTab);
+    avanzadoLayout->setContentsMargins(10, 20, 10, 10);
+    avanzadoLayout->setSpacing(14);
+
+    QFormLayout *form = new QFormLayout();
+    form->setHorizontalSpacing(18);
+    form->setVerticalSpacing(12);
+    form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    m_spinDuracion = new QSpinBox(avanzadoTab);
+    m_spinDuracion->setRange(30, 90);
+    m_spinDuracion->setSuffix(" min");
+    m_spinDuracion->setValue(35);
+
+    m_spinDias = new QSpinBox(avanzadoTab);
+    m_spinDias->setRange(1, 7);
+    m_spinDias->setValue(5);
+
+    m_comboMaxAnios = new QComboBox(avanzadoTab);
+    m_comboMaxAnios->setObjectName(QStringLiteral("maxAniosCombo"));
+    m_comboMaxAnios->addItem("Hasta 5to año (liceos regulares)",
+                             PreferenciasGeneracion::kMaxAniosMinimo);
+    m_comboMaxAnios->addItem("Hasta 6to año (liceos técnicos)",
+                             PreferenciasGeneracion::kMaxAniosMaximo);
+    m_comboMaxAnios->setToolTip(
+        "Controla hasta qué año se pueden crear cursos en «Años y secciones».");
+
+    m_checkAulaFija = new QCheckBox(
+        "Usar el aula fija asignada a cada curso", avanzadoTab);
+    m_checkAulaFija->setChecked(true);
+
+    form->addRow("Duración de la hora académica (bloque)", m_spinDuracion);
+    form->addRow("Días a planificar", m_spinDias);
+    form->addRow("Año máximo permitido", m_comboMaxAnios);
+    form->addRow(QString(), m_checkAulaFija);
+
+    avanzadoLayout->addLayout(form);
+
+    QLabel *ayuda = new QLabel(
+        "Estos valores se usan al generar el horario y al guardar un preset. "
+        "La duración es global y se comprueba contra la ventana de cada turno; "
+        "las franjas por día se calculan sumando las de los turnos. El año "
+        "máximo limita la creación de cursos en «Años y secciones».",
+        avanzadoTab);
+    ayuda->setWordWrap(true);
+    ayuda->setStyleSheet("color: #64748b; font-size: 12px;");
+    avanzadoLayout->addWidget(ayuda);
+    avanzadoLayout->addStretch();
+
     tabWidget->addTab(generalTab, "Preferencias Generales");
-    tabWidget->addTab(new QWidget(), "Avanzado");
+    tabWidget->addTab(avanzadoTab, "Avanzado");
     mainLayout->addWidget(tabWidget);
 
     QHBoxLayout *buttonsLayout = new QHBoxLayout();
@@ -96,19 +164,82 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     btnGuardar->setStyleSheet("padding: 8px 16px; border: none; border-radius: 4px; background: #243c8a; color: white; font-weight: bold;");
     btnGuardar->setCursor(Qt::PointingHandCursor);
     connect(btnGuardar, &QPushButton::clicked, this, [this]() {
-        // Guardar en QSettings al aceptar
-        QSettings settings("LiceoRobertSerra", "GestorHorarios");
+        QSettings settings(kOrganizacion, kAplicacion);
+        if (!guardarConfiguracionAvanzada())
+            return;
         settings.setValue("darkMode", m_darkModeSwitch->isChecked());
+        settings.setValue("generacion/dias", m_spinDias->value());
+        settings.setValue("generacion/aulaFija", m_checkAulaFija->isChecked());
+        PreferenciasGeneracion::guardarMaxAnios(m_comboMaxAnios->currentData().toInt());
         accept();
     });
 
     buttonsLayout->addWidget(btnDescartar);
     buttonsLayout->addWidget(btnGuardar);
     mainLayout->addLayout(buttonsLayout);
+
+    // Días y aula fija son preferencias de la interfaz (QSettings); la duración
+    // se lee del núcleo cuando se inyecta con `setNucleoDatos`.
+    QSettings settingsUi(kOrganizacion, kAplicacion);
+    m_spinDias->setValue(qBound(1, settingsUi.value("generacion/dias", 5).toInt(), 7));
+    m_checkAulaFija->setChecked(settingsUi.value("generacion/aulaFija", true).toBool());
+
+    const int maxAnios = PreferenciasGeneracion::maxAnios();
+    const int indiceMax = m_comboMaxAnios->findData(maxAnios);
+    if (indiceMax >= 0)
+        m_comboMaxAnios->setCurrentIndex(indiceMax);
 }
 
 bool SettingsDialog::isDarkMode() const {
     return m_darkModeSwitch->isChecked();
+}
+
+void SettingsDialog::setNucleoDatos(NucleoDatos* nucleo) {
+    m_nucleo = nucleo;
+    if (!m_nucleo)
+        return;
+    if (const auto config = m_nucleo->configuracionHoraria(); config.ok)
+        m_spinDuracion->setValue(qBound(30, config.valor.duracionMinutos, 90));
+}
+
+bool SettingsDialog::guardarConfiguracionAvanzada() {
+    if (!m_nucleo)
+        return true;
+
+    const int duracion = m_spinDuracion->value();
+
+    // La duración debe encajar en TODOS los turnos y en la ventana de cada
+    // evento: el generador la aplica siempre y un valor incompatible dejaría
+    // la generación inválida.
+    if (const auto turnos = m_nucleo->listarTurnos(); turnos.ok) {
+        for (const TurnoDTO& turno : turnos.valor) {
+            const QString error = errorDeEncaje(turno, duracion);
+            if (!error.isEmpty()) {
+                QMessageBox::warning(this, "Duración incompatible", error);
+                return false;
+            }
+            for (const EventoDTO& evento : turno.eventos) {
+                if (!eventoDentroDeVentana(evento, turno, evento.despuesDeSlot, duracion)) {
+                    QMessageBox::warning(
+                        this, "Duración incompatible",
+                        QStringLiteral("El evento «%1» del turno «%2» no cabe en su "
+                                       "franja con una hora académica de %3 min. "
+                                       "Ajuste la duración o el horario del evento.")
+                            .arg(evento.nombre, turno.nombre)
+                            .arg(duracion));
+                    return false;
+                }
+            }
+        }
+    }
+
+    const auto guardado = m_nucleo->guardarConfiguracionHoraria(duracion);
+    if (!guardado.ok) {
+        QMessageBox::warning(this, "No se pudo guardar la duración",
+                             guardado.mensajeError);
+        return false;
+    }
+    return true;
 }
 
 void SettingsDialog::cancelarCambios() {

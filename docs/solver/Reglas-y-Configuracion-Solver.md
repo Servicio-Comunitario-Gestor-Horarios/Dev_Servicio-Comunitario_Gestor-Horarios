@@ -14,7 +14,7 @@
   interfaz.
 - Recibe una **configuración ya validada** y devuelve una asignación **o** un fallo con causa. No
   completa ni corrige la entrada.
-- Para la misma entrada, el resultado es **reproducible**.
+- Para la misma entrada, el resultado es **válido con las reglas vigentes**. La búsqueda usa **8 workers** con semilla fija y **no se promete el mismo horario entre ejecuciones** (enmienda de la 014); los diagnósticos y cálculos puros siguen siendo deterministas.
 
 ## 2. Modelo persistido (base de datos del cliente)
 
@@ -28,7 +28,7 @@ El solver **no** lee la BD; lo hace el cliente y lo empaqueta en la entrada. En 
 | `Profesores` | Docentes (materias titular, disponibilidad, …). |
 | `Materias` | Catálogo de materias. |
 | `PlanEstudio` / `PlanEstudio_Materia` | Planes de estudio y sus materias+horas por año. |
-| `Turnos` / `Recesos` | Turnos y sus recesos. |
+| `Turnos` / `Eventos` | Turnos y sus eventos (recesos, actos…); definen los segmentos del bloque. |
 
 - **No existe** la relación persistida **curso–materia** (`Curso_Materia`): las materias de un curso
   se derivan de su **plan**.
@@ -66,12 +66,13 @@ La entrada **incluye los planes de estudio** (con sus materias y horas semanales
 que el solver resuelva **sin tocar la BD**. Se embeben los planes **referenciados** por los cursos
 presentes.
 
-### 3.4 Aulas, turnos y recesos
+### 3.4 Aulas, turnos y eventos
 
 - **Aulas:** se referencian por su **índice** en el conjunto de aulas (no por nombre). La interfaz/CSV
   traducen índice→nombre.
 - **Turnos:** nombre + franjas (slots absolutos del día, por orden de inicio).
-- **Recesos:** metadata; el solver los ignora.
+- **Eventos:** no crean ni quitan franjas, pero **definen los segmentos** del bloque (dos franjas
+  separadas por un evento no forman bloque, spec 014).
 
 ### 3.5 Profesores
 

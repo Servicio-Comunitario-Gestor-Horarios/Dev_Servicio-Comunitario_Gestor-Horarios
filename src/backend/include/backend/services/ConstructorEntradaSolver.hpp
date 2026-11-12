@@ -5,25 +5,32 @@
  * @brief Construcción del JSON de entrada del solver (RF-1).
  *
  * Combina una instantánea de los dominios del cliente (entidades: docentes,
- * aulas, materias, planes, cursos y turnos/recesos) con los parámetros del solver
- * (preset: franja horaria, penalizaciones, planificación, generación y los campos
- * por docente como horas_requeridas/horas_aula, casados por nombre).
+ * aulas, materias, planes, cursos y turnos con sus eventos) con los parámetros del
+ * solver (preset: franja horaria, penalizaciones, planificación, generación y los
+ * campos por docente como horas_requeridas/horas_aula, casados por nombre).
  *
  * Deriva `dimensiones` de los tamaños de los arrays y estampa
  * `meta.fecha_modificacion` con un instante inyectado. No toca la base de datos.
- * Es una función pura (sin E/S): su único efecto es devolver el JSON.
+ * Es una función pura (sin E/S): su único efecto es devolver la entrada 2.0.
+ *
+ * Los tipos de aula viajan por su **nombre** (`AulaDTO::tipoAula` /
+ * `MateriaDTO::tipoAula`). Si un aula o una materia de la instantánea no declara
+ * tipo, la construcción **falla** (RF-1): no se rellena un tipo por defecto ni se
+ * emite JSON.
  */
 
 #include <QDateTime>
 #include <QJsonObject>
 
+#include "backend/resultado.hpp"
 #include "backend/services/ServicioAula.hpp"
 #include "backend/services/ServicioCursos.hpp"
 #include "backend/services/ServicioMaterias.hpp"
 #include "backend/services/ServicioPlanesEstudio.hpp"
 #include "backend/data/plan_estudio.hpp"
 #include "backend/services/ServicioProfesor.hpp"
-#include "backend/services/ServicioTurnosRecesos.hpp"
+#include "backend/services/ServicioTurnosEventos.hpp"
+#include "backend/services/proyeccion_preferencias.hpp"
 #include "backend/solver/config/solver_config.hpp"
 
 /// Instantánea de los dominios del cliente que forman la entrada del solver.
@@ -34,25 +41,62 @@ struct DatosDominio
     QVector<MateriaDTO>  materias;
     QVector<PlanEstudio> planes;   ///< planes compuestos (materias + horas)
     QVector<CursoDTO>    cursos;
-    QVector<TurnoDTO>    turnos;   ///< incluye sus recesos
+    QVector<TurnoDTO>    turnos;   ///< incluye sus eventos
 };
 
-/// Construye el JSON de entrada (13 secciones) de forma pura.
+/// Resultado completo de la construcción (013): la entrada y el diagnóstico de preferencias.
 ///
-/// `parametros` aporta lo que no es entidad: `version`, `franja_horaria`,
-/// `planificacion`, `generacion`, `penalizaciones` y, por docente (casado por
-/// nombre), `horas_requeridas`, `horas_aula`, `turno`, `plan` y
-/// `materias_suplente`. Las entidades (materias, aulas, cursos, docentes y
-/// turnos/recesos) se toman de `datos`.
-QJsonObject construirJsonEntrada(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora);
+/// `intervinientes` son las preferencias que viajan ya proyectadas en `json`; `noAplicadas` las
+/// que no intervienen, con su ÚNICO motivo. El estado por preferencia sobre el horario y el
+/// agregado de cumplimiento se calculan más tarde (spec 013, RF-8).
+struct EntradaConstruida
+{
+    QJsonObject                    json;
+    QVector<PreferenciaProyectada> intervinientes;
+    QVector<PreferenciaNoAplicada> noAplicadas;
+};
+
+/// Construye la entrada del solver y el diagnóstico de preferencias, de forma pura (RF-1, RF-3).
+///
+/// Misma construcción que `construirJsonEntrada` más la proyección de las preferencias de los
+/// datos: la sección `preferencias` sale SIEMPRE de los datos (la del preset se ignora y se
+/// sobrescribe) y va ya proyectada —docente por índice, día de la generación, franjas
+/// alcanzables y sentido—. Con 0 preferencias intervinientes el arreglo queda vacío y `toJson`
+/// omite la sección, de modo que el JSON es el de siempre. La validación (V19 incluida) la hace
+/// el flujo de generación con `validarEntradaSolver`, después de construir.
+Resultado<EntradaConstruida> construirEntradaCompleta(const DatosDominio& datos,
+                                                      const SolverConfig& parametros,
+                                                      int duracionMinutos,
+                                                      const QDateTime& ahora);
+
+/// Construye la entrada del solver (12 secciones del contrato 2.0 + `meta`) de forma pura (RF-1).
+///
+/// Envoltorio de `construirEntradaCompleta` que conserva la firma de hoy y devuelve solo el JSON.
+///
+/// `parametros` aporta lo que no es entidad: `franja_horaria`, `aula_fija` y, por
+/// docente (casado por nombre), `horas_requeridas`, `horas_aula`, `turno`, `plan` y
+/// `materias_suplente`. Las entidades (materias, aulas, cursos, docentes y turnos
+/// con sus eventos) se toman de `datos`; la versión de la entrada es siempre 2.0.
+///
+/// `duracionMinutos` es la duración efectiva de la hora académica: **sobrescribe
+/// siempre** la del preset (que es un campo derivado) y alinea con ella la rejilla
+/// de disponibilidad (RF-3, RF-5). Se valida **después** de la sobrescritura: un
+/// preset con 0, 5 o 45 no bloquea, pero una `duracionMinutos` fuera de 30–90 falla
+/// sin emitir JSON.
+///
+/// Devuelve error (sin emitir JSON) si un aula o una materia de `datos` no declara
+/// tipo de aula.
+Resultado<QJsonObject> construirJsonEntrada(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            int duracionMinutos,
+                                            const QDateTime& ahora);
 
 /// Fachada del constructor (equivalente a `construirJsonEntrada`).
 class ConstructorEntradaSolver
 {
 public:
-    static QJsonObject construir(const DatosDominio& datos,
-                                 const SolverConfig& parametros,
-                                 const QDateTime& ahora);
+    static Resultado<QJsonObject> construir(const DatosDominio& datos,
+                                            const SolverConfig& parametros,
+                                            int duracionMinutos,
+                                            const QDateTime& ahora);
 };

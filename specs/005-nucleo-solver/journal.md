@@ -131,3 +131,81 @@ No se tocó ningún otro cálculo del solver: los call sites de `bloques`/`bloqu
    ```
    Los mismos datos de 13 cursos pasan de 5 840 a 520 asignaciones, coincidiendo con la suma real del horario.
 3. **Regresión relacionada**: `test_servicio_generacion` → `Totals: 12 passed, 0 failed`.
+
+---
+
+## Residuales de la validación: avisos P1/P3, metadata y estado del solver (2026-10-29)
+
+**Base:** `57725b6`. Deudas de `estado.md` («Residuales») y de la decisión I2 de la 005.
+
+### F1 - Retirada de los avisos P1 y P3
+
+- `ValidadorSalidaSolver.cpp`: se elimina la generación del aviso de horas no cubiertas (P1) y la de
+  capacidad de aula (P3), con sus conteos y los ayudantes que solo ellas usaban
+  (`indiceCurso`, `horasEsperadas`). Se conserva **P2** (exceso de horas de profesor) y **P4**
+  (solapamientos, no presentable).
+- Cabecera: solo P2 genera avisos; P4 no es presentable; se anota que I2 retiró P1/P3.
+- Tests: `horasNoCubiertas_noGeneraAviso`, `excesoDeCapacidadDeAula_noGeneraAviso` y
+  `aulaFijaConClasesEnAulasDistintas_esPresentableSinAvisos` (antes contaban avisos; el `grep`
+  previsto no los detectó porque los nombres no contenían las cadenas literales). P2 y P4 siguen
+  cubiertos y en verde. Suite **54/54**.
+- **Docs pendientes (no editadas):** `docs/interfaz-frontend.md:607` («avisos P1–P3 y conflictos
+  P4») y `:667-669` (descripción de P1/P2/P3 en la tabla de `ValidadorSalidaSolver`).
+
+### F2 - Metadata de la salida con datos reales
+
+- `Solver::extraerSolucion` cuenta las **clases emitidas** (`total_asignaciones`), los **docentes
+  distintos** con al menos una clase (`profesores_asignados`) y publica el **tiempo** medido por el
+  solver (`tiempo_ejecucion_ms`, rellenado en `resolver` desde el `QElapsedTimer`).
+  `cursos_generados` sigue siendo el número de cursos.
+- Test `solver_metadataCuadraConLaSalida`: con el fixture mínimo, la metadata cuadra con lo emitido
+  (8 clases y los docentes de la salida). Antes `total_asignaciones` valía 48 (variables del modelo).
+  Suite **54/54**.
+
+### F3 - `Solver::resolver` sin estado arrastrado
+
+- `resolver` reinicia `model` (`CpModelBuilder`) y `vars` (`VariablesSolver`) al inicio; dos llamadas
+  a la **misma** instancia equivalen a dos nuevas.
+- Tests: `solver_reutilizarLaMismaInstancia_daElMismoResultado` (mismo horario y mismos errores) y
+  `solver_reutilizarLaInstancia_noContaminaConOtraEntrada` (factible → infactible → factible sin
+  heredar nada). Antes, la segunda resolución daba otro horario y la tercera era INFEASIBLE.
+  Suite **54/54**.
+
+## T10 - Cierre de deudas: RF-13, cobertura RNF-4 y objetivo/contrato (2026-10-29)
+
+**Base:** `b1b9711`. Tres bloques, un commit cada uno.
+
+### C1 - Los planes de los docentes también se embeben (RF-13)
+
+- `ConstructorEntradaSolver`: `embeberPlan(codigo)` evita duplicados, resuelve el plan del centro y
+  lo añade; primero se recorren los **cursos** y después los **docentes**, en el orden de sus listas
+  (orden determinista). Un `plan` vacío no añade nada (D11) y un plan inexistente no se embebe: el
+  filtro D7 del docente lo juzga en V13.
+- Tests: `planSoloDeDocentes_seEmbebeAlFinal` (plan sin curso que lo use viaja como segundo plan, con
+  su materia resuelta), `planDeDocenteQueCoincideConElDelCurso_noSeDuplica`,
+  `planDeDocenteInexistenteOVacio_seIgnora`. Rojo previo en el primero (planes 1 ≠ 2). Suite **54/54**.
+
+### C2 - Cobertura RNF-4 del validador (V7, V8, V15, D13)
+
+- `v7_turnoAusente_falla`: curso sin `turno` → V7 («no declara turno»).
+- `v8_modoMovilSinAulaDeCurso_pasa`: `aula_fija = false` y curso sin `aula` → la entrada pasa (el
+  aula se ignora).
+- `v15_movilSinAulasEnElCentro_falla`: móvil con `aulas` vacío y curso sin aula → V15.
+- `v13_d13_docenteDeOtroAnioNoEsElegible_falla`: el único docente declara `anios = [2]` y el curso es
+  de 1.º → sin candidato elegible (V13; la regla D13 está en `docenteCandidatoElegible`).
+- Los cuatro casos pasan con el código actual: no destaparon incumplimientos. Suite **54/54**.
+
+### C3 - Objetivo y contrato (RNF-4)
+
+- `solver_excesoDeHorasEsLaValvulaSinCapacidad` (S1, comparativo): con 4 h el docente cubre los 4
+  bloques sin exceso; con 2 h el exceso se permite y el horario sigue siendo factible (la
+  penalización con `PESO_HORAS` la demuestra S2).
+- `solver_titularAlTope_usaAlSuplente` (S2): el titular (2 h de aula, 4 bloques) no da ninguna clase y
+  el suplente elegible cubre las 4 (coste `COSTE_SUPLENTE`). El caso simétrico «sin suplente → exceso
+  permitido» es el de S1.
+- **Aula de salida como índice:** ya estaba cubierto en los dos modos
+  (`solver_aulaFijaUsaLaReferenciaSiElTipoCoincide` afirma `asig.aula == 0`;
+  `solver_modoMovilEligeAulaDelTipoRequerido` afirma los índices 0/1/2), así que no se duplicó.
+- `test_contrato_solver::idaYVuelta2_0_sinPerdida` amplía: un par suplente con `peso = 7` sobrevive
+  `toJson`/`fromJson` y el JSON vuelve idéntico.
+- Suite **54/54**; `test_solver_horarios` 48 casos y `test_contrato_solver` 13.

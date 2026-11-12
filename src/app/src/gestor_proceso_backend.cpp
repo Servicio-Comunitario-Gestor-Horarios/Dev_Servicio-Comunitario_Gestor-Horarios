@@ -61,6 +61,9 @@ void GestorProcesoBackend::iniciar()
  */
 void GestorProcesoBackend::detener()
 {
+    // Una parada intencional no es un colapso: los avisos de caída se silencian
+    // mientras dure (incluido el cierre normal de la aplicación).
+    m_deteniendo = true;
     m_timerVerificacion->stop();
     if (m_proceso->state() == QProcess::NotRunning)
         return;
@@ -149,6 +152,12 @@ void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus e
 {
     m_timerVerificacion->stop();
 
+    // Una parada pedida por la aplicación (cierre normal) no es un colapso.
+    if (m_deteniendo) {
+        qDebug() << "GestorProcesoBackend: backend detenido por la aplicación, código" << codigo;
+        return;
+    }
+
     if (estado == QProcess::CrashExit) {
         qWarning() << "GestorProcesoBackend: backend COLAPSÓ con código" << codigo;
         emit backendColapsado(codigo);
@@ -160,10 +169,15 @@ void GestorProcesoBackend::alFinalizarProceso(int codigo, QProcess::ExitStatus e
 /**
  * @brief Callback cuando ocurre un error en QProcess.
  *
- * Emite backendColapsado para que la UI pueda reaccionar.
+ * Emite backendColapsado para que la UI pueda reaccionar, salvo que la parada
+ * la haya pedido la propia aplicación (cierre normal).
  */
 void GestorProcesoBackend::alOcurrirErrorProceso(QProcess::ProcessError error)
 {
+    if (m_deteniendo) {
+        qDebug() << "GestorProcesoBackend: error esperado durante la parada:" << error;
+        return;
+    }
     qCritical() << "GestorProcesoBackend: error en QProcess:" << error;
     emit backendColapsado(0);
 }

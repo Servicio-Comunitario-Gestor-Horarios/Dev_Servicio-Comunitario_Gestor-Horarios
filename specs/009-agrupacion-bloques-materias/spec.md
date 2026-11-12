@@ -4,6 +4,20 @@ Estado: aprobada (2026-10-18)
 
 > Esta spec añade una **restricción blanda nueva (S3)** al solver para favorecer que las horas de cada materia-curso se impartan en **grupos de 2–3 franjas contiguas** dentro del mismo día, en vez de dispersarse. No toca restricciones duras D1–D13 ni las prioridades blandas actuales S1/S2.
 
+> **Nota por la 013 (2026-11-06).** La **preferencia horaria del docente** se sitúa **por encima de S3**
+> y por debajo de S2 (`PESO_AGRUPACION < PESO_PREFERENCIA < COSTE_SUPLENTE`; hoy 10 < 25 < 100), y la
+> jerarquía se impone por fases (la preferencia se fija antes de desempatar con S3). **La definición de
+> S3 no cambia**: esta spec sigue siendo la fuente de la agrupación de bloques (RF-1 a RF-5) y la 013
+> solo añade una prioridad entre S2 y S3. El riesgo del **doble uso de «S3»** (aquí agrupación; en la
+> 005, cobertura de emergencia) y de las **dos specs «009»** queda anotado, sin resolver, en la 005 y
+> en la 013.
+
+> **Superada entera por la 014 (2026-11-07).** La 014 **elimina S3**: la agrupación se mide con el
+> **desvío de la rejilla del curso** (emparejamiento de **bloques de dos horas** y alineación por materia),
+> no con grupos de 1 por materia. Quedan superadas su métrica de S3, su `PESO_AGRUPACION` y sus **criterios
+> de aceptación, incluido AC-8**, y los tests que los fijan. Se conserva su noción de **segmento
+> contiguo** (hoy definida por los **eventos** del turno) y el corte por receso.
+
 ## Contexto y problema
 
 Hoy el solver optimiza solo dos prioridades blandas:

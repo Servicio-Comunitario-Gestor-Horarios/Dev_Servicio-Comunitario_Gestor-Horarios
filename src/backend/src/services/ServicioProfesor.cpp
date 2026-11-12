@@ -1,4 +1,5 @@
 #include "backend/services/ServicioProfesor.hpp"
+#include "backend/services/franja_horaria_validacion.hpp"
 #include "backend/services/ordenacion.hpp"
 
 #include <algorithm>
@@ -10,28 +11,7 @@
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 
-static constexpr int DIA_MIN = 0;   // domingo
-static constexpr int DIA_MAX = 6;   // sábado
-
 static const QString FORMATO_HORA = QStringLiteral("HH:mm");
-
-// Valida una franja horaria reutilizable (no es miembro porque no usa estado).
-static bool validarFranja(const FranjaHoraria& f, QString& error) {
-    if (f.dia < DIA_MIN || f.dia > DIA_MAX) {
-        error = QString("El día debe estar entre %1 (domingo) y %2 (sábado).")
-                    .arg(DIA_MIN).arg(DIA_MAX);
-        return false;
-    }
-    if (!f.inicio.isValid() || !f.fin.isValid()) {
-        error = "Las horas de la franja no son válidas.";
-        return false;
-    }
-    if (f.inicio >= f.fin) {
-        error = "La hora de inicio debe ser anterior a la hora de fin.";
-        return false;
-    }
-    return true;
-}
 
 // ─── ProfesorDTO ───────────────────────────────────────────────────────────
 
@@ -54,7 +34,32 @@ Profesor ProfesorDTO::toProfesor() const {
 
 // ─── ServicioProfesor ──────────────────────────────────────────────────────
 
-ServicioProfesor::ServicioProfesor(QSqlDatabase& db) : m_db(db) {}
+ServicioProfesor::ServicioProfesor(QSqlDatabase& db) : m_db(db)
+{
+    // Tabla auxiliar opcional para las materias suplentes (#95). No forma parte
+    // de `Migracion` para no cambiar la huella del esquema versionado; se crea
+    // bajo demanda y convive con bases ya existentes.
+    asegurarTablaSuplentes();
+}
+
+bool ServicioProfesor::asegurarTablaSuplentes() const
+{
+    QSqlQuery q(m_db);
+    if (q.exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS Profesor_Materia_Suplente ("
+            "id_Profesor TEXT NOT NULL REFERENCES Profesores(id),"
+            "id_Materia INTEGER NOT NULL REFERENCES Materias(id),"
+            "PRIMARY KEY (id_Profesor, id_Materia)"
+            ")"))) {
+        return true;
+    }
+    // Si el esquema mínimo aún no existe (por ejemplo, una prueba que construye
+    // el servicio sobre una base vacía), no es un error fatal: las consultas
+    // posteriores devolverán listas vacías.
+    qWarning() << "No se pudo asegurar la tabla de materias suplentes:"
+               << q.lastError().text();
+    return false;
+}
 
 bool ServicioProfesor::validarProfesor(const QString& id,
                                        const QString& nombre,
@@ -118,6 +123,17 @@ bool ServicioProfesor::cargarDisponibilidad(ProfesorDTO& dto) const {
     return true;
 }
 
+bool ServicioProfesor::cargarPreferencias(ProfesorDTO& dto) const {
+    // Una sola consulta y un solo orden: los pone `ServicioPreferencias::listar`.
+    const auto resultado = ServicioPreferencias(m_db).listar(dto.id);
+    if (!resultado.ok) {
+        qCritical() << "Error al cargar preferencias:" << resultado.mensajeError;
+        return false;
+    }
+    dto.preferencias = resultado.valor;
+    return true;
+}
+
 bool ServicioProfesor::cargarMaterias(ProfesorDTO& dto) const {
     QSqlQuery q(m_db);
     q.prepare(
@@ -140,6 +156,30 @@ bool ServicioProfesor::cargarMaterias(ProfesorDTO& dto) const {
         m.nombre = q.value("nombre").toString();
         dto.materias.append(m);
     }
+
+    // Materias suplentes: tabla auxiliar. Si aún no existe, la lista queda vacía.
+    QSqlQuery suplentes(m_db);
+    suplentes.prepare(
+        "SELECT m.id AS id, m.nombre AS nombre "
+        "FROM Profesor_Materia_Suplente pms "
+        "JOIN Materias m ON m.id = pms.id_Materia "
+        "WHERE pms.id_Profesor = :id "
+        "ORDER BY m.nombre"
+    );
+    suplentes.bindValue(":id", dto.id);
+
+    if (suplentes.exec()) {
+        while (suplentes.next()) {
+            MateriaAsignadaDTO m;
+            m.id     = suplentes.value("id").toInt();
+            m.nombre = suplentes.value("nombre").toString();
+            dto.materiasSuplentes.append(m);
+        }
+    } else {
+        qWarning() << "No se pudieron cargar las materias suplentes:"
+                   << suplentes.lastError().text();
+    }
+
     return true;
 }
 
@@ -214,7 +254,7 @@ Resultado<ProfesorDTO> ServicioProfesor::obtenerProfesor(const QString& id) cons
     }
 
     ProfesorDTO dto = mapearARecord(query.record());
-    if (!cargarDisponibilidad(dto) || !cargarMaterias(dto)) {
+    if (!cargarDisponibilidad(dto) || !cargarPreferencias(dto) || !cargarMaterias(dto)) {
         return Resultado<ProfesorDTO>::error(
             "Error al cargar los datos relacionados del profesor.");
     }
@@ -239,6 +279,7 @@ Resultado<QVector<ProfesorDTO>> ServicioProfesor::listarProfesores() const {
     while (query.next()) {
         ProfesorDTO dto = mapearARecord(query.record());
         cargarDisponibilidad(dto);
+        cargarPreferencias(dto);
         cargarMaterias(dto);
         resultados.append(dto);
     }
@@ -314,8 +355,10 @@ bool ServicioProfesor::eliminarProfesor(const QString& id) {
         return true;
     };
 
-    if (!borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
-        !borrarHijas("DELETE FROM Profesor_Materia       WHERE id_Profesor = :id")) {
+    if (!borrarHijas("DELETE FROM Preferencia_Profesor    WHERE id_Profesor = :id") ||
+        !borrarHijas("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id") ||
+        !borrarHijas("DELETE FROM Profesor_Materia       WHERE id_Profesor = :id") ||
+        !borrarHijas("DELETE FROM Profesor_Materia_Suplente WHERE id_Profesor = :id")) {
         m_db.rollback();
         return false;
     }
@@ -349,9 +392,10 @@ Resultado<DisponibilidadDTO> ServicioProfesor::agregarDisponibilidad(
         return Resultado<DisponibilidadDTO>::error("ID de profesor inválido.");
     }
 
-    QString error;
-    if (!validarFranja(franja, error)) {
-        return Resultado<DisponibilidadDTO>::error(error);
+    // Validación compartida con las preferencias: única definición de día y rango.
+    const QString errorFranja = franja_horaria::errorDeFranja(franja);
+    if (!errorFranja.isEmpty()) {
+        return Resultado<DisponibilidadDTO>::error(errorFranja);
     }
 
     // Verificar que el profesor exista antes de insertar (mejor mensaje que FK)
@@ -407,6 +451,62 @@ bool ServicioProfesor::limpiarDisponibilidad(const QString& idProfesor) {
         qCritical() << "Error al limpiar disponibilidad:" << q.lastError().text();
         return false;
     }
+    return true;
+}
+
+bool ServicioProfesor::reemplazarDisponibilidad(const QString& idProfesor,
+                                                const QVector<FranjaHoraria>& franjas,
+                                                QString& error) {
+    const QString idLimpio = idProfesor.trimmed();
+    if (idLimpio.isEmpty()) {
+        error = QStringLiteral("ID de profesor inválido.");
+        return false;
+    }
+
+    {
+        QSqlQuery existe(m_db);
+        existe.prepare("SELECT 1 FROM Profesores WHERE id = :id LIMIT 1");
+        existe.bindValue(":id", idLimpio);
+        if (!existe.exec() || !existe.next()) {
+            error = QStringLiteral("El docente no existe en la base de datos.");
+            return false;
+        }
+    }
+
+    for (const FranjaHoraria& franja : franjas) {
+        const QString errorFranja = franja_horaria::errorDeFranja(franja);
+        if (!errorFranja.isEmpty()) {
+            error = errorFranja;
+            return false;
+        }
+    }
+
+    QSqlQuery borrar(m_db);
+    borrar.prepare("DELETE FROM Disponibilidad_Profesor WHERE id_Profesor = :id");
+    borrar.bindValue(":id", idLimpio);
+    if (!borrar.exec()) {
+        error = QStringLiteral("No se pudo reemplazar la disponibilidad del docente.");
+        qCritical() << "Error al limpiar disponibilidad:" << borrar.lastError().text();
+        return false;
+    }
+
+    QSqlQuery insertar(m_db);
+    insertar.prepare(
+        "INSERT INTO Disponibilidad_Profesor (id_Profesor, dia, hora_inicio, hora_fin) "
+        "VALUES (:id_Profesor, :dia, :hora_inicio, :hora_fin)");
+
+    for (const FranjaHoraria& franja : franjas) {
+        insertar.bindValue(":id_Profesor", idLimpio);
+        insertar.bindValue(":dia", QString::number(franja.dia));
+        insertar.bindValue(":hora_inicio", franja.inicio.toString(FORMATO_HORA));
+        insertar.bindValue(":hora_fin", franja.fin.toString(FORMATO_HORA));
+        if (!insertar.exec()) {
+            error = QStringLiteral("No se pudo guardar la disponibilidad del docente.");
+            qCritical() << "Error al insertar disponibilidad:" << insertar.lastError().text();
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -477,6 +577,128 @@ bool ServicioProfesor::limpiarMaterias(const QString& idProfesor) {
     if (!q.exec()) {
         qCritical() << "Error al limpiar materias:" << q.lastError().text();
         return false;
+    }
+    return true;
+}
+
+bool ServicioProfesor::reemplazarMaterias(const QString& idProfesor,
+                                          const QVector<int>& idsMaterias,
+                                          QString& error) {
+    const QString idLimpio = idProfesor.trimmed();
+    if (idLimpio.isEmpty()) {
+        error = QStringLiteral("ID de profesor inválido.");
+        return false;
+    }
+
+    if (!limpiarMaterias(idLimpio)) {
+        error = QStringLiteral("No se pudieron reemplazar las materias del docente.");
+        return false;
+    }
+
+    QSqlQuery insertar(m_db);
+    insertar.prepare(
+        "INSERT OR IGNORE INTO Profesor_Materia (id_Profesor, id_Materia) "
+        "VALUES (:id_Profesor, :id_Materia)");
+
+    for (int idMateria : idsMaterias) {
+        if (idMateria <= 0) {
+            error = QStringLiteral("Hay una materia inválida en la selección.");
+            return false;
+        }
+        insertar.bindValue(":id_Profesor", idLimpio);
+        insertar.bindValue(":id_Materia", idMateria);
+        if (!insertar.exec()) {
+            error = QStringLiteral("No se pudieron guardar las materias del docente.");
+            qCritical() << "Error al asignar materia:" << insertar.lastError().text();
+            return false;
+        }
+    }
+    return true;
+}
+
+// ─── Materias suplentes (tabla auxiliar) ───────────────────────────────────
+
+bool ServicioProfesor::asignarMateriaSuplente(const QString& idProfesor, int idMateria) {
+    if (idProfesor.trimmed().isEmpty() || idMateria <= 0) return false;
+    asegurarTablaSuplentes();
+
+    QSqlQuery q(m_db);
+    q.prepare(
+        "INSERT OR IGNORE INTO Profesor_Materia_Suplente (id_Profesor, id_Materia) "
+        "VALUES (:id_Profesor, :id_Materia)");
+    q.bindValue(":id_Profesor", idProfesor.trimmed());
+    q.bindValue(":id_Materia", idMateria);
+
+    if (!q.exec()) {
+        qCritical() << "Error al asignar materia suplente:" << q.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool ServicioProfesor::quitarMateriaSuplente(const QString& idProfesor, int idMateria) {
+    if (idProfesor.trimmed().isEmpty() || idMateria <= 0) return false;
+
+    QSqlQuery q(m_db);
+    q.prepare(
+        "DELETE FROM Profesor_Materia_Suplente "
+        "WHERE id_Profesor = :id_Profesor AND id_Materia = :id_Materia");
+    q.bindValue(":id_Profesor", idProfesor.trimmed());
+    q.bindValue(":id_Materia", idMateria);
+
+    if (!q.exec()) {
+        qCritical() << "Error al quitar materia suplente:" << q.lastError().text();
+        return false;
+    }
+    return q.numRowsAffected() > 0;
+}
+
+bool ServicioProfesor::limpiarMateriasSuplentes(const QString& idProfesor) {
+    if (idProfesor.trimmed().isEmpty()) return false;
+    asegurarTablaSuplentes();
+
+    QSqlQuery q(m_db);
+    q.prepare("DELETE FROM Profesor_Materia_Suplente WHERE id_Profesor = :id");
+    q.bindValue(":id", idProfesor.trimmed());
+
+    if (!q.exec()) {
+        qCritical() << "Error al limpiar materias suplentes:" << q.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool ServicioProfesor::reemplazarMateriasSuplentes(const QString& idProfesor,
+                                                   const QVector<int>& idsMaterias,
+                                                   QString& error) {
+    const QString idLimpio = idProfesor.trimmed();
+    if (idLimpio.isEmpty()) {
+        error = QStringLiteral("ID de profesor inválido.");
+        return false;
+    }
+
+    if (!limpiarMateriasSuplentes(idLimpio)) {
+        error = QStringLiteral("No se pudieron reemplazar las materias suplentes del docente.");
+        return false;
+    }
+
+    QSqlQuery insertar(m_db);
+    insertar.prepare(
+        "INSERT OR IGNORE INTO Profesor_Materia_Suplente (id_Profesor, id_Materia) "
+        "VALUES (:id_Profesor, :id_Materia)");
+
+    for (int idMateria : idsMaterias) {
+        if (idMateria <= 0) {
+            error = QStringLiteral("Hay una materia suplente inválida en la selección.");
+            return false;
+        }
+        insertar.bindValue(":id_Profesor", idLimpio);
+        insertar.bindValue(":id_Materia", idMateria);
+        if (!insertar.exec()) {
+            error = QStringLiteral("No se pudieron guardar las materias suplentes del docente.");
+            qCritical() << "Error al asignar materia suplente:" << insertar.lastError().text();
+            return false;
+        }
     }
     return true;
 }

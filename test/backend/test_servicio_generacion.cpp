@@ -9,6 +9,9 @@
 #include <backend/data/materia.hpp>
 #include <backend/data/plan_estudio.hpp>
 #include <backend/services/ServicioGeneracion.hpp>
+#include <backend/services/ServicioTurnosEventos.hpp>
+#include <backend/services/preferencias_cumplimiento.hpp>
+#include <backend/services/proyeccion_preferencias.hpp>
 #include <backend/solver/config/contrato_solver.hpp>
 
 using Estado = ResultadoGeneracion::Estado;
@@ -46,9 +49,11 @@ private:
         DatosDominio d;
 
         MateriaDTO mat; mat.id = 1; mat.nombre = QStringLiteral("Matemática");
+        mat.idTipoAula = 1; mat.tipoAula = QStringLiteral("Aula de estudio");
         d.materias = {mat};
 
         AulaDTO aula; aula.id = 10; aula.nombre = QStringLiteral("A1"); aula.capacidad = 30;
+        aula.idTipoAula = 1; aula.tipoAula = QStringLiteral("Aula de estudio");
         d.aulas = {aula};
 
         TurnoDTO turno;
@@ -84,7 +89,7 @@ private:
     SolverConfig parametros() const
     {
         SolverConfig p;
-        p.version = QStringLiteral("1.0");
+        p.version = QStringLiteral("2.0");
         p.dimensiones.num_dias = 5;
         p.dimensiones.num_slots_dia = 6;
         p.franja_horaria.duracion_minutos = 45;
@@ -103,8 +108,90 @@ private:
 
     QJsonObject entradaValida() const
     {
-        return construirJsonEntrada(dominio(), parametros(),
-                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const auto resultado = construirJsonEntrada(dominio(), parametros(), 35,
+                                                    QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        const bool ok = QTest::qVerify(resultado.ok, "construirJsonEntrada(dominio())",
+                                       qPrintable(resultado.mensajeError), __FILE__, __LINE__);
+        Q_UNUSED(ok);
+        return resultado.valor;
+    }
+
+    /// Una preferencia ya proyectada, para fijar qué entra en la huella (013, RF-6).
+    static PreferenciaProyectada interviniente(int docente, int dia, const QVector<int>& slot,
+                                               SentidoPreferencia sentido)
+    {
+        PreferenciaProyectada p;
+        p.docente = docente;
+        p.dia = dia;
+        p.slot = slot;
+        p.sentido = sentido;
+        return p;
+    }
+
+    /// Añade al dominio una preferencia de reloj del docente `indice` (dominio: 0 = domingo).
+    static void agregarPreferenciaAlDominio(DatosDominio& datos, int indice, int dia,
+                                            const QTime& inicio, const QTime& fin,
+                                            SentidoPreferencia sentido)
+    {
+        PreferenciaDTO preferencia;
+        preferencia.id = 1;
+        preferencia.idProfesor = datos.docentes[indice].id;
+        preferencia.franja = FranjaHoraria{dia, inicio, fin};
+        preferencia.sentido = sentido;
+        datos.docentes[indice].preferencias.append(preferencia);
+    }
+
+    /// Preferencia ya proyectada para la configuración del solver (día de la generación).
+    static PreferenciaSolverConfig preferencia(int docente, int dia, const QVector<int>& franjas,
+                                                const QString& sentido)
+    {
+        PreferenciaSolverConfig p;
+        p.docente = docente;
+        p.dia = dia;
+        p.slot = franjas;
+        p.sentido = sentido;
+        return p;
+    }
+
+    /// Preferencia no aplicada, con su franja de DOMINIO y su único motivo.
+    static PreferenciaNoAplicada noAplicada(int docente, int diaDominio,
+                                             SentidoPreferencia sentido,
+                                             MotivoPreferencia motivo)
+    {
+        PreferenciaNoAplicada p;
+        p.docente = docente;
+        p.franja = FranjaHoraria{diaDominio, QTime(7, 0), QTime(9, 0)};
+        p.sentido = sentido;
+        p.motivo = motivo;
+        return p;
+    }
+
+    /// Añade una clase al horario de prueba (y crea curso/día si hacen falta).
+    static void agregarClase(HorarioSalida& horario, const QString& curso, int dia, int slot,
+                             int materia, int profesor)
+    {
+        CursoOutput& output = horario.horarios[curso];
+        output.turno = QStringLiteral("manana");
+        const AsignacionOutput asignacion{slot, materia, profesor, 0};
+        for (DiaOutput& d : output.dias) {
+            if (d.dia != dia)
+                continue;
+            d.asignaciones.append(asignacion);
+            return;
+        }
+        DiaOutput nuevo;
+        nuevo.dia = dia;
+        nuevo.asignaciones = {asignacion};
+        output.dias.append(nuevo);
+    }
+
+    /// Horario de prueba del curso 1|A: dos clases de la materia 0 con el docente 0 (día 0).
+    static HorarioSalida horarioDosClases()
+    {
+        HorarioSalida horario;
+        agregarClase(horario, claveCurso(1, QStringLiteral("A")), 0, 0, 0, 0);
+        agregarClase(horario, claveCurso(1, QStringLiteral("A")), 0, 1, 0, 0);
+        return horario;
     }
 
     /// Salida válida: cubre las 2 horas sin solapamientos.
@@ -157,6 +244,46 @@ private slots:
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::EntradaInvalida);
         QCOMPARE(puerto.llamadas, 0);
+    }
+
+    void baseInvalida_noEnvia()
+    {
+        PuertoFalso puerto;
+        const QString mensajeBase = QStringLiteral(
+            "La base de datos no cumple el esquema esperado: falta el disparador "
+            "«TiposAula_general_no_borrar». Restaure un respaldo de la versión vigente o cree "
+            "una base nueva (con respaldo obligatorio).");
+        ServicioGeneracion servicio(puerto, 0, {}, {}, [mensajeBase]() { return mensajeBase; });
+        QSignalSpy spy(&servicio, &ServicioGeneracion::finalizada);
+
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::BaseInvalida);
+        QCOMPARE(puerto.llamadas, 0);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(!servicio.enCurso());
+        QCOMPARE(servicio.ultimoResultado().mensaje, mensajeBase);
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("esquema esperado")));
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("base nueva")));
+    }
+
+    void baseInvalidaTienePrioridadSobreLaEntrada()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0, {}, {}, []() {
+            return QStringLiteral("La base de datos no cumple el esquema esperado: falta el tipo "
+                                  "general. Restaure un respaldo de la versión vigente o cree "
+                                  "una base nueva.");
+        });
+        QSignalSpy spy(&servicio, &ServicioGeneracion::finalizada);
+
+        // La entrada también es inválida: el diagnóstico de la base tiene prioridad.
+        servicio.generar(QJsonObject{}, QStringLiteral("h"));
+
+        QCOMPARE(servicio.ultimoResultado().estado, Estado::BaseInvalida);
+        QCOMPARE(puerto.llamadas, 0);
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(servicio.ultimoResultado().mensaje.contains(QStringLiteral("tipo general")));
     }
 
     void segundaGeneracion_noAdmitida()
@@ -218,6 +345,15 @@ private slots:
 
         QCOMPARE(servicio.ultimoResultado().estado, Estado::Listo);
         QVERIFY(servicio.ultimoResultado().presentable);
+
+        // 014, RF-12: el informe de bloques es aditivo y se calcula sobre la salida.
+        const AnalisisBloques& bloques = servicio.ultimoResultado().bloques;
+        QCOMPARE(bloques.bloques.size(), 1);
+        QCOMPARE(bloques.bloquesSimples, 1);
+        QCOMPARE(bloques.bloquesCompartidos, 0);
+        QCOMPARE(bloques.bloquesDeUno, 0);
+        QCOMPARE(bloques.desvio, 0);
+        QCOMPARE(bloques.materias.size(), 1);
     }
 
     void datosAnteriores_siLaHuellaCambia()
@@ -257,13 +393,415 @@ private slots:
 
     void huellaDatos_esDeterministaYcambiaConLosDatos()
     {
-        const QString h1 = huellaDatos(dominio());
-        QCOMPARE(h1, huellaDatos(dominio()));
+        const QString h1 = huellaDatos(dominio(), 35, {});
+        QCOMPARE(h1, huellaDatos(dominio(), 35, {}));
 
         DatosDominio modificado = dominio();
         modificado.cursos[0].seccion = QStringLiteral("B");
-        QVERIFY(huellaDatos(modificado) != h1);
+        QVERIFY(huellaDatos(modificado, 35, {}) != h1);
     }
+
+    void huellaDatos_cambiaConElTipoDeAula()
+    {
+        const QString h1 = huellaDatos(dominio(), 35, {});
+
+        DatosDominio otraAula = dominio();
+        otraAula.aulas[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraAula, 35, {}) != h1);
+
+        DatosDominio otraMateria = dominio();
+        otraMateria.materias[0].idTipoAula = 7;
+        QVERIFY(huellaDatos(otraMateria, 35, {}) != h1);
+    }
+
+    void huellaDatos_noIncluyeElTipoGeneralNiSuNombreVisible()
+    {
+        // El nombre visible del tipo no entra en la huella (solo su identidad, `idTipoAula`).
+        // Dos dominios que solo difieren en `tipoAula` dan la misma huella; el control
+        // `huellaDatos_cambiaConElTipoDeAula` fija que el id sí entra.
+        const QString h1 = huellaDatos(dominio(), 35, {});
+
+        DatosDominio otroNombre = dominio();
+        otroNombre.aulas[0].tipoAula = QStringLiteral("Otro nombre visible");
+        otroNombre.materias[0].tipoAula = QStringLiteral("Otro nombre visible");
+        QCOMPARE(huellaDatos(otroNombre, 35, {}), h1);
+
+        // Tampoco entra el nombre por separado en cada colección.
+        DatosDominio soloAula = dominio();
+        soloAula.aulas[0].tipoAula = QStringLiteral("Aula común");
+        QCOMPARE(huellaDatos(soloAula, 35, {}), h1);
+
+        DatosDominio soloMateria = dominio();
+        soloMateria.materias[0].tipoAula = QStringLiteral("Aula común");
+        QCOMPARE(huellaDatos(soloMateria, 35, {}), h1);
+    }
+
+    void huellaDatos_cambiaConLasMateriasSuplentes()
+    {
+        const QString h1 = huellaDatos(dominio(), 35, {});
+
+        DatosDominio conSuplente = dominio();
+        QVERIFY(!conSuplente.docentes.isEmpty());
+        MateriaAsignadaDTO suplente;
+        suplente.id = 99;
+        suplente.nombre = QStringLiteral("Materia suplente");
+        conSuplente.docentes[0].materiasSuplentes.append(suplente);
+
+        QVERIFY(huellaDatos(conSuplente, 35, {}) != h1);
+    }
+
+    void huellaDatos_cambiaConLosEventos()
+    {
+        EventoDTO evento;
+        evento.id = 3;
+        evento.nombre = QStringLiteral("Receso");
+        evento.despuesDeSlot = 2;
+        evento.orden = 1;
+        evento.duracion = 10;
+        evento.inicio = QTime(8, 20);
+        evento.fin = QTime(8, 30);
+
+        DatosDominio sinEventos = dominio();
+        const QString h1 = huellaDatos(sinEventos, 35, {});
+
+        DatosDominio conEvento = dominio();
+        conEvento.turnos[0].eventos = {evento};
+        const QString h2 = huellaDatos(conEvento, 35, {});
+        QVERIFY(h2 != h1);
+
+        // El orden persistente del evento también entra en la huella.
+        DatosDominio otroOrden = conEvento;
+        otroOrden.turnos[0].eventos[0].orden = 2;
+        QVERIFY(huellaDatos(otroOrden, 35, {}) != h2);
+    }
+
+    /// La huella incluye la hora académica (RF-6): es estable y distinta con otra D.
+    void huellaDatos_incluyeLaDuracion()
+    {
+        const QString con35 = huellaDatos(dominio(), 35, {});
+        QCOMPARE(con35, huellaDatos(dominio(), 35, {}));
+        QVERIFY(huellaDatos(dominio(), 45, {}) != con35);
+    }
+
+    // ─── Preferencias intervinientes en la huella (013, RF-6) ─────────────
+
+    /// RNF-4 (013): sin intervinientes la huella vale EXACTAMENTE lo mismo que antes de la 013
+    /// (golden del algoritmo anterior con el mismo `dominio()` y D = 35).
+    void huellaDatos_sinIntervinientes_conservaElValorDeHoy()
+    {
+        QCOMPARE(huellaDatos(dominio(), 35, {}),
+                 QStringLiteral("3c50f3abc8e7c294815cb32bf6e80b8837265950341f6a07fbbe576fd0ed1330"));
+    }
+
+    /// RF-6: una preferencia interviniente (ya proyectada) cambia la huella; el sentido y las
+    /// franjas también. Es el caso de punta a punta: datos → proyección → huella.
+    void huellaDatos_unaPreferenciaIntervinienteCambiaLaHuella()
+    {
+        const QString base = huellaDatos(dominio(), 35, {});
+
+        DatosDominio conLunes = dominio();
+        // Lunes 07:00–09:00 con D = 35 → franjas {0, 1, 2} y día de generación 0.
+        agregarPreferenciaAlDominio(conLunes, 0, 1, QTime(7, 0), QTime(9, 0),
+                                    SentidoPreferencia::Evitada);
+
+        const auto construida = construirEntradaCompleta(
+            conLunes, parametros(), 35, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        QVERIFY2(construida.ok, qPrintable(construida.mensajeError));
+        QCOMPARE(construida.valor.intervinientes.size(), 1);
+
+        const QString conInterviniente =
+            huellaDatos(conLunes, 35, construida.valor.intervinientes);
+        QVERIFY(conInterviniente != base);
+
+        // El sentido y las franjas forman parte de la huella.
+        const QString preferida = huellaDatos(
+            conLunes, 35, {interviniente(0, 0, {0, 1, 2}, SentidoPreferencia::Preferida)});
+        QVERIFY(preferida != conInterviniente);
+        QVERIFY(huellaDatos(conLunes, 35,
+                            {interviniente(0, 0, {0, 1}, SentidoPreferencia::Evitada)}) !=
+                conInterviniente);
+    }
+
+    /// RF-6: una preferencia que no interviene no entra en la huella. La de domingo se descarta
+    /// en la proyección y el llamador pasa la lista vacía (no cambia la huella).
+    void huellaDatos_unaPreferenciaNoIntervinienteNoCambiaLaHuella()
+    {
+        const QString base = huellaDatos(dominio(), 35, {});
+
+        DatosDominio conDomingo = dominio();
+        agregarPreferenciaAlDominio(conDomingo, 0, 0, QTime(7, 0), QTime(9, 0),
+                                    SentidoPreferencia::Evitada);
+
+        const auto construida = construirEntradaCompleta(
+            conDomingo, parametros(), 35, QDateTime(QDate(2026, 10, 10), QTime(12, 0, 0)));
+        QVERIFY2(construida.ok, qPrintable(construida.mensajeError));
+        QVERIFY(construida.valor.intervinientes.isEmpty());
+
+        QCOMPARE(huellaDatos(conDomingo, 35, construida.valor.intervinientes), base);
+    }
+
+    /// RNF-2/RF-6: el orden de las preferencias y el de las franjas dentro de una preferencia
+    /// no alteran la huella (se canoniza antes de hashear).
+    void huellaDatos_elOrdenDePreferenciasYfranjasNoAlteraLaHuella()
+    {
+        const PreferenciaProyectada a =
+            interviniente(0, 1, {0, 3}, SentidoPreferencia::Evitada);
+        const PreferenciaProyectada b =
+            interviniente(1, 2, {5}, SentidoPreferencia::Preferida);
+
+        const QString h1 = huellaDatos(dominio(), 35, {a, b});
+        QCOMPARE(huellaDatos(dominio(), 35, {b, a}), h1);
+        QVERIFY(h1 != huellaDatos(dominio(), 35, {}));
+
+        const PreferenciaProyectada desordenada =
+            interviniente(0, 1, {3, 0}, SentidoPreferencia::Evitada);
+        QCOMPARE(huellaDatos(dominio(), 35, {desordenada, b}), h1);
+    }
+
+    /// RF-6: un cambio de una preferencia INTERVINIENTE entre el envío y la respuesta marca
+    /// «datos anteriores».
+    void datosAnteriores_siCambiaUnaPreferenciaInterviniente()
+    {
+        const DatosDominio d = dominio();
+        const QVector<PreferenciaProyectada> intervinientes{
+            interviniente(0, 0, {0, 1}, SentidoPreferencia::Evitada)};
+
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(
+            puerto, 0, [d, intervinientes]() { return huellaDatos(d, 35, intervinientes); });
+        servicio.generar(entradaValida(), huellaDatos(d, 35, {}));
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::DatosAnteriores);
+        QVERIFY(r.datosAnteriores);
+    }
+
+    // ─── Estado por preferencia y cumplimiento (013, RF-8) ─────────────────
+
+    void cumplimiento_evitadaRespetada()
+    {
+        SolverConfig config;
+        config.preferencias = {preferencia(0, 0, {2, 3}, QStringLiteral("evitada"))};
+        const HorarioSalida horario = horarioDosClases();   // clases en (día 0, slots 0 y 1)
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horario, {});
+
+        QCOMPARE(cumplimiento.porPreferencia.size(), 1);
+        const PreferenciaEstado& estado = cumplimiento.porPreferencia[0];
+        QCOMPARE(estado.estado, EstadoPreferencia::Respetada);
+        QCOMPARE(estado.motivo, MotivoPreferencia::Ninguno);
+        QCOMPARE(estado.docente, 0);
+        QCOMPARE(estado.dia, 1);   // generación 0 = lunes → dominio 1
+        QCOMPARE(estado.slot, (QVector<int>{2, 3}));
+        QCOMPARE(estado.sentido, QStringLiteral("evitada"));
+        QVERIFY(estado.clasesIncumplidas.isEmpty());
+        QCOMPARE(cumplimiento.respetadas, 1);
+        QCOMPARE(cumplimiento.incumplidas, 0);
+        QCOMPARE(cumplimiento.noAplicadas, 0);
+    }
+
+    void cumplimiento_evitadaIncumplidaListaLasClasesOcupadas()
+    {
+        SolverConfig config;
+        config.preferencias = {preferencia(0, 0, {0, 1}, QStringLiteral("evitada"))};
+        const HorarioSalida horario = horarioDosClases();
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horario, {});
+
+        QCOMPARE(cumplimiento.porPreferencia.size(), 1);
+        const PreferenciaEstado& estado = cumplimiento.porPreferencia[0];
+        QCOMPARE(estado.estado, EstadoPreferencia::Incumplida);
+        QCOMPARE(estado.motivo, MotivoPreferencia::Ninguno);   // solo las no aplicadas llevan motivo
+        QCOMPARE(estado.clasesIncumplidas.size(), 2);
+        // Lista de clases incumplidas: curso ("anio|seccion"), materia y slot, en orden.
+        QCOMPARE(estado.clasesIncumplidas[0].curso, claveCurso(1, QStringLiteral("A")));
+        QCOMPARE(estado.clasesIncumplidas[0].materia, 0);
+        QCOMPARE(estado.clasesIncumplidas[0].slot, 0);
+        QCOMPARE(estado.clasesIncumplidas[1].slot, 1);
+        QCOMPARE(cumplimiento.incumplidas, 1);
+        QCOMPARE(cumplimiento.respetadas, 0);
+    }
+
+    void cumplimiento_evitadaParcialmenteOcupadaEsIncumplida()
+    {
+        // Se evitan {0, 1}; solo la franja 0 está ocupada: sigue siendo incumplida.
+        SolverConfig config;
+        config.preferencias = {preferencia(0, 0, {0, 5}, QStringLiteral("evitada"))};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horarioDosClases(), {});
+
+        QCOMPARE(cumplimiento.porPreferencia[0].estado, EstadoPreferencia::Incumplida);
+        QCOMPARE(cumplimiento.porPreferencia[0].clasesIncumplidas.size(), 1);
+        QCOMPARE(cumplimiento.porPreferencia[0].clasesIncumplidas[0].slot, 0);
+    }
+
+    void cumplimiento_preferidaSinClaseEsIncumplida()
+    {
+        SolverConfig config;
+        config.preferencias = {preferencia(0, 0, {4, 5}, QStringLiteral("preferida"))};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horarioDosClases(), {});
+
+        QCOMPARE(cumplimiento.porPreferencia[0].estado, EstadoPreferencia::Incumplida);
+        QCOMPARE(cumplimiento.porPreferencia[0].motivo, MotivoPreferencia::Ninguno);
+        // Una preferida sin clases no tiene clases que listar.
+        QVERIFY(cumplimiento.porPreferencia[0].clasesIncumplidas.isEmpty());
+        QCOMPARE(cumplimiento.incumplidas, 1);
+    }
+
+    void cumplimiento_preferidaConClaseEsRespetada()
+    {
+        SolverConfig config;
+        config.preferencias = {preferencia(0, 0, {1}, QStringLiteral("preferida"))};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horarioDosClases(), {});
+
+        QCOMPARE(cumplimiento.porPreferencia[0].estado, EstadoPreferencia::Respetada);
+        QVERIFY(cumplimiento.porPreferencia[0].clasesIncumplidas.isEmpty());
+        QCOMPARE(cumplimiento.respetadas, 1);
+    }
+
+    void cumplimiento_soloCuentanLasClasesDelPropioDocente()
+    {
+        // El docente 1 no da clase: su evitada sobre la franja ocupada por el docente 0 se respeta.
+        SolverConfig config;
+        config.preferencias = {preferencia(1, 0, {0, 1}, QStringLiteral("evitada"))};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horarioDosClases(), {});
+
+        QCOMPARE(cumplimiento.porPreferencia[0].estado, EstadoPreferencia::Respetada);
+    }
+
+    void cumplimiento_noAplicadasConservanSuMotivo()
+    {
+        const QVector<PreferenciaNoAplicada> noAplicadas = {
+            noAplicada(0, 0, SentidoPreferencia::Evitada, MotivoPreferencia::DiaFueraDeSemana),
+            noAplicada(0, 3, SentidoPreferencia::Preferida, MotivoPreferencia::SinFranjaDelTurno),
+            noAplicada(1, 2, SentidoPreferencia::Evitada, MotivoPreferencia::DocenteNoParticipa)};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(SolverConfig{}, HorarioSalida{}, noAplicadas);
+
+        QCOMPARE(cumplimiento.porPreferencia.size(), 3);
+        // Orden canónico por (docente, día, sentido, franjas).
+        QCOMPARE(cumplimiento.porPreferencia[0].docente, 0);
+        QCOMPARE(cumplimiento.porPreferencia[0].dia, 0);   // ya es día de DOMINIO
+        QCOMPARE(cumplimiento.porPreferencia[0].motivo, MotivoPreferencia::DiaFueraDeSemana);
+        QCOMPARE(cumplimiento.porPreferencia[0].sentido, QStringLiteral("evitada"));
+        QVERIFY(cumplimiento.porPreferencia[0].slot.isEmpty());
+        QCOMPARE(cumplimiento.porPreferencia[1].dia, 3);
+        QCOMPARE(cumplimiento.porPreferencia[1].motivo, MotivoPreferencia::SinFranjaDelTurno);
+        QCOMPARE(cumplimiento.porPreferencia[2].docente, 1);
+        QCOMPARE(cumplimiento.porPreferencia[2].motivo, MotivoPreferencia::DocenteNoParticipa);
+        QCOMPARE(cumplimiento.noAplicadas, 3);
+        QCOMPARE(cumplimiento.respetadas, 0);
+        QCOMPARE(cumplimiento.incumplidas, 0);
+    }
+
+    void cumplimiento_totalesYordenCanonico()
+    {
+        SolverConfig config;
+        // Declaradas fuera de orden: el resultado se canoniza por (docente, dia, sentido, slot).
+        config.preferencias = {
+            preferencia(0, 2, {4}, QStringLiteral("preferida")),   // incumplida (sin clase)
+            preferencia(0, 0, {0}, QStringLiteral("evitada")),     // incumplida (clase)
+            preferencia(0, 1, {2}, QStringLiteral("evitada"))};    // respetada
+
+        const QVector<PreferenciaNoAplicada> noAplicadas = {
+            noAplicada(0, 4, SentidoPreferencia::Evitada, MotivoPreferencia::SinFranjaDelTurno)};
+
+        const CumplimientoPreferencias cumplimiento =
+            analizarPreferencias(config, horarioDosClases(), noAplicadas);
+
+        QCOMPARE(cumplimiento.porPreferencia.size(), 4);
+        QCOMPARE(cumplimiento.respetadas, 1);
+        QCOMPARE(cumplimiento.incumplidas, 2);
+        QCOMPARE(cumplimiento.noAplicadas, 1);
+        // Orden: día 0 evitada, día 1 evitada, día 2 preferida, día 4 (no aplicada).
+        QCOMPARE(cumplimiento.porPreferencia[0].dia, 1);   // generación 0 → dominio 1
+        QCOMPARE(cumplimiento.porPreferencia[0].sentido, QStringLiteral("evitada"));
+        QCOMPARE(cumplimiento.porPreferencia[1].dia, 2);   // generación 1 → dominio 2
+        QCOMPARE(cumplimiento.porPreferencia[2].dia, 3);   // generación 2 → dominio 3
+        QCOMPARE(cumplimiento.porPreferencia[3].dia, 4);   // no aplicada (dominio)
+        QCOMPARE(cumplimiento.porPreferencia[3].estado, EstadoPreferencia::NoAplicada);
+    }
+
+    /// RF-8: el servicio expone el cumplimiento en su resultado, con las no aplicadas que recibe.
+    void servicio_cumplimientoEnElResultado()
+    {
+        QJsonObject entrada = entradaValida();
+        // El horario de prueba da clases del docente 0 en (día 0, slots 0 y 1).
+        entrada[QStringLiteral("preferencias")] = QJsonArray{
+            QJsonObject{{QStringLiteral("docente"), 0},
+                        {QStringLiteral("dia"), 0},
+                        {QStringLiteral("slot"), QJsonArray{0}},
+                        {QStringLiteral("sentido"), QStringLiteral("evitada")}}};
+
+        const QVector<PreferenciaNoAplicada> noAplicadas = {
+            noAplicada(0, 0, SentidoPreferencia::Evitada, MotivoPreferencia::DiaFueraDeSemana)};
+
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entrada, QStringLiteral("h"), noAplicadas);
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::Listo);
+        QCOMPARE(r.cumplimiento.porPreferencia.size(), 2);
+        QCOMPARE(r.cumplimiento.incumplidas, 1);
+        QCOMPARE(r.cumplimiento.noAplicadas, 1);
+        QCOMPARE(r.cumplimiento.respetadas, 0);
+        // Orden canónico por día: la no aplicada (dominio 0) va antes que la interviniente
+        // (generación 0 → dominio 1).
+        QCOMPARE(r.cumplimiento.porPreferencia[0].estado, EstadoPreferencia::NoAplicada);
+        QCOMPARE(r.cumplimiento.porPreferencia[0].dia, 0);
+        QCOMPARE(r.cumplimiento.porPreferencia[1].estado, EstadoPreferencia::Incumplida);
+        QCOMPARE(r.cumplimiento.porPreferencia[1].dia, 1);
+        QCOMPARE(r.cumplimiento.porPreferencia[1].clasesIncumplidas.size(), 1);
+        QCOMPARE(r.cumplimiento.porPreferencia[1].clasesIncumplidas[0].slot, 0);
+        QCOMPARE(r.cumplimiento.porPreferencia[1].clasesIncumplidas[0].curso,
+                 claveCurso(1, QStringLiteral("A")));
+    }
+
+    /// Sin preferencias ni diagnóstico, el cumplimiento queda vacío (aditivo, sin ruido).
+    void servicio_sinPreferencias_cumplimientoVacio()
+    {
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0);
+        servicio.generar(entradaValida(), QStringLiteral("h"));
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::Listo);
+        QVERIFY(r.cumplimiento.porPreferencia.isEmpty());
+        QCOMPARE(r.cumplimiento.respetadas, 0);
+        QCOMPARE(r.cumplimiento.incumplidas, 0);
+        QCOMPARE(r.cumplimiento.noAplicadas, 0);
+    }
+
+    /// Un cambio de D entre el envío y la respuesta marca «datos anteriores» (RF-6).
+    void datosAnteriores_siCambiaLaDuracionEntreEnvioYRespuesta()
+    {
+        const DatosDominio d = dominio();
+        PuertoFalso puerto;
+        ServicioGeneracion servicio(puerto, 0, [d]() { return huellaDatos(d, 45, {}); });
+        servicio.generar(entradaValida(), huellaDatos(d, 35, {}));
+
+        puerto.responder(respuestaFactible());
+
+        const ResultadoGeneracion& r = servicio.ultimoResultado();
+        QCOMPARE(r.estado, Estado::DatosAnteriores);
+        QVERIFY(r.datosAnteriores);
+    }
+
 
     void estamparFechaGeneracion_usaElInstante()
     {

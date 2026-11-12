@@ -15,7 +15,9 @@
 #include <QApplication>
 #include <QColor>
 #include <QHash>
+#include <QPair>
 #include <QString>
+#include <QVector>
 #include <QWidget>
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
@@ -95,33 +97,53 @@ inline Palette current()
     return palette(darkMode());
 }
 
-/** Color asociado a una materia (paleta armónica del prototipo). */
+/** Color mate asociado a una materia (paleta del centro).
+ *
+ * Tonos medios, poco saturados y lo bastante oscuros para que el texto claro
+ * se lea bien en modo claro (el usuario pidió «colores mate, no tan claros»).
+ * Las familias se comparan por PREFIJO, así «Matemáticas 1º», «Física
+ * Aplicada» o «Ciencias de la Tierra 5º» caen en su color; el orden importa
+ * (lo específico antes que lo general).
+ */
 inline QColor subjectColor(const QString& subject)
 {
-    static const QHash<QString, QColor> map = {
-        {"Matemáticas",      QColor("#5565F1")},
-        {"Física",           QColor("#8C61EF")},
-        {"Química",          QColor("#12C0E2")},
-        {"Biología",         QColor("#2DBE70")},
-        {"Historia",         QColor("#F29A36")},
-        {"Geografía",        QColor("#E76F51")},
-        {"Literatura",       QColor("#EA539E")},
-        {"Lenguaje",         QColor("#EA539E")},
-        {"Inglés",           QColor("#14B8A6")},
-        {"Educación Física", QColor("#E9A400")},
-        {"Arte",             QColor("#B164D8")},
-        {"Música",           QColor("#D65DB1")},
-        {"Tecnología",       QColor("#2F9BD6")},
-        {"Filosofía",        QColor("#7C83FD")},
-        {"Ciudadanía",       QColor("#F0564E")},
+    static const QVector<QPair<QString, QColor>> familias = {
+        {"Ciencias Naturales",    QColor("#4F7A62")},
+        {"Ciencias de la Tierra", QColor("#7A6247")},
+        {"Educación Física",      QColor("#8A743D")},
+        {"Matemátic",             QColor("#4C5B78")},
+        {"Físic",                 QColor("#6A5A88")},
+        {"Químic",                QColor("#41777E")},
+        {"Biolog",                QColor("#4C7560")},
+        {"Geograf",               QColor("#7D5A4C")},
+        {"Historia",              QColor("#8A6B42")},
+        {"Castellano",            QColor("#7C5065")},
+        {"Literatura",            QColor("#7C5065")},
+        {"Lenguaje",              QColor("#7C5065")},
+        {"Inglés",                QColor("#446F6B")},
+        {"Arte",                  QColor("#6E5284")},
+        {"Música",                QColor("#82566F")},
+        {"Computación",           QColor("#496A85")},
+        {"Tecnolog",              QColor("#496A85")},
+        {"Informátic",            QColor("#496A85")},
+        {"Filosof",               QColor("#5A5A80")},
+        {"Ciudadan",              QColor("#834C4C")},
+        {"Orientación",           QColor("#5F6E7A")},
+        {"Participación",         QColor("#6B6250")},
+        {"Formación",             QColor("#705C48")},
     };
-    auto it = map.constFind(subject);
-    if (it != map.constEnd()) {
-        return it.value();
+
+    for (const auto& familia : familias) {
+        if (subject.startsWith(familia.first, Qt::CaseInsensitive)) {
+            // En oscuro se aclaran un poco para separarse del fondo, sin perder
+            // el carácter mate.
+            return darkMode() ? familia.second.lighter(118) : familia.second;
+        }
     }
-    // Fallback estable: matiz derivado del nombre.
+
+    // Fallback estable: matiz derivado del nombre, también mate.
     const int hue = static_cast<int>(qHash(subject) % 360u);
-    return QColor::fromHsl(hue, 170, 140);
+    return QColor::fromHsl(hue, 70, darkMode() ? 130 : 98);
 }
 
 /** Texto legible (blanco u oscuro) sobre el color de materia dado. */

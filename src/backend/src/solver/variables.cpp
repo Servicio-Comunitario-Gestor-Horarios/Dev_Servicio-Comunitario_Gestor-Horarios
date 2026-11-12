@@ -2,6 +2,8 @@
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/cp_model.h"
 
+#include <QSet>
+
 VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config) {
     VariablesSolver vars;
     const auto& dim = config.dimensiones;
@@ -10,11 +12,10 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
     for (const auto& t : config.turnos.turnos)
         slotsPorTurno[t.nombre] = t.slot;
 
-    // Pre-computar segmentos por turno (para S3)
+    // Segmentos por turno: un `par` solo existe si `s+1` está en el mismo segmento (R2).
     QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
-    for (const TurnoConfig& t : config.turnos.turnos) {
-        segmentosPorTurno[t.nombre] = segmentosTurno(t, config.recesos);
-    }
+    for (const TurnoConfig& t : config.turnos.turnos)
+        segmentosPorTurno[t.nombre] = segmentosTurno(t, config.eventos);
 
     // ── x[p][m][c][d][s]  +  z[p][c][m] ──
     for (int c = 0; c < dim.num_cursos; ++c) {
@@ -44,49 +45,75 @@ VariablesSolver crearVariables(CpModelBuilder& model, const SolverConfig& config
         }
     }
 
-    // ── S3: Variables de agrupación (start y len) ──
-    // Solo para las materias que EXISTEN en el plan del curso Y para las franjas
-    // donde hay al menos una x (un docente candidato disponible). Esto evita
-    // crear decenas de miles de variables innecesarias.
+    // ── ocupada[c][d][s] y par[c][d][s] (R1/R2) ──
+    // `ocupada` se crea en TODAS las franjas del turno del curso (aunque no haya ninguna x:
+    // su igualdad la fija a 0). `par` solo si `s+1` está en el mismo segmento.
     for (int c = 0; c < dim.num_cursos; ++c) {
-        const CursoSolverConfig& curso = config.cursos[c];
-        const QVector<QVector<int>>& segs = segmentosPorTurno.value(curso.turno);
-        if (segs.isEmpty()) continue;
-
-        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
-            const int m = mc.materiaIDx;
-
-            for (int d = 0; d < dim.num_dias; ++d) {
-                for (int seg = 0; seg < segs.size(); ++seg) {
-                    const QVector<int>& slotsSeg = segs[seg];
-                    if (slotsSeg.isEmpty()) continue;
-
-                    for (int s : slotsSeg) {
-                        // Solo crear start/len si existe al menos una x para (m,c,d,s)
-                        bool hayX = false;
-                        for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
-                            const auto [p, mX, cX, dX, sX] = it.key();
-                            if (mX == m && cX == c && dX == d && sX == s) { hayX = true; break; }
-                        }
-                        if (!hayX) continue;
-
-                        vars.hay[{m, c, d, seg, s}] = model.NewBoolVar();
-                        vars.isolated[{m, c, d, seg, s}] = model.NewBoolVar();
-                    }
+        const QVector<QVector<int>>& segs = segmentosPorTurno.value(config.cursos[c].turno);
+        for (int d = 0; d < dim.num_dias; ++d) {
+            for (const QVector<int>& franjas : segs) {
+                for (int k = 0; k < franjas.size(); ++k) {
+                    vars.ocupada[{c, d, franjas[k]}] = model.NewBoolVar();
+                    if (k + 1 < franjas.size())
+                        vars.par[{c, d, franjas[k]}] = model.NewBoolVar();
                 }
             }
         }
     }
 
-    // ── y[c][d][s][a]  (solo cursos MÓVILES: D9/D10) ──
-    if (!config.aula_fija) {
-        for (int c = 0; c < dim.num_cursos; ++c) {
-            const QVector<int> slotsCurso = slotsPorTurno.value(config.cursos[c].turno);
-            for (int d = 0; d < dim.num_dias; ++d)
-                for (int s : slotsCurso)
-                    for (int a = 0; a < dim.num_aulas; ++a)
-                        vars.aulaAssignment[{c, d, s, a}] = model.NewBoolVar();
+    // ── materiaEnFranja[m][c][d][s] (R3) ──
+    // Solo donde existe al menos una x: sin candidato, la expresión es 0 y no se crea la
+    // variable (la alineación de T4 tratará la ausencia como 0).
+    for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
+        const auto [p, m, c, d, s] = it.key();
+        (void)p;
+        const std::tuple<int, int, int, int> clave{m, c, d, s};
+        if (!vars.materiaEnFranja.contains(clave))
+            vars.materiaEnFranja[clave] = model.NewBoolVar();
+    }
+
+    // ── bloqueSimple[m][c][d][s] (R4) ──
+    // Solo donde el par existe y la materia tiene `materiaEnFranja` en las dos franjas.
+    for (auto it = vars.materiaEnFranja.constBegin(); it != vars.materiaEnFranja.constEnd(); ++it) {
+        const auto [m, c, d, s] = it.key();
+        if (!vars.par.contains({c, d, s})) continue;
+        if (!vars.materiaEnFranja.contains({m, c, d, s + 1})) continue;
+        vars.bloqueSimple[{m, c, d, s}] = model.NewBoolVar();
+    }
+
+    // ── apareceDia[m][c][d] e incumpleSeparacion (R8, separación blanda con prioridad alta) ──
+    for (int c = 0; c < dim.num_cursos; ++c) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[c])) {
+            const int m = mc.materiaIDx;
+            for (int d = 0; d < dim.num_dias; ++d) {
+                vars.apareceDia[{m, c, d}] = model.NewBoolVar();
+                if (d + 1 < dim.num_dias)
+                    vars.incumpleSeparacion[{m, c, d}] = model.NewBoolVar();
+            }
         }
+    }
+
+    // ── y[c][d][s][a]  (aula REAL de la clase: fijos y móviles, D9 ampliada) ──
+    // Solo se crea la `y` de las aulas cuyo tipo requiere alguna materia del curso: una `y`
+    // de otro tipo sería siempre 0 por la regla de tipo exacto (RF-3, spec 010).
+    const int numAulas = qMin(dim.num_aulas, config.aulas.size());
+    for (int c = 0; c < dim.num_cursos; ++c) {
+        const CursoSolverConfig& curso = config.cursos[c];
+
+        QSet<QString> tiposRequeridos;
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, curso)) {
+            const int m = mc.materiaIDx;
+            if (m >= 0 && m < config.materias.size())
+                tiposRequeridos.insert(claveTipo(config.materias[m].tipo));
+        }
+
+        const QVector<int> slotsCurso = slotsPorTurno.value(curso.turno);
+        for (int d = 0; d < dim.num_dias; ++d)
+            for (int s : slotsCurso)
+                for (int a = 0; a < numAulas; ++a) {
+                    if (!tiposRequeridos.contains(claveTipo(config.aulas[a].tipo))) continue;
+                    vars.aulaAssignment[{c, d, s, a}] = model.NewBoolVar();
+                }
     }
 
     // ── e[p]  (exceso sobre el tope, S1) ──

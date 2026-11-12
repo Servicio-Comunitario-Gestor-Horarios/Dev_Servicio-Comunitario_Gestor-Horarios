@@ -31,7 +31,7 @@ using namespace operations_research::sat;
 struct VariablesTest : public ::testing::Test {
     SolverConfig makeBaseConfig() {
         SolverConfig cfg;
-        cfg.version = "1.0";
+        cfg.version = "2.0";
 
         // Dimensiones
         cfg.dimensiones = {1, 1, 1, 1, 5, 12};
@@ -43,9 +43,6 @@ struct VariablesTest : public ::testing::Test {
         TurnoConfig manana{"manana", {0, 1, 2, 3, 4, 5}};
         TurnoConfig tarde{"tarde", {6, 7, 8, 9, 10, 11}};
         cfg.turnos.turnos = {manana, tarde};
-
-        // Recesos (vacío)
-        cfg.recesos = {};
 
         // Modo de aula fija (global) + plan embebido
         cfg.aula_fija = true;
@@ -74,7 +71,7 @@ struct VariablesTest : public ::testing::Test {
         cfg.profesores = {prof};
 
         // Materias
-        cfg.materias = {{"Matemática"}};
+        cfg.materias = {{"Matemática", "regular"}};
 
         // Aulas
         cfg.aulas = {{"A1", "regular", 30}};
@@ -88,7 +85,7 @@ struct VariablesTest : public ::testing::Test {
 TEST_F(VariablesTest, EmptyConfig_NoVariablesCreated) {
     // Arrange
     SolverConfig cfg;
-    cfg.version = "1.0";
+    cfg.version = "2.0";
     cfg.dimensiones = {0, 0, 0, 0, 5, 12};
     cfg.franja_horaria = {60, 6};
     TurnoConfig manana{"manana", {0, 1, 2, 3, 4, 5}};
@@ -102,6 +99,9 @@ TEST_F(VariablesTest, EmptyConfig_NoVariablesCreated) {
     // Assert
     EXPECT_TRUE(vars.assignment.isEmpty());
     EXPECT_TRUE(vars.aulaAssignment.isEmpty());
+    EXPECT_TRUE(vars.ocupada.isEmpty());
+    EXPECT_TRUE(vars.par.isEmpty());
+    EXPECT_TRUE(vars.materiaEnFranja.isEmpty());
 }
 
 TEST_F(VariablesTest, OneProfessorOneCourse_CreatesCorrectVariables) {
@@ -135,6 +135,69 @@ TEST_F(VariablesTest, AssignmentKeysAreCorrect) {
     // slot 6 es tarde, turno es mañana
     std::tuple<int,int,int,int,int> wrongSlot{0, 0, 0, 0, 6};
     EXPECT_FALSE(vars.assignment.contains(wrongSlot));
+}
+
+TEST_F(VariablesTest, OcupadaYPar_SeCreanPorSegmento) {
+    // Turno mañana de 6 franjas sin eventos → un segmento [0..5] por día.
+    SolverConfig cfg = makeBaseConfig();
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // `ocupada` existe en todas las franjas del turno: 5 días × 6 = 30.
+    EXPECT_EQ(vars.ocupada.size(), 30);
+    EXPECT_TRUE(vars.ocupada.contains({0, 0, 0}));
+    EXPECT_TRUE(vars.ocupada.contains({0, 4, 5}));
+
+    // `par` solo donde `s+1` está en el mismo segmento: 5 por día × 5 = 25.
+    EXPECT_EQ(vars.par.size(), 25);
+    EXPECT_TRUE(vars.par.contains({0, 0, 0}));
+    EXPECT_TRUE(vars.par.contains({0, 0, 4}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 5}));   // última franja del segmento
+}
+
+TEST_F(VariablesTest, Par_RespetaElEventoDelTurno) {
+    // Evento tras la franja 1: segmentos [0,1] y [2..5]; `par` no cruza el evento.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.eventos = {{"Receso", "manana", 2, 1, 10, "", ""}};
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    EXPECT_EQ(vars.ocupada.size(), 30);       // las franjas no cambian
+    EXPECT_EQ(vars.par.size(), 20);           // 1 + 3 por día × 5
+    EXPECT_TRUE(vars.par.contains({0, 0, 0}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 1}));   // último del primer segmento
+    EXPECT_TRUE(vars.par.contains({0, 0, 2}));
+    EXPECT_TRUE(vars.par.contains({0, 0, 4}));
+    EXPECT_FALSE(vars.par.contains({0, 0, 5}));   // último del segundo segmento
+}
+
+TEST_F(VariablesTest, MateriaEnFranja_SoloDondeHayClase) {
+    SolverConfig cfg = makeBaseConfig();
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // 1 materia × 1 curso × 5 días × 6 franjas con `x` = 30.
+    EXPECT_EQ(vars.materiaEnFranja.size(), 30);
+    EXPECT_TRUE(vars.materiaEnFranja.contains({0, 0, 0, 0}));
+    EXPECT_TRUE(vars.materiaEnFranja.contains({0, 0, 4, 5}));
+}
+
+TEST_F(VariablesTest, OcupadaYPar_ExistenAunqueNoHayaDocente) {
+    // Sin docente disponible no hay `x`, pero la rejilla del curso sigue existiendo: R1 fija
+    // `ocupada = 0` y R2 propaga `par = 0`. No se crea `materiaEnFranja`.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.profesores[0].disponibilidad = {};
+    CpModelBuilder model;
+
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    EXPECT_TRUE(vars.assignment.isEmpty());
+    EXPECT_EQ(vars.ocupada.size(), 30);
+    EXPECT_EQ(vars.par.size(), 25);
+    EXPECT_TRUE(vars.materiaEnFranja.isEmpty());
 }
 
 TEST_F(VariablesTest, ProfessorNotTeachingSubject_NoVariables) {
@@ -299,16 +362,21 @@ TEST_F(VariablesTest, TwoProfessorsDifferentAvailability_CorrectPruning) {
 
 // ─── Tests: Aula assignment ─────────────────────────────────────────────────
 
-TEST_F(VariablesTest, FixedAula_NoAulaAssignmentCreated) {
+TEST_F(VariablesTest, AulaFija_CreaAulaAssignmentParaTodasLasFranjasDelCurso) {
     // Arrange
-    SolverConfig cfg = makeBaseConfig();
+    SolverConfig cfg = makeBaseConfig();   // aula_fija = true
     CpModelBuilder model;
 
     // Act
     VariablesSolver vars = crearVariables(model, cfg);
 
-    // Assert
-    EXPECT_TRUE(vars.aulaAssignment.isEmpty());
+    // Assert: la `y` existe también con aula de referencia (D9 ampliada).
+    // 1 curso × 5 días × 6 franjas del turno × 1 aula = 30
+    EXPECT_EQ(vars.aulaAssignment.size(), 30);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+
+    // Slot 6 (tarde) no pertenece al turno mañana del curso.
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 6, 0}));
 }
 
 TEST_F(VariablesTest, MobileAula_CreatesAulaAssignment) {
@@ -329,14 +397,36 @@ TEST_F(VariablesTest, MobileAula_MultipleAulas) {
     SolverConfig cfg = makeBaseConfig();
     cfg.aula_fija = false;
     cfg.dimensiones.num_aulas = 3;
+    cfg.dimensiones.num_materias = 2;
+    cfg.materias = {{"Matemática", "regular"}, {"Química", "lab"}};
+    cfg.planes = {{"General", {{0, 1, 4}, {1, 1, 2}}}};
+    cfg.profesores[0].materias_asignadas = {0, 1};
     cfg.aulas = {{"A1", "regular", 30}, {"A2", "lab", 25}, {"A3", "regular", 40}};
     CpModelBuilder model;
 
     // Act
     VariablesSolver vars = crearVariables(model, cfg);
 
-    // Assert: 1 curso × 5 días × 6 slots × 3 aulas = 90
+    // Assert: el curso requiere los tipos «regular» y «lab» → las 3 aulas.
+    // 1 curso × 5 días × 6 slots × 3 aulas = 90
     EXPECT_EQ(vars.aulaAssignment.size(), 90);
+}
+
+TEST_F(VariablesTest, AulaAssignment_SoloAulasDeLosTiposQueElCursoRequiere) {
+    // Arrange: una sola materia de tipo «regular»; el laboratorio no se crea.
+    SolverConfig cfg = makeBaseConfig();
+    cfg.aula_fija = false;
+    cfg.dimensiones.num_aulas = 2;
+    cfg.aulas = {{"A1", "regular", 30}, {"Lab", "Laboratorio", 20}};
+    CpModelBuilder model;
+
+    // Act
+    VariablesSolver vars = crearVariables(model, cfg);
+
+    // Assert
+    EXPECT_EQ(vars.aulaAssignment.size(), 30);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 0, 1}));
 }
 
 TEST_F(VariablesTest, MobileAula_KeysAreCorrect) {
@@ -386,6 +476,13 @@ TEST_F(VariablesTest, MultipleCourses_DifferentTurnos) {
 
     // Assert: curso1(mañana)=30 + curso2(tarde)=30 = 60
     EXPECT_EQ(vars.assignment.size(), 60);
+
+    // `y` para TODOS los cursos (fijos y móviles), solo en las franjas de su turno.
+    EXPECT_EQ(vars.aulaAssignment.size(), 60);
+    EXPECT_TRUE(vars.aulaAssignment.contains({0, 0, 0, 0}));
+    EXPECT_TRUE(vars.aulaAssignment.contains({1, 0, 6, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({0, 0, 6, 0}));
+    EXPECT_FALSE(vars.aulaAssignment.contains({1, 0, 0, 0}));
 }
 
 TEST_F(VariablesTest, MultipleMateriasPerCourse) {

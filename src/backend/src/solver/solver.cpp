@@ -4,7 +4,8 @@
 #include "backend/solver/restricciones/restricciones_turnos.hpp"
 #include "backend/solver/restricciones/restricciones_aulas.hpp"
 #include "backend/solver/restricciones/restricciones_profesores.hpp"
-#include "backend/solver/restricciones/restricciones_agrupacion.hpp"
+#include "backend/solver/restricciones/restricciones_bloques.hpp"
+#include "backend/solver/config/bloques.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 #include "ortools/sat/sat_parameters.pb.h"
 #include "ortools/sat/cp_model.h"
@@ -12,23 +13,18 @@
 #include "ortools/sat/cp_model_solver.h"
 #include "ortools/sat/model.h"
 #include "qvariant.h"
+#include <cmath>
 #include <cstdio>
 #include <QElapsedTimer>
 #include <QMap>
 #include <QSet>
 #include <QStringList>
 
+#include <tuple>
+
 using namespace operations_research::sat;
 
 namespace {
-
-/// Slots declarados por el turno `nombre`, o vacío si no existe.
-QVector<int> slotsTurno(const SolverConfig& config, const QString& nombre) {
-    for (const TurnoConfig& t : config.turnos.turnos)
-        if (t.nombre == nombre)
-            return t.slot;
-    return {};
-}
 
 int bloquesMateria(const SolverConfig& config, const PlanMateriaConfig& mc) {
     return bloques(mc.horasSemanales, config.franja_horaria.duracion_minutos);
@@ -42,11 +38,6 @@ int bloquesCurso(const SolverConfig& config, const CursoSolverConfig& curso) {
     return total;
 }
 
-/// Franjas semanales del curso = nº_días × |franjas del turno declarado|.
-int franjasCurso(const SolverConfig& config, const CursoSolverConfig& curso) {
-    return config.dimensiones.num_dias * slotsTurno(config, curso.turno).size();
-}
-
 /// Máximo de clases que un docente puede cubrir de una materia-curso (una por franja disponible).
 int bloquesDisponiblesDocente(const SolverConfig& config, const CursoSolverConfig& curso,
                               const ProfesorSolverConfig& prof) {
@@ -56,16 +47,18 @@ int bloquesDisponiblesDocente(const SolverConfig& config, const CursoSolverConfi
     return total;
 }
 
-QString nombreAula(const SolverConfig& config, int idx) {
-    return (idx >= 0 && idx < config.aulas.size()) ? config.aulas[idx].nombre : QString::number(idx);
-}
-
 QString nombreMateria(const SolverConfig& config, int idx) {
     return (idx >= 0 && idx < config.materias.size()) ? config.materias[idx].nombre : QString::number(idx);
 }
 
+/// Clave normalizada del tipo requerido por la materia `m` ("" si el índice no existe).
+QString claveMateria(const SolverConfig& config, int m) {
+    if (m < 0 || m >= config.materias.size()) return QString();
+    return claveTipo(config.materias[m].tipo);
+}
+
 /// Categoría (1) entrada inválida: la configuración no es consistente como entrada del solver.
-/// En el flujo real, V1–V15 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
+/// En el flujo real, V1–V19 la rechaza antes de invocar al solver; aquí cubre el modelo inválido
 /// y las llamadas directas al solver con una configuración inconsistente.
 QString causaEntradaInvalida(const SolverConfig& config) {
     const DimensionesConfig& d = config.dimensiones;
@@ -75,6 +68,12 @@ QString causaEntradaInvalida(const SolverConfig& config) {
         d.num_cursos     != config.cursos.size())
         return QStringLiteral("Causa (1) entrada inválida: las dimensiones declaradas no coinciden con los tamaños de las listas.");
 
+    QSet<QString> tiposDeAula;
+    for (const AulaSolverConfig& a : config.aulas) {
+        const QString clave = claveTipo(a.tipo);
+        if (!clave.isEmpty()) tiposDeAula.insert(clave);
+    }
+
     for (const CursoSolverConfig& c : config.cursos) {
         if (c.turno.isEmpty())
             return QStringLiteral("Causa (1) entrada inválida: el curso %1 no declara turno.")
@@ -82,52 +81,67 @@ QString causaEntradaInvalida(const SolverConfig& config) {
         if (materiasDelCurso(config, c).isEmpty())
             return QStringLiteral("Causa (1) entrada inválida: el curso %1 no tiene materias en su plan '%2'.")
                 .arg(claveCurso(c.anio, c.seccion)).arg(c.plan);
+
+        // V17 (RF-5): el tipo requerido por una materia tiene que tener aulas. Es entrada
+        // inválida, no conflicto de aula: el modelo no puede cumplir la regla de tipo.
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
+            const QString clave = claveMateria(config, mc.materiaIDx);
+            if (clave.isEmpty() || tiposDeAula.contains(clave)) continue;
+            return QStringLiteral("Causa (1) entrada inválida: la materia «%1» del curso %2 requiere "
+                                  "el tipo de aula «%3» y no hay ninguna aula de ese tipo.")
+                .arg(nombreMateria(config, mc.materiaIDx))
+                .arg(claveCurso(c.anio, c.seccion))
+                .arg(config.materias[mc.materiaIDx].tipo.trimmed());
+        }
     }
     return {};
 }
 
-/// Categoría (2) conflicto de aula (D8/D9/D10). Devuelve "" si no aplica.
-QString causaConflictoDeAula(const SolverConfig& config) {
-    if (!config.aula_fija) {
-        // D9: cursos móviles en un centro sin aulas.
-        if (config.dimensiones.num_aulas <= 0)
-            return QStringLiteral("Causa (2) conflicto de aula: el modo de aulas móviles no tiene aulas disponibles.");
-        int total = 0;
-        QSet<int> franjas;
-        for (const CursoSolverConfig& c : config.cursos) {
-            total += bloquesCurso(config, c);
-            for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
+/// Categoría (2) conflicto de aula: la demanda de un tipo supera la capacidad de sus aulas
+/// (RF-6). Demanda = bloques de las materias que requieren el tipo en todos los cursos;
+/// capacidad = nº de aulas del tipo × franjas de la semana que aportan los turnos de los cursos
+/// que lo requieren (`capacidadDelTipo`). No se descuenta el bloqueo de las aulas de referencia:
+/// es una regla del modelo, no una cifra de demanda. Un tipo sin aulas es entrada inválida (V17),
+/// así que aquí solo se miden tipos con aulas.
+QString causaSaturacionPorTipo(const SolverConfig& config) {
+    // Excepción de precedencia de RF-6 (aprobada el 2026-10-26): si un curso no cabe en su turno,
+    // la causa es (3) conflicto de persona y una (2) mecánica taparía el motivo concreto.
+    for (const CursoSolverConfig& c : config.cursos)
+        if (bloquesCurso(config, c) > franjasSemanales(config, c)) return {};
+
+    // Nombre visible del tipo (el de la primera materia que lo requiere), por clave. El QMap
+    // recorre en orden de clave: el diagnóstico es determinista (RNF-1).
+    QMap<QString, QString> nombreVisible;
+    for (const CursoSolverConfig& c : config.cursos) {
+        for (const PlanMateriaConfig& mc : materiasDelCurso(config, c)) {
+            const QString clave = claveMateria(config, mc.materiaIDx);
+            if (clave.isEmpty()) continue;   // V16 lo rechaza como entrada inválida
+            if (!nombreVisible.contains(clave))
+                nombreVisible.insert(clave, config.materias[mc.materiaIDx].tipo.trimmed());
         }
-        const int capacidad = config.dimensiones.num_dias * franjas.size() * config.dimensiones.num_aulas;
-        if (total > capacidad)
-            return QStringLiteral("Causa (2) conflicto de aula: los cursos móviles necesitan %1 bloques y las %2 aulas ofrecen %3 franjas.")
-                .arg(total).arg(config.dimensiones.num_aulas).arg(capacidad);
-        return {};
     }
 
-    // D8: aulas fijas compartidas. Solo es causa del aula si cada curso cabe por separado
-    // (si un curso no cabe en su turno, la causa es de persona: categoría 3).
-    QMap<int, QVector<int>> cursosPorAula;
-    for (int i = 0; i < config.cursos.size(); ++i)
-        if (config.cursos[i].aula >= 0)
-            cursosPorAula[config.cursos[i].aula].append(i);
+    for (auto it = nombreVisible.constBegin(); it != nombreVisible.constEnd(); ++it) {
+        // Un tipo sin aulas es entrada inválida (V17), no conflicto de aula. Un tipo sin franjas
+        // significa que ningún curso que lo requiere tiene turno válido: lo juzga la categoría (3).
+        const int aulas = aulasDelTipo(config, it.key());
+        if (aulas == 0) continue;
+        if (franjasDelTipo(config, it.key()).isEmpty()) continue;
 
-    for (auto it = cursosPorAula.constBegin(); it != cursosPorAula.constEnd(); ++it) {
-        int total = 0;
-        QSet<int> franjas;
-        bool todosCaben = true;
-        for (int idx : it.value()) {
-            const CursoSolverConfig& c = config.cursos[idx];
-            const int bloques = bloquesCurso(config, c);
-            if (bloques > franjasCurso(config, c)) { todosCaben = false; break; }
-            total += bloques;
-            for (int s : slotsTurno(config, c.turno)) franjas.insert(s);
+        const int demanda = demandaDelTipo(config, it.key());
+        const int capacidad = capacidadDelTipo(config, it.key());
+        if (demanda > capacidad) {
+            // 018 (RF-6): la capacidad se explica con sus tres factores y el aforo del tipo.
+            const int franjas = franjasDelTipo(config, it.key()).size();
+            return QStringLiteral("Causa (2) conflicto de aula: el tipo «%1» necesita %2 bloques y "
+                                  "sus %3 aulas ofrecen %4 plazas (%5 franjas × aforo %6).")
+                .arg(it.value())
+                .arg(demanda)
+                .arg(aulas)
+                .arg(capacidad)
+                .arg(franjas)
+                .arg(aforoDelTipo(it.key()));
         }
-        if (!todosCaben) continue;
-        const int capacidad = config.dimensiones.num_dias * franjas.size();
-        if (total > capacidad)
-            return QStringLiteral("Causa (2) conflicto de aula: el aula «%1» no da abasto para los cursos que la comparten (%2 bloques en %3 franjas).")
-                .arg(nombreAula(config, it.key())).arg(total).arg(capacidad);
     }
     return {};
 }
@@ -136,7 +150,7 @@ QString causaConflictoDeAula(const SolverConfig& config) {
 QString causaConflictoDePersona(const SolverConfig& config) {
     for (const CursoSolverConfig& c : config.cursos) {
         const int bloques = bloquesCurso(config, c);
-        const int franjas = franjasCurso(config, c);
+        const int franjas = franjasSemanales(config, c);
         if (bloques > franjas)
             return QStringLiteral("Causa (3) conflicto de persona: el curso %1 necesita %2 bloques y su turno «%3» solo ofrece %4 franjas semanales.")
                 .arg(claveCurso(c.anio, c.seccion)).arg(bloques).arg(c.turno).arg(franjas);
@@ -173,53 +187,236 @@ QString causaConflictoDeAsignacion(const SolverConfig& config) {
 QString primeraCausaNoFactible(const SolverConfig& config) {
     QString causa = causaEntradaInvalida(config);
     if (!causa.isEmpty()) return causa;
-    causa = causaConflictoDeAula(config);
+    causa = causaSaturacionPorTipo(config);
     if (!causa.isEmpty()) return causa;
     causa = causaConflictoDePersona(config);
     if (!causa.isEmpty()) return causa;
-    return causaConflictoDeAsignacion(config);
+    causa = causaConflictoDeAsignacion(config);
+    if (!causa.isEmpty()) return causa;
+    // (5) conflicto de bloques (014, RF-10): solo condiciones detectables sobre la entrada y
+    // SIEMPRE después de (1)–(4); un fallo de aula concreta no se atribuye a (5).
+    for (int c = 0; c < config.cursos.size(); ++c) {
+        QString motivo;
+        if (rejilla::causaCincoDeCurso(config, c, &motivo)) return motivo;
+    }
+    return {};
+}
+
+/// ¿La respuesta contiene una solución utilizable? (OPTIMAL o FEASIBLE)
+bool esFactible(CpSolverStatus status) {
+    return status == CpSolverStatus::OPTIMAL || status == CpSolverStatus::FEASIBLE;
+}
+
+/// Clave de deduplicación del objetivo: (docente, día de la generación, slot).
+///
+/// Es la misma unidad que `FranjaSemana` de la 005, pero con el docente: Qt no ofrece `qHash`
+/// para `std::tuple`, así que el proyecto usa una clave con `qHash` propia (como `FranjaSemana`).
+struct FranjaPreferencia {
+    int docente = 0;
+    int dia = 0;
+    int slot = 0;
+};
+
+inline bool operator==(const FranjaPreferencia& a, const FranjaPreferencia& b) {
+    return a.docente == b.docente && a.dia == b.dia && a.slot == b.slot;
+}
+
+inline size_t qHash(const FranjaPreferencia& franja, size_t seed = 0) noexcept {
+    return qHashMulti(seed, franja.docente, franja.dia, franja.slot);
 }
 
 } // namespace
 
 
 Solver::ResultadoSolver Solver::resolver(const SolverConfig& config) {
+    return resolver(config, PresupuestoFases{});
+}
+
+Solver::ResultadoSolver Solver::resolver(const SolverConfig& config,
+                                         const PresupuestoFases& presupuesto) {
     QElapsedTimer timer;
     timer.start();
 
     ResultadoSolver resultado;
     resultado.exito = false;
-    
-    // Crear variables de decision
-    vars = crearVariables(model, config);
 
-    // Agregar restricciones
-    agregarRestricciones(config);
-
-    // Objetivo
+    // FASE 1 — referencia: el modelo de S1 + S2. Es la generación de referencia contra la que
+    // se exige la igualdad de reparto y de exceso.
+    prepararModelo(config);
     construirObjetivo(config);
+    const CpSolverResponse referencia = ejecutar(presupuesto.referencia, presupuesto.workers);
 
-    // Resolver CP-SAT (parametros deterministas: RNF-1)
+    if (!esFactible(referencia.status())) {
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.errores = analizarFallo(referencia, config);
+        return resultado;
+    }
+
+    // Se extrae AHORA: `vars` corresponde todavía a esta respuesta (con otro modelo, los
+    // índices de variable no valdrían para leerla).
+    HorarioSalida horario = extraerSolucion(referencia, config);
+
+    // FASE 2a — separación y huecos con z* y e* FIJADOS por igualdad (RF-7/RF-8). La garantía
+    // estructural se mantiene: el reparto de docentes y el exceso son los de la referencia, y
+    // los términos blandos solo deciden DÓNDE caen las clases.
+    const AnclajeEstructural anclaje = extraerAnclaje(referencia);
+    prepararModelo(config);
+    fijarAnclaje(anclaje);
+    model.Minimize(expresionSeparacionViernes(config));
+    const CpSolverResponse fase2a = ejecutar(presupuesto.separacionHuecos, presupuesto.workers);
+
+    bool hayFase2a = false;
+    int64_t valorFase2a = 0;
+    if (esFactible(fase2a.status())) {
+        horario = extraerSolucion(fase2a, config);
+        hayFase2a = true;
+        // `expresionSeparacionViernes` es entera: se redondea para fijarla por igualdad en 2b.
+        valorFase2a = static_cast<int64_t>(std::llround(fase2a.objective_value()));
+    } else if (fase2a.status() == CpSolverStatus::INFEASIBLE ||
+               fase2a.status() == CpSolverStatus::UNKNOWN) {
+        // Escalera 2a→referencia: se devuelve la referencia (P7). La separación y los huecos son
+        // blandos y nunca convierten en infactible un horario que la referencia ya resolvía.
+    } else {
+        // MODEL_INVALID y otros errores internos se propagan como fallo.
+        resultado.tiempo_ms = timer.elapsed();
+        resultado.errores = analizarFallo(fase2a, config);
+        return resultado;
+    }
+
+    // FASE 2b — preferencia con el valor de la 2a FIJADO por igualdad. Así la preferencia no
+    // puede empeorar la separación ni los huecos (RF-8). Sin preferencias se omite.
+    if (hayFase2a && !config.preferencias.isEmpty()) {
+        prepararModelo(config);
+        fijarAnclaje(anclaje);
+        model.AddEquality(expresionSeparacionViernes(config), valorFase2a);
+        model.Minimize(expresionPreferencias(config));
+        const CpSolverResponse fase2b = ejecutar(presupuesto.preferencias, presupuesto.workers);
+
+        if (esFactible(fase2b.status())) {
+            horario = extraerSolucion(fase2b, config);
+        } else if (fase2b.status() == CpSolverStatus::INFEASIBLE ||
+                   fase2b.status() == CpSolverStatus::UNKNOWN) {
+            // Escalera 2b→2a: se queda la solución de la 2a (P7).
+        } else {
+            // MODEL_INVALID y otros errores internos sí se propagan como fallo.
+            resultado.tiempo_ms = timer.elapsed();
+            resultado.errores = analizarFallo(fase2b, config);
+            return resultado;
+        }
+    }
+
+    resultado.exito = true;
+    resultado.tiempo_ms = timer.elapsed();
+    horario.metadata.tiempo_ejecucion_ms = static_cast<int>(resultado.tiempo_ms);
+    resultado.resultado = horario;
+    return resultado;
+}
+
+void Solver::prepararModelo(const SolverConfig& config) {
+    // No arrastrar estado entre resoluciones: `model` y `vars` son miembros y una segunda
+    // llamada acumularía variables y restricciones. Se reinician al inicio (F3), de modo que
+    // dos llamadas a la misma instancia equivalen a dos instancias nuevas.
+    model = CpModelBuilder();
+    vars = VariablesSolver();
+
+    vars = crearVariables(model, config);
+    agregarRestricciones(config);
+}
+
+CpSolverResponse Solver::ejecutar(double presupuesto, int workers) {
+    // Parámetros de búsqueda: seed 0 y presupuesto determinista. El defecto de producción es
+    // 8 workers (PresupuestoFases::workers, 014b); la prueba de aceptación puede ajustarlo.
     SatParameters params;
-    params.set_num_search_workers(1);
+    params.set_num_search_workers(workers > 0 ? workers : 1);
     params.set_random_seed(0);
-    params.set_max_deterministic_time(2.0);
+    params.set_max_deterministic_time(presupuesto);
 
     Model sat_model;
     sat_model.Add(NewSatParameters(params));
-    const CpSolverResponse response = SolveCpModel(model.Build(), &sat_model);
+    return SolveCpModel(model.Build(), &sat_model);
+}
 
-    // Verificar status
-    if (response.status() == CpSolverStatus::OPTIMAL ||
-        response.status() == CpSolverStatus::FEASIBLE) {
-        resultado.exito = true;
-        resultado.resultado = extraerSolucion(response, config);
-    } else {
-        resultado.errores = analizarFallo(response, config);
+Solver::AnclajeEstructural Solver::extraerAnclaje(const CpSolverResponse& response) const {
+    AnclajeEstructural anclaje;
+    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd();
+         ++it) {
+        anclaje.docentePorMateria.insert(it.key(),
+                                         SolutionBooleanValue(response, it.value()) ? 1 : 0);
     }
-    
-    resultado.tiempo_ms = timer.elapsed();
-    return resultado;
+    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
+        anclaje.excesoPorDocente.insert(
+            it.key(), static_cast<int>(SolutionIntegerValue(response, it.value())));
+    }
+    return anclaje;
+}
+
+void Solver::fijarAnclaje(const AnclajeEstructural& anclaje) {
+    for (auto it = vars.asignacionDocente.constBegin(); it != vars.asignacionDocente.constEnd();
+         ++it) {
+        model.AddEquality(it.value(), anclaje.docentePorMateria.value(it.key(), 0));
+    }
+    for (auto it = vars.exceso.constBegin(); it != vars.exceso.constEnd(); ++it) {
+        model.AddEquality(it.value(), anclaje.excesoPorDocente.value(it.key(), 0));
+    }
+}
+
+LinearExpr Solver::expresionSeparacionViernes(const SolverConfig& config) const {
+    const rejilla::PesosBlandos pesos = rejilla::pesosBlandos(config);
+    LinearExpr expresion(0);
+
+    // Separación blanda con prioridad alta: una violación pesa más que todos los huecos
+    // no-viernes juntos.
+    for (auto it = vars.incumpleSeparacion.constBegin();
+         it != vars.incumpleSeparacion.constEnd(); ++it) {
+        expresion = expresion + LinearExpr(it.value()) * pesos.separacion;
+    }
+
+    // Viernes (día de generación 4): los huecos fuera del viernes.
+    for (auto it = vars.ocupada.constBegin(); it != vars.ocupada.constEnd(); ++it) {
+        const auto [c, d, s] = it.key();
+        (void)c; (void)s;
+        if (d == 4) continue;
+        expresion = expresion + (LinearExpr(1) - LinearExpr(it.value())) * pesos.huecoViernes;
+    }
+
+    return expresion;
+}
+
+LinearExpr Solver::expresionPreferencias(const SolverConfig& config) const {
+    // Deduplicación por (docente, día, slot) y sentido: una franja alcanzada por dos
+    // preferencias del MISMO sentido se cuenta una sola vez (P1). Dos sentidos opuestos sobre
+    // la misma franja se aplican los dos y se compensan (V19 no comprueba solapes).
+    QSet<FranjaPreferencia> evitadas;
+    QSet<FranjaPreferencia> preferidas;
+    for (const PreferenciaSolverConfig& preferencia : config.preferencias) {
+        QSet<FranjaPreferencia>* destino = nullptr;
+        if (preferencia.sentido == QLatin1String("evitada"))
+            destino = &evitadas;
+        else if (preferencia.sentido == QLatin1String("preferida"))
+            destino = &preferidas;
+        if (!destino)
+            continue;   // sentido desconocido: V19 lo rechaza; aquí no se inventa un término
+
+        for (int slot : preferencia.slot)
+            destino->insert(FranjaPreferencia{preferencia.docente, preferencia.dia, slot});
+    }
+
+    // Penaliza lo evitado y premia lo preferido con el mismo peso y la misma unidad (por franja
+    // de clase). El premio es un coste negativo equivalente (RF-4).
+    LinearExpr expresion = LinearExpr(0);
+    for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
+        const auto [p, m, c, d, s] = it.key();
+        const FranjaPreferencia franja{p, d, s};
+        if (evitadas.contains(franja)) {
+            expresion =
+                expresion + LinearExpr::Term(it.value(), ContratoSolver::PESO_PREFERENCIA);
+        }
+        if (preferidas.contains(franja)) {
+            expresion =
+                expresion + LinearExpr::Term(it.value(), -ContratoSolver::PESO_PREFERENCIA);
+        }
+    }
+    return expresion;
 }
 
 void Solver::construirObjetivo(const SolverConfig& config) {
@@ -242,15 +439,6 @@ void Solver::construirObjetivo(const SolverConfig& config) {
         }
     }
 
-    // S3: penalización por fragmentación (agrupación de bloques) - RF-2
-    // Penalización = PESO_AGRUPACION · Σ (isolated + longGroup)
-    //   isolated  → grupo de 1          (1 unidad)
-    //   longGroup → 4.ª franja o más    (1 unidad por franja extra)
-    //   grupos de 2–3 → 0
-    // Esto equivale a f(len): 1 → 1, 2–3 → 0, ≥4 → len − 3.
-    for (auto it = vars.isolated.constBegin(); it != vars.isolated.constEnd(); ++it)
-        objetivo = objetivo + LinearExpr::Term(it.value(), ContratoSolver::PESO_AGRUPACION);
-
     model.Minimize(objetivo);
 }
 
@@ -258,29 +446,32 @@ void Solver::agregarRestricciones(const SolverConfig& config) {
     agregarRestriccionesTurnos(model, config, vars);
     agregarRestriccionesAulas(model, config, vars);
     agregarRestriccionProfesores(model, config, vars);
-    agregarRestriccionesAgrupacion(model, config, vars);
+    agregarRestriccionesBloques(model, config, vars);
 }
 
 HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const SolverConfig& config) {
     HorarioSalida horario;
 
     QMap<int, QMap<int, QVector<AsignacionOutput>>> porCursoDia;
+
+    // Metadata real de la salida: clases emitidas (no variables booleanas del modelo)
+    // y docentes distintos con al menos una clase.
     int totalAsignaciones = 0;
+    QSet<int> docentesAsignados;
 
     for (auto it = vars.assignment.constBegin(); it != vars.assignment.constEnd(); ++it) {
         if (!SolutionBooleanValue(response, it.value())) continue;
 
         auto [p, m, c, d, s] = it.key();
 
-        // Aula: la fija del curso (indice) en modo fijo; en movil, la asignada.
-        int aula = config.aula_fija ? config.cursos[c].aula : -1;
-        if (aula < 0) {
-            for (auto itA = vars.aulaAssignment.constBegin(); itA != vars.aulaAssignment.constEnd(); ++itA) {
-                auto [ac, ad, as, aa] = itA.key();
-                if (ac == c && ad == d && as == s && SolutionBooleanValue(response, itA.value())) {
-                    aula = aa;
-                    break;
-                }
+        // Aula real de la clase: la única `y[c][d][s][a]` activa, también en modo de aula
+        // fija (RF-4). Una clase desplazada informa el aula donde se imparte, no la referencia.
+        int aula = -1;
+        for (auto itA = vars.aulaAssignment.constBegin(); itA != vars.aulaAssignment.constEnd(); ++itA) {
+            const auto [ac, ad, as, aa] = itA.key();
+            if (ac == c && ad == d && as == s && SolutionBooleanValue(response, itA.value())) {
+                aula = aa;
+                break;
             }
         }
 
@@ -292,6 +483,8 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
 
         porCursoDia[c][d].append(asignacion);
         ++totalAsignaciones;
+        if (p >= 0)
+            docentesAsignados.insert(p);
     }
 
     for (auto itC = porCursoDia.constBegin(); itC != porCursoDia.constEnd(); ++itC) {
@@ -315,6 +508,7 @@ HorarioSalida Solver::extraerSolucion(const CpSolverResponse& response, const So
     // Clases (asignaciones) realmente extraídas de la solución; no el número de
     // variables booleanas del modelo.
     metadata.total_asignaciones = totalAsignaciones;
+    metadata.profesores_asignados = docentesAsignados.size();
     metadata.cursos_generados = config.cursos.size();
     horario.metadata = metadata;
 
@@ -334,8 +528,12 @@ QStringList Solver::analizarFallo(const CpSolverResponse& response, const Solver
             if (!causa.isEmpty())
                 errores.append(causa);
             else
-                errores.append(QStringLiteral("Causa: no se pudo identificar una categoría concreta; "
-                                              "revise horas, aulas y disponibilidad de docentes."));
+                errores.append(QStringLiteral("Causa: no atribuible. Ninguna categoría de (1) a (5) "
+                                              "explica el fallo; revise la capacidad de los tipos de "
+                                              "aula, las franjas de los turnos y la disponibilidad de "
+                                              "los docentes, y el diagnóstico de bloques (apariciones "
+                                              "frente a días no consecutivos, restos sin pareja del "
+                                              "mismo tipo y huecos que no caben al final)."));
 
             errores.append(QStringLiteral("Entorno: %1 docentes, %2 cursos, %3 materias, %4 aulas.")
                 .arg(config.profesores.size())

@@ -1,11 +1,27 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioAula.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioAula : public QObject {
     Q_OBJECT
@@ -21,9 +37,14 @@ private slots:
         QVERIFY(m_dbManager->isInitialized());
 
         m_servicio.reset(new ServicioAula(m_dbManager->database()));
+
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
+        m_tipos.reset();
         m_servicio.reset();
         m_dbManager->close();
         m_dbManager.reset();
@@ -33,7 +54,8 @@ private slots:
     // ─── Tests ──────────────────────────────────────────────────────────────
 
     void crearAula_exitoso() {
-        auto resultado = m_servicio->crearAula("Aula 101", 30, "Edificio A", "Piso 1");
+        auto resultado = m_servicio->crearAula("Aula 101", 30, "Edificio A", "Piso 1",
+                                              m_idTipoAula);
 
         QVERIFY(resultado.ok);
         QCOMPARE(resultado.valor.nombre, "Aula 101");
@@ -43,38 +65,105 @@ private slots:
         QVERIFY(resultado.valor.id > 0);
     }
 
+    void crearAula_sinTipo_falla() {
+        auto resultado = m_servicio->crearAula("Aula 101", 30, "", "", -1);
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("sin tipo"));
+        QVERIFY(m_servicio->listarAulas().valor.isEmpty());
+    }
+
+    void crearAula_tipoInexistente_falla() {
+        auto resultado = m_servicio->crearAula("Aula 101", 30, "", "", 9999);
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("No existe el tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("9999"));
+        QVERIFY(m_servicio->listarAulas().valor.isEmpty());
+    }
+
+    void crearAula_sinTipoValido_falla() {
+        // Base nueva con el tipo general del esquema: «catálogo vacío» ya no existe.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        DatabaseManager db;
+        QVERIFY(db.initialize(dir.filePath("sin_tipos.db")));
+
+        ServicioAula servicio(db.database());
+
+        auto sinTipo = servicio.crearAula("Aula 101", 30, "", "", -1);
+        QVERIFY(!sinTipo.ok);
+        QVERIFY(sinTipo.mensajeError.contains("sin tipo"));
+        QVERIFY(!sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
+
+        // El tipo general del esquema sirve para dar de alta el aula (RF-1).
+        const int idGeneral = idTipoGeneral(db.database());
+        QVERIFY(idGeneral > 0);
+        auto conGeneral = servicio.crearAula("Aula 101", 30, "", "", idGeneral);
+        QVERIFY(conGeneral.ok);
+        QCOMPARE(conGeneral.valor.idTipoAula, idGeneral);
+
+        // Un id inexistente sigue rechazándose.
+        auto tipoInexistente = servicio.crearAula("Aula 102", 30, "", "", 9999);
+        QVERIFY(!tipoInexistente.ok);
+
+        db.close();
+    }
+
+    void crearAula_exponeElTipo() {
+        const auto creada = m_servicio->crearAula("Aula 101", 30, "", "", m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        QCOMPARE(creada.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(creada.valor.tipoAula, QString("Aula de estudio"));
+
+        const auto obtenida = m_servicio->obtenerAula(creada.valor.id);
+        QVERIFY(obtenida.ok);
+        QCOMPARE(obtenida.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(obtenida.valor.tipoAula, QString("Aula de estudio"));
+
+        const auto lista = m_servicio->listarAulas();
+        QVERIFY(lista.ok);
+        QCOMPARE(lista.valor.size(), 1);
+        QCOMPARE(lista.valor[0].idTipoAula, m_idTipoAula);
+        QCOMPARE(lista.valor[0].tipoAula, QString("Aula de estudio"));
+    }
+
     void crearAula_nombreVacio_falla() {
-        auto resultado = m_servicio->crearAula("", 30);
+        auto resultado = m_servicio->crearAula("", 30, "", "", m_idTipoAula);
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("no puede estar vacío"));
     }
 
     void crearAula_capacidadCero_falla() {
-        auto resultado = m_servicio->crearAula("Aula 101", 0);
+        auto resultado = m_servicio->crearAula("Aula 101", 0, "", "", m_idTipoAula);
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("al menos"));
+        QVERIFY(resultado.mensajeError.contains("se recibió 0"));
     }
 
     void crearAula_capacidadExcesiva_falla() {
-        auto resultado = m_servicio->crearAula("Aula 101", 600);
+        auto resultado = m_servicio->crearAula("Aula 101", 600, "", "", m_idTipoAula);
 
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("no puede exceder"));
+        QVERIFY(resultado.mensajeError.contains("se recibió 600"));
     }
 
     void crearAula_nombreDuplicado_falla() {
-        auto r1 = m_servicio->crearAula("Aula Duplicada", 25);
+        auto r1 = m_servicio->crearAula("Aula Duplicada", 25, "", "", m_idTipoAula);
         QVERIFY(r1.ok);
 
-        auto r2 = m_servicio->crearAula("Aula Duplicada", 30);
+        auto r2 = m_servicio->crearAula("Aula Duplicada", 30, "", "", m_idTipoAula);
         QVERIFY(!r2.ok);
         QVERIFY(r2.mensajeError.contains("Ya existe"));
     }
 
     void obtenerAula_exitoso() {
-        auto creada = m_servicio->crearAula("Aula 202", 35, "Edificio B");
+        auto creada = m_servicio->crearAula("Aula 202", 35, "Edificio B", "", m_idTipoAula);
         QVERIFY(creada.ok);
 
         auto obtenida = m_servicio->obtenerAula(creada.valor.id);
@@ -96,9 +185,9 @@ private slots:
     }
 
     void listarAulas_conDatos() {
-        m_servicio->crearAula("Aula Z", 20);
-        m_servicio->crearAula("Aula A", 25);
-        m_servicio->crearAula("Aula M", 30);
+        m_servicio->crearAula("Aula Z", 20, "", "", m_idTipoAula);
+        m_servicio->crearAula("Aula A", 25, "", "", m_idTipoAula);
+        m_servicio->crearAula("Aula M", 30, "", "", m_idTipoAula);
 
         auto lista = m_servicio->listarAulas().valor;
         QCOMPARE(lista.size(), 3);
@@ -110,11 +199,11 @@ private slots:
     }
 
     void actualizarAula_exitoso() {
-        auto creada = m_servicio->crearAula("Aula Original", 20);
+        auto creada = m_servicio->crearAula("Aula Original", 20, "", "", m_idTipoAula);
         QVERIFY(creada.ok);
 
         auto actualizada = m_servicio->actualizarAula(
-            creada.valor.id, "Aula Renovada", 45, "Edificio C", "Piso 3"
+            creada.valor.id, "Aula Renovada", 45, "Edificio C", "Piso 3", m_idTipoAula
         );
 
         QVERIFY(actualizada.ok);
@@ -124,14 +213,47 @@ private slots:
         QCOMPARE(actualizada.valor.piso, "Piso 3");
     }
 
+    void actualizarAula_sinTipo_falla() {
+        auto creada = m_servicio->crearAula("Aula Original", 20, "", "", m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        auto actualizada = m_servicio->actualizarAula(creada.valor.id, "Aula Renovada", 45,
+                                                      "", "", -1);
+
+        QVERIFY(!actualizada.ok);
+        QVERIFY(actualizada.mensajeError.contains("tipo de aula"));
+        QVERIFY(actualizada.mensajeError.contains("sin tipo"));
+
+        // No se conserva el tipo anterior de forma implícita: el aula sigue igual.
+        auto sinCambios = m_servicio->obtenerAula(creada.valor.id);
+        QVERIFY(sinCambios.ok);
+        QCOMPARE(sinCambios.valor.nombre, "Aula Original");
+        QCOMPARE(sinCambios.valor.idTipoAula, m_idTipoAula);
+    }
+
+    void actualizarAula_cambiaTipo() {
+        auto creada = m_servicio->crearAula("Aula 101", 30, "", "", m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        const auto otro = m_tipos->crearTipoAula(QStringLiteral("Laboratorio"));
+        QVERIFY(otro.ok);
+
+        auto actualizada = m_servicio->actualizarAula(creada.valor.id, "Aula 101", 30, "", "",
+                                                      otro.valor.id);
+
+        QVERIFY(actualizada.ok);
+        QCOMPARE(actualizada.valor.idTipoAula, otro.valor.id);
+        QCOMPARE(actualizada.valor.tipoAula, QString("Laboratorio"));
+    }
+
     void actualizarAula_inexistente_falla() {
-        auto resultado = m_servicio->actualizarAula(9999, "Aula", 20);
+        auto resultado = m_servicio->actualizarAula(9999, "Aula", 20, "", "", m_idTipoAula);
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("No se encontró"));
     }
 
     void eliminarAula_exitoso() {
-        auto creada = m_servicio->crearAula("Aula a Eliminar", 20);
+        auto creada = m_servicio->crearAula("Aula a Eliminar", 20, "", "", m_idTipoAula);
         QVERIFY(creada.ok);
 
         bool eliminado = m_servicio->eliminarAula(creada.valor.id);
@@ -147,8 +269,8 @@ private slots:
     }
 
     void obtenerTodasParaSolver() {
-        m_servicio->crearAula("Aula 1", 20, "Edif A");
-        m_servicio->crearAula("Aula 2", 30, "Edif B", "Piso 2");
+        m_servicio->crearAula("Aula 1", 20, "Edif A", "", m_idTipoAula);
+        m_servicio->crearAula("Aula 2", 30, "Edif B", "Piso 2", m_idTipoAula);
 
         auto aulas = m_servicio->obtenerTodasParaSolver();
 
@@ -160,7 +282,7 @@ private slots:
     }
 
     void obtenerAulaParaSolver() {
-        auto creada = m_servicio->crearAula("Aula Solver", 25, "Edif C");
+        auto creada = m_servicio->crearAula("Aula Solver", 25, "Edif C", "", m_idTipoAula);
         QVERIFY(creada.ok);
 
         auto resultado = m_servicio->obtenerAulaParaSolver(creada.valor.id);
@@ -193,6 +315,8 @@ private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;
     std::unique_ptr<ServicioAula> m_servicio;
+    std::unique_ptr<ServicioTiposAula> m_tipos;
+    int m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioAula)

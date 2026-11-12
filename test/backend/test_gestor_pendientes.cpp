@@ -24,6 +24,7 @@ private:
     std::unique_ptr<DatabaseManager> m_dbManager;
     std::unique_ptr<NucleoDatos> m_nucleo;
     QString m_ruta;
+    int m_idTipoAula = -1;
 
     /// Abre una conexión a la base de prueba y construye el núcleo de datos.
     void abrirBase()
@@ -53,6 +54,17 @@ private:
         return true;
     }
 
+    /// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+    int idTipoGeneral() const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"))
+            || !query.next()) {
+            return -1;
+        }
+        return query.value(0).toInt();
+    }
+
 private slots:
 
     void init()
@@ -61,6 +73,9 @@ private slots:
         QVERIFY(m_dir->isValid());
         m_ruta = m_dir->filePath("pendientes.db");
         abrirBase();
+
+        m_idTipoAula = idTipoGeneral();
+        QVERIFY2(m_idTipoAula > 0, "La base nueva debe traer el tipo general (RF-1).");
     }
 
     void cleanup()
@@ -193,7 +208,8 @@ private slots:
             "BEGIN SELECT RAISE(ABORT, 'fallo simulado de escritura'); END;")));
 
         const auto creado = m_nucleo->crearAula(QStringLiteral("Aula 101"), 30,
-                                                QStringLiteral("Edificio A"));
+                                                QStringLiteral("Edificio A"), QString(),
+                                                m_idTipoAula);
         QVERIFY(!creado.ok);
         QVERIFY(m_nucleo->listarAulas().valor.isEmpty());
 
@@ -219,7 +235,7 @@ private slots:
 
     void nucleo_falloDeBaja_registraPendienteEliminarYReintentoBorra()
     {
-        const auto aula = m_nucleo->crearAula(QStringLiteral("Aula 202"), 25);
+        const auto aula = m_nucleo->crearAula(QStringLiteral("Aula 202"), 25, QString(), QString(), m_idTipoAula);
         QVERIFY(aula.ok);
 
         QVERIFY(ejecutar(QStringLiteral(
@@ -251,7 +267,7 @@ private slots:
             "CREATE TRIGGER fallo_insert_aulas BEFORE INSERT ON Aulas "
             "BEGIN SELECT RAISE(ABORT, 'fallo simulado de escritura'); END;")));
 
-        QVERIFY(!m_nucleo->crearAula(QStringLiteral("Aula 303"), 10).ok);
+        QVERIFY(!m_nucleo->crearAula(QStringLiteral("Aula 303"), 10, QString(), QString(), m_idTipoAula).ok);
         const qint64 id = m_nucleo->gestorPendientes().pendientes().first().id;
 
         // El reintento vuelve a fallar: el cambio pendiente se conserva.

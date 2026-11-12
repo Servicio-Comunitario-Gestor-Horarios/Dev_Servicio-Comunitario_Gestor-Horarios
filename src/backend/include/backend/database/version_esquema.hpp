@@ -11,7 +11,18 @@
 namespace VersionEsquema
 {
     /// Versión de esquema que espera esta compilación de la aplicación (marca única).
-    constexpr int VERSION_ESQUEMA_ACTUAL = 2;
+    ///
+    /// v6: el tipo general de aula existe en toda base nueva y está protegido (015: fila,
+    /// índice único y dos disparadores; la guardia lo comprueba junto a tablas y columnas).
+    /// v5: preferencias horarias del docente (`Preferencia_Profesor`: día 0–6, rango e
+    /// inicio anterior al fin, sentido «preferida»/«evitada» y duplicado exacto único)
+    /// (spec 012).
+    /// v4: configuración global de la hora académica (`ConfiguracionHoraria`, una
+    /// sola fila, 35 minutos por defecto y rango 30–90) (spec 011).
+    /// v3: catálogo de tipos de aula con clave normalizada, referencia de tipo
+    /// obligatoria en aulas y materias, y eventos del turno con identidad y orden
+    /// (se retira el registro de recesos).
+    constexpr int VERSION_ESQUEMA_ACTUAL = 6;
 
     /// Resultado de decidir qué hacer al abrir una base de datos.
     enum class EstadoApertura
@@ -35,9 +46,12 @@ namespace VersionEsquema
     /// completo y fija la marca de versión. Idempotente. Retorna false si falla.
     bool crearEsquema(QSqlDatabase& db);
 
-    /// Comprueba que la base tenga el catálogo del esquema único (tablas y columnas
-    /// esperadas) y **no** tenga tablas retiradas (p. ej. `Curso_Materia`).
-    /// Si se pasa `motivo`, recibe una explicación legible de lo que no cuadra
-    /// (vacía si el catálogo corresponde al esquema esperado).
+    /// Comprueba que la base tenga el catálogo del esquema único: tablas y columnas
+    /// esperadas, el índice único y los dos disparadores por nombre, la fila del tipo
+    /// general según el predicado de validez y **no** tablas retiradas (p. ej.
+    /// `Curso_Materia` o el registro de recesos `Recesos`, sustituido por `Eventos`).
+    /// La comprobación corre en una transacción de solo lectura (si ya hay una abierta,
+    /// usa esa) y no escribe nunca. Si se pasa `motivo`, recibe una explicación legible de
+    /// lo que no cuadra (vacía si el catálogo corresponde al esquema esperado).
     bool esquemaEsperado(QSqlDatabase& db, QString* motivo = nullptr);
 }

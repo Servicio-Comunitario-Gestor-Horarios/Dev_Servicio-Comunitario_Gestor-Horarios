@@ -33,9 +33,11 @@ using namespace ScheduleTheme;
 namespace {
 
 constexpr int kTimeColW = 116;
-constexpr int kDayColW  = 150;
+constexpr int kDayColW  = 150;   // ancho de referencia si aún no hay tamaño visible
+constexpr int kDayColWMin = 120;
 constexpr int kHeaderH  = 46;
-constexpr int kRowH     = 74;
+constexpr int kRowH     = 74;    // alto de referencia si aún no hay tamaño visible
+constexpr int kRowHMin  = 50;
 constexpr int kRecessH  = 36;
 constexpr int kDays     = 5;
 
@@ -56,7 +58,12 @@ ScheduleGridDialog::ScheduleGridDialog(const QJsonObject& rootData, bool showCou
     , m_showCourse(showCourse)
 {
     setModal(true);
-    setMinimumSize(1080, 740);
+    // La ventana se abre maximizada desde la vista de horarios, pero debe poder
+    // restaurarse, moverse y redimensionarse: la rejilla recalcula sus celdas.
+    setWindowFlags(windowFlags() | Qt::WindowMaximizeButtonHint
+                                | Qt::WindowMinimizeButtonHint);
+    setSizeGripEnabled(true);
+    setMinimumSize(860, 560);
     resize(1240, 860);
 }
 
@@ -94,6 +101,7 @@ QWidget* ScheduleGridDialog::buildGridCard(QWidget* parent)
 
     m_gridScroll->setWidget(m_gridHost);
     m_gridScroll->viewport()->setAutoFillBackground(false);
+    m_gridScroll->viewport()->installEventFilter(this);
     cardLayout->addWidget(m_gridScroll);
     card->setMinimumWidth(480);
     return card;
@@ -101,33 +109,60 @@ QWidget* ScheduleGridDialog::buildGridCard(QWidget* parent)
 
 QWidget* ScheduleGridDialog::buildLegendCard(QWidget* parent)
 {
-    static const QStringList materiasDeEjemplo = {
-        "Matemáticas", "Física", "Química", "Biología", "Historia",
-        "Geografía", "Literatura", "Inglés", "Educación Física",
-        "Arte", "Música", "Tecnología", "Filosofía", "Ciudadanía"
-    };
+    // Leyenda lateral: solo las materias del horario que se está viendo.
+    QFrame* legendCard = new QFrame(parent);
+    legendCard->setObjectName("LegendCard");
+    applyShadow(legendCard, darkMode(), 22, 6);
+    legendCard->setMinimumHeight(150);
+    legendCard->setMaximumHeight(340);
 
-    // La leyenda se arma con las materias que realmente trae el horario (los
-    // bloques se colorean por materia): puede haber decenas, así que se ordena
-    // por peso y se muestra en una tira desplazable.
+    QVBoxLayout* legendLayout = new QVBoxLayout(legendCard);
+    legendLayout->setContentsMargins(16, 12, 16, 12);
+    legendLayout->setSpacing(8);
+
+    auto* legendTitle = new QLabel("LEYENDA", legendCard);
+    legendTitle->setObjectName("LegendTitle");
+    legendLayout->addWidget(legendTitle, 0, Qt::AlignLeft);
+
+    m_legendScroll = new QScrollArea(legendCard);
+    m_legendScroll->setObjectName("LegendScroll");
+    m_legendScroll->setFrameShape(QFrame::NoFrame);
+    m_legendScroll->setWidgetResizable(true);
+    m_legendScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_legendScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    m_legendHost = new QWidget(m_legendScroll);
+    m_legendHost->setObjectName("LegendHost");
+    m_legendHost->setStyleSheet(QStringLiteral("background: transparent;"));
+    m_legendLayout = new QVBoxLayout(m_legendHost);
+    m_legendLayout->setContentsMargins(0, 0, 0, 0);
+    m_legendLayout->setSpacing(5);
+
+    m_legendScroll->setWidget(m_legendHost);
+    m_legendScroll->viewport()->setAutoFillBackground(false);
+    legendLayout->addWidget(m_legendScroll, 1);
+    return legendCard;
+}
+
+void ScheduleGridDialog::rebuildLegend()
+{
+    if (!m_legendLayout) return;
+
+    while (QLayoutItem* item = m_legendLayout->takeAt(0)) {
+        if (item->widget()) { item->widget()->hide(); item->widget()->deleteLater(); }
+        delete item;
+    }
+
+    // Solo las materias del horario que se está viendo (docente o sección),
+    // no todas las materias del centro.
+    const QJsonObject schedule = ScheduleModel::scheduleOf(m_data, currentRef());
     QHash<QString, int> frecuencia;
-    auto recoger = [&frecuencia](const QJsonObject& schedule) {
-        for (auto it = schedule.constBegin(); it != schedule.constEnd(); ++it) {
-            const QJsonObject dia = it.value().toObject();
-            for (auto jt = dia.constBegin(); jt != dia.constEnd(); ++jt) {
-                const QString materia = ScheduleModel::parseBlock(jt.value()).materia.trimmed();
-                if (!materia.isEmpty()) frecuencia[materia] += 1;
-            }
+    for (auto it = schedule.constBegin(); it != schedule.constEnd(); ++it) {
+        const QJsonObject dia = it.value().toObject();
+        for (auto jt = dia.constBegin(); jt != dia.constEnd(); ++jt) {
+            const QString materia = ScheduleModel::parseBlock(jt.value()).materia.trimmed();
+            if (!materia.isEmpty()) frecuencia[materia] += 1;
         }
-    };
-    const QJsonArray teachers = m_data.value("teachers").toArray();
-    for (const QJsonValue& v : teachers)
-        recoger(v.toObject().value("schedule").toObject());
-    const QJsonArray years = m_data.value("years").toArray();
-    for (const QJsonValue& yv : years) {
-        const QJsonArray sections = yv.toObject().value("sections").toArray();
-        for (const QJsonValue& sv : sections)
-            recoger(sv.toObject().value("schedule").toObject());
     }
 
     QStringList subjects;
@@ -139,62 +174,40 @@ QWidget* ScheduleGridDialog::buildLegendCard(QWidget* parent)
             return frecuencia.value(a) > frecuencia.value(b);
         return a.localeAwareCompare(b) < 0;
     });
-    if (subjects.isEmpty())
-        subjects = materiasDeEjemplo;
 
-    QFrame* legendCard = new QFrame(parent);
-    legendCard->setObjectName("LegendCard");
-    applyShadow(legendCard, darkMode(), 22, 6);
-    QHBoxLayout* legendLayout = new QHBoxLayout(legendCard);
-    legendLayout->setContentsMargins(16, 10, 16, 10);
-    legendLayout->setSpacing(14);
-
-    auto* legendTitle = new QLabel("LEYENDA", legendCard);
-    legendTitle->setObjectName("LegendTitle");
-    legendLayout->addWidget(legendTitle, 0, Qt::AlignVCenter);
-
-    QScrollArea* scroll = new QScrollArea(legendCard);
-    scroll->setObjectName("LegendScroll");
-    scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setWidgetResizable(true);
-    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    scroll->setFixedHeight(34);
-
-    QWidget* host = new QWidget(scroll);
-    host->setObjectName("LegendHost");
-    host->setStyleSheet(QStringLiteral("background: transparent;"));
-    QHBoxLayout* hostLayout = new QHBoxLayout(host);
-    hostLayout->setContentsMargins(0, 0, 0, 0);
-    hostLayout->setSpacing(14);
+    if (subjects.isEmpty()) {
+        auto* vacio = new QLabel(QStringLiteral("Sin materias en este horario"), m_legendHost);
+        vacio->setObjectName("LegendText");
+        vacio->setWordWrap(true);
+        m_legendLayout->addWidget(vacio);
+        m_legendLayout->addStretch(1);
+        return;
+    }
 
     for (const QString& subject : subjects) {
-        QWidget* itemWidget = new QWidget(host);
-        itemWidget->setObjectName("LegendItem");
-        QHBoxLayout* itemLayout = new QHBoxLayout(itemWidget);
-        itemLayout->setContentsMargins(0, 0, 0, 0);
-        itemLayout->setSpacing(7);
+        QWidget* row = new QWidget(m_legendHost);
+        row->setObjectName("LegendItem");
+        QHBoxLayout* rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(0, 0, 0, 0);
+        rowLayout->setSpacing(8);
 
-        QFrame* swatch = new QFrame(itemWidget);
+        QFrame* swatch = new QFrame(row);
         swatch->setFixedSize(14, 14);
         swatch->setStyleSheet(QString("background: %1; border-radius: 4px;")
                                   .arg(subjectColor(subject).name()));
-        itemLayout->addWidget(swatch);
+        rowLayout->addWidget(swatch, 0, Qt::AlignVCenter);
 
-        auto* text = new QLabel(subject, itemWidget);
+        auto* text = new QLabel(subject, row);
         text->setObjectName("LegendText");
         text->setToolTip(subject);
         const QFontMetrics fm(text->font());
-        text->setText(fm.elidedText(subject, Qt::ElideRight, 150));
-        itemLayout->addWidget(text);
+        text->setText(fm.elidedText(subject, Qt::ElideRight, 170));
+        text->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        rowLayout->addWidget(text, 1);
 
-        hostLayout->addWidget(itemWidget);
+        m_legendLayout->addWidget(row);
     }
-    hostLayout->addStretch(1);
-    scroll->setWidget(host);
-    scroll->viewport()->setAutoFillBackground(false);
-    legendLayout->addWidget(scroll, 1);
-    return legendCard;
+    m_legendLayout->addStretch(1);
 }
 
 QFrame* ScheduleGridDialog::createBlockCell(int day, int slot, const ScheduleModel::Block& block,
@@ -205,7 +218,7 @@ QFrame* ScheduleGridDialog::createBlockCell(int day, int slot, const ScheduleMod
     QFrame* cell = new QFrame(m_gridHost);
     cell->setObjectName("BlockCell");
     // Un bloque de varias franjas ocupa las filas de sus franjas (rowSpan).
-    cell->setFixedSize(kDayColW, span * kRowH + (span - 1) * m_scheduleGrid->spacing());
+    cell->setFixedSize(m_dayColW, span * m_rowH + (span - 1) * m_scheduleGrid->spacing());
     cell->setFrameShape(QFrame::NoFrame);
     cell->setProperty("day", day);
     cell->setProperty("slot", slot);
@@ -251,7 +264,7 @@ QFrame* ScheduleGridDialog::createBlockCell(int day, int slot, const ScheduleMod
     subjectFont.setPointSize(9);
     subject->setFont(subjectFont);
     subject->setStyleSheet(QString("color:%1; background:transparent;").arg(textColor.name()));
-    subject->setText(elideText(block.materia, subjectFont, kDayColW - 18));
+    subject->setText(elideText(block.materia, subjectFont, m_dayColW - 18));
     subject->setToolTip(block.materia);
     lay->addWidget(subject);
 
@@ -274,14 +287,14 @@ QFrame* ScheduleGridDialog::createBlockCell(int day, int slot, const ScheduleMod
         c.setAlpha(alpha);
         label->setStyleSheet(QString("color:%1; background:transparent;")
                                  .arg(c.name(QColor::HexArgb)));
-        label->setText(elideText(text, f, kDayColW - 18));
+        label->setText(elideText(text, f, m_dayColW - 18));
         label->setToolTip(text);
         lay->addWidget(label);
     };
-    addMeta(line2, 225);   // profesor
-    addMeta(line3, 185);   // aula (+ curso)
+    addMeta(line2, 232);   // profesor
+    addMeta(line3, 205);   // aula (+ curso)
     if (span > 1 && !rangoHoras.isEmpty())
-        addMeta(rangoHoras, 170);   // tiempo académico del bloque
+        addMeta(rangoHoras, 190);   // tiempo académico del bloque
 
     lay->addStretch(0);
     return cell;
@@ -323,7 +336,7 @@ void ScheduleGridDialog::rebuildGrid()
 
     for (int d = 0; d < numDias; ++d) {
         auto* day = new QLabel(days.value(d).toUpper(), m_gridHost);
-        day->setFixedSize(kDayColW, kHeaderH);
+        day->setFixedSize(m_dayColW, kHeaderH);
         day->setAlignment(Qt::AlignCenter);
         day->setStyleSheet(headStyle);
         m_scheduleGrid->addWidget(day, 0, d + 1);
@@ -331,8 +344,26 @@ void ScheduleGridDialog::rebuildGrid()
 
     const QJsonObject schedule = ScheduleModel::scheduleOf(m_data, currentRef());
 
+    // Las celdas se dimensionan para llenar el área visible (y se recalculan al
+    // redimensionar o maximizar); si aún no hay tamaño, se usan las de referencia.
     int teachingRows = 0;
     int recessRows = 0;
+    for (const ScheduleModel::RowDef& rd : rows)
+        (rd.recess ? recessRows : teachingRows)++;
+
+    m_numDias = numDias;
+    m_teachingRows = teachingRows;
+    m_recessRows = recessRows;
+
+    int dayW = kDayColW;
+    int rowH = kRowH;
+    if (!computeCellSizes(dayW, rowH)) {
+        dayW = kDayColW;
+        rowH = kRowH;
+    }
+    m_dayColW = dayW;
+    m_rowH = rowH;
+
     // Última fila que ya cubre un bloque de varias franjas, por día.
     QVector<int> cubierto(numDias + 1, 0);
 
@@ -341,15 +372,21 @@ void ScheduleGridDialog::rebuildGrid()
         const int gridRow = r + 1;
 
         if (rd.recess) {
-            ++recessRows;
-            auto* cornerRecess = new QLabel("R", m_gridHost);
+            const QString nombreEvento = rd.nombre.isEmpty() ? rd.label : rd.nombre;
+            const QColor colorEvento =
+                nombreEvento.compare(QStringLiteral("Receso"), Qt::CaseInsensitive) == 0
+                    ? p.warning
+                    : p.accent;
+
+            auto* cornerRecess = new QLabel(nombreEvento.left(2).toUpper(), m_gridHost);
             cornerRecess->setFixedSize(kTimeColW, kRecessH);
             cornerRecess->setAlignment(Qt::AlignCenter);
             cornerRecess->setStyleSheet(QString(
                 "background-color:%1; color:%2; font-weight:700; font-size:10px;"
                 "letter-spacing:1px; border:none; border-radius:8px;")
-                .arg(p.surface2, p.warning));
-            cornerRecess->setToolTip(QString("RECESO  ·  %1  ·  %2").arg(rd.turno, rd.detalle));
+                .arg(p.surface2, colorEvento.name()));
+            cornerRecess->setToolTip(QString("%1  ·  %2  ·  %3")
+                                         .arg(nombreEvento.toUpper(), rd.turno, rd.detalle));
             m_scheduleGrid->addWidget(cornerRecess, gridRow, 0);
 
             auto* bar = new QFrame(m_gridHost);
@@ -357,24 +394,24 @@ void ScheduleGridDialog::rebuildGrid()
             bar->setFixedHeight(kRecessH);
             bar->setStyleSheet(QString(
                 "#RecessRow { background-color:%1; border:1px dashed %2; border-radius:8px; }")
-                .arg(p.surface2, p.warning));
+                .arg(p.surface2, colorEvento.name()));
             auto* barLayout = new QHBoxLayout(bar);
             barLayout->setContentsMargins(0, 0, 0, 0);
-            // El receso lleva su turno y su duración real (no siempre son 30 min).
-            auto* barLabel = new QLabel(QString("RECESO   %1  ·  %2").arg(rd.turno, rd.detalle), bar);
+            // Cada evento lleva su nombre y su duración real (no siempre son 30 min).
+            auto* barLabel = new QLabel(QString("%1   %2  ·  %3")
+                                            .arg(nombreEvento.toUpper(), rd.turno, rd.detalle),
+                                        bar);
             barLabel->setAlignment(Qt::AlignCenter);
             barLabel->setStyleSheet(QString(
                 "color:%1; font-size:10px; font-weight:700; letter-spacing:2px; background:transparent;")
-                .arg(p.warning));
+                .arg(colorEvento.name()));
             barLayout->addWidget(barLabel);
             m_scheduleGrid->addWidget(bar, gridRow, 1, 1, numDias);
             continue;
         }
 
-        ++teachingRows;
-
         auto* timeLabel = new QLabel(m_gridHost);
-        timeLabel->setFixedSize(kTimeColW, kRowH);
+        timeLabel->setFixedSize(kTimeColW, m_rowH);
         timeLabel->setAlignment(Qt::AlignCenter);
         timeLabel->setStyleSheet(QString(
             "background-color:%1; color:%2; font-weight:600; font-size:11px;"
@@ -410,11 +447,61 @@ void ScheduleGridDialog::rebuildGrid()
     // Tamaño determinista (ver nota histórica: sizeHint() puede dar 0x0 tras
     // reconstruir porque los widgets nuevos aún no están "visibles").
     const int gap = m_scheduleGrid->spacing();
-    const int gridW = kTimeColW + numDias * kDayColW + numDias * gap;
-    const int gridH = kHeaderH + teachingRows * kRowH + recessRows * kRecessH
+    const int gridW = kTimeColW + numDias * m_dayColW + numDias * gap;
+    const int gridH = kHeaderH + teachingRows * m_rowH + recessRows * kRecessH
                     + (teachingRows + recessRows) * gap;
     m_gridHost->setFixedSize(gridW, gridH);
     m_scheduleGrid->activate();
+
+    m_lastViewportW = m_gridScroll ? m_gridScroll->viewport()->width() : -1;
+    m_lastViewportH = m_gridScroll ? m_gridScroll->viewport()->height() : -1;
+
+    // La leyenda sigue al horario que se está viendo.
+    rebuildLegend();
+}
+
+bool ScheduleGridDialog::computeCellSizes(int& dayW, int& rowH) const
+{
+    if (!m_gridScroll || !m_scheduleGrid) return false;
+    const int vw = m_gridScroll->viewport()->width();
+    const int vh = m_gridScroll->viewport()->height();
+    if (vw <= 0 || vh <= 0) return false;
+
+    const int gap = m_scheduleGrid->spacing();
+    const int numDias = qMax(1, m_numDias);
+    const int teaching = qMax(1, m_teachingRows);
+    const int recess = qMax(0, m_recessRows);
+
+    dayW = qMax(kDayColWMin, (vw - kTimeColW - numDias * gap) / numDias);
+    const int alto = vh - kHeaderH - recess * kRecessH - (teaching + recess) * gap;
+    rowH = qMax(kRowHMin, alto / teaching);
+    return true;
+}
+
+void ScheduleGridDialog::scheduleSizeRebuild()
+{
+    if (!m_sizeTimer) {
+        m_sizeTimer = new QTimer(this);
+        m_sizeTimer->setSingleShot(true);
+        connect(m_sizeTimer, &QTimer::timeout, this,
+                &ScheduleGridDialog::rebuildForViewportIfNeeded);
+    }
+    m_sizeTimer->start(60);
+}
+
+void ScheduleGridDialog::rebuildForViewportIfNeeded()
+{
+    if (!isVisible() || !m_scheduleGrid) return;
+    const int vw = m_gridScroll->viewport()->width();
+    const int vh = m_gridScroll->viewport()->height();
+    if (vw == m_lastViewportW && vh == m_lastViewportH) return;
+
+    int dayW = m_dayColW;
+    int rowH = m_rowH;
+    if (!computeCellSizes(dayW, rowH)) return;
+    // Sin cambio de tamaño no se reconstruye (evita bucles con las barras de scroll).
+    if (dayW == m_dayColW && rowH == m_rowH) return;
+    rebuildGrid();
 }
 
 void ScheduleGridDialog::resetGridScroll()
@@ -462,7 +549,7 @@ void ScheduleGridDialog::startDrag(QFrame* cell, const QPoint& pos)
     payload["slot"] = cell->property("slot").toInt();
     // Franja del bloque que se agarró (0 = la primera). El bloque se dibuja
     // entero bajo el puntero, así que al soltarlo ha de caer donde se ve.
-    const int paso = kRowH + m_scheduleGrid->spacing();
+    const int paso = m_rowH + m_scheduleGrid->spacing();
     const int span = qMax(1, (cell->height() + m_scheduleGrid->spacing()) / paso);
     payload["grab"] = qBound(0, pos.y() / paso, span - 1);
 
@@ -478,6 +565,14 @@ void ScheduleGridDialog::startDrag(QFrame* cell, const QPoint& pos)
 
 bool ScheduleGridDialog::eventFilter(QObject* watched, QEvent* event)
 {
+    // El área visible cambió (maximizar, restaurar o arrastrar el borde): la
+    // rejilla recalcula el tamaño de sus celdas para llenarla.
+    if (m_gridScroll && watched == m_gridScroll->viewport()
+        && event->type() == QEvent::Resize) {
+        scheduleSizeRebuild();
+        return false;
+    }
+
     QFrame* cell = qobject_cast<QFrame*>(watched);
 
     switch (event->type()) {
@@ -540,7 +635,7 @@ bool ScheduleGridDialog::eventFilter(QObject* watched, QEvent* event)
             // bloque: así el bloque cae donde se ve al soltarlo, no en la franja
             // del puntero (que en un bloque de dos horas desalineaba el
             // intercambio en una franja).
-            const int paso = kRowH + m_scheduleGrid->spacing();
+            const int paso = m_rowH + m_scheduleGrid->spacing();
             const int caida = static_cast<int>(de->position().y()) / paso;
             const int toSlot = cell->property("slot").toInt() + caida - grab;
             moveBlock(fromDay, fromSlot, toDay, toSlot);
@@ -735,4 +830,6 @@ void ScheduleGridDialog::showEvent(QShowEvent* event)
         anim->setEasingCurve(QEasingCurve::OutCubic);
         anim->start(QAbstractAnimation::DeleteWhenStopped);
     }
+    // Con la ventana ya visible se conoce el tamaño del área de la rejilla.
+    scheduleSizeRebuild();
 }

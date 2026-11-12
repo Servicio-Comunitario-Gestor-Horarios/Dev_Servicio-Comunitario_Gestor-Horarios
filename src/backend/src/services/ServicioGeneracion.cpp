@@ -1,13 +1,53 @@
 #include "backend/services/ServicioGeneracion.hpp"
 
+#include "backend/services/ServicioTurnosEventos.hpp"
 #include "backend/services/ValidadorEntradaSolver.hpp"
+#include "backend/services/preferencias.hpp"
 
 #include <QCryptographicHash>
+#include <QStringList>
 #include <QTimer>
 
-QString huellaDatos(const DatosDominio& datos)
+#include <algorithm>
+
+QString huellaDatos(const DatosDominio& datos, int duracionMinutos,
+                    const QVector<PreferenciaProyectada>& intervinientes)
 {
     QString canon;
+
+    // La hora académica entra en la huella (RF-6): un cambio de D entre el envío y la
+    // respuesta marca «datos anteriores».
+    canon += QStringLiteral("dur:%1;").arg(duracionMinutos);
+
+    // Preferencias intervinientes (013, RF-6): solo las que intervienen, ya proyectadas —
+    // docente, día de la generación, sentido y franjas—; nunca el rango de reloj. Sin
+    // intervinientes no se emite el bloque, así que la huella vale lo mismo que antes de la 013.
+    if (!intervinientes.isEmpty())
+    {
+        // Canonización: ni el orden de la lista ni el de las franjas alteran la huella (RNF-2).
+        QVector<PreferenciaProyectada> ordenadas = intervinientes;
+        for (PreferenciaProyectada& p : ordenadas)
+            std::sort(p.slot.begin(), p.slot.end());
+        std::sort(ordenadas.begin(), ordenadas.end(),
+                  [](const PreferenciaProyectada& a, const PreferenciaProyectada& b) {
+                      if (a.docente != b.docente) return a.docente < b.docente;
+                      if (a.dia != b.dia) return a.dia < b.dia;
+                      if (a.sentido != b.sentido)
+                          return static_cast<int>(a.sentido) < static_cast<int>(b.sentido);
+                      return a.slot < b.slot;
+                  });
+
+        for (const PreferenciaProyectada& p : ordenadas)
+        {
+            QStringList franjas;
+            for (int slot : p.slot)
+                franjas << QString::number(slot);
+            canon += QStringLiteral("pref:%1,%2,%3,%4;")
+                         .arg(p.docente)
+                         .arg(p.dia)
+                         .arg(textoDeSentido(p.sentido), franjas.join(QLatin1Char(',')));
+        }
+    }
 
     for (const ProfesorDTO& d : datos.docentes)
     {
@@ -19,11 +59,17 @@ QString huellaDatos(const DatosDominio& datos)
                               disp.franja.fin.toString(QStringLiteral("HH:mm")));
         for (const MateriaAsignadaDTO& m : d.materias)
             canon += QStringLiteral("mat:%1;").arg(m.id);
+        for (const MateriaAsignadaDTO& m : d.materiasSuplentes)
+            canon += QStringLiteral("sup:%1;").arg(m.id);
     }
     for (const AulaDTO& a : datos.aulas)
-        canon += QStringLiteral("A:%1|%2|%3;").arg(a.id).arg(a.nombre).arg(a.capacidad);
+        canon += QStringLiteral("A:%1|%2|%3|%4;")
+                     .arg(a.id)
+                     .arg(a.nombre)
+                     .arg(a.capacidad)
+                     .arg(a.idTipoAula);
     for (const MateriaDTO& m : datos.materias)
-        canon += QStringLiteral("M:%1|%2;").arg(m.id).arg(m.nombre);
+        canon += QStringLiteral("M:%1|%2|%3;").arg(m.id).arg(m.nombre).arg(m.idTipoAula);
     for (const PlanEstudio& p : datos.planes)
     {
         canon += QStringLiteral("P:%1|%2;").arg(p.codigo, p.nombre);
@@ -47,8 +93,17 @@ QString huellaDatos(const DatosDominio& datos)
                      .arg(t.inicio.toString(QStringLiteral("HH:mm")),
                           t.fin.toString(QStringLiteral("HH:mm")))
                      .arg(t.numSlots);
-        for (const RecesoDTO& r : t.recesos)
-            canon += QStringLiteral("r:%1,%2;").arg(r.despuesDeSlot).arg(r.duracion);
+        for (const EventoDTO& e : t.eventos)
+            canon += QStringLiteral("e:%1|%2|%3|%4|%5|%6|%7;")
+                         .arg(e.id)
+                         .arg(e.nombre)
+                         .arg(e.despuesDeSlot)
+                         .arg(e.orden)
+                         .arg(e.duracion)
+                         .arg(e.inicio.isValid() ? e.inicio.toString(QStringLiteral("HH:mm"))
+                                                 : QString(),
+                              e.fin.isValid() ? e.fin.toString(QStringLiteral("HH:mm"))
+                                              : QString());
     }
 
     return QString::fromLatin1(
@@ -67,12 +122,14 @@ ServicioGeneracion::ServicioGeneracion(PuertoSolver& puerto,
                                        int plazoMs,
                                        std::function<QString()> huellaActual,
                                        std::function<QDateTime()> reloj,
+                                       std::function<QString()> revisarBase,
                                        QObject* padre)
     : QObject(padre)
     , m_puerto(puerto)
     , m_plazoMs(plazoMs)
     , m_huellaActual(std::move(huellaActual))
     , m_reloj(std::move(reloj))
+    , m_revisarBase(std::move(revisarBase))
 {
 }
 
@@ -81,11 +138,30 @@ QDateTime ServicioGeneracion::ahora() const
     return m_reloj ? m_reloj() : QDateTime::currentDateTime();
 }
 
-void ServicioGeneracion::generar(const QJsonObject& entrada, const QString& huella)
+void ServicioGeneracion::generar(const QJsonObject& entrada, const QString& huella,
+                                 const QVector<PreferenciaNoAplicada>& noAplicadas)
 {
     // Segunda generación concurrente: no admitida.
     if (m_enCurso)
         return;
+
+    // Diagnóstico de esta generación (013, RF-8): preferencias que no intervinieron.
+    m_noAplicadas = noAplicadas;
+
+    // Validez de la base (016 RF-1): va antes de validar la entrada y de enviar. Con una
+    // base inválida el diagnóstico útil es el de la base, no el de los datos.
+    if (m_revisarBase)
+    {
+        const QString mensajeBase = m_revisarBase();
+        if (!mensajeBase.isEmpty())
+        {
+            m_ultimo = ResultadoGeneracion{};
+            m_ultimo.estado  = ResultadoGeneracion::Estado::BaseInvalida;
+            m_ultimo.mensaje = mensajeBase;
+            emit finalizada();
+            return;
+        }
+    }
 
     // Validaciones previas (RF-1): si no pasan, no se envía.
     const Resultado<SolverConfig> validacion = validarEntradaSolver(entrada);
@@ -172,6 +248,11 @@ void ServicioGeneracion::alResponder(const RespuestaSolver& respuesta)
     m_ultimo = ResultadoGeneracion{};
     m_ultimo.horario  = horario;
     m_ultimo.analisis = analisis;
+    // 013, RF-8: estado por preferencia y agregado, sobre el horario y la proyección ya
+    // calculada. No cambia el contrato de salida del solver.
+    m_ultimo.cumplimiento = analizarPreferencias(m_config, horario, m_noAplicadas);
+    // 014, RF-12: informe aditivo de bloques, desvío, huecos y separación sobre el horario.
+    m_ultimo.bloques = analizarBloques(horario, m_config);
 
     // P4: conflictos de solapamiento ⇒ el cálculo falló.
     if (!analisis.presentable())

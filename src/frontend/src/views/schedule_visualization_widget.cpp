@@ -292,7 +292,23 @@ void ScheduleVisualizationWidget::showTeacherSchedules(const QJsonObject& data)
         m_loadedStudentSchedules = updatedData;
     });
 
-    dialog->show();
+    // La ventana principal se oculta mientras se consulta el horario y vuelve a
+    // mostrarse al cerrar el diálogo; el horario ocupa toda la pantalla. Se
+    // desactiva «cerrar al cerrar la última ventana» durante la transición.
+    const bool cerrarAlUltimo = qApp->quitOnLastWindowClosed();
+    qApp->setQuitOnLastWindowClosed(false);
+    QWidget* principal = window();
+    dialog->showMaximized();
+    if (principal)
+        principal->hide();
+    connect(dialog, &QDialog::finished, this, [principal, cerrarAlUltimo]() {
+        qApp->setQuitOnLastWindowClosed(cerrarAlUltimo);
+        if (principal) {
+            principal->show();
+            principal->raise();
+            principal->activateWindow();
+        }
+    });
 }
 
 void ScheduleVisualizationWidget::showStudentSchedules(const QJsonObject& data)
@@ -308,7 +324,23 @@ void ScheduleVisualizationWidget::showStudentSchedules(const QJsonObject& data)
         m_loadedStudentSchedules = updatedData;
     });
 
-    dialog->show();
+    // La ventana principal se oculta mientras se consulta el horario y vuelve a
+    // mostrarse al cerrar el diálogo; el horario ocupa toda la pantalla. Se
+    // desactiva «cerrar al cerrar la última ventana» durante la transición.
+    const bool cerrarAlUltimo = qApp->quitOnLastWindowClosed();
+    qApp->setQuitOnLastWindowClosed(false);
+    QWidget* principal = window();
+    dialog->showMaximized();
+    if (principal)
+        principal->hide();
+    connect(dialog, &QDialog::finished, this, [principal, cerrarAlUltimo]() {
+        qApp->setQuitOnLastWindowClosed(cerrarAlUltimo);
+        if (principal) {
+            principal->show();
+            principal->raise();
+            principal->activateWindow();
+        }
+    });
 }
 
 void ScheduleVisualizationWidget::loadSchedules(const QJsonObject& datos)

@@ -31,7 +31,7 @@
 
 ## 5. Protección de los datos del usuario
 
-- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, asignaturas, cursos, turnos, recesos y configuración del solver) nunca se borran ni se sobrescriben sin confirmación explícita.
+- Los datos del usuario en SQLite (planes de estudio, docentes, aulas, tipos de aula, asignaturas, cursos, turnos, eventos y configuración del solver) nunca se borran ni se sobrescriben sin confirmación explícita.
 - Los presets y los horarios guardados se gestionan como archivos JSON, no como datos de la base de datos; el usuario es dueño de esos archivos.
 - Toda operación destructiva o migración de esquema debe ser reversible o ir acompañada de respaldo.
 - La información sensible no se incluye en logs, dumps ni specs; los fixtures de test usan datos ficticios.
@@ -52,40 +52,78 @@ El solver es la única pieza que decide el horario. Esta sección fija su contra
 > `duracion_minutos` define **solo la duración real** de la franja (rejilla horaria, receso y
 > disponibilidad). Afecta a §7.1.2 y a **V14** (§7.4); el detalle normativo queda en la spec 005.
 
+> **Enmienda (2026-11-10, spec 018).** El **aforo simultáneo por aula** deja de ser una spec futura: es una
+> **regla del sistema por tipo de aula** —cancha **2**, resto **1**—, **hardcodeada**: no viaja en la
+> configuración, no toca el esquema y no entra en los presets. Afecta a **§7.1.3** (un aula admite hasta su
+> aforo de clases simultáneas), **§7.1.5** (la exclusividad rige también las clases desplazadas, con el aforo
+> de la cancha), **§7.3** (qué declara un aula y que el aforo es regla del motor) y **§7 «Comportamiento»**
+> (la causa (2) cuenta `aulas × franjas × aforo` y cita las cuatro cifras). **§7.4 no cambia: V1–V19 se
+> mantienen.**
+
 - **Frontera.** El solver no abre la base de datos ni depende de la interfaz. Recibe una configuración ya validada y devuelve una asignación o un fallo. La base aporta las entidades de dominio; el preset, los parámetros de cálculo.
-- **Comportamiento.** O encuentra una solución que respeta *todas* las restricciones duras, o declara el problema no factible con la causa. No completa ni corrige la entrada. Para la misma entrada el resultado es reproducible.
+- **Comportamiento.** O encuentra una solución que respeta *todas* las restricciones duras, o declara el problema no factible **con la causa cuando una categoría la explica y sin atribuirla cuando ninguna aplica**. No completa ni corrige la entrada. El catálogo de causas es **(1) entrada inválida, (2) conflicto de aula, (3) conflicto de persona, (4) conflicto de asignación de docente y (5) conflicto de bloques** (total semanal impar o más apariciones que días; con 5 días, una materia de **11 h o más**); si ninguna de (1)–(5) explica el fallo, el mensaje es «no atribuible» y cita (1)–(5) y el diagnóstico de bloques. La **causa (2)** cuenta la capacidad de un tipo como
+**aulas × franjas × aforo** y su mensaje cita las **cuatro cifras** (demanda, aulas, franjas y aforo); la
+precedencia de **(3)** sobre **(2)** se mantiene. Para la misma entrada el resultado es **válido con las reglas vigentes**; la búsqueda usa **8 workers** con semilla fija y **no se promete el mismo horario entre ejecuciones**. Los diagnósticos y los cálculos puros siguen siendo deterministas.
 
 ### 7.1. Qué garantiza (invariantes)
 
 1. **Un docente por materia-curso.** Cada materia de cada curso la dicta exactamente un profesor; no se reparte.
 2. **Horas de la materia-curso.** Cada materia-curso recibe exactamente sus **horas académicas semanales en bloques** (1 hora académica = 1 bloque).
-3. **Sin solapamientos.** Ni un curso, ni un profesor, ni un aula tienen dos clases a la vez.
+3. **Sin solapamientos (con el aforo del aula).** Ni un curso ni un profesor tienen dos clases a la vez. Un
+   aula admite **hasta su aforo simultáneo** de clases en la misma franja: **cancha → 2** (dos **cursos**
+   distintos con **docentes** distintos) y el **resto de tipos → 1**. El aforo es una **regla del sistema por
+   tipo de aula**, no un dato de la configuración (§7.3).
 4. **Turno, plan y año.** Un profesor **no enseña fuera del turno, el plan ni los años que tenga definidos**; un criterio **ausente** se interpreta como **cualquiera**. (Se refiere a los filtros del **profesor**; el turno y el plan del **curso** son obligatorios para generar — ver spec 005.)
-5. **Aula.** Con el modo de aula fija **inactivo**, cada curso ocupa exactamente un aula en cada franja en que tiene clase (la decide el solver); con el modo **activo**, cada curso usa su aula fija.
+5. **Aula.** Toda clase se imparte en un aula cuyo **tipo** coincide con el tipo de aula requerido por su materia. Con el modo de aula fija **inactivo**, el solver elige un aula del tipo requerido en cada franja en que el curso tiene clase; con el modo **activo**, cada curso declara un **aula de referencia**: la usa cuando su tipo coincide, y las clases cuya materia requiere otro tipo se imparten en un aula de ese tipo y el curso **vuelve** a la referencia en las demás. Mientras un curso tiene una clase desplazada en una franja, su aula de referencia queda **vacía y bloqueada** en esa franja. La **exclusividad de aula** rige también las clases desplazadas, **con el aforo de su tipo**: la **cancha**
+admite **dos** clases desplazadas a la vez (cursos y docentes distintos; sus dos bloques ocupan
+**exactamente las mismas dos franjas**) y las demás aulas, **una**; la referencia sigue **vacía y
+bloqueada**, también cuando hay dos cursos en la cancha. El **aula de referencia es siempre del tipo general/ordinario** del centro (el tipo de clave normalizada `aula de estudio`); las aulas de los demás tipos **nunca** quedan reservadas.
+6. **Forma dura del reparto en bloques.** Cada tramo ocupado de un (curso, día, segmento) se cubre con **pares de franjas adyacentes**; un tramo impar no es solución. Cada materia-curso ocupa **bloques enteros salvo su resto**; como máximo hay **un bloque de la misma materia por día**. El resto de una materia impar comparte bloque con el resto de **otra materia impar del mismo tipo de aula** (un bloque compartido tiene exactamente dos restos). Las dos franjas de un bloque usan la **misma aula**. Las franjas libres de cada día son un **sufijo** (huecos al final): `ocupada[s] ≥ ocupada[s+1]`.
 
 ### 7.2. Qué prioriza (función objetivo)
 
-El solver minimiza una penalización entera y **nunca** viola una restricción dura para reducirla. Prioridades, de mayor a menor peso:
+> **Enmienda (2026-11-07, spec 014).** La antigua agrupación de bloques queda **eliminada** y su peso
+> ya no existe. El emparejamiento, la alineación, la misma aula y los **huecos al final** son reglas
+> **duras**. El orden blando es **S1 > S2 > separación > viernes > preferencia**; la separación y el
+> viernes son blandos.
+
+El solver minimiza una penalización entera y **nunca** viola una restricción dura para reducirla. Prioridades, de mayor a menor:
 
 1. **No exceder las horas de aula de un profesor** (`PESO_HORAS`): cada profesor respeta el tope de su contrato; si la demanda lo obliga, el exceso se paga y se minimiza.
 2. **Preferir titulares antes que suplentes.** Cada asignación a un suplente se penaliza con un coste entero positivo **fijo** (`COSTE_SUPLENTE`). Como asignar a un suplente cuesta más que dar clase a un titular con **capacidad de horas libre**, un suplente solo cubre una materia-curso cuando los titulares **elegibles** ya **no tienen horas libres** (no son **preferidos**) o no tienen disponibilidad. La **elegibilidad** es factibilidad previa (plan, turno, año, disponibilidad); la **capacidad de horas** es preferencia del objetivo, **no** una compuerta. Esta regla **emerge** de la optimización y no se impone a mano.
+3. **Separación de un día entre apariciones** (prioridad **blanda alta**): se minimizan los pares de apariciones de la misma materia-curso en días consecutivos. Su peso por instancia domina a todos los huecos no-viernes. No altera las reglas duras.
+4. **Huecos fuera del viernes** (prioridad **blanda**): se minimizan los huecos que no caen en viernes. Los huecos **al final del día** son una regla dura.
+5. **Preferencia horaria del docente** (`PESO_PREFERENCIA`): una prioridad **blanda**. Penaliza las franjas que el docente **evita** y premia las que **prefiere** con el mismo peso y por franja de clase; nunca altera la factibilidad ni añade causas de no factibilidad, y **no** elige qué docente dicta una materia-curso. Con las mismas preferencias, la **asignación de docente por materia-curso** y el **exceso de horas** por docente son los de la generación de referencia (la misma entrada sin preferencias): la preferencia solo decide **dónde** caen las clases. La garantía es **sobre el resultado** y se impone de forma estructural (resolución por fases), no por la magnitud del peso.
 
-`PESO_HORAS` y `COSTE_SUPLENTE` son constantes enteras del motor, con `PESO_HORAS > COSTE_SUPLENTE > 0`. El `peso` de cada par (docente, materia-suplente) es dato de la entrada (hoy **sin uso** en el objetivo; ver spec 005).
+`PESO_HORAS`, `COSTE_SUPLENTE` y `PESO_PREFERENCIA` son constantes enteras del motor, con
+`PESO_HORAS > COSTE_SUPLENTE > PESO_PREFERENCIA` (hoy `1000 > 100 > 25`). El peso de la separación
+se calcula por instancia (`maxHuecos + 1`) y el del viernes vale 1. El orden por unidad expresa la
+importancia relativa, pero **no basta** para garantizar la igualdad de S1/S2 (el objetivo es
+aditivo); esa igualdad la da la jerarquía por fases. La preferencia no se declara por rango ni por
+docente y **no viaja** en la configuración. El `peso` de cada par (docente, materia-suplente) es dato
+de la entrada (hoy **sin uso** en el objetivo; ver spec 005).
 
 ### 7.3. Contrato de configuración
 
 - La entrada es un JSON versionado; un preset es una configuración completa y reutilizable.
-- **Cursos:** se identifican por `anio` (entero) y `seccion` (carácter); el nombre se deriva de ellos (`"1ro A"`) y lo calcula **quien muestra**, no el solver. De cada curso se configuran su `plan` (del que se derivan sus materias y horas) y su `num_estudiantes`; su `turno` y su `aula` provienen de los datos del curso. El **modo de aula fija es global** (booleano, por defecto verdadero): activo → cada curso usa su aula fija; inactivo → aulas móviles que decide el solver. El **turno y el plan del curso son obligatorios para generar** (si faltan, la entrada se rechaza); la **asignación automática de turno** se difiere a la spec 006.
+- **Cursos:** se identifican por `anio` (entero) y `seccion` (carácter); el nombre se deriva de ellos (`"1ro A"`) y lo calcula **quien muestra**, no el solver. De cada curso se configuran su `plan` (del que se derivan sus materias y horas) y su `num_estudiantes`; su `turno` y su `aula` provienen de los datos del curso; esa `aula` **debe ser del tipo general/ordinario** (V18). El **modo de aula fija es global** (booleano, por defecto verdadero): activo → el aula del curso es su **aula de referencia** (§7.1.5: desplazamiento y vuelta); inactivo → el solver elige el aula de cada clase. El **turno y el plan del curso son obligatorios para generar** (si faltan, la entrada se rechaza); la **asignación automática de turno** se difiere a la spec 006. La configuración **no** lleva datos que distingan los tipos generales: la convención es el nombre del tipo (clave normalizada `aula de estudio`).
 - **Planes:** la entrada **embebe** los planes de estudio con sus materias y horas, para que el solver no acceda a la base de datos.
 - **Profesores:** además de materias (titular/suplente), turno y plan, tienen `anios` (años a los que pueden dictar; vacío = cualquiera).
-- **Aulas:** se referencian por su **índice** en el pool de aulas, no por nombre; la interfaz y el CSV traducen índice→nombre.
+- **Aulas:** se referencian por su **índice** en el pool de aulas, no por nombre; la interfaz y el CSV traducen índice→nombre. Cada aula declara su **tipo** y cada materia el **tipo de aula requerido**; la igualdad es exacta sobre la **clave normalizada** (sin espacios extremos y sin distinguir mayúsculas), aunque el nombre visible del tipo se conserva. Cada aula declara también su **capacidad física** (alumnos),
+que **no** es el aforo simultáneo. El **aforo** (clases a la vez en la misma franja) es una **regla del motor
+por tipo de aula** —cancha **2**, resto **1**—, **hardcodeada**: no se declara por aula, **no viaja** en la
+configuración, no toca el esquema y no entra en los presets.
+- **Eventos:** la entrada lleva los eventos de cada turno (nombre, posición, orden, duración y horario opcional); sustituyen a la sección de recesos. **No crean ni quitan franjas**, pero **definen los segmentos** del bloque: dos franjas separadas por un evento no forman bloque. La **identidad** del evento no viaja en el contrato.
 - La base define la estructura de cursos con `anio`, `seccion`, `turno` y `aula` (opcional, referencia a un aula), y **sin `nombre` almacenado**; `(anio, seccion)` es único en todo el sistema. La relación persistida curso–materia **no existe**.
 - La **construcción de la entrada** (leer los datos persistidos y el preset y producir el JSON) es responsabilidad de la **spec 005**; el solver **no** accede a la base.
+- La versión del contrato es **2.0**; una configuración `1.0` o sin versión se rechaza.
 
 ### 7.4. Validación previa
 
-Antes de construir el modelo se ejecutan las validaciones V1–V15; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas.
+Antes de construir el modelo se ejecutan las validaciones V1–V19; si alguna falla, el solver no se invoca. **V13** exige que cada materia-curso tenga al menos un candidato **elegible** (titular o suplente) que respete plan, turno, año y disponibilidad (la capacidad de horas es preferencia del objetivo, no de V13). **V7** exige que cada curso declare un turno válido y **V10/V11** que declare un plan. **V14** rechaza un curso que necesite más horas académicas que franjas útiles tiene su turno (`Σ_m horas_m ≤ nº_días × |franjas del turno|`). **V15** rechaza la entrada cuando el modo de aulas móviles está activo y el centro no dispone de aulas. **V1** espera la sección de **eventos** (no la de recesos). **V19** valida la forma y las referencias de la sección **opcional** `preferencias` —índice de docente, día de la generación, franja y sentido— y **no** comprueba rangos de reloj, coherencia con el turno, el plan o los años, ni solapes: la sección llega ya proyectada. El contenido de V1, V2, V16, V17 y V18 vive en la spec 005 y en la 010, y el de V19 en la 013.
 
 ### 7.5. Fuera de alcance de este contrato
 
-Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. La **capacidad de aula** y las **horas no cubiertas** podrían volver **como avisos posteriores** (ver spec 002). El receso es metadata que el solver ignora; el horario del profesor se deriva por post-proceso.
+Turnos automáticos (spec 006), generación parcial (spec 007), cobertura de emergencia. Los avisos de **capacidad de aula** y de **horas no cubiertas** están **retirados por la decisión I2 de la spec 005** (el único aviso vigente del validador de salida es el **exceso de horas del docente**); podrían volver **como avisos posteriores** al solver (ver spec 002). El **evento** de turno **no crea ni quita franjas**: define los **segmentos** válidos para el bloque; el horario del profesor se deriva por post-proceso.
+
+Las **preferencias del docente que no intervienen** —docente que no participa en la generación, día fuera de la semana declarada o rango que no alcanza ninguna franja del turno de un curso donde el docente es candidato— **no viajan** en la configuración, **no entran** en la huella de datos y **no son causa de no factibilidad**: el resultado de la generación las informa como **no aplicadas**, con su motivo. Las preferencias **nunca** convierten en elegible a un docente, no cambian el reparto de docentes ni el exceso de horas y no intervienen fuera de la semana declarada.

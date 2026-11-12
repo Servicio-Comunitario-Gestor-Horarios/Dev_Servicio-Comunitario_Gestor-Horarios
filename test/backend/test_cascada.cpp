@@ -30,6 +30,7 @@ private:
     std::unique_ptr<ServicioCargaHoraria> m_carga;
     std::unique_ptr<ServicioProfesor> m_profesor;
     QString m_ruta;
+    int m_idTipoAula = -1;
 
     /// Abre una conexión a la base de prueba y construye el núcleo de datos.
     void abrirBase()
@@ -93,6 +94,17 @@ private:
         return total;
     }
 
+    /// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+    int idTipoGeneral() const
+    {
+        QSqlQuery query(m_dbManager->database());
+        if (!query.exec(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"))
+            || !query.next()) {
+            return -1;
+        }
+        return query.value(0).toInt();
+    }
+
 private slots:
 
     void init()
@@ -101,6 +113,9 @@ private slots:
         QVERIFY(m_dir->isValid());
         m_ruta = m_dir->filePath("cascada.db");
         abrirBase();
+
+        m_idTipoAula = idTipoGeneral();
+        QVERIFY2(m_idTipoAula > 0, "La base nueva debe traer el tipo general (RF-1).");
     }
 
     void cleanup()
@@ -114,17 +129,20 @@ private slots:
     void dependenciasDe_describeRelacionesPorDominio()
     {
         const auto materia = dependenciasDe(QStringLiteral("materia"));
-        QCOMPARE(materia.size(), 2);
+        QCOMPARE(materia.size(), 3);
 
         bool apuntaAProfesor = false;
         bool apuntaACurso = false;
         bool apuntaAPlan = false;
+        bool apuntaASuplente = false;
         for (const RelacionCascada& rel : materia) {
             if (rel.tabla == QStringLiteral("Profesor_Materia")) apuntaAProfesor = true;
+            if (rel.tabla == QStringLiteral("Profesor_Materia_Suplente")) apuntaASuplente = true;
             if (rel.tabla == QStringLiteral("Curso_Materia"))    apuntaACurso = true;
             if (rel.tabla == QStringLiteral("PlanEstudio_Materia")) apuntaAPlan = true;
         }
         QVERIFY(apuntaAProfesor);
+        QVERIFY(apuntaASuplente);
         QVERIFY(!apuntaACurso);   // Curso_Materia se retiro (RF-5)
         QVERIFY(apuntaAPlan);
 
@@ -132,7 +150,7 @@ private slots:
         QCOMPARE(dependenciasDe(QStringLiteral("curso")).size(), 0); // ya no arrastra nada
         QCOMPARE(dependenciasDe(QStringLiteral("turno")).size(), 2);
         QCOMPARE(dependenciasDe(QStringLiteral("plan")).size(), 1);  // sin plan -> cursos
-        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 2);
+        QCOMPARE(dependenciasDe(QStringLiteral("profesor")).size(), 4);
 
         QVERIFY(dependenciasDe(QStringLiteral("inexistente")).isEmpty());
         QVERIFY(!dominioValido(QStringLiteral("inexistente")));
@@ -144,7 +162,7 @@ private slots:
     void dependientesDe_plan_listaMateriasYCursos()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Matemática");
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
 
@@ -162,7 +180,7 @@ private slots:
     void dependientesDe_materia_listaPlanProfesorYCurso()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Física");
+        auto materia = m_nucleo->crearMateria("Física", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 2, 3).ok);
 
@@ -182,7 +200,7 @@ private slots:
 
     void dependientesDe_aula_listaCursosConAulaFija()
     {
-        auto aula = m_nucleo->crearAula("Aula 101", 30, "Edificio A");
+        auto aula = m_nucleo->crearAula("Aula 101", 30, "Edificio A", QString(), m_idTipoAula);
         QVERIFY(aula.ok);
         auto curso = m_nucleo->crearCurso(1, "A", QString(), aula.valor.id);
         QVERIFY(curso.ok);
@@ -206,7 +224,7 @@ private slots:
 
     void dependientesDe_profesor_listaRelaciones()
     {
-        auto materia = m_nucleo->crearMateria("Historia");
+        auto materia = m_nucleo->crearMateria("Historia", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
         QVERIFY(m_profesor->asignarMateria("P1", materia.valor.id));
@@ -217,22 +235,43 @@ private slots:
         franja.fin = QTime(10, 0);
         QVERIFY(m_profesor->agregarDisponibilidad("P1", franja).ok);
 
+        FranjaHoraria preferida;
+        preferida.dia = 2;
+        preferida.inicio = QTime(14, 0);
+        preferida.fin = QTime(16, 0);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", preferida,
+                                             SentidoPreferencia::Evitada).ok);
+
         const auto dependencias =
             m_nucleo->dependientesDe(QStringLiteral("profesor"), QStringLiteral("P1"));
 
         QCOMPARE(contarDominio(dependencias, QStringLiteral("profesor_materia")), 1);
         QCOMPARE(contarDominio(dependencias, QStringLiteral("disponibilidad")), 1);
+        QCOMPARE(contarDominio(dependencias, QStringLiteral("preferencia")), 1);
+
+        // La preferencia se lista con etiqueta legible (sentido, día y rango).
+        bool etiquetaLegible = false;
+        for (const Dependencia& d : dependencias) {
+            if (d.dominio != QStringLiteral("preferencia"))
+                continue;
+            etiquetaLegible = d.descripcion.contains(QStringLiteral("Preferencia horaria")) &&
+                              d.descripcion.contains(QStringLiteral("evitada")) &&
+                              d.descripcion.contains(QStringLiteral("14:00-16:00"));
+        }
+        QVERIFY(etiquetaLegible);
     }
 
-    void dependientesDe_turno_listaRecesos()
+    void dependientesDe_turno_listaEventos()
     {
         QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
-        QVERIFY(m_nucleo->agregarReceso("Mañana", 2, 10).ok);
+        QVERIFY(m_nucleo->agregarEvento("Mañana", "Receso", 2, 10).ok);
 
         const auto dependencias =
             m_nucleo->dependientesDe(QStringLiteral("turno"), QStringLiteral("Mañana"));
 
-        QCOMPARE(contarDominio(dependencias, QStringLiteral("receso")), 1);
+        QCOMPARE(contarDominio(dependencias, QStringLiteral("evento")), 1);
+        // La dependencia lleva la etiqueta del evento (su nombre).
+        QVERIFY(dependencias.first().descripcion.contains(QStringLiteral("Receso")));
     }
 
     void dependientesDe_dominioDesconocido_estaVacio()
@@ -246,7 +285,7 @@ private slots:
     void calcularDependencias_noModificaDatos()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Matemática");
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
         auto curso = m_nucleo->crearCurso(1, "A");
@@ -274,7 +313,7 @@ private slots:
     void eliminarConCascada_plan_borraVinculosYCursos()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Matemática");
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
         auto curso = m_nucleo->crearCurso(1, "A");
@@ -293,7 +332,7 @@ private slots:
     void eliminarConCascada_materia_borraSusVinculos()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Física");
+        auto materia = m_nucleo->crearMateria("Física", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 2, 3).ok);
 
@@ -317,7 +356,7 @@ private slots:
 
     void eliminarConCascada_curso_borraElCurso()
     {
-        auto materia = m_nucleo->crearMateria("Química");
+        auto materia = m_nucleo->crearMateria("Química", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         auto curso = m_nucleo->crearCurso(1, "A");
         QVERIFY(curso.ok);
@@ -333,7 +372,7 @@ private slots:
 
     void eliminarConCascada_aula_anulaReferenciaDeCursos()
     {
-        auto aula = m_nucleo->crearAula("Aula 101", 30);
+        auto aula = m_nucleo->crearAula("Aula 101", 30, QString(), QString(), m_idTipoAula);
         QVERIFY(aula.ok);
         QVERIFY(m_nucleo->crearCurso(1, "A", QString(), aula.valor.id).ok);
 
@@ -360,6 +399,80 @@ private slots:
         QVERIFY(cursos.first().turno.isEmpty());
     }
 
+    void eliminarConCascada_profesor_borraDisponibilidadYPreferencias()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+
+        FranjaHoraria disponibilidad;
+        disponibilidad.dia = 1;
+        disponibilidad.inicio = QTime(8, 0);
+        disponibilidad.fin = QTime(10, 0);
+        QVERIFY(m_profesor->agregarDisponibilidad("P1", disponibilidad).ok);
+
+        FranjaHoraria preferida;
+        preferida.dia = 2;
+        preferida.inicio = QTime(14, 0);
+        preferida.fin = QTime(16, 0);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", preferida,
+                                             SentidoPreferencia::Preferida).ok);
+
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 1);
+
+        QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                             QStringLiteral("P1")));
+
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 0);
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 0);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 0);
+    }
+
+    /// Un fallo al borrar el docente revierte también sus hijas (RNF-4).
+    void eliminarConCascada_profesor_atomico_falloDejaTodoIntacto()
+    {
+        QVERIFY(m_nucleo->crearDocente("P1", "Ana Pérez", "ana@test.com").ok);
+
+        FranjaHoraria franja;
+        franja.dia = 1;
+        franja.inicio = QTime(8, 0);
+        franja.fin = QTime(10, 0);
+        QVERIFY(m_profesor->agregarDisponibilidad("P1", franja).ok);
+        QVERIFY(m_nucleo->agregarPreferencia("P1", franja,
+                                             SentidoPreferencia::Preferida).ok);
+
+        // El trigger aborta al borrar el docente, después de borrar sus hijas.
+        QVERIFY(ejecutar(QStringLiteral(
+            "CREATE TRIGGER fallo_cascada BEFORE DELETE ON Profesores "
+            "BEGIN SELECT RAISE(ABORT, 'fallo simulado en cascada'); END;")));
+
+        QVERIFY(!m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                              QStringLiteral("P1")));
+
+        // Nada aplicado: docente, disponibilidad y preferencia siguen ahí.
+        QCOMPARE(m_nucleo->listarDocentes().valor.size(), 1);
+        QCOMPARE(contar(QStringLiteral("Disponibilidad_Profesor")), 1);
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 1);
+
+        // Retirado el trigger, la cascada vuelve a funcionar.
+        QVERIFY(ejecutar(QStringLiteral("DROP TRIGGER fallo_cascada")));
+        QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("profesor"),
+                                             QStringLiteral("P1")));
+        QCOMPARE(contar(QStringLiteral("Preferencia_Profesor")), 0);
+    }
+
+    void eliminarConCascada_turno_borraSusEventos()
+    {
+        QVERIFY(m_nucleo->crearTurno("Mañana", QTime(7, 0), QTime(12, 0), 5).ok);
+        QVERIFY(m_nucleo->agregarEvento("Mañana", "Receso", 2, 10).ok);
+        QVERIFY(m_nucleo->agregarEvento("Mañana", "Acto cívico", 2, 5).ok);
+        QCOMPARE(contar(QStringLiteral("Eventos")), 2);
+
+        QVERIFY(m_nucleo->eliminarConCascada(QStringLiteral("turno"), QStringLiteral("Mañana")));
+
+        QCOMPARE(m_nucleo->listarTurnos().valor.size(), 0);
+        QCOMPARE(contar(QStringLiteral("Eventos")), 0);
+    }
+
     void eliminarConCascada_registroInexistente_falla()
     {
         QVERIFY(!m_nucleo->eliminarConCascada(QStringLiteral("materia"),
@@ -373,7 +486,7 @@ private slots:
     void eliminarConCascada_atomico_falloDejaTodoIntacto()
     {
         QVERIFY(m_nucleo->crearPlan("IS-2026", "Ingeniería").ok);
-        auto materia = m_nucleo->crearMateria("Matemática");
+        auto materia = m_nucleo->crearMateria("Matemática", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_carga->asignarCarga("IS-2026", materia.valor.id, 1, 4).ok);
 

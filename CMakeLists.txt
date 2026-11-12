@@ -35,6 +35,10 @@ option(BUILD_BACKEND "Build backend, middleware, and solver (requires OR-Tools)"
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_CONSOLA "Build the DB console tool (requires BUILD_BACKEND)" ON)
 option(BUILD_SEED "Build the test-data seeder (requires BUILD_BACKEND)" ON)
+# BUILD_FRONTEND=OFF omite la interfaz Qt y el ejecutable `gestor-horarios`.
+# `src/app` se sigue configurando porque `app_core` (instancia única) no depende
+# de la UI. Sirve para verificar backend, seed y consola sin la interfaz.
+option(BUILD_FRONTEND "Build the Qt GUI frontend and the gestor-horarios executable" ON)
 
 # ── Dependencias externas ──
 # Qt6: framework de interfaz gráfica, base de datos e IPC

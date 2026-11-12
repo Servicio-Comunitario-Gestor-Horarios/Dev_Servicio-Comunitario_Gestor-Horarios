@@ -1,0 +1,83 @@
+{
+    "version": "1.0",
+    "aula_fija": true,
+    "dimensiones": {
+        "num_profesores": 1,
+        "num_materias": 1,
+        "num_aulas": 1,
+        "num_cursos": 1,
+        "num_dias": 5,
+        "num_slots_dia": 6
+    },
+    "franja_horaria": {
+        "duracion_minutos": 45,
+        "slots_por_turno": 6
+    },
+    "turnos": {
+        "turnos": [
+            {
+                "nombre": "manana",
+                "slot": [0, 1, 2, 3, 4, 5]
+            }
+        ]
+    },
+    "recesos": [
+        {
+            "turno": "manana",
+            "despues_de_slot": 2,
+            "duracion": 30,
+            "inicio": "09:15",
+            "fin": "09:45"
+        }
+    ],
+    "planes": [
+        {
+            "codigo": "Ciencias",
+            "materias": [
+                {
+                    "materia_idx": 0,
+                    "curso": 1,
+                    "horas_semanales": 2
+                }
+            ]
+        }
+    ],
+    "cursos": [
+        {
+            "anio": 1,
+            "seccion": "A",
+            "turno": "manana",
+            "plan": "Ciencias",
+            "num_estudiantes": 20,
+            "aula": 0
+        }
+    ],
+    "profesores": [
+        {
+            "nombre": "Ana",
+            "horas_aula": 2,
+            "turno": "",
+            "plan": "",
+            "anios": [1],
+            "materias_asignadas": [0],
+            "materias_suplente": [],
+            "disponibilidad": [
+                {
+                    "dia": 0,
+                    "slot": [0, 1, 2, 3, 4, 5]
+                }
+            ]
+        }
+    ],
+    "materias": [
+        {
+            "nombre": "Matemática"
+        }
+    ],
+    "aulas": [
+        {
+            "nombre": "A1",
+            "capacidad": 30
+        }
+    ]
+}

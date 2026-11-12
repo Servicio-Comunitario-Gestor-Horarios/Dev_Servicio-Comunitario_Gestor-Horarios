@@ -53,5 +53,14 @@
 - Test nuevo: 5 h en un curso sin acoplamiento → 2+3, sin grupos de 1.
 - `max_deterministic_time(2.0)` mantiene la reproducibilidad (RF-6).
 
+## Ajuste del límite determinista (2026-11-02)
+- El límite sube de **2.0** a **6.0** s deterministas (`src/backend/src/solver/solver.cpp`).
+  Con el centro completo (13 cursos) 2.0 no alcanzaba para encontrar la primera solución y el
+  motor devolvía `UNKNOWN`; el presupuesto determinista no afecta a la reproducibilidad
+  (sigue con 1 worker y seed 0).
+- Medido con el centro 31059 (13 cursos, 3 laboratorios): `FEASIBLE` en ~6 s deterministas
+  (~20 s de pared), P4 sin conflictos y penalización S3 = 166. Con un solo laboratorio la
+  instancia sigue siendo `INFEASIBLE` por capacidad del tipo (107 bloques vs 80 franjas).
+
 ## Próximo paso
 Validación QA final (reviewer) y cierre definitivo de la spec.

@@ -2,6 +2,26 @@
 
 Estado: implementada (2026-10-17)
 
+> **Sustituida en sus datos por la 017 (2026-11-08).** El conjunto de datos de prueba pasa a ser el **centro
+> real** (Liceo Nacional Robert Serra, 2026/2027): **2 planes** (31059 y 31060), **85 materias** (79 con
+> carga y 6 sin carga), **24 cursos con turno**, **13 aulas** (12 de uso general compartidas entre turnos
+> + 1 cancha), **32 docentes** y **hora académica de 40 min** (07:00–12:40 y 12:40–18:10). Se **retiran
+> las cuatro variantes de docentes** (holgada, suplentes, sin profesorado y sin disponibilidad) y los **tres
+> planes derivados** (EXA/NAT/SOC), con su conmutación. Quedan **superados** de esta spec: **«cada curso un
+> aula propia y distinta»** (12 aulas para 24 cursos, **compartidas entre turnos**), los **cursos sembrados
+> sin turno** (ahora el **turno es dato del curso** y se persiste) y la **ventana de mañana 07:00–12:30**,
+> que pasa a **07:00–12:40** por el **acto cívico** (8 × 40 + 10 + 10). El conjunto **no se declara
+> generable** hasta que exista el **aforo simultáneo** de la cancha: **48 clases de Educación Física por
+> turno frente a 40 franjas de cancha** (con aforo ×2: 96 ≤ 160 y 48 ≤ 80).
+>
+> **Sigue vigente** lo que no es dato del centro: las garantías de **aplicación segura** (base de destino
+> obligatoria, fallo si hay datos, confirmación explícita y **respaldo previo obligatorio**), el **reemplazo
+> total atómico** en una **transacción única** y el **determinismo**. El detalle está en
+> `specs/017-datos-reales-del-centro/`.
+
+> **Anotado por la 015 (2026-11-05).** La fila del tipo general no cuenta como dato de dominio; el
+> recuento de tipos es 3 y se lee de la base; el perfil no declara «Aula de estudio» (015, RF-5).
+
 > **Cambio de requisitos (2026-10-17): 40 horas académicas por año.** La hora del 31059 es una **hora
 > académica** (= un bloque), **no** una hora de reloj; la spec 005 se rectificó (1 hora = 1 bloque,
 > `duracion_minutos` solo fija la duración real de la franja). Por eso el plan General **no** se adapta a
@@ -148,6 +168,8 @@ persistido, no la configuración de cálculo.
   del conjunto.
 - **Reemplazo de docentes:** borrado **solo** de los docentes, sus materias asignadas y su
   disponibilidad, y carga de otra variante; el resto de los datos no se toca.
+  > **Superado en lo que toca a las preferencias por la 012 (2026-10-29).** La conmutación borra
+  > también `Preferencia_Profesor` antes que los docentes; el resto de la definición sigue vigente.
 - **Base vacía:** base con el esquema esperado y **ningún** registro de dominio.
 - **Datos ficticios:** nombres, correos y contactos inventados; ninguna persona real (constitución §5).
 
@@ -268,6 +290,11 @@ persistido, no la configuración de cálculo.
   bloque 3 empieza a las 08:20 (mañana) y a las 14:00 (tarde), es decir, **durante la campana del
   receso**. El desfase se documenta y se asume: el conjunto **no** intenta corregirlo ni inventa una
   rejilla alternativa.
+
+  > **Superado por la 011 (2026-10-29).** El inventario de 8 franjas de 40 min y la rejilla
+  > `8 × 40 + 10` se sustituyen por 8 franjas de D = 35: Mañana 07:00–11:50 y Tarde 12:40–17:30,
+  > recesos 08:10–08:20 y 13:50–14:00 (`8 × 35 + 10 = 290`). La rejilla de clases termina en 11:40 y
+  > 17:20; el `fin` añade el evento de 10 min (el mismo desfase de 10 min que ya se documentaba aquí).
 
   **Nota de indexado de `despues_de_slot`.** El esquema admite el valor **0** y **no documenta** si el
   índice es 1-based (el receso cae tras la franja 2) o 0-based (tras la franja 1). Con
@@ -396,6 +423,9 @@ persistido, no la configuración de cálculo.
   completa**, sin estados intermedios.
 - **CUANDO se aplique dos veces la misma variante, EL SISTEMA dejará el mismo estado final**, sin
   duplicar docentes, materias asignadas ni disponibilidades.
+
+> **Superado en lo que toca a las preferencias por la 012 (2026-10-29).** La conmutación de variante
+> borra también `Preferencia_Profesor` antes que los docentes; la 008 conserva el resto de su RF-9.
 
 ### RF-10. Aplicación inicial, reemplazo y protección de la base
 
@@ -541,6 +571,12 @@ persistido, no la configuración de cálculo.
 1. Aplicar el perfil por defecto sobre una base vacía deja el centro completo: 2 turnos con su receso, 16
    aulas, el catálogo de materias-año, 4 planes, 13 cursos y una variante de docentes con sus materias y
    disponibilidad (RF-1, RF-4, RF-5, RF-6).
+
+   > **Superado por la 011 (2026-10-29).** El inventario de 8 franjas de 40 min y la rejilla
+   > `8 × 40 + 10` se sustituyen por 8 franjas de D = 35: Mañana 07:00–11:50 y Tarde 12:40–17:30,
+   > recesos 08:10–08:20 y 13:50–14:00 (`8 × 35 + 10 = 290`). La rejilla de clases termina en 11:40 y
+   > 17:20; el `fin` añade el evento de 10 min (el mismo desfase de 10 min que ya se documentaba aquí).
+
 2. El plan General conserva las **14 áreas y la progresión del 31059** con **9/9/10/11/12 materias por
    año** (51 materias-año) y **40 horas académicas en cada año** (1 hora = 1 bloque, sin conversión);
    los tres planes derivados añaden sus materias de área, varían horas, **no superan 40 horas
@@ -549,6 +585,12 @@ persistido, no la configuración de cálculo.
 3. Los dos turnos tienen **8 franjas de 40 minutos**, ventanas de campana **07:00–12:30** y
    **12:40–18:10**, **receso de 10 minutos tras la franja 2** (08:20–08:30 y 14:00–14:10) y **rejilla
    aritmética** de 07:00 a **12:20** y de 12:40 a **18:00** (el `fin` guardado incluye el receso) (RF-4).
+
+   > **Superado por la 011 (2026-10-29).** El inventario de 8 franjas de 40 min y la rejilla
+   > `8 × 40 + 10` se sustituyen por 8 franjas de D = 35: Mañana 07:00–11:50 y Tarde 12:40–17:30,
+   > recesos 08:10–08:20 y 13:50–14:00 (`8 × 35 + 10 = 290`). La rejilla de clases termina en 11:40 y
+   > 17:20; el `fin` añade el evento de 10 min (el mismo desfase de 10 min que ya se documentaba aquí).
+
 4. Los cursos son 13 (3+3+3+2+2 secciones), **sin turno**, cada uno con un **aula distinta**; el preset
    aporta el turno al generar (RF-4, RF-5).
 5. Las cuatro variantes existen y son intercambiables, y su diferencia se puede comprobar **a nivel de
@@ -571,3 +613,11 @@ persistido, no la configuración de cálculo.
 ## Dudas abiertas
 
 Ninguna.
+
+## Nota 014b (B7, 2026-11-06)
+
+El catálogo sintético del **31059** cambia, para cumplir RNF-8 de la 014 (ninguna materia impar de
+laboratorio/taller sin pareja del mismo tipo), **Ciencias Naturales 1.º y 2.º: 5 → 6 h** (laboratorio
+par) y compensa con **GHC 1.º y 2.º: 6 → 5 h** (general; sigue habiendo cuatro materias generales
+impares que emparejan sus restos). Los años siguen sumando **40 h**; el resto de planes y recuentos no
+cambia.

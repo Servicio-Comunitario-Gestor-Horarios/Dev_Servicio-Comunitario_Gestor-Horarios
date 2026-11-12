@@ -23,11 +23,13 @@ using namespace operations_research::sat;
  *
  * Contiene:
  * - assignment         (x): profesor-materia-curso-dia-slot
- * - aulaAssignment     (y): aula de cursos moviles (solo si el modo no es aula fija)
+ * - aulaAssignment     (y): aula REAL de cada clase, para TODOS los cursos (fijos y móviles);
+ *                          solo se crean las aulas de los tipos que el curso requiere
  * - asignacionDocente  (z): docente activo por materia-curso (D1/D2)
  * - exceso             (e): bloques por encima del tope de horas de aula (S1)
- * - hay                (h): presencia de la materia en (m,c,d,seg,s) para S3
- * - isolated           (i): grupo de 1 (penaliza)
+ * - ocupada            (o): el curso tiene clase en (c,d,s) (R1)
+ * - par                (p): par de franjas (s, s+1) emparejado; solo dentro del segmento (R2)
+ * - materiaEnFranja    (u): la materia tiene clase en (m,c,d,s) (R3)
 
  */
 struct VariablesSolver {
@@ -36,14 +38,18 @@ struct VariablesSolver {
     QMap<std::tuple<int,int,int>, BoolVar> asignacionDocente;               ///< z: [p][c][m]
     QMap<int, IntVar> exceso;                                              ///< e[p]
 
-    // --- S3: Agrupación de bloques ---
-    // hay[m][c][d][seg][s] = 1 si la materia tiene clase en esa franja.
-    // isolated[m][c][d][seg][s] = 1 si la franja es un grupo de 1 (penaliza 1).
-    // longGroup[m][c][d][seg][s] = 1 si la franja es la 4.ª+ consecutiva (penaliza 1).
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> hay;                 ///< [m][c][d][seg][s]
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> isolated;            ///< [m][c][d][seg][s]
-    QMap<std::tuple<int, int, int, int, int>, BoolVar> longGroup;           ///< [m][c][d][seg][s]
+    // ── Emparejamiento en bloques de dos horas (014, R1–R3) ──
+    QMap<std::tuple<int, int, int>, BoolVar> ocupada;          ///< [c][d][s]
+    QMap<std::tuple<int, int, int>, BoolVar> par;              ///< [c][d][s] (par que empieza en s)
+    QMap<std::tuple<int, int, int, int>, BoolVar> materiaEnFranja;  ///< [m][c][d][s]
 
+    // ── Alineación (014, R4–R6) ──
+    /// [m][c][d][s]: el par (s, s+1) es entero de la materia (bloque simple).
+    QMap<std::tuple<int, int, int, int>, BoolVar> bloqueSimple;
+
+    // ── Separación blanda con prioridad alta (014b, R8) ──
+    QMap<std::tuple<int, int, int>, BoolVar> apareceDia;          ///< [m][c][d]
+    QMap<std::tuple<int, int, int>, BoolVar> incumpleSeparacion;  ///< [m][c][d] (d y d+1)
 };
 
 /**
@@ -57,7 +63,9 @@ struct VariablesSolver {
  * Crea `z[p][c][m]` para TODO candidato elegible por plan/anio (aunque no tenga ninguna `x`):
  * los recortes por turno/disponibilidad viven en las `x` y D3 (`Σx = bloques·z`) fuerza z=0, de
  * modo que la ausencia de candidato con disponibilidad hace INFEASIBLE a D1 (no se omite).
- * `y[c][d][s][a]` solo con el modo de aulas moviles (config.aula_fija == false).
+ * Crea `y[c][d][s][a]` para TODOS los cursos (fijos y móviles), en las franjas de su turno y solo
+ * para las aulas cuyo tipo requiere alguna materia del curso: es el aula real de la clase (D9
+ * ampliada y RF-3 de la spec 010).
  *
  * @param model Modelo CP-SAT donde se crean las BoolVar
  * @param config Configuración completa del solver

@@ -17,7 +17,7 @@ namespace gestor::frontend::forms {
 
 ClassroomFormDialog::ClassroomFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Aula");
-    resize(400, 250);
+    resize(400, 300);
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -33,7 +33,7 @@ ClassroomFormDialog::ClassroomFormDialog(QWidget *parent) : QDialog(parent) {
     setStyleSheet(QString("QDialog { background-color: %1; color: %2; }").arg(bgColor, textColor));
 
     QString inputStyle = QString(
-                             "QLineEdit, QSpinBox { border: 1px solid %1; border-radius: 6px; padding: 8px; padding-right: 24px; background: %2; color: %3; font-size: 13px; }"
+                             "QLineEdit, QSpinBox, QComboBox { border: 1px solid %1; border-radius: 6px; padding: 8px; padding-right: 24px; background: %2; color: %3; font-size: 13px; }"
                              "QLineEdit::placeholder { color: %4; }"
                              "QSpinBox::up-button, QSpinBox::down-button { subcontrol-origin: padding; border: none; background: %2; width: 16px; margin-right: 2px; }"
                              "QSpinBox::up-button { subcontrol-position: top right; margin-top: 2px; }"
@@ -52,6 +52,9 @@ ClassroomFormDialog::ClassroomFormDialog(QWidget *parent) : QDialog(parent) {
     campoCapacidad->setRange(1, 500);
     campoCapacidad->setValue(30);
     campoCapacidad->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+
+    campoTipoAula = new QComboBox(this);
+    campoTipoAula->setStyleSheet(inputStyle);
 
     campoEdificio = new QLineEdit(this);
     campoEdificio->setStyleSheet(inputStyle);
@@ -81,6 +84,7 @@ ClassroomFormDialog::ClassroomFormDialog(QWidget *parent) : QDialog(parent) {
 
     formLayout->addRow(labelStyle + "Nombre:*</span>", campoNombre);
     formLayout->addRow(labelStyle + "Capacidad:*</span>", campoCapacidad);
+    formLayout->addRow(labelStyle + "Tipo de aula:*</span>", campoTipoAula);
     formLayout->addRow(labelStyle + "Edificio:</span>", campoEdificio);
     formLayout->addRow(labelStyle + "Piso:</span>", campoPiso);
 
@@ -99,9 +103,29 @@ ClassroomFormDialog::ClassroomFormDialog(QWidget *parent) : QDialog(parent) {
     connect(botonCancelar, &QPushButton::clicked, this, &QDialog::reject);
 }
 
-void ClassroomFormDialog::cargarDatos(const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
+void ClassroomFormDialog::cargarTiposAula(const QVector<TipoAulaDTO>& tipos, int idSeleccionado)
+{
+    campoTipoAula->clear();
+    for (const TipoAulaDTO& tipo : tipos)
+        campoTipoAula->addItem(tipo.nombre, tipo.id);
+
+    if (idSeleccionado > 0) {
+        const int indice = campoTipoAula->findData(idSeleccionado);
+        if (indice >= 0)
+            campoTipoAula->setCurrentIndex(indice);
+    }
+}
+
+void ClassroomFormDialog::cargarDatos(const QString& nombre, int capacidad,
+                                      const QString& edificio, const QString& piso,
+                                      int idTipoAula) {
     campoNombre->setText(nombre);
     campoCapacidad->setValue(capacidad);
+    if (idTipoAula > 0) {
+        const int indice = campoTipoAula->findData(idTipoAula);
+        if (indice >= 0)
+            campoTipoAula->setCurrentIndex(indice);
+    }
     campoEdificio->setText(edificio != "N/A" ? edificio : "");
     campoPiso->setText(piso != "N/A" ? piso : "");
 }
@@ -112,7 +136,16 @@ void ClassroomFormDialog::guardarAula() {
         return;
     }
 
-    emit aulaGuardada(campoNombre->text().trimmed(), campoCapacidad->value(), campoEdificio->text().trimmed(), campoPiso->text().trimmed());
+    const int idTipoAula = campoTipoAula->currentData().toInt();
+    if (idTipoAula <= 0) {
+        QMessageBox::warning(this, "Error de Validación",
+                             "Debe seleccionar un tipo de aula del catálogo.");
+        return;
+    }
+
+    emit aulaGuardada(campoNombre->text().trimmed(), campoCapacidad->value(),
+                      campoEdificio->text().trimmed(), campoPiso->text().trimmed(),
+                      idTipoAula);
     accept();
 }
 

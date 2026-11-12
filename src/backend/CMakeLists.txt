@@ -24,13 +24,16 @@ target_sources(backend PRIVATE
 
 				# Database
 				src/database/DatabaseManager.cpp
+				src/database/comprobacion_validez.cpp
 				src/database/migracion.cpp
+				src/database/tipo_general.cpp
 				src/database/version_esquema.cpp
 				src/database/respaldo.cpp
 				src/database/apertura_base_datos.cpp
 
 				# Services - Issue #23 (Aulas)
 				src/services/ServicioAula.cpp
+				src/services/ServicioTiposAula.cpp
 
 				# Services - Issue #21 (Materias - usando tablas existentes)
 				src/services/ServicioMaterias.cpp
@@ -42,9 +45,17 @@ target_sources(backend PRIVATE
 				src/services/ServicioConsultaHorario.cpp
 				src/services/ServicioProfesor.cpp
 
-				# Services - Nucleo de datos (Cursos, Turnos/Recesos y fachada)
+				# Services - Nucleo de datos (Cursos, Turnos/Eventos y fachada)
 				src/services/ServicioCursos.cpp
-				src/services/ServicioTurnosRecesos.cpp
+				src/services/ServicioTurnosEventos.cpp
+				src/services/calculo_eventos.cpp
+				src/services/duracion_horaria.cpp
+				src/services/franja_horaria_validacion.cpp
+				src/services/preferencias.cpp
+				src/services/proyeccion_preferencias.cpp
+				src/services/preferencias_cumplimiento.cpp
+				src/services/ServicioPreferencias.cpp
+				src/services/ServicioConfiguracionHoraria.cpp
 				src/services/NucleoDatos.cpp
 				src/services/GestorPendientes.cpp
 				src/services/cascada.cpp
@@ -55,9 +66,11 @@ target_sources(backend PRIVATE
 				src/services/ConstructorEntradaSolver.cpp
 				src/services/ValidadorEntradaSolver.cpp
 				src/services/ValidadorSalidaSolver.cpp
+				src/services/analisis_bloques.cpp
 				src/services/ServicioGeneracion.cpp
 				include/backend/services/ServicioGeneracion.hpp
 				src/solver/config/contrato_solver.cpp
+				src/solver/config/bloques.cpp
 )
 
 target_include_directories(backend PUBLIC
@@ -71,6 +84,7 @@ target_include_directories(backend PRIVATE
 target_link_libraries(backend PUBLIC
 				Qt6::Core
 				Qt6::Sql
+				common
 )
 
 set_project_warnings(backend)
@@ -88,7 +102,7 @@ target_sources(backend_solver PRIVATE
 				src/solver/restricciones/restricciones_turnos.cpp
 				src/solver/restricciones/restricciones_aulas.cpp
 				src/solver/restricciones/restricciones_profesores.cpp
-				src/solver/restricciones/restricciones_agrupacion.cpp
+				src/solver/restricciones/restricciones_bloques.cpp
 )
 
 target_include_directories(backend_solver PUBLIC

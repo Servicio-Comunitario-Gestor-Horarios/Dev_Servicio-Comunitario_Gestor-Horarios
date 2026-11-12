@@ -1,16 +1,15 @@
 #include "backend/services/ValidadorSalidaSolver.hpp"
 
+#include "backend/solver/config/bloques.hpp"
 #include "backend/solver/config/contrato_solver.hpp"
 
+#include <algorithm>
 #include <QMap>
-#include <QPair>
 #include <QSet>
-
-#include <tuple>
 
 namespace
 {
-    /// Indice del curso de `config` con esa clave de identidad (`claveCurso`), o -1.
+    /// Índice en `config.cursos` del curso con esa clave (`año|sección`), o -1.
     int indiceCurso(const SolverConfig& config, const QString& clave)
     {
         for (int i = 0; i < config.cursos.size(); ++i)
@@ -19,39 +18,197 @@ namespace
         return -1;
     }
 
-    /// Horas semanales esperadas de `materia` en el curso de `config`, o -1.
-    int horasEsperadas(const SolverConfig& config, int idxCurso, int materia)
+    /// P4 ampliado (014, RF-12): bloque de 1, materia mal alineada o dos aulas en un bloque.
+    void comprobarBloques(const HorarioSalida& horario, const SolverConfig& config,
+                          AnalisisSalida& analisis)
     {
-        if (idxCurso < 0)
-            return -1;
-        for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[idxCurso]))
-            if (mc.materiaIDx == materia)
-                return mc.horasSemanales;
-        return -1;
+        for (auto it = horario.horarios.constBegin(); it != horario.horarios.constEnd(); ++it)
+        {
+            const QString& clave = it.key();
+            const int curso = indiceCurso(config, clave);
+            if (curso < 0) continue;
+
+            QSet<FranjaSemana> ocupadas;
+            QMap<int, QSet<FranjaSemana>> porMateria;
+            QMap<FranjaSemana, int> materiaPorFranja;
+            QMap<FranjaSemana, int> aulaPorFranja;
+            for (const DiaOutput& dia : it.value().dias)
+            {
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                {
+                    const FranjaSemana franja{dia.dia, asignacion.slot};
+                    ocupadas.insert(franja);
+                    porMateria[asignacion.materia].insert(franja);
+                    materiaPorFranja.insert(franja, asignacion.materia);
+                    aulaPorFranja.insert(franja, asignacion.aula);
+                }
+            }
+
+            // Bloque de 1: franjas ocupadas que no forman par.
+            const int sueltas = rejilla::bloquesDeUno(config, curso, ocupadas);
+            if (sueltas > 0)
+                analisis.conflictos.append(
+                    QStringLiteral("El curso «%1» tiene %2 franjas sin bloque de dos horas.")
+                        .arg(clave)
+                        .arg(sueltas));
+
+            // Materia mal alineada: más franjas descubiertas que su resto.
+            for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[curso]))
+            {
+                const int materia = mc.materiaIDx;
+                const int horas =
+                    bloques(mc.horasSemanales, config.franja_horaria.duracion_minutos);
+                const int descubiertas = rejilla::franjasDescubiertasDeMateria(
+                    config, curso, porMateria.value(materia));
+                if (descubiertas > horas % 2)
+                {
+                    const QString nombre =
+                        (materia >= 0 && materia < config.materias.size())
+                            ? config.materias[materia].nombre
+                            : QString::number(materia);
+                    analisis.conflictos.append(
+                        QStringLiteral("La materia «%1» del curso «%2» tiene %3 franjas "
+                                       "descubiertas y su resto es %4.")
+                            .arg(nombre)
+                            .arg(clave)
+                            .arg(descubiertas)
+                            .arg(horas % 2));
+                }
+            }
+
+            // Hueco que no es sufijo: una franja libre con clase después en el mismo día.
+            QVector<int> franjasTurno = slotsTurno(config, config.cursos[curso].turno);
+            std::sort(franjasTurno.begin(), franjasTurno.end());
+            for (int dia = 0; dia < config.dimensiones.num_dias; ++dia)
+            {
+                bool hayHueco = false;
+                for (int slot : franjasTurno)
+                {
+                    const bool ocupada = ocupadas.contains(FranjaSemana{dia, slot});
+                    if (!ocupada)
+                        hayHueco = true;
+                    else if (hayHueco)
+                    {
+                        analisis.conflictos.append(
+                            QStringLiteral("El curso «%1» tiene un hueco que no es sufijo el día %2 "
+                                           "(franja %3).")
+                                .arg(clave)
+                                .arg(dia)
+                                .arg(slot));
+                        break;
+                    }
+                }
+            }
+
+            // Dos aulas distintas en un mismo bloque.
+            for (const rejilla::Par& par : rejilla::paresDeCurso(config, curso, ocupadas))
+            {
+                const int aulaA = aulaPorFranja.value(FranjaSemana{par.dia, par.inicio}, -1);
+                const int aulaB = aulaPorFranja.value(FranjaSemana{par.dia, par.inicio + 1}, -1);
+                if (aulaA >= 0 && aulaB >= 0 && aulaA != aulaB)
+                    analisis.conflictos.append(
+                        QStringLiteral("El bloque del curso «%1» (día %2, franjas %3-%4) usa "
+                                       "dos aulas distintas.")
+                            .arg(clave)
+                            .arg(par.dia)
+                            .arg(par.inicio)
+                            .arg(par.inicio + 1));
+            }
+        }
     }
+
+    /// Clave de ocupación de P4: un recurso (docente o aula) ocupado en una franja concreta.
+    ///
+    /// P4 debe distinguir el recurso: dos clases en la misma franja solo chocan si comparten
+    /// docente o aula, no por coincidir en el día y el slot.
+    struct ClaveOcupacion
+    {
+        int recurso = -1;  ///< índice de profesor o de aula
+        int dia = -1;
+        int slot = -1;
+
+        bool operator<(const ClaveOcupacion& otro) const
+        {
+            if (recurso != otro.recurso)
+                return recurso < otro.recurso;
+            if (dia != otro.dia)
+                return dia < otro.dia;
+            return slot < otro.slot;
+        }
+    };
+
+    /// 018 (RF-5/RF-7): la cancha no admite **pares cruzados**. Recorre los segmentos del turno
+    /// del curso con sus pares alineados al inicio del segmento y marca la franja de cancha que
+    /// no tiene su pareja. Con aforo 1 en todas las aulas, `canchaSlots` queda vacío y el bloque
+    /// no añade nada.
+    void comprobarParesCancha(const HorarioSalida& horario, const SolverConfig& config,
+                              AnalisisSalida& analisis)
+    {
+        for (auto it = horario.horarios.constBegin(); it != horario.horarios.constEnd(); ++it)
+        {
+            const QString& clave = it.key();
+            const int curso = indiceCurso(config, clave);
+            if (curso < 0) continue;
+
+            const TurnoConfig* turno = nullptr;
+            for (const TurnoConfig& t : config.turnos.turnos)
+                if (t.nombre == config.cursos[curso].turno)
+                {
+                    turno = &t;
+                    break;
+                }
+            if (turno == nullptr) continue;   // sin turno no se inventan segmentos
+
+            const QVector<QVector<int>> segmentos = segmentosTurno(*turno, config.eventos);
+            if (segmentos.isEmpty()) continue;
+
+            for (const DiaOutput& dia : it.value().dias)
+            {
+                QSet<int> canchaSlots;
+                for (const AsignacionOutput& asignacion : dia.asignaciones)
+                    if (asignacion.aula >= 0 && aforoDelAula(config, asignacion.aula) > 1)
+                        canchaSlots.insert(asignacion.slot);
+
+                if (canchaSlots.isEmpty()) continue;
+
+                for (const QVector<int>& segmento : segmentos)
+                    for (int k = 0; k + 1 < segmento.size(); k += 2)
+                    {
+                        const int inicio = segmento[k];
+                        const int fin = segmento[k + 1];
+                        if (canchaSlots.contains(inicio) != canchaSlots.contains(fin))
+                            analisis.conflictos.append(
+                                QStringLiteral("El curso «%1» ocupa la cancha en una sola franja "
+                                               "del bloque %2–%3 (día %4).")
+                                    .arg(clave)
+                                    .arg(inicio)
+                                    .arg(fin)
+                                    .arg(dia.dia));
+                    }
+            }
+        }
+    }
+
 } // namespace
 
 AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverConfig& config)
 {
     AnalisisSalida analisis;
 
-    // Ocupación por (entidad, día, slot) para detectar solapamientos (P4).
-    // La clave incluye el docente o el aula: dos clases en la misma franja no
-    // colisionan si las imparten docentes distintos en aulas distintas.
-    QMap<std::tuple<int, int, int>, QString> ocupacionProfesor;  // -> nombre de curso
-    QMap<std::tuple<int, int, int>, QString> ocupacionAula;
+    // Ocupación de cada recurso en cada franja para detectar solapamientos (P4): las claves
+    // incluyen el docente / el aula, no solo el día y el slot. El aula se **cuenta**: dos clases
+    // solo son conflicto si superan el aforo del aula (018, RF-7).
+    QMap<ClaveOcupacion, QString> ocupacionProfesor;  // -> nombre de curso
+    QMap<ClaveOcupacion, int> conteoAula;             // -> nº de clases en la franja
 
-    // Conteos para P1 y P2.
-    // (curso, materia) -> nº de asignaciones
-    QMap<QPair<QString, int>, int> cubiertas;
-    QMap<int, int> horasPorProfesor;   // índice de profesor -> asignaciones
+    // Conteo para P2: índice de profesor -> asignaciones.
+    QMap<int, int> horasPorProfesor;
 
     for (auto itCurso = horario.horarios.constBegin(); itCurso != horario.horarios.constEnd();
          ++itCurso)
     {
         const QString& nombreCurso = itCurso.key();
         const CursoOutput& curso = itCurso.value();
-        const int idxCurso = indiceCurso(config, nombreCurso);
 
         for (const DiaOutput& dia : curso.dias)
         {
@@ -70,16 +227,16 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                 }
                 slotsDelCurso.insert(asig.slot);
 
-                // P4: profesor en dos sitios a la vez. Un profesor sin asignar
-                // (-1) no ocupa ninguna entidad real: no se comprueba ni registra.
+                // P4: profesor en dos sitios a la vez. Un docente sin asignar (índice
+                // negativo) no ocupa la franja: dos clases sin docente no chocan entre sí.
                 if (asig.profesor >= 0)
                 {
-                    const std::tuple<int, int, int> claveProfesor{asig.profesor, dia.dia, asig.slot};
-                    if (ocupacionProfesor.contains(claveProfesor))
+                    const ClaveOcupacion clave{asig.profesor, dia.dia, asig.slot};
+                    if (ocupacionProfesor.contains(clave))
                     {
                         const int idx = asig.profesor;
                         const QString nombreProf =
-                            (idx >= 0 && idx < config.profesores.size())
+                            (idx < config.profesores.size())
                                 ? config.profesores[idx].nombre
                                 : QStringLiteral("(desconocido)");
                         analisis.conflictos.append(
@@ -90,166 +247,51 @@ AnalisisSalida analizarSalidaSolver(const HorarioSalida& horario, const SolverCo
                     }
                     else
                     {
-                        ocupacionProfesor[claveProfesor] = nombreCurso;
+                        ocupacionProfesor[clave] = nombreCurso;
                     }
                 }
 
-                // P4: aula en dos sitios a la vez. Un aula sin asignar (-1) no
-                // se comprueba ni registra.
+                // P4: aula por encima de su aforo. Un aula sin asignar (índice negativo) no
+                // ocupa la franja ni crea ni alivia conflictos: queda fuera de la cuenta. Un
+                // índice fuera de rango o un tipo no reconocido tiene aforo 1 (RF-7).
                 if (asig.aula >= 0)
                 {
-                    const std::tuple<int, int, int> claveAula{asig.aula, dia.dia, asig.slot};
-                    if (ocupacionAula.contains(claveAula))
+                    const ClaveOcupacion clave{asig.aula, dia.dia, asig.slot};
+                    const int cuenta = ++conteoAula[clave];
+                    const int aforo = aforoDelAula(config, asig.aula);
+                    if (cuenta > aforo)
                     {
                         const int idx = asig.aula;
                         const QString nombreAula =
-                            (idx >= 0 && idx < config.aulas.size())
+                            (idx < config.aulas.size())
                                 ? config.aulas[idx].nombre
                                 : QStringLiteral("(desconocida)");
                         analisis.conflictos.append(
-                            QStringLiteral("El aula «%1» está ocupada por dos clases a la vez (día %2, slot %3).")
+                            QStringLiteral("El aula «%1» tiene %2 clases en la misma franja (día %3, "
+                                           "slot %4) y su aforo es %5.")
                                 .arg(nombreAula)
+                                .arg(cuenta)
                                 .arg(dia.dia)
-                                .arg(asig.slot));
-                    }
-                    else
-                    {
-                        ocupacionAula[claveAula] = nombreCurso;
+                                .arg(asig.slot)
+                                .arg(aforo));
                     }
                 }
 
-                // Conteos P1/P2.
-                cubiertas[{nombreCurso, asig.materia}] += 1;
+                // Conteo P2.
                 if (asig.profesor >= 0)
                     horasPorProfesor[asig.profesor] += 1;
-
-                // P3: capacidad de aula.
-                if (idxCurso >= 0 && asig.aula >= 0 && asig.aula < config.aulas.size())
-                {
-                    const int estudiantes = config.cursos[idxCurso].num_estudiantes;
-                    const int capacidad = config.aulas[asig.aula].capacidad;
-                    if (capacidad > 0 && estudiantes > capacidad)
-                    {
-                        const QString aviso =
-                            QStringLiteral("El curso «%1» (%2 estudiantes) excede la capacidad del aula «%3» (%4).")
-                                .arg(nombreCurso)
-                                .arg(estudiantes)
-                                .arg(config.aulas[asig.aula].nombre)
-                                .arg(capacidad);
-                        if (!analisis.avisos.contains(aviso))
-                            analisis.avisos.append(aviso);
-                    }
-                }
             }
         }
     }
 
-    // P1: horas semanales cubiertas por curso/materia.
-    for (auto itCurso = horario.horarios.constBegin(); itCurso != horario.horarios.constEnd();
-         ++itCurso)
-    {
-        const QString& nombreCurso = itCurso.key();
-        const int idxCurso = indiceCurso(config, nombreCurso);
-        if (idxCurso < 0)
-            continue;
+    // P4 ampliado (014): bloque de 1, materia mal alineada o dos aulas en un bloque.
+    comprobarBloques(horario, config, analisis);
 
-        for (const PlanMateriaConfig& mc : materiasDelCurso(config, config.cursos[idxCurso]))
-        {
-            const int esperadas = mc.horasSemanales;
-            const int cubiertasActual = cubiertas.value({nombreCurso, mc.materiaIDx}, 0);
-            if (cubiertasActual < esperadas)
-            {
-                const QString nombreMateria =
-                    (mc.materiaIDx >= 0 && mc.materiaIDx < config.materias.size())
-                        ? config.materias[mc.materiaIDx].nombre
-                        : QString::number(mc.materiaIDx);
-                analisis.avisos.append(
-                    QStringLiteral("Horas no cubiertas: «%1» del curso «%2» tiene %3 de %4 horas.")
-                        .arg(nombreMateria)
-                        .arg(nombreCurso)
-                        .arg(cubiertasActual)
-                        .arg(esperadas));
-            }
-        }
-    }
+    // P4 con aforo (018): la cancha no admite pares cruzados.
+    comprobarParesCancha(horario, config, analisis);
 
-    // ── S3: análisis de agrupación de bloques ──
-    // Para cada (curso, materia, día, segmento), detectar los grupos contiguos
-    // y calcular su penalización (RF-2).
-    {
-        QMap<QString, QVector<QVector<int>>> segmentosPorTurno;
-        for (const TurnoConfig& t : config.turnos.turnos)
-            segmentosPorTurno[t.nombre] = segmentosTurno(t, config.recesos);
-
-        for (auto itCurso = horario.horarios.constBegin();
-             itCurso != horario.horarios.constEnd(); ++itCurso)
-        {
-            const QString& nombreCurso = itCurso.key();
-            const CursoOutput& curso = itCurso.value();
-            const int idxCurso = indiceCurso(config, nombreCurso);
-            if (idxCurso < 0) continue;
-
-            const CursoSolverConfig& cursoCfg = config.cursos[idxCurso];
-            const QVector<QVector<int>>& segs = segmentosPorTurno.value(cursoCfg.turno);
-            if (segs.isEmpty()) continue;
-
-            for (const DiaOutput& dia : curso.dias)
-            {
-                // Horas del día por materia (suma sobre todos los segmentos).
-                QMap<int, int> horasDia;
-                for (const AsignacionOutput& asig : dia.asignaciones)
-                    horasDia[asig.materia] += 1;
-
-                for (int seg = 0; seg < segs.size(); ++seg)
-                {
-                    const QVector<int>& franjas = segs[seg];
-
-                    for (auto itM = horasDia.constBegin(); itM != horasDia.constEnd(); ++itM)
-                    {
-                        const int materia = itM.key();
-                        int runLen = 0;
-                        int runInicio = -1;
-
-                        auto cerrarGrupo = [&]() {
-                            if (runLen <= 0) return;
-                            GrupoAgrupacion g;
-                            g.curso = nombreCurso;
-                            g.materia = materia;
-                            g.dia = dia.dia;
-                            g.segmento = seg;
-                            g.inicio = runInicio;
-                            g.tamano = runLen;
-                            g.penalizacion = calcularPenalizacionGrupo(runLen, horasDia.value(materia));
-                            analisis.grupos.append(g);
-                            analisis.penalizacionAgrupacion += g.penalizacion;
-                            runLen = 0;
-                            runInicio = -1;
-                        };
-
-                        for (int f : franjas)
-                        {
-                            bool tiene = false;
-                            for (const AsignacionOutput& asig : dia.asignaciones)
-                                if (asig.materia == materia && asig.slot == f) { tiene = true; break; }
-
-                            if (tiene)
-                            {
-                                if (runLen == 0) runInicio = f;
-                                ++runLen;
-                            }
-                            else
-                            {
-                                cerrarGrupo();
-                            }
-                        }
-                        cerrarGrupo();
-                    }
-                }
-            }
-        }
-    }
-
-    // P2: ningún profesor excede sus horas requeridas.
+    // P2: ningún profesor excede sus horas requeridas. Es el único aviso que queda (005 I2):
+    // las horas no cubiertas (P1) y la capacidad de aula (P3) se retiraron.
     for (auto it = horasPorProfesor.constBegin(); it != horasPorProfesor.constEnd(); ++it)
     {
         const int idx = it.key();

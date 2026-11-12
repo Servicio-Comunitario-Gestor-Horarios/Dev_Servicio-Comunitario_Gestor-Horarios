@@ -50,6 +50,13 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("id_Materia"), QStringLiteral("rowid"),
             QStringLiteral("id_Profesor"), QStringLiteral("Docente que imparte la materia"),
             false));
+
+        relaciones.append(relacion(
+            QStringLiteral("profesor_materia_suplente"),
+            QStringLiteral("Profesor_Materia_Suplente"),
+            QStringLiteral("id_Materia"), QStringLiteral("rowid"),
+            QStringLiteral("id_Profesor"), QStringLiteral("Docente que puede suplir la materia"),
+            false));
     }
     else if (dominio == QStringLiteral("profesor"))
     {
@@ -59,9 +66,23 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
             QStringLiteral("id_Materia"), QStringLiteral("Materia del docente"), false));
 
         relaciones.append(relacion(
+            QStringLiteral("profesor_materia_suplente"),
+            QStringLiteral("Profesor_Materia_Suplente"),
+            QStringLiteral("id_Profesor"), QStringLiteral("rowid"),
+            QStringLiteral("id_Materia"), QStringLiteral("Materia suplente del docente"),
+            false));
+
+        relaciones.append(relacion(
             QStringLiteral("disponibilidad"), QStringLiteral("Disponibilidad_Profesor"),
             QStringLiteral("id_Profesor"), QStringLiteral("id"),
             QStringLiteral("dia"), QStringLiteral("Franja de disponibilidad"), false));
+
+        // Preferencias horarias (012, RF-4): etiqueta legible con sentido, día y rango.
+        relaciones.append(relacion(
+            QStringLiteral("preferencia"), QStringLiteral("Preferencia_Profesor"),
+            QStringLiteral("id_Profesor"), QStringLiteral("id"),
+            QStringLiteral("sentido || ' ' || dia || ' ' || hora_inicio || '-' || hora_fin"),
+            QStringLiteral("Preferencia horaria"), false));
     }
     else if (dominio == QStringLiteral("aula"))
     {
@@ -77,10 +98,11 @@ QVector<RelacionCascada> dependenciasDe(const QString& dominio)
     }
     else if (dominio == QStringLiteral("turno"))
     {
+        // Los eventos del turno se borran antes que el turno (RF-1).
         relaciones.append(relacion(
-            QStringLiteral("receso"), QStringLiteral("Recesos"),
-            QStringLiteral("turno"), QStringLiteral("despues_de_slot"),
-            QString(), QStringLiteral("Receso del turno"), false));
+            QStringLiteral("evento"), QStringLiteral("Eventos"),
+            QStringLiteral("turno"), QStringLiteral("id"),
+            QStringLiteral("nombre"), QStringLiteral("Evento del turno"), false));
 
         relaciones.append(relacion(
             QStringLiteral("curso"), QStringLiteral("Cursos"),

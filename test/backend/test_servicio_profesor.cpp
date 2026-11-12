@@ -1,13 +1,31 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTime>
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioProfesor.hpp>
+#include <backend/services/ServicioPreferencias.hpp>
 
 #include <backend/services/ServicioMaterias.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioProfesor : public QObject {
     Q_OBJECT
@@ -24,9 +42,14 @@ private slots:
 
         m_servicio.reset(new ServicioProfesor(m_dbManager->database()));
         m_servicioMaterias.reset(new ServicioMaterias(m_dbManager->database()));
+
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
+        m_tipos.reset();
         m_servicioMaterias.reset();
         m_servicio.reset();
         m_dbManager->close();
@@ -260,9 +283,14 @@ private slots:
         QVERIFY(m_servicio->agregarDisponibilidad(
             "P-900", franja(1, 8, 0, 10, 0)).ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Materia Cascada");
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-900", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
+        auto materia = m_servicioMaterias->crearMateria("Materia Cascada", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-900", materia.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-900", materia.valor.id));
 
         QVERIFY(m_servicio->eliminarProfesor("P-900"));
 
@@ -278,6 +306,56 @@ private slots:
         q.bindValue(":id", "P-900");
         QVERIFY(q.exec() && q.next());
         QCOMPARE(q.value(0).toInt(), 0);
+
+        q.prepare("SELECT COUNT(*) FROM Profesor_Materia_Suplente WHERE id_Profesor = :id");
+        q.bindValue(":id", "P-900");
+        QVERIFY(q.exec() && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+
+        q.prepare("SELECT COUNT(*) FROM Preferencia_Profesor WHERE id_Profesor = :id");
+        q.bindValue(":id", "P-900");
+        QVERIFY(q.exec() && q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+    }
+
+    // ─── agregarDisponibilidad ──────────────────────────────────────────────
+
+    void eliminarProfesor_falloALaMitad_noBorraNada() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-950", "Dr. Rollback", "rollback@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad(
+            "P-950", franja(1, 8, 0, 10, 0)).ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-950", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
+        // El trigger aborta al borrar el docente, después de borrar sus hijas.
+        {
+            QSqlQuery trigger(m_dbManager->database());
+            QVERIFY2(trigger.exec("CREATE TRIGGER fallo_baja BEFORE DELETE ON Profesores "
+                                  "BEGIN SELECT RAISE(ABORT, 'fallo simulado'); END;"),
+                     qPrintable(trigger.lastError().text()));
+        }
+
+        QVERIFY(!m_servicio->eliminarProfesor("P-950"));
+
+        // Rollback: docente, disponibilidad y preferencia siguen intactos.
+        QSqlQuery q(m_dbManager->database());
+        for (const char* sql : {"SELECT COUNT(*) FROM Profesores WHERE id = 'P-950'",
+                                "SELECT COUNT(*) FROM Disponibilidad_Profesor "
+                                "WHERE id_Profesor = 'P-950'",
+                                "SELECT COUNT(*) FROM Preferencia_Profesor "
+                                "WHERE id_Profesor = 'P-950'"}) {
+            QVERIFY2(q.exec(QString::fromLatin1(sql)), qPrintable(q.lastError().text()));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 1);
+        }
+
+        // Retirado el trigger, la baja vuelve a funcionar.
+        QSqlQuery drop(m_dbManager->database());
+        QVERIFY(drop.exec("DROP TRIGGER fallo_baja"));
+        QVERIFY(m_servicio->eliminarProfesor("P-950"));
     }
 
     // ─── agregarDisponibilidad ──────────────────────────────────────────────
@@ -362,6 +440,74 @@ private slots:
         QCOMPARE(obtenido.valor.disponibilidad[2].franja.dia, 3);
     }
 
+    // ─── Preferencias del docente (RF-3) ───────────────────────────────────
+
+    void obtenerProfesor_incluyePreferenciasSeparadasYOrdenadas() {
+        QVERIFY(m_servicio->crearProfesor("P-1800", "Dra. Pref", "pref@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad("P-1800", franja(1, 8, 0, 10, 0)).ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-1800", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+        // Coincide con la disponibilidad: son listas distintas (poder frente a querer).
+        QVERIFY(preferencias.agregar("P-1800", franja(1, 8, 0, 10, 0),
+                                     SentidoPreferencia::Preferida).ok);
+
+        auto r = m_servicio->obtenerProfesor("P-1800");
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        QCOMPARE(r.valor.disponibilidad.size(), 1);
+        QCOMPARE(r.valor.preferencias.size(), 2);
+
+        // Ordenadas por día y hora de inicio.
+        QCOMPARE(r.valor.preferencias[0].franja.dia, 1);
+        QCOMPARE(r.valor.preferencias[0].franja.inicio, QTime(8, 0));
+        QCOMPARE(r.valor.preferencias[0].sentido, SentidoPreferencia::Preferida);
+        QCOMPARE(r.valor.preferencias[1].franja.dia, 2);
+        QCOMPARE(r.valor.preferencias[1].sentido, SentidoPreferencia::Evitada);
+        QCOMPARE(r.valor.disponibilidad.first().franja.dia, 1);
+    }
+
+    void listarProfesores_cargaPreferenciasDeCadaDocente() {
+        QVERIFY(m_servicio->crearProfesor("P-1900", "Con Pref", "con@uni.edu").ok);
+        QVERIFY(m_servicio->crearProfesor("P-1901", "Sin Pref", "sin@uni.edu").ok);
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-1900", franja(3, 9, 0, 11, 0),
+                                     SentidoPreferencia::Preferida).ok);
+
+        const auto r = m_servicio->listarProfesores();
+        QVERIFY2(r.ok, qPrintable(r.mensajeError));
+        for (const ProfesorDTO& dto : r.valor) {
+            if (dto.id == QStringLiteral("P-1900"))
+                QCOMPARE(dto.preferencias.size(), 1);
+            if (dto.id == QStringLiteral("P-1901"))
+                QVERIFY(dto.preferencias.isEmpty());
+        }
+    }
+
+    void toProfesor_noCopiaLasPreferencias() {
+        QVERIFY(m_servicio->crearProfesor("P-2000", "Dra. Solver", "solver@uni.edu").ok);
+        QVERIFY(m_servicio->agregarDisponibilidad("P-2000", franja(1, 8, 0, 10, 0)).ok);
+
+        auto sinPreferencias = m_servicio->obtenerProfesor("P-2000");
+        QVERIFY(sinPreferencias.ok);
+        const Profesor antes = sinPreferencias.valor.toProfesor();
+
+        ServicioPreferencias preferencias(m_dbManager->database());
+        QVERIFY(preferencias.agregar("P-2000", franja(2, 14, 0, 16, 0),
+                                     SentidoPreferencia::Evitada).ok);
+
+        auto conPreferencias = m_servicio->obtenerProfesor("P-2000");
+        QVERIFY(conPreferencias.ok);
+        QCOMPARE(conPreferencias.valor.preferencias.size(), 1);
+
+        const Profesor despues = conPreferencias.valor.toProfesor();
+        // La disponibilidad sí viaja; las preferencias no alteran el modelo del solver.
+        QCOMPARE(despues.disponibilidad.size(), 1);
+        QCOMPARE(despues.disponibilidad.first().dia, 1);
+        QCOMPARE(despues.toJson(), antes.toJson());
+    }
+
     // ─── eliminarDisponibilidad / limpiarDisponibilidad ────────────────────
 
     void eliminarDisponibilidad_exitoso() {
@@ -413,7 +559,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-1700", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Álgebra");
+        auto materia = m_servicioMaterias->crearMateria("Álgebra", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-1700", materia.valor.id));
@@ -429,7 +575,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-1800", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Física");
+        auto materia = m_servicioMaterias->crearMateria("Física", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-1800", materia.valor.id));
@@ -441,7 +587,7 @@ private slots:
     }
 
     void asignarMateria_parametrosInvalidos_falla() {
-        auto materia = m_servicioMaterias->crearMateria("Química");
+        auto materia = m_servicioMaterias->crearMateria("Química", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(!m_servicio->asignarMateria("", materia.valor.id));
@@ -453,7 +599,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2000", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Cálculo");
+        auto materia = m_servicioMaterias->crearMateria("Cálculo", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(m_servicio->asignarMateriaPorNombre("P-2000", "Cálculo"));
@@ -481,8 +627,8 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2200", "Dr. X", "x@uni.edu").ok);
 
-        auto m1 = m_servicioMaterias->crearMateria("Mat A");
-        auto m2 = m_servicioMaterias->crearMateria("Mat B");
+        auto m1 = m_servicioMaterias->crearMateria("Mat A", QString(), m_idTipoAula);
+        auto m2 = m_servicioMaterias->crearMateria("Mat B", QString(), m_idTipoAula);
         QVERIFY(m1.ok && m2.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-2200", m1.valor.id));
@@ -500,7 +646,7 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2300", "Dr. X", "x@uni.edu").ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Sin Asignar");
+        auto materia = m_servicioMaterias->crearMateria("Sin Asignar", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         QVERIFY(!m_servicio->quitarMateria("P-2300", materia.valor.id));
@@ -515,8 +661,8 @@ private slots:
         QVERIFY(m_servicio->crearProfesor(
             "P-2400", "Dr. X", "x@uni.edu").ok);
 
-        auto m1 = m_servicioMaterias->crearMateria("A");
-        auto m2 = m_servicioMaterias->crearMateria("B");
+        auto m1 = m_servicioMaterias->crearMateria("A", QString(), m_idTipoAula);
+        auto m2 = m_servicioMaterias->crearMateria("B", QString(), m_idTipoAula);
         QVERIFY(m1.ok && m2.ok);
 
         QVERIFY(m_servicio->asignarMateria("P-2400", m1.valor.id));
@@ -572,7 +718,7 @@ private slots:
         QVERIFY(m_servicio->agregarDisponibilidad(
             "P-2500", franja(1, 8, 0, 10, 0)).ok);
 
-        auto materia = m_servicioMaterias->crearMateria("Mat");
+        auto materia = m_servicioMaterias->crearMateria("Mat", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
         QVERIFY(m_servicio->asignarMateria("P-2500", materia.valor.id));
 
@@ -612,11 +758,75 @@ private slots:
         QCOMPARE(resultado.codigoError, -3);
     }
 
+    void reemplazarDisponibilidad_exitoso() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2700", "Dr. Reemplazo", "r@uni.edu").ok);
+
+        QVector<FranjaHoraria> franjas;
+        franjas.append(franja(1, 7, 0, 8, 0));
+        franjas.append(franja(2, 9, 0, 10, 0));
+
+        QString error;
+        QVERIFY(m_servicio->reemplazarDisponibilidad("P-2700", franjas, error));
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+
+        auto obtenido = m_servicio->obtenerProfesor("P-2700");
+        QVERIFY(obtenido.ok);
+        QCOMPARE(obtenido.valor.disponibilidad.size(), 2);
+
+        QVERIFY(m_servicio->reemplazarDisponibilidad("P-2700", {}, error));
+        QVERIFY(m_servicio->obtenerProfesor("P-2700").valor.disponibilidad.isEmpty());
+    }
+
+    void reemplazarDisponibilidad_franjaInvalida_falla() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2701", "Dr. Inválido", "inv@uni.edu").ok);
+
+        QVector<FranjaHoraria> franjas;
+        franjas.append(franja(1, 10, 0, 9, 0));
+
+        QString error;
+        QVERIFY(!m_servicio->reemplazarDisponibilidad("P-2701", franjas, error));
+        QVERIFY(!error.isEmpty());
+        QVERIFY(m_servicio->obtenerProfesor("P-2701").valor.disponibilidad.isEmpty());
+    }
+
+    void materiasSuplentes_crudYSeCarganEnObtenerProfesor() {
+        QVERIFY(m_servicio->crearProfesor(
+            "P-2800", "Dr. Suplente", "sup@uni.edu").ok);
+        auto mat1 = m_servicioMaterias->crearMateria("Historia", QString(), m_idTipoAula);
+        auto mat2 = m_servicioMaterias->crearMateria("Geografía", QString(), m_idTipoAula);
+        QVERIFY(mat1.ok && mat2.ok);
+
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat1.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat2.valor.id));
+        QVERIFY(m_servicio->asignarMateriaSuplente("P-2800", mat1.valor.id)); // idempotente
+
+        auto obtenido = m_servicio->obtenerProfesor("P-2800");
+        QVERIFY(obtenido.ok);
+        QCOMPARE(obtenido.valor.materiasSuplentes.size(), 2);
+        QVERIFY(obtenido.valor.materias.isEmpty());
+
+        QVector<int> ids;
+        ids.append(mat1.valor.id);
+        QString error;
+        QVERIFY(m_servicio->reemplazarMateriasSuplentes("P-2800", ids, error));
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        obtenido = m_servicio->obtenerProfesor("P-2800");
+        QCOMPARE(obtenido.valor.materiasSuplentes.size(), 1);
+        QCOMPARE(obtenido.valor.materiasSuplentes.first().nombre, QString("Historia"));
+
+        QVERIFY(m_servicio->limpiarMateriasSuplentes("P-2800"));
+        QVERIFY(m_servicio->obtenerProfesor("P-2800").valor.materiasSuplentes.isEmpty());
+    }
+
 private:
     std::unique_ptr<QTemporaryDir>       m_tempDir;
     std::unique_ptr<DatabaseManager>     m_dbManager;
     std::unique_ptr<ServicioProfesor>    m_servicio;
     std::unique_ptr<ServicioMaterias>    m_servicioMaterias;
+    std::unique_ptr<ServicioTiposAula>   m_tipos;
+    int                                  m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioProfesor)

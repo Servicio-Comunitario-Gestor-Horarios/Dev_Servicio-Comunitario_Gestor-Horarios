@@ -155,10 +155,20 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
     //    se manejan por señales, no por valor de retorno.
     GestorProcesoBackend gestor;
 
+    // Cierre normal: el backend se detiene a propósito y no debe mostrarse un
+    // aviso de caída (ni el que lleva el código de salida).
+    bool cerrando = false;
+    QObject::connect(qApp, &QCoreApplication::aboutToQuit, [&cerrando]() {
+        cerrando = true;
+    });
+
     QObject::connect(&gestor, &GestorProcesoBackend::backendListo, []() {
         qDebug() << "[frontend] Backend listo";
     });
-    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado, [](int codigo) {
+    QObject::connect(&gestor, &GestorProcesoBackend::backendColapsado,
+                     [&cerrando](int codigo) {
+        if (cerrando || QCoreApplication::closingDown())
+            return;
         QMessageBox::critical(nullptr, QStringLiteral("Backend"),
                               detalleColapsoBackend(codigo));
     });
@@ -176,7 +186,7 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
 #if defined(GESTOR_TIENE_BACKEND)
     ventana.setNucleoDatos(&contexto.nucleo());
 #endif
-    ventana.show();
+    ventana.showMaximized();
 
     // 5. Enfoque de la instancia existente (RF-5): si otra instancia pide activar,
     //    traer esta ventana al frente. La detección sigue activa durante toda la
@@ -185,7 +195,8 @@ int ejecutarAplicacionFrontend(int argc, char *argv[], InstanciaUnica *instancia
     {
         QObject::connect(instanciaUnica, &InstanciaUnica::activarSolicitada, &ventana,
                          [&ventana]() {
-                             ventana.showNormal();
+                             if (ventana.isMinimized())
+                                 ventana.showNormal();
                              ventana.raise();
                              ventana.activateWindow();
                          });

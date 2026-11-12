@@ -44,7 +44,28 @@ Resultado<SolverConfig> CargadorConfiguracionSolver::cargar(const QString& ruta)
                 .arg(ruta));
     }
 
-    return SolverConfig::fromJson(doc.object());
+    const QJsonObject objeto = doc.object();
+    const Resultado<SolverConfig> configuracion = SolverConfig::fromJson(objeto);
+    if (configuracion.ok)
+        return configuracion;
+
+    // RF-2: una configuración 1.0, sin versión o con versión no reconocida se rechaza sin
+    // reinterpretarla ni convertirla. Como aquí la configuración es un preset guardado en disco, el
+    // rechazo añade el archivo y la acción disponible. La versión se comprueba antes que las
+    // secciones (V1), así que este mensaje no reprocha secciones ausentes.
+    const QString version = objeto.value(QLatin1String("version")).toString();
+    if (version != QLatin1String("2.0"))
+    {
+        const QString declarada = version.isEmpty()
+                                      ? QStringLiteral("no declara versión")
+                                      : QStringLiteral("declara la versión «%1»").arg(version);
+        return Resultado<SolverConfig>::error(
+            QStringLiteral("La configuración de «%1» %2; solo se acepta la versión 2.0. Genere una"
+                           " configuración 2.0 desde los datos con la versión actual.")
+                .arg(ruta, declarada));
+    }
+
+    return configuracion;
 }
 
 Resultado<bool> CargadorConfiguracionSolver::guardar(const QString& ruta, const SolverConfig& config)
@@ -74,7 +95,13 @@ Resultado<bool> CargadorConfiguracionSolver::guardar(const QString& ruta, const 
                 .arg(ruta));
     }
 
-    const QJsonDocument doc(config.toJson());
+    // Un preset NO persiste preferencias (013, RF-2): se elimina la clave aunque la
+    // configuración en memoria las conserve. La ida y vuelta sin pérdida es de la
+    // configuración, no del preset.
+    QJsonObject objeto = config.toJson();
+    objeto.remove(QStringLiteral("preferencias"));
+
+    const QJsonDocument doc(objeto);
     if (archivo.write(doc.toJson(QJsonDocument::Indented)) == -1)
     {
         archivo.close();

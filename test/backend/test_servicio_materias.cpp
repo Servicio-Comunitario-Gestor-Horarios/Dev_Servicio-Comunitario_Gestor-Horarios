@@ -1,10 +1,26 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <memory>
 
 #include <backend/database/DatabaseManager.hpp>
 #include <backend/services/ServicioMaterias.hpp>
+#include <backend/services/ServicioTiposAula.hpp>
+
+namespace {
+
+/// Id de la fila del tipo general que deja el esquema en una base nueva (RF-1).
+int idTipoGeneral(QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("SELECT id FROM TiposAula WHERE clave = 'aula de estudio'"));
+    if (!query.exec() || !query.next())
+        return -1;
+    return query.value(0).toInt();
+}
+
+} // namespace
 
 class TestServicioMaterias : public QObject {
     Q_OBJECT
@@ -20,9 +36,14 @@ private slots:
         QVERIFY(m_dbManager->isInitialized());
 
         m_servicio.reset(new ServicioMaterias(m_dbManager->database()));
+
+        m_tipos.reset(new ServicioTiposAula(m_dbManager->database()));
+        m_idTipoAula = idTipoGeneral(m_dbManager->database());
+        QVERIFY(m_idTipoAula > 0);
     }
 
     void cleanup() {
+        m_tipos.reset();
         m_servicio.reset();
         m_dbManager->close();
         m_dbManager.reset();
@@ -32,7 +53,8 @@ private slots:
     // ─── Tests ──────────────────────────────────────────────────────────────
 
     void crearMateria_exitoso() {
-        auto resultado = m_servicio->crearMateria("Matemática", "Álgebra, Geometría");
+        auto resultado = m_servicio->crearMateria("Matemática", "Álgebra, Geometría",
+                                                 m_idTipoAula);
 
         QVERIFY(resultado.ok);
         QCOMPARE(resultado.valor.nombre, "Matemática");
@@ -41,30 +63,95 @@ private slots:
     }
 
     void crearMateria_sinRequisitos() {
-        auto resultado = m_servicio->crearMateria("Física");
+        auto resultado = m_servicio->crearMateria("Física", QString(), m_idTipoAula);
 
         QVERIFY(resultado.ok);
         QCOMPARE(resultado.valor.nombre, "Física");
         QVERIFY(resultado.valor.requisitos.isEmpty());
     }
 
+    void crearMateria_sinTipo_falla() {
+        auto resultado = m_servicio->crearMateria("Matemática", QString(), -1);
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("sin tipo"));
+        QVERIFY(m_servicio->listarMaterias().valor.isEmpty());
+    }
+
+    void crearMateria_tipoInexistente_falla() {
+        auto resultado = m_servicio->crearMateria("Matemática", QString(), 9999);
+
+        QVERIFY(!resultado.ok);
+        QVERIFY(resultado.mensajeError.contains("No existe el tipo de aula"));
+        QVERIFY(resultado.mensajeError.contains("9999"));
+        QVERIFY(m_servicio->listarMaterias().valor.isEmpty());
+    }
+
+    void crearMateria_sinTipoValido_falla() {
+        // Base nueva con el tipo general del esquema: «catálogo vacío» ya no existe.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        DatabaseManager db;
+        QVERIFY(db.initialize(dir.filePath("sin_tipos.db")));
+
+        ServicioMaterias servicio(db.database());
+
+        auto sinTipo = servicio.crearMateria("Matemática", QString(), -1);
+        QVERIFY(!sinTipo.ok);
+        QVERIFY(sinTipo.mensajeError.contains("sin tipo"));
+        QVERIFY(!sinTipo.mensajeError.contains("No hay tipos de aula registrados"));
+
+        // El tipo general del esquema sirve para dar de alta la materia (RF-1).
+        const int idGeneral = idTipoGeneral(db.database());
+        QVERIFY(idGeneral > 0);
+        auto conGeneral = servicio.crearMateria("Matemática", QString(), idGeneral);
+        QVERIFY(conGeneral.ok);
+        QCOMPARE(conGeneral.valor.idTipoAula, idGeneral);
+
+        // Un id inexistente sigue rechazándose.
+        auto tipoInexistente = servicio.crearMateria("Física", QString(), 9999);
+        QVERIFY(!tipoInexistente.ok);
+
+        db.close();
+    }
+
+    void crearMateria_exponeElTipo() {
+        const auto creada = m_servicio->crearMateria("Matemática", QString(), m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        QCOMPARE(creada.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(creada.valor.tipoAula, QString("Aula de estudio"));
+
+        const auto obtenida = m_servicio->obtenerMateria(creada.valor.id);
+        QVERIFY(obtenida.ok);
+        QCOMPARE(obtenida.valor.idTipoAula, m_idTipoAula);
+        QCOMPARE(obtenida.valor.tipoAula, QString("Aula de estudio"));
+
+        const auto lista = m_servicio->listarMaterias();
+        QVERIFY(lista.ok);
+        QCOMPARE(lista.valor.size(), 1);
+        QCOMPARE(lista.valor[0].idTipoAula, m_idTipoAula);
+        QCOMPARE(lista.valor[0].tipoAula, QString("Aula de estudio"));
+    }
+
     void crearMateria_nombreVacio_falla() {
-        auto resultado = m_servicio->crearMateria("");
+        auto resultado = m_servicio->crearMateria("", QString(), m_idTipoAula);
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("no puede estar vacío"));
     }
 
     void crearMateria_nombreDuplicado_falla() {
-        auto r1 = m_servicio->crearMateria("Química");
+        auto r1 = m_servicio->crearMateria("Química", QString(), m_idTipoAula);
         QVERIFY(r1.ok);
 
-        auto r2 = m_servicio->crearMateria("Química");
+        auto r2 = m_servicio->crearMateria("Química", QString(), m_idTipoAula);
         QVERIFY(!r2.ok);
         QVERIFY(r2.mensajeError.contains("Ya existe"));
     }
 
     void obtenerMateria_exitoso() {
-        auto creada = m_servicio->crearMateria("Biología", "Química");
+        auto creada = m_servicio->crearMateria("Biología", "Química", m_idTipoAula);
         QVERIFY(creada.ok);
 
         auto obtenida = m_servicio->obtenerMateria(creada.valor.id);
@@ -80,9 +167,9 @@ private slots:
     }
 
     void listarMaterias() {
-        m_servicio->crearMateria("Zootecnia");
-        m_servicio->crearMateria("Agronomía");
-        m_servicio->crearMateria("Botánica");
+        m_servicio->crearMateria("Zootecnia", QString(), m_idTipoAula);
+        m_servicio->crearMateria("Agronomía", QString(), m_idTipoAula);
+        m_servicio->crearMateria("Botánica", QString(), m_idTipoAula);
 
         auto lista = m_servicio->listarMaterias().valor;
         QCOMPARE(lista.size(), 3);
@@ -94,11 +181,11 @@ private slots:
     }
 
     void actualizarMateria_exitoso() {
-        auto creada = m_servicio->crearMateria("Matemática Antigua");
+        auto creada = m_servicio->crearMateria("Matemática Antigua", QString(), m_idTipoAula);
         QVERIFY(creada.ok);
 
         auto actualizada = m_servicio->actualizarMateria(
-            creada.valor.id, "Matemática Moderna", "Álgebra, Cálculo"
+            creada.valor.id, "Matemática Moderna", "Álgebra, Cálculo", m_idTipoAula
         );
 
         QVERIFY(actualizada.ok);
@@ -106,14 +193,47 @@ private slots:
         QCOMPARE(actualizada.valor.requisitos, "Álgebra, Cálculo");
     }
 
+    void actualizarMateria_sinTipo_falla() {
+        auto creada = m_servicio->crearMateria("Matemática Antigua", QString(), m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        auto actualizada = m_servicio->actualizarMateria(creada.valor.id,
+                                                        "Matemática Moderna", QString(), -1);
+
+        QVERIFY(!actualizada.ok);
+        QVERIFY(actualizada.mensajeError.contains("tipo de aula"));
+        QVERIFY(actualizada.mensajeError.contains("sin tipo"));
+
+        // No se conserva el tipo anterior de forma implícita: la materia sigue igual.
+        auto sinCambios = m_servicio->obtenerMateria(creada.valor.id);
+        QVERIFY(sinCambios.ok);
+        QCOMPARE(sinCambios.valor.nombre, "Matemática Antigua");
+        QCOMPARE(sinCambios.valor.idTipoAula, m_idTipoAula);
+    }
+
+    void actualizarMateria_cambiaTipo() {
+        auto creada = m_servicio->crearMateria("Física", QString(), m_idTipoAula);
+        QVERIFY(creada.ok);
+
+        const auto otro = m_tipos->crearTipoAula(QStringLiteral("Laboratorio"));
+        QVERIFY(otro.ok);
+
+        auto actualizada = m_servicio->actualizarMateria(creada.valor.id, "Física", QString(),
+                                                         otro.valor.id);
+
+        QVERIFY(actualizada.ok);
+        QCOMPARE(actualizada.valor.idTipoAula, otro.valor.id);
+        QCOMPARE(actualizada.valor.tipoAula, QString("Laboratorio"));
+    }
+
     void actualizarMateria_inexistente_falla() {
-        auto resultado = m_servicio->actualizarMateria(9999, "Materia");
+        auto resultado = m_servicio->actualizarMateria(9999, "Materia", QString(), m_idTipoAula);
         QVERIFY(!resultado.ok);
         QVERIFY(resultado.mensajeError.contains("No se encontró"));
     }
 
     void eliminarMateria_exitoso() {
-        auto creada = m_servicio->crearMateria("Materia a Eliminar");
+        auto creada = m_servicio->crearMateria("Materia a Eliminar", QString(), m_idTipoAula);
         QVERIFY(creada.ok);
 
         bool eliminado = m_servicio->eliminarMateria(creada.valor.id);
@@ -124,7 +244,7 @@ private slots:
     }
 
     void eliminarMateria_conPlanAsociado_falla() {
-        auto materia = m_servicio->crearMateria("Materia Plan");
+        auto materia = m_servicio->crearMateria("Materia Plan", QString(), m_idTipoAula);
         QVERIFY(materia.ok);
 
         // Crear un plan y asociar la materia
@@ -196,6 +316,8 @@ private:
     std::unique_ptr<QTemporaryDir> m_tempDir;
     std::unique_ptr<DatabaseManager> m_dbManager;
     std::unique_ptr<ServicioMaterias> m_servicio;
+    std::unique_ptr<ServicioTiposAula> m_tipos;
+    int m_idTipoAula = -1;
 };
 
 QTEST_MAIN(TestServicioMaterias)

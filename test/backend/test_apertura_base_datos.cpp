@@ -157,6 +157,41 @@ private slots:
         QVERIFY(!resultado.ok());
     }
 
+    void abrir_baseV4_fallaEsquemaSinMigrarNiBorrar()
+    {
+        // La spec 012 sube el esquema a v5 (preferencias del docente). Una base con la
+        // marca 4 se rechaza al abrir, sin migrar, sin borrar datos y sin tocar la marca.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("v4.db"));
+        crearBaseConEsquema(ruta, 4);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.detalle.contains(QStringLiteral("4")));
+        QCOMPARE(leerVersion(ruta), 4); // la marca del archivo no se reescribe
+    }
+
+    void abrir_baseV3_fallaEsquemaSinMigrarNiBorrar()
+    {
+        // La spec 011 sube el esquema a v4 (configuración global de la hora
+        // académica). La política de la 009 sigue: una base con la marca 3 se
+        // rechaza al abrir, sin migrar, sin borrar datos y sin tocar la marca.
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath("v3.db");
+        crearBaseConEsquema(ruta, 3);
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta);
+
+        QCOMPARE(resultado.estado, Estado::FalloEsquema);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.detalle.contains(QStringLiteral("3")));
+        QCOMPARE(leerVersion(ruta), 3); // la marca del archivo no se reescribe
+    }
+
     void abrir_versionPosterior_fallaEsquema()
     {
         QTemporaryDir dir;
@@ -182,6 +217,11 @@ private slots:
 
         QCOMPARE(resultado.estado, Estado::FalloEsquema);
         QVERIFY(!resultado.ok());
+        // La causa esquema califica el respaldo: debe ser de la versión vigente.
+        QVERIFY(resultado.detalle.contains(
+            QStringLiteral("restaurar un respaldo de la versión vigente")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("crear una base nueva")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("Curso_Materia")));
     }
 
     void abrir_versionAnterior_detallaAmbasVersiones()
@@ -197,6 +237,10 @@ private slots:
         // El detalle nombra la versión del archivo y la que espera la app (RNF-1).
         QVERIFY(resultado.detalle.contains(QString::number(VersionEsquema::VERSION_ESQUEMA_ACTUAL - 1)));
         QVERIFY(resultado.detalle.contains(QString::number(VersionEsquema::VERSION_ESQUEMA_ACTUAL)));
+        // La causa versión ofrece crear una base nueva y advierte del respaldo inútil.
+        QVERIFY(resultado.detalle.contains(QStringLiteral("cree una base nueva")));
+        QVERIFY(resultado.detalle.contains(
+            QStringLiteral("restaurar un respaldo de la versión anterior volverá a fallar")));
     }
 
     void abrir_catalogoViejoConMarcaActual_detallaElMotivo()
@@ -247,6 +291,27 @@ private slots:
         const Resultado resultado = AperturaBaseDatos::abrir(QString());
         QCOMPARE(resultado.estado, Estado::FalloApertura);
         QVERIFY(!resultado.ok());
+    }
+
+    void abrir_falloDeCreacion_explicaQueNoQuedaEsquemaParcial()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString ruta = dir.filePath(QStringLiteral("fallo_creacion.db"));
+
+        // Fuerza el fallo de creación sin depender del DDL: el detalle debe explicar que no
+        // quedó esquema parcial y que el archivo puede descartarse y crearse de nuevo.
+        Opciones opciones;
+        opciones.crear = [](QSqlDatabase&) { return false; };
+
+        const Resultado resultado = AperturaBaseDatos::abrir(ruta, opciones);
+
+        QCOMPARE(resultado.estado, Estado::FalloApertura);
+        QVERIFY(!resultado.ok());
+        QVERIFY(resultado.detalle.contains(QStringLiteral("no quedó esquema parcial")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("descartarse")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("crearse de nuevo")));
+        QVERIFY(resultado.detalle.contains(QStringLiteral("respaldo")));
     }
 
     void abrir_noAbrible_mensajeSinTextoCrudoDeQt()

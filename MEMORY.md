@@ -4,11 +4,11 @@
 
 ## Fase actual
 
-- **Fase:** spec **008 (datos de prueba) implementada** y **005 implementada con T11** (rectificación hora académica = bloque). **Visualización de horarios dirigida por datos** (rejilla, turnos, recesos y bloques de varias franjas según el motor). Suite **47/47** en verde.
-- **Fecha:** 2026-10-17
-- **Rama:** `sdd/005-nucleo-solver` (local, sin pushear; `develop` tiene la 004 mergeada)
-- **Specs en curso:** `specs/005-nucleo-solver` (implementada; T10 abierta por pendientes) y `specs/008-datos-de-prueba` (implementada; APROBADA por el reviewer)
-- **Siguiente paso:** resolver los **pendientes conocidos de la 005** (ver abajo), los menores de la 008 y abrir **PR** de `sdd/005-nucleo-solver` → `develop` (rama protegida: por PR, sin merge commits).
+- **Fase:** **018 (aforo simultáneo de la cancha)** **implementada y cerrada (2026-11-10)** con la validación **APROBADA**; la **017** cerrada el 2026-11-09 con **corrección de datos (2026-11-10, P033)**; la **014** cerrada el 2026-11-07 (`b5844b5`) y la **013** el 2026-11-06 (`2eb45ec`); 015/016 cerradas en `c7b9427` (esquema **v6**). Suites **62/62** (`backend`), **67/67** (`full-release`) y **2/2** (lento) en el host.
+- **Fecha:** 2026-11-11
+- **Rama:** `feat/Motor`, `HEAD` = `e8d4e24` (merge de `feat/frontend-generacion` con el backend 013–018) más los commits SDD de la 019; el merge local se publica en `origin/feat/Motor` el **2026-11-11**.
+- **Specs en curso:** **019 (integración frontend/backend)** **aprobada el 2026-11-10**; **plan y tareas aplazados a mañana** (decisión del usuario). Tras la 019: **rendimiento/descomposición**.
+- **Siguiente paso:** **escribir el `plan.md` y las `tasks.md` de la 019 y pasar el QA del plan**; después, implementación tarea a tarea. Suites verificadas el **2026-11-11**: **62/62** (`backend`), **67/67** (`full-release`) y **2/2** (lento; centro real **281,05 s**, techo **300 s**). Después de la 019: spec de **rendimiento/descomposición**. La generación parcial (antigua 007) sigue descartada/diferida (2026-11-04).
 
 ## Specs activas
 
@@ -17,11 +17,22 @@
 | 001-base-datos-local | aprobada | **implementada** (T1–T8) |
 | 002-generacion-horarios-ipc | aprobada | **implementada** (T1–T9) |
 | 003-cierre-001-base-datos | aprobada | **implementada** (T1–T5: cierra los 5 huecos de la 001) |
-| 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9; suite 38/43) |
-| 005-nucleo-solver | aprobada | **implementada** (T1–T9 + T11; T10 abierta por pendientes conocidos; suite 46/46) |
-| 008-datos-de-prueba | aprobada | **implementada** (T1–T9; 57 materias, 4 planes, 13 cursos, 4 variantes) |
+| 004-persistencia-campos-curso | aprobada | **implementada** (T1–T9) |
+| 005-nucleo-solver | aprobada | **implementada (2026-10-29)** (T1–T9 + T11; **T10 cerrada el 2026-10-29**) |
+| 008-datos-de-prueba | aprobada | **implementada** (T1–T9) · **superada en datos por la 017 (2026-11-08)** |
+| 009-tipos-de-aula-y-eventos | aprobada (2026-10-23) | **implementada** (T1–T9; APROBADO 2026-10-24) |
+| 010-solver-tipos-y-eventos | aprobada (2026-10-23; cambio de requisitos 2026-10-26) | **implementada (2026-10-27)** (T1–T10 + T11–T16; APROBADO de la 2.ª entrega 2026-10-27) |
+| 011-horas-academicas | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T10; **T8 adelantada**; APROBADO 2026-10-29) |
+| 012-preferencias-docente | aprobada (2026-10-23) | **implementada (2026-10-29)** (T1–T9; APROBADO 2026-10-29) |
+| 013-preferencias-docente-solver | aprobada (2026-11-04) | **implementada y cerrada (2026-11-06)** (T1–T10; APROBADO 2026-11-06; re-baseada a v6 en `c7b9427`; sin commits) |
+| 014-bloques-de-dos-horas | aprobada (2026-11-06) | **implementada y cerrada (2026-11-07)** (014a T1–T7 + 014b B1–B7; APROBADO 2026-11-07; sin commits) |
+| 015-tipo-general-en-el-esquema | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T8; APROBADO 2026-11-05; esquema **v6**) |
+| 016-tipo-general-comprobacion-y-cierre | aprobada (2026-11-05) | **implementada y cerrada (2026-11-05)** (T1–T9; APROBADO; T8 del planner) |
+| 017-datos-reales-del-centro | aprobada (2026-11-08) | **implementada y cerrada (2026-11-09)** (T1–T10; APROBADO 2026-11-09) · **corrección de datos (2026-11-10): P033, 33 docentes, 165 disponibilidades** |
+| 018-aforo-simultaneo-cancha | aprobada (2026-11-10) | **implementada y cerrada (2026-11-10)** (T1–T8 + T4b; APROBADO 2026-11-10; sin commits) |
+| 019-integracion-frontend-backend | aprobada (2026-11-10) | **plan y tareas pendientes** (H1, H2, H3, H4, H6 y H8 + formalización H5; esquema **v7**; deuda H7 y H9–H16 salvo las partes de H10 cédula y H14 causas, más 002 RF-5) |
 
-> Épico **solver** (la numeración sigue el orden de trabajo): **004 (persistencia de campos) → 005 (núcleo del solver) → 006 (turnos automáticos) → 007 (generación parcial)**. 006 y 007 reservadas, sin crear.
+> Épico **solver** (numeración real del trabajo): **004 → 005 → 008 → 009 → 010 → 011 → 012 (cerradas)** → **015 (tipo general en el esquema, cerrada el 2026-11-05, esquema v6)** → **016 (comprobación y cierre, cerrada el 2026-11-05)**; **013** (preferencias en el solver) aprobada y **re-baseada a v6**, sin implementar; **014** (materias en bloques de dos horas) planificada y sin escribir. Las antiguas **006 (turnos automáticos)** y **007 (generación parcial)** **no se han creado**; la 007 queda además **descartada/diferida** por decisión del usuario (2026-11-04).
 
 > La antigua spec `002-frontend-db-ipc-solver` se dividió en dos (001 + 002) por tamaño
 > (superaba las 10 tareas) y se renumeró desde 001.
@@ -61,26 +72,115 @@
   - **Años del docente: viven en el preset/config, NO en la BD** (no hay columna nueva en `docentes`). **No hay presets antiguos** → sin compatibilidad hacia atrás. La persistencia (spec 004) solo añade `anio`/`seccion` a `Cursos` y expone los campos en el dominio/DTO (el mapeo DTO→JSON es de la spec 005).
   - **Modo didáctico:** en el solver, **el usuario implementa**; el agente explica comandos/lógica y revisa. (En la implementación inicial implementó el usuario; en las correcciones de la validación se usó el subagente @implementer a petición expresa del usuario.)
   - Tests del solver que fallaban (39/41 en Docker entonces): quedaron **verdes** al cerrar la spec **005** (suite 44/44).
-
 - **Hora académica = bloque (2026-10-17):** `bloques(horas) = horas` y `bloques_aula(horas_aula) = horas_aula`; `duracion_minutos` define **solo** la duración real de la franja. D3/S1/V14 sin conversión. Constitución §7 enmendada. Implementado en **005-T11**.
 - **Seed de datos de prueba (spec 008):** `gestor-horarios-seed` + librería `seed`; **solo puebla la BD, no genera presets**. Plan 31059 adaptado a **40 h académicas/año** (4 planes GEN/EXA/NAT/SOC), 57 materias-año, 210 cargas, 13 cursos **sin turno**, 16 aulas, 2 turnos de 8 franjas de 40 min con receso, 4 variantes de docentes (65/43/64/65; demanda 520, Σ topes 461). Las 210 cargas y los docentes se insertan por **SQL directo** dentro de una transacción única (no `asignarCarga`). Guía: `docs/guias/datos-prueba.md`; suite 46/46.
 - **Empaquetado portable (2026-10-18):** `cmake/Packaging.cmake` (incluido desde el `CMakeLists.txt` raíz) añade `install()` + CPack (`ZIP`) para distribuir el ejecutable con todas sus dependencias, **sin instalación ni administrador**. Las DLL y plugins de Qt los copia `windeployqt` (`--no-translations`, `--no-system-d3d-compiler`, `--no-system-dxc-compiler`, `--no-opengl-sw` y sin los drivers SQL distintos de SQLite, porque la interfaz solo usa Widgets/Network/Sql y solo `QSQLITE`); las de OR-Tools se copian desde `<ortools_DIR>/../../../bin`; el runtime de Visual C++ se instala **app-local** desde `VCToolsRedistDir` en vez de arrastrar `vc_redist.x64.exe`. ICU no se empaqueta: lo aporta Windows (`System32\icuuc.dll`). Se genera solo en Windows y solo en Release; en Docker se omite. Guía: `docs/guias/desarrollo/CMAKE_GUIDE.md` §Empaquetado. Verificado en el host: 44 archivos, 119,6 MB expandido / 38,1 MB el ZIP; `--version` y `--backend` (6 s) con el `PATH` limpio; sonda `QSQLITE` dentro del ZIP descomprimido; auditoría `dumpbin` sin dependencias sin resolver.
+- **Paquete con datos de demostración (2026-10-18):** el paquete estándar **no** trae datos (la app crea la base vacía en `%APPDATA%`); para una entrega que funcione recién descomprimida se añadió `GESTOR_PACK_DEMO` (OFF por defecto) a `cmake/Packaging.cmake`: el ZIP y su carpeta raíz pasan a llamarse «Generador de Horarios Demo» y se incluyen `datos-demo/` (base sembrada del Plan 31059 + su preset) y, en la raíz, `Instalar-datos-demo.bat` + `LEEME-DATOS-DEMO.txt`. El `.bat` copia la base a `%APPDATA%\LiceoRobertSerra\GestorHorarios\gestor_horarios.db` **solo si no existe** (nunca pisa datos del usuario) y recuerda dónde está el preset, que se carga con «Cargar preset…» (el instalador no lo copia: la app lo lee de donde esté). Si faltara algún archivo de `datos-prueba/`, la configuración falla con un mensaje explícito. Verificado: 48 archivos, 38,2 MB; el `.bat` instaló la base (hash idéntico a `datos-prueba/`) en un `%APPDATA%` simulado y en la segunda ejecución no tocó nada; `--version` del paquete OK.
+
+- **Tipos de aula y eventos (spec 009, cerrada el 2026-10-24):**
+  - **Reparto en dos specs.** La **009** se queda con **persistencia y servicios** (esquema, marca de versión, catálogo de esquema, servicios, cascada, huella, seed y documentación de la API); todo lo del **solver** pasa a la **010** (contrato 2.0, regla de tipo, validaciones, supersesión de la 005, constitución, documentación del contrato y MER). La 009 **precede** a la 010.
+  - **Clave normalizada almacenada en el catálogo** (`TiposAula.clave`: recorte + `toCaseFolded()` Unicode, calculada por el servicio) con **índice único sobre la clave**; el `lower()`/`trim()` de SQLite solo pliega ASCII. Corrige la definición y RF-5 de la 009 sin reabrirla.
+  - **Eventos del turno con identidad propia** (varios por franja); el **orden persistente** dentro de la posición es consecuencia de la presentación estable. Sustituyen a los recesos: **sin capa de compatibilidad**.
+  - **Contrato del solver a 2.0** (lo implementa la 010): la 009 solo persiste y expone tipos y eventos.
+  - **Interfaz fuera de alcance**, como en la 001; se documenta la API en `docs/interfaz-frontend.md`. El frontend no compila hasta que su equipo lo adapte; las heurísticas de la interfaz pasan a deuda documentada. La **consola** no es frontend y se actualiza aquí.
+  - **Sin migración:** una base con el **esquema anterior** (sin catálogo/eventos) es **fallo de apertura** —no se migra, no se borra, no se convierten recesos—; la marca de versión sube (esquema **v3**).
+  - **Seed sin promesa de generabilidad:** se siembra de forma **determinista** con tipos y eventos coherentes, pero **no** se exige generar horario con la regla dura de tipo (supersede la promesa de la 008). Cada materia recibe el tipo especializado de su área si el perfil tiene aulas de ese tipo; si no, el genérico. El conjunto se sustituirá por los datos reales.
+- **Tipos y eventos en el solver (spec 010, 1.ª entrega T1–T10, 2026-10-25):**
+  - **Contrato 2.0 único**: se acepta solo `2.0`; `1.0`, ausente o desconocida se rechaza como entrada inválida, **sin conversión** ni tipos por defecto; los presets 1.0 en disco no se tocan.
+  - **Regla de tipo dura siempre** (D8/D9 ampliadas): toda clase en un aula del **tipo exacto** requerido; en modo fijo el aula del curso es su **aula de referencia**: se usa cuando el tipo coincide, las demás se **desplazan** y el curso **vuelve**; mientras está desplazado la referencia queda **vacía y bloqueada**.
+  - **Salida con el aula real** de cada clase (también en modo fijo), no el aula de referencia. **V16/V17** (tipo declarado en aulas y materias; el tipo requerido tiene aulas, en ambos modos).
+  - **P4** (`ValidadorSalidaSolver`): la ocupación se indexa por **(recurso, día, slot)**, no por franja. Desviación **autorizada por el usuario** fuera del plan (`06fc70e`); sin ella, cualquier horario con dos cursos en paralelo se marcaba `CalculoFallido`.
+- **Diagnóstico de causas y referencia general (spec 010, 2.ª entrega T11–T16, cerrada el 2026-10-27):**
+  - **El aula de referencia es siempre del tipo general/ordinario**, identificado por **convención de nombre**: el tipo de clave normalizada **`aula de estudio`** (`tipoGeneralAula()`). **No hay columna, campo, sección ni cambio de esquema**; un centro cuyo tipo ordinario se llame de otra forma no está soportado. **V18** lo valida al final de la cadena (V16 → V17 → V18).
+  - **La reserva del aula de referencia se mantiene** como regla del modelo, pero **no se descuenta** de la capacidad de ningún tipo.
+  - **La causa (2) conflicto de aula es un conteo exacto por tipo**: `demanda(t) > nº de aulas del tipo × nº de días × nº de franjas distintas de la unión de los turnos de los cursos que requieren t`, sin cotas y **sin descontar bloqueos**. Es **necesario, no suficiente**.
+  - **Si ningún test aplica, la causa es «no atribuible»**: el mensaje no nombra una entidad y no se inventa categoría. El sistema sigue sin corregir la entrada.
+  - **Excepción de precedencia**: si un curso necesita más bloques que franjas tiene su turno, la causa es **(3) conflicto de persona** aunque la capacidad del tipo también falle (es el motivo concreto y comprobable). Fuera de ese caso, el orden (1)(2)(3)(4) no cambia.
+  - **Se eliminaron** `palomarPorTipo`, `franjasBloqueadasEnFranjasContadas`, el conteo por aula de referencia compartida y `causaConflictoDeAula`; **`causaSaturacionPorTipo` se reescribe** (es el conteo que se conserva) y `analizarFallo` informa el desenlace «no atribuible».
+  - **`FranjaSemana` (día, franja)** en `contrato_solver`, con las funciones puras de demanda/capacidad; elimina los productos manuales por `num_dias` (origen del error de unidades) y no refactoriza `x`/`y`.
+  - **Documentación y normas alineadas**: `docs/contrato-solver-2.0.md` (tipo general, capacidad, «no atribuible», preset 2.0 con referencia especializada inválido por V18), `docs/constitution.md` (§7.1.5, §7.3, §7.4 y «Comportamiento») y la 005 (**V1–V18**, (2) por capacidad, «no atribuible» y excepción).
+- **Superado por la 010 (2026-10-27).** La definición de causa de la **005** (categorías con (2) = D8/D9/D10 y «primera categoría aplicable» sin desenlace alternativo), la versión **1.0** del contrato y la invariante **D10** quedan supersedidas por la 010; la 005 sigue vigente en todo lo demás (D1–D9, D11, D13, S1/S2, V1–V15 en lo no citado). El «contrato JSON de 002» que supersedía la 005 también queda superado por el 2.0 de la 010.
+
+- **Duración de la hora académica (spec 011, cerrada el 2026-10-29):**
+  - **Configuración global de una fila** (`ConfiguracionHoraria`, `CHECK(id = 1)`), **35 por defecto**, rango **30–90**; **esquema v4**, catálogo y `HUELLAS_CONOCIDAS` en el mismo cambio; **sin migración** (una base v3 se rechaza al abrir).
+  - **Punto único `duracion_horaria`** (rango, horas académicas → minutos, `franjasUtilizables`, `deficitDeEncaje`), usado por la configuración, **V2 del contrato**, el servicio de turnos, el seed y el constructor. **Ninguna otra pieza hace horas → minutos**; multiplicar por D para el ancho de franja o el encaje **no** es esa conversión.
+  - **La franja dura D**: se elimina `duracionFranjaEstimada` y el reparto de la ventana; el sobrante queda al final. **V2 pasa de `> 0` a 30–90** y valida el **encaje de todos los turnos**.
+  - **El preset no manda**: `construirJsonEntrada(datos, preset, D, ahora)` **sobrescribe siempre** la duración antes de validar (un preset con 0, 5 o 45 no bloquea).
+  - **La huella de datos incluye D**; un cambio de D entre el inicio y la recepción marca «datos anteriores».
+  - **Seed con D = 35**: turnos **07:00–11:50 / 12:40–17:30**, recesos **08:10–08:20 / 13:50–14:00**, `8 × 35 + 10 = 290`; rejilla de clases hasta **11:40/17:20** y `fin` que añade los 10 min del evento. La configuración se asegura de forma idempotente y **no cuenta como dato de dominio**.
+  - **Si falla la lectura de la configuración** (error de SQL, no «sin fila»), **la operación de turnos/eventos falla**; el 35 solo se usa cuando hay esquema y no hay fila (decisión del usuario, `19ceccb`).
+  - **Supersesiones**: 009 (franja estimada y su cálculo), 008 (8×40+10), 005/010 (V2 solo `> 0`), anotadas en sus specs con fecha `011 (2026-10-29)`.
+
+- **Preferencias horarias del docente (spec 012, cerrada el 2026-10-29):**
+  - **Modelo que replica la disponibilidad y añade sentido.** Tabla `Preferencia_Profesor` con docente, día, inicio, fin y **sentido** (`preferida`/`evitada`), con identidad propia. **No se mezcla** con la disponibilidad: una cosa es poder y otra querer.
+  - **Día 0–6** (0 = domingo … 6 = sábado), el mismo rango que la disponibilidad; sábado y domingo se guardan y se exponen pero **no intervienen** en la generación actual.
+  - **Validación:** docente existente, día 0–6, `inicio < fin`, sentido válido, **sin solapes de sentidos opuestos**, **sin duplicado exacto**; los solapes y rangos contiguos del **mismo sentido** se admiten; **cambiar el sentido o el día se revalida** y, si contradice, se rechaza **conservando el anterior**.
+  - **Servicios y DTO:** `ServicioPreferencias` (`agregar`/`listar`/`actualizar`/`eliminar`/`limpiar`) con `Resultado<T>` y mensajes con valor y acción; `ProfesorDTO` gana `preferencias` **separadas** de `disponibilidad` (cambios aditivos) y **`toProfesor()` las ignora**.
+  - **Cascada en los dos caminos:** `eliminarProfesor` y `eliminarConCascada` borran preferencias y disponibilidad de forma atómica; las dependencias se listan antes de confirmar.
+  - **Huella intacta:** no entran en `DatosDominio`/`huellaDatos` y cambiarlas no marca «datos anteriores». **Condición futura:** cuando el solver las consuma, deberán entrar en ambos.
+  - **Esquema v5** con catálogo y `HUELLAS_CONOCIDAS` en el mismo cambio; **sin migración** (una base v4 se rechaza al abrir). `CHECK(hora_inicio < hora_fin)` **depende del formato `HH:mm`** (barrera lexicográfica, no un parser), y el `UNIQUE` frena el duplicado exacto.
+  - **Seed con 0 preferencias** (`Preferencias: 0`, 12 tablas de dominio); `--solo-docentes` y el reemplazo total **borran preferencias antes que docentes** y disponibilidad, en una transacción; **supersede RF-9 y la definición de reemplazo de docentes de la 008**.
+
+- **Integración del frontend con la base de datos (2026-11-01):**
+  - **Merge, no rebase:** `origin/feat/Base-datos` se integró en `feat/frontend-generacion` con un commit de merge, conservando la historia de ambas ramas. Se mantiene la agrupación S3 de bloques (spec `009-agrupacion-bloques-materias`, que vive en `develop`/`release/1.0` y no en la rama de datos) adaptada al contrato 2.0.
+  - **Migración según `docs/guias/migracion-frontend.md`:** el builder lee la D global de `NucleoDatos::configuracionHoraria()` y maneja el `Resultado` de `construirJsonEntrada`; la rejilla de visualización se alimenta del array `eventos` (sin `recesos` en el contrato) y `huellaActual` cablea `huellaDatos(datos, D)`; se retira el selector de duración y `OpcionesUI::duracionMinutos`.
+  - **Catálogo de tipos de aula (009) en la interfaz:** aulas y materias se dan de alta con `idTipoAula` desde `listarTiposAula()`; la clasificación y la estimación de ocupación usan `AulaDTO.tipoAula`/`MateriaDTO.tipoAula` en vez de heurísticas por nombre o por `requisitos`. La **gestión del catálogo** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) sigue sin pantalla: es deuda declarada, no afecta a la compilación.
+  - **`test_generacion_seed` con la regla de tipo exacto:** el seed (un solo laboratorio) no admite los 13 cursos; el test recorta su copia temporal a 8 cursos —los cinco años y ambos turnos— para que la demanda de laboratorio de cada turno quepa en su capacidad semanal (5 días × 8 franjas) y el motor resuelva. El seed en disco no cambia.
+
+- **Centro generable y paleta mate del horario (2026-11-02):**
+  - **Presupuesto del solver:** el límite determinista sube de **2.0 a 6.0** s. Con 13 cursos, 2.0 devolvía `UNKNOWN` (no encontraba la primera solución); con 6.0 el centro 31059 resuelve, P4 sale sin conflictos y la S3 queda en 166. Se mantiene la reproducibilidad (1 worker, seed 0). Documentado en `specs/009-agrupacion-bloques-materias/estado.md`.
+  - **Capacidad de laboratorio:** con un solo laboratorio la instancia es **INFEASIBLE** (107 bloques de laboratorio frente a 80 franjas); con **tres** laboratorios y el presupuesto nuevo genera. El aula del tipo sobrante no se usa si ninguna materia la requiere.
+  - **Preset 2.0 del centro:** `datos-prueba/preset-centro-31059-2.0.json` (local; `datos-prueba/` está en `.gitignore`), con el reparto plan/turno original, D=40 y las opciones de docentes calculadas. Se carga con «Cargar preset…»; la generación se verificó reproduciendo ese camino (cargar preset → construir entrada → resolver).
+  - **Colores de los bloques:** `schedule_theme.hpp` pasa a una paleta **mate** (tonos medios poco saturados, texto claro) con familias por **prefijo** —«Matemáticas 1º», «Física Aplicada», «Ciencias de la Tierra 5º»…—, en vez de coincidencia exacta; en oscuro se aclaran ligeramente. El fallback por nombre también es mate.
+
+- **Ventanas de horario (2026-11-02):**
+  - **Leyenda lateral y por horario:** la leyenda sale de la tira inferior y pasa a la barra derecha, bajo el navegador de docentes/secciones; muestra **solo las materias del horario que se está viendo** (docente o sección) y se reconstruye al navegar.
+  - **Rejilla que se reescala:** las celdas se dimensionan para llenar el área visible y se recalculan al redimensionar o maximizar (con un tamaño mínimo que activa las barras de scroll cuando no cabe, p. ej. el docente con los dos turnos).
+  - **Pantalla completa:** el diálogo de horarios se abre maximizado y con botones de maximizar/restaurar; mientras está abierto, la **ventana principal se oculta** y vuelve al cerrarlo. Durante la transición se desactiva «cerrar al cerrar la última ventana» para que la app no termine.
+
+- **Bienvenida y tipos de aula (2026-11-02):**
+  - **Panel principal**: pasa a una ventana de bienvenida con el **logo del liceo**, «Bienvenido», una frase («Enseñar y aprender: dos caminos que crecen juntos.») y los totales de **docentes, aulas y materias** en tarjetas pequeñas al pie. Se retiran el gauge de generación, las notificaciones y los diálogos de detalles/conflictos.
+  - **Logo**: se carga de `:/logo.png`; la biblioteca `frontend` es estática, así que `dashboard_widget.cpp` fuerza el enlace del `.qrc` con `Q_INIT_RESOURCE(resources)`.
+  - **Tipos de aula**: botón «+ Tipo de aula» en Gestión de Aulas que llama a `NucleoDatos::crearTipoAula`; el tipo queda disponible de inmediato en los formularios de aulas y materias y el solver lo exigirá para las materias de ese tipo.
+
+- **Eventos con nombre y configuración de generación (2026-11-02):**
+  - **Eventos del turno**: el contrato 2.0 ya envía `eventos` (metadata que el solver ignora) y la entrada del centro lleva 3: receso de mañana, **acto cívico** de mañana y receso de tarde. El frontend conserva su `nombre` en `_cuadricula` y lo pinta: el receso en ámbar y los demás eventos en el acento, con sus horas reales.
+  - **Datos del centro**: se añadió «Acto cívico» (Mañana, tras el receso, 10 min, 08:30–08:40) y la ventana del turno de mañana pasó a **07:00–12:40** (8 × 40 + 10 + 10). La generación de 13 cursos sigue siendo factible y presentable.
+  - **Configuración de generación**: la vista ya no expone franjas por día (se derivan de los turnos) ni días, aula fija o duración. Esos ajustes viven en **Configuración → Avanzado**: días y aula fija en `QSettings` (`generacion/dias`, `generacion/aulaFija`); la duración en la base, validando el encaje de todos los turnos antes de guardar. La vista muestra un resumen de la configuración vigente.
+
+- **Preferencias del docente y cierre limpio (2026-11-02):**
+  - **Formulario del docente**: tres desplegables **opcionales** —turno, plan de estudio y año preferencial— que no se muestran en la tabla. Se guardan en `QSettings` (`docentes/<id>/{turno,plan,anio}`) y la tabla de docentes de «Generación de horario» los **precarga**; un preset cargado los sobrescribe. Al eliminar el docente se limpian.
+  - **Altas y bajas visibles en Generación**: la tabla de docentes se poblaba solo al arrancar. Ahora `sincronizarDocentes()` la pone al día **al entrar en la vista** (añade y quita filas) conservando los valores ya ajustados de los docentes que siguen; un docente nuevo entra con sus preferencias. Test de regresión en `test_selector_generacion`.
+  - **Preferencias aplicadas al entrar**: las preferencias guardadas en el formulario se aplican también a filas **limpias** cuando la vista ya existía (aunque el conjunto de docentes no cambie); las filas ajustadas a mano o por un preset se respetan. El año del formulario usa **«Todos»** como opción por defecto.
+  - **Tabla de generación simplificada**: se quitaron las columnas «Materias asignadas» y «Materias suplentes» (queda en 6 columnas); los presets antiguos con suplencias ya no las configuran desde la vista.
+  - **QSettings centralizado** en `PreferenciasDocenteUI`, con espacio de configuración intercambiable; los tests usan uno propio y no tocan la configuración real.
+  - **Cierre sin avisos**: `GestorProcesoBackend` marca la parada intencional (`m_deteniendo`) y no emite `backendColapsado` al detener el proceso; además el frontend ignora la señal durante `aboutToQuit`/`closingDown`. Ya no aparece «El proceso de cálculo dejó de responder» (ni su código) al cerrar la aplicación con normalidad.
+  - El test de la vista de generación aísla `QSettings` en un INI temporal para no depender de las preferencias de la máquina.
+
+- **Tipo general de aula: 015 (garantía estructural) y 016 (comprobación y cierre), cerradas el 2026-11-05.** Esquema **v6**: toda base nace con el tipo general («Aula de estudio», clave normalizada `aula de estudio`) en la creación, con índice único y **dos disparadores** que prohíben borrarlo y renombrarlo (también por escritura directa); la guardia exige tablas, columnas, índice, disparadores y **exactamente una** fila (nombre normalizado + clave), y las tablas retiradas siguen invalidando. El literal vive en `common/tipo_general.hpp` y solver, servicio, seed y frontend delegan. El seed **reutiliza** el tipo, la base nueva **cuenta como vacía**, el reemplazo total **lo conserva** y el recuento es 3 leído de la base. La 016 exige la validez **al abrir, antes de generar y antes de guardar la configuración** con **una sola** comprobación de solo lectura (`validez_base::comprobar`); el frontend **no sustituye** el tipo general (`idTipoGeneral` → `Resultado<int>`), V18 explica la convención y la acción y el tipo general queda **fuera de la huella de datos**. **Sin cambios de API del catálogo ni del contrato 2.0.** Deudas aceptadas: `Causa::Version` cubre también un fallo de lectura (interno); `revisarBase` con valor por defecto; el mensaje de versión **posterior** (v7) sin matizar; `cerrar()` no propaga el fallo de `commit()`; faltan tests de conexión cerrada y de base rota tras abrir; `docs/solver/Informe-Motor-Solver.md` sigue citando «V1–V13»; coste ≈1,03 ms por comprobación. La **013** quedó **re-baseada a v6** sin cambiar sus requisitos.
+
+- **Preferencias del docente en la generación (013, implementada y cerrada el 2026-11-06):** prioridad **blanda con garantía estructural** — la preferencia nunca cambia la asignación de docente por materia-curso ni el exceso de horas, y se logra con **tres resoluciones**: fase 1 = modelo actual (referencia), fase 2a con `z*` y `e*` fijados por igualdad minimizando la preferencia, y fase 2b que fija ese valor y desempata con S3. `PESO_PREFERENCIA = 25` (10 < 25 < 100), unidad por franja deduplicada por (docente, día, slot). Contrato 2.0 con sección **opcional `preferencias`** ya proyectada (docente por índice, día de la generación, franjas, sentido): `toJson` la omite vacía, **el preset no la persiste** (se elimina al guardar) y la ignora al cargar, y la equivalencia de ida y vuelta es de la **configuración** (acotación anotada en 005/010). Proyección reloj→franja en la construcción con **la misma rejilla** que la disponibilidad (bloque entero, todos los turnos, el evento no corta) y filtro de día dominio→generación (domingo no aplica; sábado solo si la semana lo incluye); solo viajan las **intervinientes** y las demás se informan como **no aplicadas** con motivo (c) > (a) > (b). **V19** y catálogo **V1–V19**; constitución §7.2 con S1/S2/preferencia/S3 y §7.4 a V1–V19. Huella con bloque `pref:` solo de intervinientes (golden sin preferencias `3c50f3ab…`). **Cumplimiento** por preferencia en el resultado del backend (día de dominio, motivo, clases incumplidas, tres totales); la salida del solver no cambia. Medición: 3937 ms → 4676 ms (**+18,8 %**), techo de 60 s asertado. **Deudas:** cobertura de aristas (sentidos opuestos solapados, cambio de preset que altere los intervinientes, turnos solapados, mejora estricta de la 2b); preset con preferencias inválidas se rechaza al cargar; sección de tipo incorrecto se tolera como vacía; `cumplimiento` vacío en NoFactible/ContratoInvalido; `longGroup` fuera del objetivo (deuda pre-existente); `docs/solver/Informe-Motor-Solver.md` en «V1–V13» (histórico).
+
+- **Materias en bloques de dos horas (014, implementada y cerrada el 2026-11-07):** **S3 eliminada** (la 009-agrupación queda superada; la sustituyen el **emparejamiento** y la **alineación**). Reglas duras: bloques de **2 franjas adyacentes** por segmento, cada materia en **bloques enteros** salvo su resto, **un bloque por materia y día**, **misma aula** en el bloque, resto compartido entre dos materias impares del mismo tipo, y **huecos al final del día**. Blandas: **separación de un día** (prioridad alta) y **viernes** para los huecos. Causa **(5) conflicto de bloques** (total impar; 11 h o más). **8 workers** (misma entrada ⇒ horario **válido**, no idéntico) y **plazo del proceso 300 s** (002). **Centro real factible** con 30 docentes: **848 clases, desvío 0, separación 2**; **172,6 s** el centro y **183,58 s** el test lento. La **cancha** se confirma para **dos cursos simultáneos**; el **aforo simultáneo por aula** es **spec futura**. Deudas: test de aceptación con 30 docentes; aserciones por curso de huecos 6/4 y `bloquesCompartidos == 4` (opcional); `docs/solver/Tareas-Implementacion.md` conserva «<60 s» histórico.
+
+- **Datos reales del centro (017, implementada y cerrada el 2026-11-09; corrección de datos del 2026-11-10):** el **conjunto de prueba pasa a ser el centro real** (Liceo Nacional Robert Serra, 2026/2027) y **sustituye** al sintético de la 008: **2 planes** (31059 **34/34/34/36/34** y 31060 **40×5**), **85 materias** (79 con carga + **6 sin carga**), **95 cargas**, **24 cursos con turno** (12 + 12; letras libres en 31060) con **matrícula 889** (579 + 310), **13 aulas** (12 de 44 **compartidas entre turnos** + **cancha** de 88), **33 docentes** (30 + 2 añadidos + **1 de apoyo, P033**), **272 asignaciones** y **165 disponibilidades**, capacidad **1188** (576 + 612), tope **36 h académicas**, **40 min** (07:00–12:40 / 12:40–18:10, receso ×2 + acto cívico) y **876 clases** (**96 de EF**, 48 por turno; 780 sin EF; 944 el plan completo). **Se retiran** las 4 variantes, los planes derivados y la conmutación; el **turno se persiste en el curso**; la duración es **configuración** y el conjunto la deja en **40**. **No generaba** por dos motivos: **48 clases de EF por turno** frente a **40** franjas y **48 clases de idiomas** en la tarde con una sola docente; la **018** (aforo ×2) y **P033** lo resuelven y el informe pasa a **`Generable: sí`**. `test_generacion_seed` **se sustituye** por `test_entrada_seed` (compone y valida, **no resuelve**; el anterior se **borró**). Suites **61/61** y **66/66** al cerrar; **62/62 y 67/67** con la 018; seed en **0,089–0,18 s**. **Deudas:** identidad (año, sección, plan), la UI del «no generable» (la 018 la deja fuera de alcance), el **paquete demo** (`GESTOR_PACK_DEMO`/`datos-demo/`) **no** se regenera, y `seed.md` sigue versionado con nombres reales mientras el conjunto usa ficticios (`P001`–`P033`).
+
+- **Aforo simultáneo de la cancha (018, implementada y cerrada el 2026-11-10):** el **aforo por aula** es una **regla del sistema por tipo** —**cancha 2**, resto **1**—, **hardcodeada** (`common/aforo_aula.hpp`): no viaja en el contrato, no toca el esquema, no entra en presets ni en la huella. La **capacidad de un tipo** es `aulas × franjas × aforo` y la **causa (2)** cita las **cuatro cifras** (demanda, aulas, franjas y aforo). Dos cursos comparten la cancha **solo en pares completos** (las mismas dos franjas, cursos y docentes distintos; **pares cruzados prohibidos**); la referencia sigue **vacía y bloqueada** y la comprobación de salida cuenta **por aforo**. Con **P033** el centro real **genera**: **876 clases**, **96 de EF en la cancha**, **0 pares cruzados**, desvío **0**, huecos **0**, en **161–264 s** (una corrida de 369,7 s). Suites **62/62**, **67/67** y **2/2** (lento). Constitución §7.1.3/§7.1.5/§7.3/§7 enmendada (**§7.4** intacto) y supersesiones en **005/010/014/017**. **Deudas:** el tiempo está **cerca del plazo de 300 s** (spec de rendimiento); el **caso literal** del par cruzado y la **precedencia (3)>(2)** sin test cruzado; `capacidadCancha` usa `turnos[0]`; el **resto impar de cancha** sin cubrir en `comprobarParesCancha`; «32 docentes» histórico en `CMAKE_GUIDE`/`migracion-frontend`.
 
 ## Siguiente paso
 
-1. **Pendientes conocidos de la 005** (ver abajo) → planificar en la próxima spec del épico (**006/007**) o en una nueva.
-2. **Orden del épico solver:** 004 (persistencia) ✅ → 005 (núcleo + T11) ✅ → 006 (turnos automáticos) → 007 (generación parcial).
-3. **Menores de la 008:** ignorar `.clangd`; confirmar la convención **1-based** de `despues_de_slot` en 004/005 (hoy asumida y verificada por las horas del receso).
-4. **Abrir PR de `sdd/005-nucleo-solver` → `develop`** (rama protegida: por PR, sin merge commits). La 004 ya está mergeada y pusheada.
-5. **Cableado de `ServicioGeneracion` con el cliente IPC real** (`PuertoSolver`): **implementado en el frontend** (2026-10-17, ver Progreso): `PuertoSolverIpc` sobre `InternalClient` + vista «Generación de horario». `docs/interfaz-frontend.md` §3.6.
-6. **Distribución:** el **ZIP portable ya se genera** (`cmake --build build-rel --target package`, ver `docs/guias/desarrollo/CMAKE_GUIDE.md` §Empaquetado). Falta lo que venga después: un instalador (Inno Setup o NSIS) que envuelva ese ZIP, y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
+1. **018 (aforo simultáneo) cerrada:** **decidir los commits** de la 017 y la 018 (hoy en el árbol); después **rendimiento/descomposición** (centro real **161–264 s**, techo **300 s**).
+2. **Deudas del frontend:** **resueltas en `feat/frontend-generacion` (2026-11-01)** — builder con D, `huellaActual` cableado, selector de duración retirado, eventos en lugar de recesos, `test_generacion_seed` reescrito (35 min, rejilla del seed). Queda solo la **pantalla de gestión del catálogo de tipos de aula** (`crearTipoAula`/`renombrarTipoAula`/`eliminarTipoAula`) y, de la 012, la **UI de preferencias** (solo API): ambas son funcionalidad nueva, no bloquean la compilación.
+3. **Divergencia con `release/1.0`:** esa rama tiene **16 commits propios** (spec `009-agrupacion-bloques-materias` con la penalización S3, frontend y empaquetado Windows) **sin integrar** en `feat/Base-datos`; `feat/frontend-generacion` **sí la tiene** (viene de `develop`) y la conservó al integrar la rama de datos: la agrupación S3 del solver convive con la ocupación por `ClaveOcupacion` de la 010. Ojo: su `009` **no es** nuestra `009-tipos-de-aula-y-eventos` (colisión de numeración entre ramas).
+4. **83 commits de `feat/Base-datos` sin PR a `develop`** (rama protegida: por PR, sin merge commits).
+5. **MEMORY actualizado** (2026-11-10) con la corrección de la 017 y el cierre de la 018 (62/62, 67/67 y 2/2).
+6. **DistribuciÃ³n:** el **ZIP portable** ya se genera con `cmake --build build-rel --target package` (`cmake/Packaging.cmake`; ver `docs/guias/desarrollo/CMAKE_GUIDE.md` Â§Empaquetado). Falta lo que venga despuÃ©s: un instalador (Inno Setup o NSIS) que envuelva ese ZIP y firmar el binario con `signtool` para evitar el aviso de SmartScreen.
 
 ### Pendientes conocidos de la 005 (diferidos y documentados)
 
-- **RF-13 — planes de los docentes:** `ConstructorEntradaSolver` embebe los planes de los **cursos** pero no los que usan los **docentes**. Sin impacto funcional hoy (el plan del docente se compara como cadena), pero es una cláusula explícita del RF.
-- **RNF-4 — cobertura de tests por regla:** faltan casos rojo→verde de V2 (`peso` negativo, `duracion_minutos ≤ 0`), V7 (turno ausente), V8 (modo inactivo), V14, V15, D13 (`anios`), S1/S2 (exceso y titular a tope), reproducibilidad (RNF-1), aula de salida como índice (fija/móvil) y `peso` en el ida y vuelta. Por esto los «Hecho cuando» de T3/T5/T7/T8 no quedan cerrados y **T10 sigue abierta**.
-- **Decisión I2 — avisos retirados:** `ValidadorSalidaSolver` sigue emitiendo los avisos de **capacidad de aula** y **horas no cubiertas**, y `test_validador_salida` los exige; la spec 005 los **retira hasta nuevo aviso**. Hay que alinear código/tests (tocando la spec si se cambia la decisión).
-- **Residuales varios:** P1/P2 de `ValidadorSalidaSolver` comparan horas vs bloques; `metadata.total_asignaciones` cuenta variables (no asignaciones); `profesores_asignados`/`tiempo_ejecucion_ms` sin rellenar; `Solver` acumula estado si se reutiliza la instancia; `.clangd` sin ignorar; no se validan materias duplicadas ni de 0 horas en un plan.
+**Sin pendientes:** T10 cerrada el 2026-10-29 — RF-13 (planes de docentes, `7e3ee0b`), RNF-4 (V7, V8, V15, D13, S1/S2, `peso` en el ida y vuelta, `70ea509`/`7354c7a`). Antes de cerrarla, el mismo día, se resolvieron la decisión I2 (`36cd7b2`; docs `ebeb3bf`), `metadata` de la salida (`d356780`), el estado de `Solver` (`57f5be8`) y el flaky del middleware (`fd7ac33`).
+
+> La validación de **materias duplicadas o de 0 horas** en un plan **no está en la spec 005**: sería un **requisito nuevo** y se abriría en otra spec.
 
 ## Progreso de implementación
 
@@ -92,137 +192,41 @@
   - `docs/interfaz-frontend.md` documenta el contrato real (implementado vs planificado); el test de
     contrato fija `Resultado<T>`, `AperturaBaseDatos::Resultado::ok()/detalle/rutaRespaldo` y
     `estadoPendienteDe` (verde).
-- 002: **T1 completa** ✅ (`CargadorConfiguracionSolver` + `SolverConfig::toJson`); `solver_config` movido al target `backend` (sin OR-Tools). Test `test_cargador_configuracion` (verde).
-  - **T2 completa** ✅ (`ConstructorEntradaSolver`/`construirJsonEntrada` + `DatosDominio`). Decisión de contrato: el JSON de entrada sigue el `SolverConfig` **implementado** (12 secciones) + `meta` (extra que `fromJson` ignora); la BD aporta entidades y el preset los parámetros del solver (horas por docente casadas por nombre). Test `test_constructor_entrada`. Divergencia con `docs/solver/Motor-Solver-Plan-Completo.md` §3 anotada.
-  - **T3 completa** ✅ (`ValidadorEntradaSolver`/`validarEntradaSolver`, envoltura de `SolverConfig::fromJson` con V1–V13). Test `test_validador_entrada` (un caso por regla).
-  - **T4 completa** ✅ (`ValidadorSalidaSolver`/`analizarSalidaSolver` + `AnalisisSalida`): P1–P3 avisos, P4 solapamiento (profesor/aula/curso) ⇒ no presentable. Test `test_validador_salida`.
-  - **T5 completa** ✅ (`ServicioGeneracion` + `PuertoSolver` inyectable, `huellaDatos`/`estamparFechaGeneracion` puras): estados Listo/DatosAnteriores/NoFactible/ContratoInvalido/CalculoFallido/TiempoAgotado/EntradaInvalida, timeout con `QTimer` e ignorado de respuestas tardías. `backend` con `AUTOMOC`. Test `test_servicio_generacion`.
-  - **T6 completa** ✅ (`messages.h`: código `RESP_SIN_SOLUCION`, ops de negocio marcadas obsoletas; `InternalClient::intentosConexion()` para verificar reutilización de socket). Test `test_middleware_transport` extendido con ruta `solver_resolve` y «sin tormenta de reconexiones».
-  - **T7 completa** ✅ (`servicio_solver`/`resolverEntradaSolver` en `backend_solver`; `aplicacion_backend` registra `solver_resolve`; `GestorProcesoBackend` sin reinicio automático). Test `test_ipc_aislamiento_bd` (no abre BD, rechaza ops de negocio).
-  - **T8 completa** ✅ (contrato de `ServicioHorarioSalida` fijado con `test_archivos_horario`: round-trip JSON y fallo de escritura sin perder el contenido).
-  - **T9 completa** ✅ (`docs/interfaz-frontend.md` §3 completa: `ServicioGeneracion`, `CargadorConfiguracionSolver`, `HorarioSalida`/archivos, `AnalisisSalida`, proceso `--backend`/salud) + `test_contrato_generacion`. **Spec 002 implementada.**
-- 005: **T1–T9 completas** ✅ (T10 abierta por pendientes conocidos). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Seller: `version="1.0"` al producir/guardar.
+- 002: **T1–T9 completas** ✅ (`CargadorConfiguracionSolver` + `SolverConfig::toJson`; `solver_config` movido al target `backend` sin OR-Tools; `ConstructorEntradaSolver`/`construirJsonEntrada` + `DatosDominio`; `ValidadorEntradaSolver` con V1–V13; `ValidadorSalidaSolver` P1–P4; `ServicioGeneracion` + `PuertoSolver`; `messages.h` y transporte; `servicio_solver`/`resolverEntradaSolver`; contrato de `ServicioHorarioSalida`; `docs/interfaz-frontend.md` §3 + `test_contrato_generacion`). **Spec 002 implementada.**
+- 005: **T1–T9 completas** ✅ (T10 cerrada el 2026-10-29). Contrato nuevo (`aula_fija` global, curso por `anio`+`seccion`, planes embebidos, `anios`, centinela `-1`), funciones puras (`bloques`/`bloquesAula`/`claveCurso`/`materiasDelCurso`/elegibilidad), validación V1–V15, construcción de la entrada desde BD+preset, variables CP-SAT, restricciones duras (D1–D11 y D13; D12 eliminada), objetivo S1+S2 (`PESO_HORAS > COSTE_SUPLENTE`), extracción por identidad (`claveCurso`, aula = índice) y causas de no factibilidad por categorías (RF-6). Sellaba `version="1.0"` al producir/guardar (**superado por la 010: 2.0**).
   - **Validación del reviewer (ronda 2): APROBADA.** Bloqueantes corregidos y commiteados: `37666a2` (D1/D3 siempre publicadas + V13 cruza disponibilidad×turno), `454a53b` (RF-10 versión no reconocida), `7a7ff1b` (RF-11 centinela `-1`, coherencia de horas, V9 estricto), `4171a4d` (RF-6 categorías de causa), `f063f39` (sello `version="1.0"`).
-- Tests ajenos que fallan: **ninguno**. Queda un **flaky preexistente** (`test_middleware_transport`, ~1 de cada 6 ejecuciones, `QLocalSocket: Invalid name`), ajeno a la 005 y reproducible en HEAD. El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
-- **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de
-  `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`
-  (la marca actual), dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004
-  cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distingue una base
-  vieja de una nueva y solo la verificación de catálogo la rechaza. Medidas:
-  - `VersionEsquema::esquemaEsperado(db, QString* motivo)`: explica exactamente lo que no cuadra
-    (tablas/columnas faltantes y tablas retiradas presentes).
-  - `AperturaBaseDatos` distingue versión ≠ esperada (nombra ambas) de catálogo ≠ esperado (nombra el
-    motivo) en `detalle`; sigue sin migrar ni tocar datos (RF-6).
-  - El arranque del cliente implementa el **diálogo de recuperación RF-4** (Reintentar / Restaurar
-    respaldo / Crear base nueva con respaldo obligatorio / Salir) sobre las APIs ya probadas de
-    `Respaldo`; antes solo mostraba un `QMessageBox` fatal y salía.
-  - **Guardia anti-regresión**: `test_backend_version_esquema` congela la huella SHA-256 del catálogo
-    por versión (`HUELLAS_CONOCIDAS`); cambiar el DDL obliga a subir la versión y registrar la huella
-    nueva, o el test falla. `test_backend_apertura_base_datos` reproduce el incidente (catálogo viejo
-    con marca actual → `FalloEsquema` con motivo).
-  - Verificación en host (MSVC + Ninja + OR-Tools): suite **36/41**; los 5 rojos son los conocidos de
-    la spec 005 (`constructor_entrada`, `validador_entrada`) y los de solver/IPC (`0xc0000135` sin las
-    DLL de OR-Tools en `PATH`; ya crashean en `restriccionBloquesRequeridos` con ellas). Todos los
-    tests de BD/versión/respaldo/apertura/contexto en verde.
-  - Base del usuario recreada (estaba vacía; respaldada como `gestor_horarios.db.respaldo-20261017-090000`).
-- Entorno: tests dentro del contenedor `gestor-dev` → `docker exec gestor-dev bash -lc "cd /workspace && cmake --preset full && cmake --build build && ctest --preset full --output-on-failure"`. OR-Tools solo en el contenedor; el host no lo tiene.
-- **Vista de generación en el frontend (2026-10-17, cierre parcial de 005):** implementada la vista
-  «Generación de horario» (`ScheduleGenerationWidget`, índice 4 de `MainWindow`) y su capa de servicios
-  en `src/frontend/src/services/` (`generacion_tipos.hpp`, `entrada_solver_builder`, `puerto_solver_ipc`).
-  Arma la entrada del solver reutilizando `construirJsonEntrada` con el **contrato nuevo**: planes
-  **embebidos** (compuestos con `NucleoDatos::componerPlanCompleto`), curso por `anio`+`seccion`,
-  `aula_fija` **global** y `anios` por docente; ya **no** inyecta `materias` por curso ni
-  planificación/penalizaciones. La envía por IPC (`OP_RESOLVER_HORARIO`) con `ServicioGeneracion` y
-  traduce el `HorarioSalida` (clave `claveCurso`) al formato de visualización (`teachers`/`years`).
-  El preset usa el formato de la propia configuración (`CargadorConfiguracionSolver`). `MainWindow`
-  guarda el `InternalClient` como miembro, inyecta el `NucleoDatos` en la vista y, al emitirse
-  `horarioGenerado`, guarda el JSON en la carpeta de horarios, lo carga en
-  `ScheduleVisualizationWidget` (`loadSchedules`) y salta a esa sección. Se corrigió el cross-talk de
-  `ScheduleVisualizationWidget` (ahora solo responde a sus propias ops). `src/CMakeLists.txt` declara
-  `backend` **antes** que `frontend` para que la interfaz use la lógica de dominio; `frontend` enlaza
-  `backend` y define `GESTOR_TIENE_BACKEND` (sin backend, la vista muestra un aviso). Compila en
-  los presets `full` y `dev-frontend` (verificado en host MSVC+Ninja; `gestor-horarios.exe` enlaza).
-  Doc: `docs/interfaz-frontend.md` §3.6.
-  Añadido el test `test_frontend_conversion` (`test/frontend/test_conversion_entrada.cpp`) para la
-  traducción `HorarioSalida`→visualización; pasa en local (`ctest -R test_frontend_conversion`).
-
+  - **T11 (rectificación 2026-10-17):** hora académica = bloque; `bloques`/`bloquesAula` identidad; `duracion_minutos` solo describe la franja; constitución §7 enmendada. Suite **46/46** entonces.
+  - **T10 (cierre 2026-10-29):** RF-13 (`7e3ee0b`, planes de los docentes embebidos sin duplicar), cobertura RNF-4 (`70ea509`: V7/V8/V15/D13; `7354c7a`: S1/S2 y `peso` en el ida y vuelta). Suite **54/54**; sin pendientes.
 - 008: **T1–T9 completas** ✅ (APROBADO por el reviewer; 57 materias, 4 planes, 13 cursos sin turno, 16 aulas, 4 variantes de docentes; suite 46/46).
-- 005: **T11 completa** ✅ (hora académica = bloque; `bloques`/`bloquesAula` identidad; T10 sigue abierta).
-
-- **Visualización dirigida por datos (2026-10-18):** la rejilla de horarios (ventanas de profesores y de
-  alumnos) deja de suponer 12 franjas de 45 min y un receso de 30 min y se dibuja con lo que el motor
-  recibe. Hallazgos y cambios:
-  - **`aFormatoVisualizacion` descartaba las franjas de la tarde.** El filtro era `slot > 11` (plantilla
-    antigua): con el contrato actual (16 franjas/día, mañana 0..7 y tarde 8..15) los cursos de la tarde
-    perdían sus clases en la vista. Ahora el rango válido lo declara la configuración
-    (`num_slots_dia`/`num_dias`) y el filtro es `slot >= numSlotsDia`.
-  - **La rejilla viaja en el horario (`_cuadricula`).** `aFormatoVisualizacion` emite duración del bloque,
-    días, franjas por turno (con su hora de inicio) y recesos (posición y duración), leídos de la propia
-    entrada ya construida (`leerCuadricula`), así que la vista no adivina: si mañana el bloque es de
-    50 min o el receso de 15, se ve tal cual. Cada sección declara además su `turno`.
-  - **Rejilla por turno y con varias franjas.** Un curso ve solo las franjas de su turno (con su receso);
-    un docente, las de todos (puede dar clase en ambos). Una clase que ocupa franjas seguidas (misma
-    materia, profesor y aula) se pinta como **un solo bloque** («12:40 - 14:00 · 2 h») y se arrastra
-    entero (`planMoveRun`); un receso en medio corta la unión. Si el documento no trae `_cuadricula`
-    (archivo de ejemplo integrado y horarios guardados por versiones anteriores) se usa la plantilla
-    histórica de 12×45 min + receso de 30.
-  - **Mover un tramo sobre su propio espacio (fix 2026-10-18).** Se reportó que al intercambiar una clase
-    de dos horas con dos clases del destino el tramo se volvía de tres horas y las otras dos «de dos
-    horas». La causa era el solape: al soltar el bloque una o dos franjas más arriba, el destino incluía
-    una franja del propio tramo y `applyMove` (que escribía par a par, en orden) pisaba una clase y
-    **alargaba** el tramo (y el lado que miraba hacia abajo se ignoraba en silencio). Ahora el movimiento
-    se calcula como una **lista de traslados elementales** (`tramoMovimientos` → `SlotMove`) que es una
-    biyección sobre las franjas afectadas y se aplica **leyendo todo el origen antes de escribir**:
-    solape → el tramo se **desplaza** y las clases ganadas pasan a las franjas libres (`plan.rotation`);
-    sin solape/días distintos → intercambio. Ninguna clase se pierde ni el tramo cambia de tamaño.
-  - **Ninguna clase se parte y el bloque cae donde se ve (fix 2026-10-18, 2.ª vuelta).** Se reportó que
-    soltar una materia de una franja sobre una de dos horas la convertía en una (el destino cortaba la
-    clase grande), y que intercambiar la grande con dos pequeñas parecía no producirse. Ahora
-    `parteUnaClase` (apoyada en `tramoQueContiene`, con las mismas reglas que `largoDeTramo`) detecta si
-    alguna clase del destino quedaría **partida** porque no cabe entera en él: el diálogo avisa («El
-    destino partiría una clase») y **no mueve nada** — hay que mover entera la clase del destino o soltar
-    la arrastrada sobre franjas libres. El intercambio de una grande (dos franjas) con dos pequeñas (una
-    cada una) **sí** se permite y conserva los tamaños de todas. Además, el arrastre anota la franja
-    agarrada (`grab`) y al soltar se calcula `toSlot = franja del puntero en la celda − grab`, así el
-    bloque cae donde se ve (antes, agarrarlo por su segunda franja lo dejaba una franja más abajo y el
-    intercambio parecía no ocurrir).
-  - **Leyenda y subtítulos.** La leyenda se arma con las materias reales del horario (ordenadas por peso,
-    en una tira desplazable) y los subtítulos muestran turno, clases pintadas y horas académicas.
-  - Pruebas: nueva `test_cuadricula_horario` (filas por turno, receso, horas, tramos, movimiento del
-    bloque completo, **desplazamiento sobre su propio espacio** hacia arriba y hacia abajo, intercambio
-    con conflicto conservando todas las clases, **intercambio de la grande con dos chicas** conservando
-    tamaños y **detección de clase partida** al soltar una chica sobre una grande o una grande junto a
-    otra), `test_frontend_conversion` actualizada (conserva la
-    tarde, emite `_cuadricula` y el turno) y `test_generacion_seed` ampliada (el documento de
-    visualización conserva las 520 clases, incluidas las de la tarde). **Suite 47/47 en verde.**
-    Verificado con un barrido de los 86 destinos posibles sobre un horario de prueba (0 clases perdidas
-    o duplicadas) y a ojo con capturas de las ventanas.
-
-- **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se
-  probó el flujo completo de la vista «Generación de horario» con la base sembrada
-  (`datos-prueba/centro-31059-holgada.db`, variante `holgada`), copiada sobre la base de la app
-  (`%APPDATA%/LiceoRobertSerra/GestorHorarios/gestor_horarios.db`) con respaldo previo
-  (`gestor_horarios.db.respaldo-antes-seed-*`). Cambios:
-  - **Turno por curso en el preset.** `ParametrosCurso` gana `turno`; la columna **Turno** de la tabla
-    de cursos pasa de texto de la base (siempre vacío en los datos sembrados) a un **desplegable** con
-    los turnos de la base + «Sin turno»; `construirEntrada` lo inyecta en el preset y
-    `ConstructorEntradaSolver` **prefiere el `turno` del preset** y cae al de la base si viene vacío
-    (la 005 I1 sigue valiendo cuando el preset no lo declara). `validarConfiguracion` exige turno.
-  - **Duración del bloque y slots derivados.** Al cargar la base por primera vez, la vista deriva de
-    los turnos el nº de slots/día (suma de slots) y `duracion_minutos` (franja menos recesos sobre
-    sus slots; 40 min en el conjunto). Antes solo derivaba los slots y fijaba 45 min.
-  - **Fix de mapeo de disponibilidad (`ConstructorEntradaSolver::slotsDeFranja`).** Antes exigía que
-    la franja del docente estuviese **contenida** en un turno, así que la disponibilidad por defecto
-    del seed (07:00–18:00, que abarca ambos turnos) se mapeaba a **cero** slots y **V13** rechazaba
-    (materia sin candidato). Ahora se emite cada bloque (anclado en el `inicio` del turno, pasos de
-    `duracion_minutos`) que cae **íntegramente** dentro de la franja, acumulando por turno — la misma
-    semántica que la cobertura del seed («la franja contiene un bloque completo»). `test_constructor_entrada`
-    sigue en verde.
-  - **Verificación de integración** `test_generacion_seed` (`test/frontend/`, con `frontend` +
-    `backend_solver` + `seed`): siembra una base temporal, compone la entrada con el reparto
-    plan/turno de la guía y **resuelve**; **Release en host: horario en ~1,5 s**. En **Debug sobre
-    Windows** el motor no arranca (CRT de depuración contra DLL Release de OR-Tools → `0xc0000374`),
-    igual que `test_solver_horarios`; el preset `full` es para Docker. Para generar en host hay que
-    **compilar en Release** (`build-rel`) y poner
-    `C:/ortools-v9.15-vs2022/or-tools_x64_VisualStudio2022_cpp_v9.15.6755/bin` en `PATH` (el proceso
-    `--backend` hereda el `PATH` del frontend).
+- 009: **T1–T9 completas** ✅ (**APROBADO 2026-10-24**). Esquema **v3** con `TiposAula` (clave normalizada + índice único), `id_tipo_aula` obligatorio y `Eventos` con identidad/orden (`059168f`, `357102d`); servicios de eventos con coherencia temporal y ventanas por posición (`08067ce`, `693fa18`), catálogo de tipos y huella (`83d7e7f`), fachada/cascada/puente de eventos en la entrada (`e79d227`); seed con tipos y eventos y reemplazo seguro (`f438079`, `af1ac8a`); preset `backend` sin interfaz (`8cfa211`); API, guías y deuda del frontend (`221e563`); mensajes de rechazo con el valor recibido (`1835399`); cierre (`e72c930`).
+- 010: **implementada (2026-10-27)** ✅. Dos entregas validadas:
+  - **1.ª (T1–T10, 2026-10-25):** contrato 2.0 y rechazo de versiones, V16/V17, regla de tipo con aula de referencia/desplazamiento/vuelta, salida con aula real, **P4**, supersesión de la 005, enmienda constitucional, MER y documentación del contrato (`0096b36` plan/tareas, `3a3e724` T1, `d2fbda1` T2, `4142939` T3, `0edc6f8` T4, `06fc70e` P4, `37cd2e1` T6, `f054b2e` T7, `4134209` T8, `9c5c301` T9, `35cd5f0` T10) y **cinco correcciones** de la heurística de causas (`aa7ee74`, `232bd19`, `45ac292`, `5fc40e0`, `de61050`; suite **49/49** en `de61050`), que llevaron al **cambio de requisitos del 2026-10-26**.
+  - **2.ª (T11–T16, 2026-10-27):** `FranjaSemana` y funciones puras (`227eacd`), **V18** (`736bbcd`), causa (2) por capacidad sin descuentos y «no atribuible» (`d3e8de0`), tests de ventanas de turno/reproducibilidad/aula especializada (`b4491ad`), contrato-constitución-005 alineados (`da71419`), regresión global con el seed intacto (`a233afc`), notas del reviewer en los tests (`072b6ee`) y **cierre** (`dea89db`). Suite **50/50**; benchmark factible en **~185–277 ms**.
+- 011: **implementada y cerrada (2026-10-29)** ✅ (APROBADO 2026-10-29 contra `8e0602c`; suite **52/52**).
+  - T1 `fc86368` · T2 `11077f8` · T3 `4262b49` · T4 `36c28b2` · **T8 `c913d87` (adelantada)** · T5 `bc7122b` · T6 `fbb1f68` · T7 `15db0d2` · T9 `c62653c` · T10 `059815b` · correcciones `19ceccb` · cierre `0703052`.
+  - **T8 se adelantó a T5** porque T5 dejaba `test_seed_aplicacion` en rojo hasta que el perfil pasara a 35; la regla «ninguna tarea cierra con el árbol sin compilar» lo exigió.
+  - **No se tocó** el modelo del solver, el tope de 40 h ni la interfaz; las deudas del frontend quedan en `docs/interfaz-frontend.md` §6.
+- 012: **implementada y cerrada (2026-10-29)** ✅ (APROBADO 2026-10-29 contra `3007c54`; suite **54/54**).
+  - T1 `4993be0` · T2 `3871488` · T3 `7405351` · T4 `d2f2147` · T5 `8acce25` · T6 `3b8ba90` · T7 `43c222c` · T8 `94647ef` · T9 `98c9dbc` · notas de la validación (M1–M6) `e12641b`.
+  - **Alcance:** persistencia, validación, servicios, cascada, seed y documentación. **No se tocó** el solver, el contrato ni la interfaz; las preferencias **no alteran la generación** y quedan **fuera de la huella** hasta que el solver las consuma.
+- 015: **T1–T8 completas** ✅ (APROBADO 2026-11-05; esquema **v6**: fila + dos disparadores + guardia ampliada; seed reutiliza y conserva el general).
+- 016: **T1–T9 completas** ✅ (APROBADO 2026-11-05; comprobación en tres momentos, ayuda estricta, V18, huella; T8 del planner re-baseó la 013).
+- 013: **T1–T10 completas** ✅ (APROBADO 2026-11-06; contrato con `preferencias`, V19, proyección, fases 1/2a/2b, huella, cumplimiento y docs).
+- 014: **implementada y cerrada** ✅ (014a T1–T7 + 014b B1–B7; S3 eliminada, bloques de 2 h, 8 workers, plazo 300 s, informe de bloques y seed a horas pares).
+- 018: **T1–T8 + T4b completas** (2026-11-10; **sin commits**, pendiente de aceptación del usuario). Aforo simultáneo **hardcodeado por tipo de aula** en un solo punto (`common/aforo_aula.hpp`: cancha **2**, resto **1**; no viaja en el contrato, no toca esquema ni presets), `AddLessOrEqual(Sum, aforoDelAula)` por (día, franja, aula), capacidad `aulas × franjas × aforo` con causa (2) de cuatro cifras, P4 por conteo con aforo y pares cruzados, y seed con guarda del tipo de la cancha **por clave** e informe «Generable: sí». Suites **62/62**, **67/67**, **2/2**; centro real **876** clases, EF 96/96 en la cancha, desvío 0, 0 pares cruzados, **161 463 ms**.
+  - **Convención (techos de tiempo de los tests lentos):** el techo del test se alinea con el **plazo del servicio (300 s)** y **no** con un margen más estricto que la spec. Medición del fixture sin EF: **149–321 s** (8 workers de CP-SAT sobre 4 núcleos, `load` 1,7–9,0); el antiguo techo de 200 s lo hacía intermitente sin que hubiera regresión.
+- Tests ajenos que fallan: **ninguno**. El antiguo **flaky `test_middleware_transport`** estaba **mal atribuido**: no era ajeno al solver, sino una **colisión del nombre fijo del socket IPC** entre los tests que levantan `InternalServer` (`health_check`, `transport`, `ipc_aislamiento_bd`) al correr en paralelo; **corregido el 2026-10-29** con `RESOURCE_LOCK` de CTest (`fd7ac33`). La suite es estable hoy en serie y en paralelo (`-j4`/`-j8`). El ordenamiento con acentos de `test_servicio_profesor` quedó **resuelto** con `QCollator` (ver decisión).
+- **Incidente y hotfix de apertura de base (2026-10-17):** una base creada con el DDL anterior de `Cursos` (`nombre`/`aula_fija`) y la tabla retirada `Curso_Materia`, pero con `user_version = 2`, dejó de abrir con «El esquema … no corresponde al esperado». Causa: la spec 004 cambió el DDL de `Cursos` **sin subir `VERSION_ESQUEMA_ACTUAL`**; la marca ya no distinguía una base vieja de una nueva. Medidas:
+  - `VersionEsquema::esquemaEsperado(db, QString* motivo)` explica exactamente lo que no cuadra (tablas/columnas faltantes y tablas retiradas presentes).
+  - `AperturaBaseDatos` distingue versión ≠ esperada de catálogo ≠ esperado (nombra el motivo) en `detalle`; sigue sin migrar ni tocar datos (RF-6).
+  - El arranque del cliente implementa el **diálogo de recuperación RF-4** (Reintentar / Restaurar respaldo / Crear base nueva con respaldo obligatorio / Salir) sobre las APIs ya probadas de `Respaldo`.
+  - **Guardia anti-regresión:** `test_backend_version_esquema` congela la huella SHA-256 del catálogo por versión (`HUELLAS_CONOCIDAS`); cambiar el DDL obliga a subir la versión y registrar la huella nueva. `test_backend_apertura_base_datos` reproduce el incidente.
+  - Base del usuario recreada tras respaldo (`gestor_horarios.db.respaldo-20261017-090000`).
+  - Verificación de entonces en host (MSVC + Ninja + OR-Tools): 36/41, con los rojos conocidos de la 005 y los de solver/IPC por las DLL de OR-Tools.
+- Entorno: la verificación es el preset **`backend`** en el host (`cmake --preset backend && cmake --build --preset backend --parallel && ctest --preset backend`), con OR-Tools en `~/.local/ortools`; **54/54**. El contenedor `gestor-dev` (`--preset full`) queda como vía alternativa.
+- **Vista de generación en el frontend (2026-10-17, cierre parcial de 005):** implementada la vista «Generación de horario» (`ScheduleGenerationWidget`, índice 4 de `MainWindow`) y su capa de servicios en `src/frontend/src/services/` (`generacion_tipos.hpp`, `entrada_solver_builder`, `puerto_solver_ipc`). Arma la entrada reutilizando `construirJsonEntrada` con el contrato nuevo (planes embebidos, curso por `anio`+`seccion`, `aula_fija` global, `anios`), la envía por IPC (`OP_RESOLVER_HORARIO`) y traduce el `HorarioSalida` al formato de visualización. `MainWindow` guarda el `InternalClient`, inyecta el `NucleoDatos` y, al emitirse `horarioGenerado`, guarda el JSON y lo carga en `ScheduleVisualizationWidget`. Doc: `docs/interfaz-frontend.md` §3.6. Test `test_frontend_conversion`. **Rotura conocida:** el builder del frontend no compila con `construirJsonEntrada` devolviendo `Resultado<QJsonObject>` (deuda del equipo del frontend; el preset `backend` no lo compila).
+- **Frontend + datos de prueba: generar con el motor (2026-10-17, cierre de la 008 en host):** se probó el flujo completo de la vista «Generación de horario» con la base sembrada (`datos-prueba/centro-31059-holgada.db`, variante `holgada`), copiada sobre la base de la app con respaldo previo. Cambios:
+  - **Turno por curso en el preset.** `ParametrosCurso` gana `turno`; la columna **Turno** pasa a desplegable con los turnos de la base + «Sin turno»; `construirEntrada` lo inyecta y `ConstructorEntradaSolver` **prefiere el `turno` del preset** y cae al de la base si viene vacío. `validarConfiguracion` exige turno.
+  - **Duración del bloque y slots derivados.** Al cargar la base, la vista deriva de los turnos el nº de slots/día y `duracion_minutos` (40 min en el conjunto).
+  - **Fix de mapeo de disponibilidad (`ConstructorEntradaSolver::slotsDeFranja`).** Emite cada bloque (anclado en el `inicio` del turno, pasos de `duracion_minutos`) que cae **íntegramente** dentro de la franja, acumulando por turno — la semántica del seed. Antes la disponibilidad 07:00–18:00 se mapeaba a cero slots y V13 rechazaba.
+  - **Verificación de integración** `test_generacion_seed` (`test/frontend/`): siembra una base temporal, compone la entrada con el reparto plan/turno de la guía y **resuelve**; **Release en host: ~1,5 s**. En **Debug sobre Windows** el motor no arranca (CRT de depuración contra DLL Release de OR-Tools → `0xc0000374`). Para generar en host: compilar en Release (`build-rel`) y poner `C:/ortools-v9.15-vs2022/or-tools_x64_VisualStudio2022_cpp_v9.15.6755/bin` en `PATH`.

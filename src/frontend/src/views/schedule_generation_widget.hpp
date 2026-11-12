@@ -19,11 +19,15 @@
  */
 
 #include <QJsonObject>
+#include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 #include <QWidget>
 
 #include "services/generacion_tipos.hpp"
+
+#include "backend/services/proyeccion_preferencias.hpp"
 
 class QCheckBox;
 class QComboBox;
@@ -58,6 +62,28 @@ public:
     /// Vuelve a leer cursos/docentes/planes del núcleo y repuebla las tablas.
     void recargarDesdeNucleo();
 
+    /**
+     * @brief Refresca cursos y catálogos sin perder lo elegido en docentes.
+     *
+     * Se usa tras crear o eliminar años/secciones: actualiza la tabla de cursos
+     * y las opciones de años de los docentes, conservando las horas, el turno y
+     * el plan que el usuario ya hubiera ajustado.
+     */
+    void refrescarCursos();
+
+    /// Relee días/aula fija de la configuración (ventana de Configuración → Avanzado)
+    /// sin tocar las tablas de cursos y docentes.
+    void recargarConfiguracionAvanzada();
+
+    /**
+     * @brief Refresca la tabla de docentes si la base ganó o perdió docentes.
+     *
+     * Conserva los valores ya elegidos para los docentes que siguen; los nuevos
+     * entran con sus preferencias (o los valores por defecto). Se llama al abrir
+     * la vista, para no exigir reiniciar la aplicación tras un alta.
+     */
+    void sincronizarDocentes();
+
     /// Reaplica los colores del tema (claro/oscuro) en caliente.
     void actualizarTema(bool modoOscuro);
 
@@ -78,6 +104,15 @@ private:
     void poblarPlanes();
     void poblarCursos();
     void poblarDocentes();
+    /// Reúne los años de los cursos y las materias existentes (para los selectores).
+    void poblarCatalogos();
+
+    /// Relee los ajustes avanzados y refresca el resumen visible.
+    void actualizarResumenParametros();
+
+    /// Rellena con las preferencias del formulario las filas de docente que el
+    /// usuario no haya ajustado a mano (ni vengan de un preset cargado).
+    void aplicarPreferenciasDocentes();
 
     GeneracionSolver::OpcionesUI leerOpciones() const;
     void aplicarOpciones(const GeneracionSolver::OpcionesUI& opciones);
@@ -93,10 +128,7 @@ private:
     QString m_schedulesDir;
 
     // ── Controles ─────────────────────────────────────────────────────────
-    QSpinBox* m_spinDuracion = nullptr;
-    QSpinBox* m_spinDias = nullptr;
-    QSpinBox* m_spinSlotsDia = nullptr;
-    QCheckBox* m_checkAulasFijas = nullptr;
+    QLabel* m_lblParametros = nullptr;
     QTableWidget* m_tablaCursos = nullptr;
     QTableWidget* m_tablaDocentes = nullptr;
     QPushButton* m_btnGenerar = nullptr;
@@ -106,17 +138,29 @@ private:
     QLabel* m_lblEstado = nullptr;
     QProgressBar* m_progreso = nullptr;
 
+    // Parámetros que vienen de Configuración → Avanzado (QSettings y núcleo).
+    int  m_numDias = 5;
+    bool m_usarAulasFijas = true;
+    int  m_slotsDia = 0;          ///< Suma de las franjas de los turnos de la base.
+
     // ── Estado de generación ──────────────────────────────────────────────
     ServicioGeneracion* m_servicio = nullptr;
     PuertoSolverIpc* m_puerto = nullptr;
     GeneracionSolver::ContextoHorario m_contexto;
     QJsonObject m_entradaActual;
+    /// Preferencias que no intervinieron en la última composición (013, RF-8): viajan al
+    /// servicio para informar el cumplimiento del resultado.
+    QVector<PreferenciaNoAplicada> m_preferenciasNoAplicadas;
 
     // ── Datos auxiliares (por fila) ───────────────────────────────────────
     QStringList m_planesCodigos;
     QStringList m_turnosNombres;
     QStringList m_cursosNombres;
     QStringList m_docentesNombres;
+    QStringList m_docentesIds;         ///< Id de cada fila de la tabla de docentes.
+    QSet<QString> m_docentesAjustados; ///< Filas con valores propios (manuales o de un preset).
+    QVector<int> m_aniosDisponibles;   ///< Años de los cursos de la base.
+    QStringList m_materiasDisponibles; ///< Materias existentes (para suplencias).
     bool m_defaultsApplied = false; ///< Los valores por defecto se derivan una vez.
     bool m_estadoError = false;     ///< El último estado mostrado es un error.
 };

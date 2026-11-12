@@ -14,7 +14,7 @@ namespace gestor::frontend::forms {
 
 SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Registrar Asignatura");
-    resize(400, 200);
+    resize(400, 220);
 
     // Detectar si el modo oscuro está activo
     bool isDark = qApp->property("isDarkMode").toBool();
@@ -40,7 +40,7 @@ SubjectFormDialog::SubjectFormDialog(QWidget *parent) : QDialog(parent) {
     m_campoNombre->setPlaceholderText("Nombre de la asignatura");
 
     m_comboTipoAula = new QComboBox(this);
-    m_comboTipoAula->addItems({"Aula de estudio", "Cancha", "Laboratorio"});
+    // El catálogo real lo aporta `cargarTiposAula` (tabla TiposAula, spec 009).
     m_comboTipoAula->setStyleSheet(QString(
                                        "QComboBox {"
                                        "    border: 1px solid %1;"
@@ -131,14 +131,41 @@ bool SubjectFormDialog::validarCampos() {
 void SubjectFormDialog::guardarMateria() {
     if (!validarCampos()) return;
 
-    emit materiaGuardada(m_campoNombre->text().trimmed(), m_comboTipoAula->currentText());
+    const int idTipoAula = m_comboTipoAula->currentData().toInt();
+    if (idTipoAula <= 0) {
+        QMessageBox::warning(this, "Error de Validación",
+                             "Debe seleccionar un tipo de aula del catálogo.");
+        return;
+    }
+
+    emit materiaGuardada(m_campoNombre->text().trimmed(), m_requisitos, idTipoAula);
     accept();
 }
 
-void SubjectFormDialog::cargarDatos(const QString& nombre, const QString& tipoAula) {
+void SubjectFormDialog::cargarTiposAula(const QVector<TipoAulaDTO>& tipos, int idSeleccionado)
+{
+    m_comboTipoAula->clear();
+    for (const TipoAulaDTO& tipo : tipos)
+        m_comboTipoAula->addItem(tipo.nombre, tipo.id);
+
+    if (idSeleccionado > 0) {
+        const int indice = m_comboTipoAula->findData(idSeleccionado);
+        if (indice >= 0)
+            m_comboTipoAula->setCurrentIndex(indice);
+    }
+}
+
+void SubjectFormDialog::cargarDatos(const QString& nombre, const QString& requisitos,
+                                    int idTipoAula) {
     m_campoNombre->setText(nombre);
-    int index = m_comboTipoAula->findText(tipoAula);
-    if (index >= 0) m_comboTipoAula->setCurrentIndex(index);
+    // Los requisitos ya no se editan en el formulario, pero se conservan para
+    // no borrarlos de las asignaturas existentes al guardar.
+    m_requisitos = requisitos;
+    if (idTipoAula > 0) {
+        const int indice = m_comboTipoAula->findData(idTipoAula);
+        if (indice >= 0)
+            m_comboTipoAula->setCurrentIndex(indice);
+    }
 }
 
 } // namespace gestor::frontend::forms

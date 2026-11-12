@@ -8,10 +8,13 @@
 #include "classroom_list_widget.hpp"
 #include "../forms/classroom_form_dialog.hpp"
 #include "backend/services/NucleoDatos.hpp"
+#include "services/tipos_aula_ui.hpp"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QFrame>
 
@@ -37,10 +40,14 @@ void ClassroomListWidget::setupUi() {
 
     QLabel *titulo = new QLabel("Gestión de Aulas", this);
     titulo->setObjectName("ClassroomTitle");
+    titulo->setWordWrap(true);
+    titulo->setMinimumWidth(0);
     titulo->setStyleSheet("font-size: 24px; font-weight: bold; color: #111827; border: none;");
 
     QLabel *subtitulo = new QLabel("Administra los espacios físicos, laboratorios y su capacidad", this);
     subtitulo->setObjectName("ClassroomSub");
+    subtitulo->setWordWrap(true);
+    subtitulo->setMinimumWidth(0);
     subtitulo->setStyleSheet("font-size: 14px; color: #6b7280; border: none;");
 
     textLayout->addWidget(titulo);
@@ -51,8 +58,15 @@ void ClassroomListWidget::setupUi() {
     m_registerButton->setCursor(Qt::PointingHandCursor);
     m_registerButton->setStyleSheet("QPushButton { background-color: #1a237e; color: white; font-weight: bold; padding: 10px 20px; border-radius: 6px; font-size: 14px; } QPushButton:hover { background-color: #283593; }");
 
+    m_typesButton = new QPushButton("+ Tipo de aula", this);
+    m_typesButton->setObjectName("ClassroomTypeBtn");
+    m_typesButton->setCursor(Qt::PointingHandCursor);
+    m_typesButton->setStyleSheet("QPushButton { background-color: white; color: #1a237e; font-weight: 600; padding: 10px 18px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #f1f5f9; }");
+    m_typesButton->setToolTip("Agrega un tipo al catálogo; el solver lo usará para exigir aulas de ese tipo");
+
     topSectionLayout->addLayout(textLayout);
     topSectionLayout->addStretch();
+    topSectionLayout->addWidget(m_typesButton, 0, Qt::AlignVCenter);
     topSectionLayout->addWidget(m_registerButton, 0, Qt::AlignVCenter);
 
     // ==========================================
@@ -62,9 +76,9 @@ void ClassroomListWidget::setupUi() {
     contentLayout->setSpacing(25);
 
     // 1. Configuración de la Tabla (Lado Izquierdo)
-    m_table = new QTableWidget(0, 5, this);
+    m_table = new QTableWidget(0, 6, this);
     m_table->setObjectName("ClassroomTable");
-    m_table->setHorizontalHeaderLabels({"Nombre", "Capacidad", "Edificio", "Piso", "Acciones"});
+    m_table->setHorizontalHeaderLabels({"Nombre", "Capacidad", "Tipo de aula", "Edificio", "Piso", "Acciones"});
     m_table->setStyleSheet(
         "QTableWidget { background-color: white; border-radius: 8px; border: 1px solid #e0e0e0; color: #334155; }"
         "QHeaderView::section { background-color: white; font-weight: bold; color: #374151; border: none; border-bottom: 1px solid #e0e0e0; padding: 12px; }"
@@ -75,8 +89,9 @@ void ClassroomListWidget::setupUi() {
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
-    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
-    m_table->setColumnWidth(4, 180);
+    m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Fixed);
+    m_table->setColumnWidth(5, 180);
     m_table->verticalHeader()->setVisible(false);
     m_table->setShowGrid(false);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -87,7 +102,8 @@ void ClassroomListWidget::setupUi() {
 
     // 2. Configuración del Panel de Resumen (Lado Derecho)
     QFrame *rightPanel = new QFrame(this);
-    rightPanel->setFixedWidth(320);
+    rightPanel->setMinimumWidth(220);
+    rightPanel->setMaximumWidth(340);
     rightPanel->setStyleSheet("QFrame#ContenedorResumen { background-color: white; border-radius: 12px; border: 1px solid #e0e0e0; }");
     rightPanel->setObjectName("ContenedorResumen");
 
@@ -144,6 +160,7 @@ void ClassroomListWidget::setupUi() {
     mainLayout->addLayout(contentLayout);
 
     connect(m_registerButton, &QPushButton::clicked, this, &ClassroomListWidget::abrirFormularioNuevo);
+    connect(m_typesButton, &QPushButton::clicked, this, &ClassroomListWidget::abrirFormularioNuevoTipo);
 }
 
 // ==========================================
@@ -164,6 +181,10 @@ void ClassroomListWidget::cargarAulas() {
     int contadorLabs = 0;
     int contadorCanchas = 0;
 
+    QVector<TipoAulaDTO> tiposAula;
+    if (const auto tipos = m_nucleo->listarTiposAula(); tipos.ok)
+        tiposAula = tipos.valor;
+
     for (const auto& aula : res.valor) {
         int fila = m_table->rowCount();
         m_table->insertRow(fila);
@@ -176,14 +197,15 @@ void ClassroomListWidget::cargarAulas() {
 
         m_table->setItem(fila, 0, crearItemCentrado(aula.nombre));
         m_table->setItem(fila, 1, crearItemCentrado(QString::number(aula.capacidad)));
-        m_table->setItem(fila, 2, crearItemCentrado(aula.edificio.isEmpty() ? "N/A" : aula.edificio));
-        m_table->setItem(fila, 3, crearItemCentrado(aula.piso.isEmpty() ? "N/A" : aula.piso));
+        m_table->setItem(fila, 2, crearItemCentrado(aula.tipoAula));
+        m_table->setItem(fila, 3, crearItemCentrado(aula.edificio.isEmpty() ? "N/A" : aula.edificio));
+        m_table->setItem(fila, 4, crearItemCentrado(aula.piso.isEmpty() ? "N/A" : aula.piso));
 
-        // Clasificar tipos para el resumen
-        QString nombreLower = aula.nombre.toLower();
-        if (nombreLower.contains("lab") || nombreLower.contains("laboratorio")) {
+        // Clasificar por el tipo de aula del catálogo (spec 009), no por el nombre.
+        const QString tipoLower = aula.tipoAula.toLower();
+        if (tipoLower.contains("lab") || tipoLower.contains("laboratorio")) {
             contadorLabs++;
-        } else if (nombreLower.contains("cancha") || nombreLower.contains("deporte")) {
+        } else if (tipoLower.contains("cancha") || tipoLower.contains("deporte")) {
             contadorCanchas++;
         } else {
             contadorTeoricas++;
@@ -208,7 +230,7 @@ void ClassroomListWidget::cargarAulas() {
         layoutAcciones->addWidget(btnEliminar);
         layoutAcciones->addStretch();
 
-        m_table->setCellWidget(fila, 4, panelAcciones);
+        m_table->setCellWidget(fila, 5, panelAcciones);
 
         int aulaId = aula.id;
 
@@ -222,14 +244,19 @@ void ClassroomListWidget::cargarAulas() {
             }
         });
 
-        connect(btnEditar, &QPushButton::clicked, this, [this, aulaId, aula]() {
+        connect(btnEditar, &QPushButton::clicked, this, [this, aulaId, aula, tiposAula]() {
             gestor::frontend::forms::ClassroomFormDialog dialogo(this);
             dialogo.setWindowTitle("Editar Aula");
-            dialogo.cargarDatos(aula.nombre, aula.capacidad, aula.edificio, aula.piso);
+            dialogo.cargarTiposAula(tiposAula, aula.idTipoAula);
+            dialogo.cargarDatos(aula.nombre, aula.capacidad, aula.edificio, aula.piso,
+                                aula.idTipoAula);
 
             connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-                    this, [this, aulaId](const QString& nNombre, int nCapacidad, const QString& nEdificio, const QString& nPiso) {
-                        auto resultado = m_nucleo->actualizarAula(aulaId, nNombre, nCapacidad, nEdificio, nPiso);
+                    this, [this, aulaId](const QString& nNombre, int nCapacidad,
+                                         const QString& nEdificio, const QString& nPiso,
+                                         int nIdTipoAula) {
+                        auto resultado = m_nucleo->actualizarAula(aulaId, nNombre, nCapacidad,
+                                                                  nEdificio, nPiso, nIdTipoAula);
                         if (!resultado.ok) {
                             QMessageBox::warning(this, "Error", "No se pudo actualizar el aula: " + resultado.mensajeError);
                         } else {
@@ -249,10 +276,27 @@ void ClassroomListWidget::cargarAulas() {
 void ClassroomListWidget::abrirFormularioNuevo() {
     if (!m_nucleo) return;
 
+    const auto tipos = m_nucleo->listarTiposAula();
+    if (!tipos.ok) {
+        QMessageBox::warning(this, "Catálogo no disponible",
+                             "No se pudo leer el catálogo de tipos de aula. " + tipos.mensajeError);
+        return;
+    }
+
+    // 016 RF-2: resolver el general antes de abrir el diálogo; si no está, no se usa otro.
+    const auto idGeneral = TiposAulaUI::idTipoGeneral(tipos.valor);
+    if (!idGeneral.ok) {
+        QMessageBox::warning(this, "Tipo general no disponible", idGeneral.mensajeError);
+        return;
+    }
+
     gestor::frontend::forms::ClassroomFormDialog dialogo(this);
+    dialogo.cargarTiposAula(tipos.valor, idGeneral.valor);
     connect(&dialogo, &gestor::frontend::forms::ClassroomFormDialog::aulaGuardada,
-            this, [this](const QString& nombre, int capacidad, const QString& edificio, const QString& piso) {
-                auto resultado = m_nucleo->crearAula(nombre, capacidad, edificio, piso);
+            this, [this](const QString& nombre, int capacidad, const QString& edificio,
+                         const QString& piso, int idTipoAula) {
+                auto resultado = m_nucleo->crearAula(nombre, capacidad, edificio, piso,
+                                                     idTipoAula);
                 if (!resultado.ok) {
                     QMessageBox::warning(this, "Error", "No se pudo crear el aula: " + resultado.mensajeError);
                 } else {
@@ -260,6 +304,34 @@ void ClassroomListWidget::abrirFormularioNuevo() {
                 }
             });
     dialogo.exec();
+}
+
+void ClassroomListWidget::abrirFormularioNuevoTipo()
+{
+    if (!m_nucleo)
+        return;
+
+    bool ok = false;
+    const QString nombre = QInputDialog::getText(
+        this, QStringLiteral("Nuevo tipo de aula"),
+        QStringLiteral("Nombre del tipo (por ejemplo, «Taller» o «Cancha»):"),
+        QLineEdit::Normal, QString(), &ok).trimmed();
+
+    if (!ok || nombre.isEmpty())
+        return;
+
+    const auto resultado = m_nucleo->crearTipoAula(nombre);
+    if (!resultado.ok) {
+        QMessageBox::warning(this, QStringLiteral("No se pudo crear el tipo de aula"),
+                             resultado.mensajeError);
+        return;
+    }
+
+    QMessageBox::information(
+        this, QStringLiteral("Tipo de aula agregado"),
+        QStringLiteral("Se agregó el tipo «%1». Ya está disponible al crear o editar "
+                       "aulas y materias, y el solver lo usará para exigir aulas de "
+                       "ese tipo.").arg(resultado.valor.nombre));
 }
 
 // ==========================================
@@ -284,6 +356,8 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
         for (QLabel *lbl : findChildren<QLabel*>("CardBadge")) {
             lbl->setStyleSheet("background-color: #333333; border-radius: 12px; font-weight: bold; color: #ffffff; border: none; font-size: 12px;");
         }
+
+        if (m_typesButton) m_typesButton->setStyleSheet("QPushButton { background-color: #252525; color: #ffffff; font-weight: 600; padding: 10px 18px; border: 1px solid #3a3a3a; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #333333; }");
 
         if (m_table) {
             m_table->setStyleSheet(
@@ -310,6 +384,8 @@ void ClassroomListWidget::actualizarTema(bool modoOscuro) {
         for (QLabel *lbl : findChildren<QLabel*>("CardBadge")) {
             lbl->setStyleSheet("background-color: #e5e7eb; border-radius: 12px; font-weight: bold; color: #374151; border: none; font-size: 12px;");
         }
+
+        if (m_typesButton) m_typesButton->setStyleSheet("QPushButton { background-color: white; color: #1a237e; font-weight: 600; padding: 10px 18px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #f1f5f9; }");
 
         if (m_table) {
             m_table->setStyleSheet(

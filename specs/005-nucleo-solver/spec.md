@@ -2,9 +2,14 @@
 
 Estado: implementada (2026-10-17)
 
+> **Supersesión por la 018 (2026-11-10).** La invariante **D8** («ni un aula tiene dos clases a la vez»)
+> pasa a **exclusividad por aforo**: un aula admite hasta su **aforo simultáneo** de clases en la misma
+> franja —**cancha 2**, resto **1**—, regla del motor por tipo y hardcodeada. Detalle en
+> `specs/018-aforo-simultaneo-cancha/` y en `docs/constitution.md` §7.1.3/§7.1.5.
+
 > **Cierre.** Implementada y aprobada por el reviewer (`VEREDICTO: APROBADO`, 2026-10-17): la
-> rectificación se hizo en **T11**. La **T10** sigue **abierta** por los pendientes conocidos del
-> solver (cobertura de tests por regla, RF-13 y residuales), documentados en `estado.md` y `MEMORY.md`.
+> rectificación se hizo en **T11**. La **T10 se cerró el 2026-10-29** con **RF-13** y la **cobertura de
+> RNF-4** (`7e3ee0b`, `70ea509`, `7354c7a`; suite 54/54), documentados en `estado.md` y `MEMORY.md`.
 
 > **Cambio de requisitos (2026-10-17): la hora académica es un bloque.** En Venezuela la **hora
 > académica** es una unidad **pedagógica**, no una hora de reloj: 45 minutos tradicionalmente, 35 desde
@@ -125,11 +130,15 @@ construir después.
 
 Esta spec cubre el **solver y todo lo suyo**: su **núcleo**, el **contrato de configuración** (forma
 del JSON y su serialización), el **modelo** (invariantes duras y función objetivo), las
-**validaciones previas** (V1–V15) y la **construcción de la entrada del solver** desde los datos
+**validaciones previas** (V1–V19) y la **construcción de la entrada del solver** desde los datos
 persistidos más el preset (RF-13). La **persistencia** de los datos del curso (año, sección, turno y
 aula) y sus **servicios** son de la **spec 004**, que **precede** a esta spec y le aporta los datos ya
 persistidos; esta spec (005) los **lee y arma** la entrada. La **gestión de los presets** como
 archivos **no** entra aquí.
+
+> **Superado en el rango por la 010 (2026-10-25) y por la 013 (2026-11-06).** Este alcance decía
+> **V1 a V15**; el catálogo vigente de validaciones previas es **V1–V19** (la 010 añadió V16, V17 y V18
+> y la 013 añade V19). El resto del alcance no cambia.
 
 Una decisión de modelado clave guía esta spec: minimizar el «déficit de horas» es **inerte** (la suma
 de horas asignadas es constante, porque las horas totales de cada materia-curso están fijadas por una
@@ -182,11 +191,15 @@ y no obligan.
 - **`duracion_minutos`:** duración **real** en minutos de cada franja; dato de la configuración, **mayor
   que 0**. Define la **rejilla horaria** (inicio y fin de cada franja, recesos y traducción de la
   disponibilidad) y **no** interviene en la conversión de horas a bloques.
+  > **Superada en el rango por la 011 (2026-10-29).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
 - **Hora académica:** unidad pedagógica de carga de una materia. **Una hora académica equivale a un
   bloque**; no es una hora de reloj.
 - **Bloque:** unidad mínima de clase, igual a una franja. La conversión de horas académicas a bloques es
   la identidad: `bloques(horas) = horas`. **Toda comparación de horas se hace en bloques** (nunca horas
   contra bloques).
+  > **Nota (014, 2026-11-07): «bloque» de 1 h y «bloque de dos horas».** Esta definición se mantiene: una
+  > hora académica es una **franja** y `bloques(horas) = horas`. La 014 usa **«bloque de dos horas»** para
+  > el par de franjas contiguas de una materia; no cambia el «bloque = franja» de esta spec.
 - **Turno:** conjunto de franjas de un día (por ejemplo, «mañana» o «tarde»). El turno **del curso** es
   **obligatorio** en esta spec (RF-7); si un curso no lo declara, la entrada se **rechaza** (V7). La
   **asignación automática de turno** queda **diferida a la spec 006**.
@@ -276,6 +289,12 @@ y no obligan.
 - **Curso móvil:** curso cuando el modo de aula fija está **inactivo**; ocupa exactamente un aula en
   cada franja en que tiene clase.
 - **Curso con aula fija:** curso cuando el modo de aula fija está **activo**; usa siempre su aula.
+  > **Superada por la 010 (2026-10-25).** «Usa siempre su aula» deja de valer: el aula del curso pasa
+  > a ser su **aula de referencia**. La referencia se usa cuando su tipo coincide con el tipo requerido
+  > por la materia; las clases cuya materia requiere **otro** tipo se imparten en un aula de ese tipo y
+  > el curso **vuelve** a la referencia en las demás. Mientras el curso tiene una clase desplazada en
+  > una franja, su aula de referencia queda **vacía y bloqueada** en esa franja. La redacción vigente
+  > está en `docs/constitution.md` §7.1.5 y en la spec 010.
 - **Índice de aula:** posición del aula en el conjunto de aulas del centro; es el identificador que
   usan la entrada, la salida y el archivo exportado. El aula fija de un curso se traduce a su índice.
 - **`num_estudiantes` — dato opcional sin regla:** dato del curso **opcional**, **aceptado** por el
@@ -294,18 +313,46 @@ y no obligan.
   (serializar y volver a cargar) reproduce **los mismos campos del contrato sin pérdida**; los **campos
   desconocidos** presentes en un archivo se **toleran** (se ignoran al cargar) y no se consideran
   pérdida ni error.
+  > **Acotación por la 013 (2026-11-06).** Para la sección **opcional `preferencias`** la equivalencia
+  > es de la **configuración** y **no del preset**: la configuración serializada la conserva sin
+  > pérdida, pero un **preset la omite al guardarse** y, si un archivo la declara, la **ignora al
+  > cargarse** (las preferencias se releen de los datos; spec 013, RF-2). Sin preferencias la sección
+  > no se emite y el JSON es el de siempre.
 - **Versión del JSON de configuración:** la configuración declara una **versión de formato**; esta
   spec produce y acepta la **versión `1.0`**. Una configuración con una versión **ausente o no
   reconocida** (por ejemplo, posterior) se **rechaza** indicando la causa, que pertenece a la categoría
   **(1) entrada inválida** de «Causa de un resultado no factible» (RF-10). Lo mismo aplica a un **fallo
   de parseo** del JSON (V1).
+  > **Superada por la 010 (2026-10-25).** La versión vigente del contrato es **`2.0`**: se produce y se
+  > acepta solo `2.0`, y `1.0`, ausente o desconocida se rechaza como **entrada inválida** sin
+  > conversión ni tipos por defecto. Un preset `1.0` en disco no se modifica, pero no se carga.
 - **Causa de un resultado no factible:** la categoría —y la entidad afectada, cuando sea identificable—
   que explica por qué no existe solución que respete todas las invariantes duras. Categorías, en el
   **orden** en que se comprueban e informan: **(1) entrada inválida** (falla una validación previa
-  V1–V15, incluida la versión/parseo del contrato); **(2) conflicto de aula** (invariantes D8/D9/D10);
-  **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de asignación de
-  docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría aplicable.
-  Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
+  V1–V19, incluida la versión/parseo del contrato); **(2) conflicto de aula** (capacidad de los tipos de
+  aula); **(3) conflicto de persona** (profesor o curso: D4/D5/D6/D7/D11/D13); **(4) conflicto de
+  asignación de docente** (cobertura de la materia-curso: D1/D2/D3). Se informa la **primera** categoría
+  aplicable. Las categorías **cubren** todas las invariantes duras D1–D11 y D13 (D12 no existe, eliminada).
+  > **Superada por la 010 (2026-10-25; revisada el 2026-10-26).** Esta definición decía **V1 a V15**, la
+  > categoría (2) eran las «invariantes D8/D9/D10» y el orden no tenía excepciones. La 010 fija:
+  > - **V1–V19** (la 010 añadió V16, V17 y V18 y la 013 añade V19; **V18** exige que el aula de
+  >   referencia sea del **tipo general/ordinario**, el de clave normalizada `aula de estudio`, con el
+  >   modo de aula fija activo).
+  > - **(2) conflicto de aula por conteo de capacidad del tipo:** `demanda(t) > nº de aulas del tipo × nº
+  >   de días × nº de franjas distintas de la unión de los turnos de los cursos que requieren t`, **sin
+  >   descontar bloqueos**. Es un conteo **necesario**: si falla, prueba la infactibilidad; si no falla,
+  >   no permite concluir.
+  > - **Desenlace «no atribuible»:** si ninguna categoría aplica (p. ej., la infactibilidad la explica la
+  >   ocupación de un aula de referencia concreta), la causa se informa como **no atribuible**, sin
+  >   inventar una. Sustituye a «las categorías cubren todas las invariantes duras».
+  > - **Excepción de precedencia:** si un curso necesita más bloques que franjas tiene su turno, la causa
+  >   es **(3) conflicto de persona** aunque la capacidad del tipo también falle; fuera de ese caso, el
+  >   orden (1)(2)(3)(4) no cambia.
+  > **Superado por la 014 (2026-11-07): el catálogo pasa a (1)–(5).** Se añade **«(5) conflicto de
+  > bloques»**, después de (1)–(4) y antes de «no atribuible», con **condiciones detectables**: **total
+  > semanal impar** de un curso o **materia con más apariciones que días** (`⌈h/2⌉ > nº_días`; con 5 días,
+  > **11 h o más**). El **emparejamiento**, la **alineación** y los **huecos al final del día** son reglas
+  > duras; la **separación** es blanda y no causa (5). El detalle vive en la 014 (RF-5/RF-10).
 
 ## Catálogo de reglas
 
@@ -324,7 +371,15 @@ en el RF indicado.
 - **D7.** Un docente no da clase de cursos de otro plan. → RF-4
 - **D8.** Un aula no aloja dos clases a la vez. → RF-2
 - **D9.** Un curso móvil ocupa exactamente un aula en cada franja en que tiene clase. → RF-3
+  > **Ampliadas por la 010 (2026-10-25).** **D9** se generaliza a **todas** las clases (fijas y
+  > móviles): cada clase ocupa exactamente un aula. **D8** se extiende a las clases **desplazadas**: dos
+  > cursos no comparten aula en la misma franja, incluidas las que se imparten fuera del aula de
+  > referencia.
 - **D10.** Un curso con aula fija (modo de aula fija activo) usa siempre su aula. → RF-3
+  > **Superada por la 010 (2026-10-25).** El aula del curso pasa a ser su **aula de referencia** con
+  > desplazamiento y vuelta (§7.1.5 de la constitución); la salida informa el **aula real** de cada
+  > clase. D10 no se sustituye por otra invariante del mismo número: su contenido queda en D8/D9
+  > ampliadas más la regla de tipo y referencia de la 010.
 - **D11.** Ninguna clase de un curso sale de las franjas de su turno (turno **declarado**, obligatorio). → RF-4
 - **D12.** Eliminada: era redundante con D8 (materia única por aula).
 - **D13.** Un docente no da clase de cursos fuera de sus años. → RF-4
@@ -389,6 +444,8 @@ salida:
 - **D10 → MIENTRAS el modo de aula fija esté activo, EL SISTEMA garantiza que un curso usa siempre su
   aula:** en la salida, toda clase de un curso declara como aula el índice de su aula fija; una clase
   que no lo cumpla no es una solución válida.
+  > **Superado por la 010 (2026-10-25).** Ver la nota de **D10** en el catálogo de reglas: el aula del
+  > curso es su **aula de referencia** y las clases de otro tipo se desplazan y vuelven.
 - **CUANDO se extraiga el horario o se exporte, EL SISTEMA identificará cada curso por su identidad
   (año y sección):** la identidad es la **clave del horario** (y del archivo exportado); las clases se
   agrupan por curso bajo esa clave. El nombre derivado (`"1ro A"`) **no** lo calcula el solver: es
@@ -396,6 +453,9 @@ salida:
 - **CUANDO se extraiga el horario, EL SISTEMA informará el aula de cada clase como su índice en el
   conjunto de aulas:** para un curso con aula fija, su aula fija; para un curso móvil, el aula que
   resultó ocupada en esa franja.
+  > **Superada por la 010 (2026-10-25).** La salida informa el **aula real** de **cada** clase, también
+  > con el modo de aula fija activo: una clase desplazada declara el aula del tipo requerido donde se
+  > impartió, no el aula de referencia del curso. En modo móvil no cambia nada.
 
 ### RF-4. Elegibilidad por turno, plan y año (condicional)
 
@@ -457,13 +517,29 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   problema no factible indicando la causa.** La causa se informa con las **categorías de la definición
   «Causa de un resultado no factible», en su orden**: (1) entrada inválida, (2) conflicto de aula,
   (3) conflicto de persona (profesor/curso), (4) conflicto de asignación de docente.
+  > **Superado en el desenlace y en el orden por la 010 (2026-10-26).** «Indicando la causa» pasa a: la
+  > **primera categoría aplicable** y, si ninguna lo es, **causa no atribuible** (sin inventar una). La
+  > **excepción de precedencia** de la 010 hace además que un curso que no cabe en su turno sea (3)
+  > aunque la capacidad del tipo también falle. Las cuatro categorías y su orden se mantienen fuera de
+  > la excepción.
 - **EL SISTEMA no completa ni corrige la entrada:** si la entrada no permite una solución, no la
   «arregla» inventando datos.
 - **EL SISTEMA es reproducible:** bajo el **mismo JSON y el mismo solver**, produce el mismo
   resultado (RNF-1). Esta reproducibilidad **no** cubre el desempate entre candidatos equivalentes
   (titulares entre sí o suplentes entre sí): cualquiera de ellos es válido.
+  > **Superado en la reproducibilidad por la 014 (2026-11-07).** La 014 busca con **8 workers** y **no
+  > promete el mismo horario entre ejecuciones**: la misma entrada produce un horario **válido**, no
+  > necesariamente idéntico. La **validez** y los **diagnósticos y cálculos puros** se mantienen (ver
+  > RNF-1).
 
 ### RF-7. Contrato de configuración de cursos
+
+> **Superado en parte por la 010 (2026-10-25).** Sigue vigente el reparto de campos del curso (identidad
+> por año y sección, turno y plan obligatorios, `num_estudiantes` opcional, modo de aula fija global en
+> el preset). Quedan **superadas** estas dos consecuencias: (a) «con el modo activo, cada curso usa su
+> aula fija» → el aula del curso es su **aula de referencia**, con desplazamiento y vuelta; (b) el aula
+> declarada del curso deja de ser el aula de todas sus clases. Además, la 010 añade al contrato el
+> **tipo de aula** de aulas y materias y la sección de **eventos**.
 
 - **EL SISTEMA identifica cada curso por su año (entero, ≥ 1) y su sección (un carácter)** —cuyo rango
   y validación son de la **spec 004** (RF-3)—; el nombre **no es un dato de identidad** y el solver
@@ -518,6 +594,11 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   una configuración declara una versión ausente o no reconocida** (por ejemplo, posterior a la
   soportada), **ENTONCES EL SISTEMA la rechazará indicando la causa** (categoría **entrada inválida**
   de «Causa de un resultado no factible», RF-6).
+  > **Superada por la 010 (2026-10-25).** La versión que se declara, produce y acepta es **`2.0`**;
+  > `1.0`, ausente o no reconocida se rechaza como **entrada inválida**, identificando la versión
+  > declarada y la acción (generar una `2.0` desde los datos), sin conversión. También queda superada la
+  > mención a la versión `1.0` del **criterio de finalización 3**; la equivalencia de ida y vuelta sigue
+  > vigente y ahora se comprueba sobre la **clave normalizada** del tipo.
 - **EL SISTEMA serializa y deserializa la configuración de forma consistente:** al guardar y volver a
   cargar una configuración con año, sección, modo de aula fija global, plan por curso y número de
   estudiantes (opcional), planes embebidos (con materias y horas), turno/plan/años de docente y `peso`
@@ -532,16 +613,40 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   sección) como clave**, sin escribir un nombre (ni almacenado ni derivado) por curso (coherente con
   el contrato de salida de la spec 002).
 
-### RF-11. Validación previa (V1–V15)
+### RF-11. Validación previa (V1–V19)
+
+> **Título superado por la 010 (2026-10-25) y por la 013 (2026-11-06).** Este título decía **V1 a V15**;
+> el catálogo vigente es **V1–V19**.
+>
+> **Ampliado por la 010 (2026-10-25 y 2026-10-26).** El catálogo de validaciones previas pasa a
+> **V1–V19**: la 010 añadió **V16** (toda aula y toda materia declara tipo), **V17** (cada tipo
+> requerido tiene al menos un aula del centro, en los dos modos) y **V18** (con aula fija activa, el
+> aula de referencia debe ser del **tipo general/ordinario**, el de clave normalizada `aula de
+> estudio`), y cambia **V1** (sección de eventos y versión 2.0). El detalle normativo de V1, V2, V16,
+> V17 y V18 vive en la spec 010; la constitución solo fija el rango y la remisión.
+>
+> **Ampliado por la 013 (2026-11-06).** El catálogo pasa a **V1–V19**: **V19** valida la forma y las
+> referencias de la sección opcional `preferencias` (índice de docente, día de la generación, franja y
+> sentido) y **no** comprueba rangos de reloj, coherencia con el turno, el plan o los años, ni solapes.
+> El detalle vive en la spec 013; `docs/constitution.md` §7.4 ya cita **V1–V19**.
 
 - **MIENTRAS se prepara una generación, EL SISTEMA ejecutará la validación previa antes de invocar al
   solver; si alguna regla falla, no invocará al solver.** Las comprobaciones se ejecutan y se informan
   en el orden en que se enumeran.
 - **V1–V12. Validaciones existentes**, enumeradas:
   - **V1. Estructura:** el JSON es parseable y contiene las secciones requeridas.
+    > **Superada por la 010 (2026-10-25).** V1 comprueba la **versión `2.0`** **antes** que las
+    > secciones y exige la sección de **eventos** del turno; ya **no** exige la sección `recesos`. Las
+    > secciones requeridas del contrato 2.0 son `version`, `dimensiones`, `franja_horaria`, `turnos`,
+    > `eventos`, `planes`, `cursos`, `profesores`, `materias` y `aulas`.
   - **V2. Tipos y rangos de campo:** cada sección y campo tiene el tipo esperado; además,
     **NUEVA: el `peso` de cada par (docente, materia-suplente) debe ser un entero no negativo** (un
     `peso` negativo se rechaza), y **NUEVA: `duracion_minutos` debe ser mayor que 0**.
+    > **Ampliada por la 010 (2026-10-25) y estrechada por la 011 (2026-10-29).** La 010 añade a V2 la
+    > **forma y temporalidad de los eventos** (`nombre`, turno existente, posición, orden, duración y
+    > par `inicio`/`fin` dentro de la ventana del turno y de su posición, sin solapes). La **011**
+    > estrecha `duracion_minutos` a **30–90** (mismo punto único que la configuración global, de la que
+    > procede el valor) y añade a V2 el **encaje** `nº franjas × D + Σ eventos ≤ ventana`.
   - **V3. Dimensiones:** las dimensiones declaradas coinciden con los tamaños de las listas.
   - **V4. Índices de materias en rango.**
   - **V5. Índices de profesores en rango.**
@@ -551,6 +656,9 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   - **V8. Aula fija válida según el modo global:** con el modo de aula fija **activo**, cada curso
     **declara** un aula válida (obligatoria); con el modo **inactivo**, el aula del curso **puede estar
     ausente** (se ignora).
+    > **Se mantiene en la 010 (2026-10-25).** V8 no se supersede: el aula declarada del curso sigue
+    > siendo obligatoria con el modo activo y se ignora con el modo inactivo. Lo que cambia es su
+    > lectura: esa aula es el **aula de referencia** (§7.1.5 de la constitución), no un aula única.
   - **V9. Número de estudiantes (opcional):** **solo cuando el dato está presente** se comprueba su
     forma (entero positivo); no tiene regla de negocio (dato sin regla). Si falta, el chequeo se omite
     y la entrada no se invalida.
@@ -617,9 +725,17 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   siempre el mismo resultado. **No** se exige desempatar entre candidatos equivalentes: dos titulares
   elegibles para la misma materia-curso (o dos suplentes, bajo el coste fijo) son intercambiables y
   **cualquiera de ellos es una solución válida** (desempate **diferido**).
+  > **Superado en la reproducibilidad del horario por la 014 (2026-11-06).** La 014 busca con **8 workers**
+  > y **no promete el mismo horario entre ejecuciones**: la misma entrada produce un horario **válido**, no
+  > necesariamente idéntico. La validez, las invariantes y los diagnósticos/cálculos puros se mantienen.
 - **RNF-2. Desempeño:** el escenario de gran tamaño del conjunto de pruebas debe resolverse en menos
   de 60 segundos, **medido en el entorno de referencia del banco de pruebas del proyecto** (el entorno
   donde se ejecuta la suite completa), no en hardware arbitrario.
+  > **Superado el umbral por la 014 y la 002 (2026-11-07).** El escenario de gran tamaño es el **fixture
+  > sin EF de la 014** (24 cursos, **848 clases**) y su referencia vigente es el **plazo del proceso de
+  > cálculo de 300 s** (002), con **8 workers**: medido en **172,6 s** (centro completo, Release) y
+  > **183,58 s** en el test lento. El umbral de **60 s** queda superado; el escenario y el margen se
+  > documentan en la 014 (RNF-2) y en su `journal.md`. *(La nota no cambia el resto de RNF-2.)*
 - **RNF-3. Mensajes de error en español:** todo rechazo o fallo de factibilidad identificará la causa
   (categoría y entidad cuando sea posible) y, cuando exista, la acción disponible para el usuario.
 - **RNF-4. Trazabilidad:** toda regla de esta spec tendrá al menos una comprobación verificable en las
@@ -646,6 +762,7 @@ valen cualquiera**. Esa semántica **no** se aplica al **turno ni al plan del cu
   cualquiera es válido; el desempate está **diferido** (RNF-1) (RF-5).
 - **`peso` de un par negativo:** rechazo previo (RF-11, V2).
 - **`duracion_minutos` menor o igual que 0:** rechazo previo (RF-11, V2).
+  > **Superada en el rango por la 011 (2026-10-29).** Ya no basta `> 0`: fuera de 30–90 se rechaza.
 - **Rango de disponibilidad no alineado con los bloques:** se cubren solo los bloques enteros
   contenidos en el rango; los solapes parciales no cuentan (definición de regla de traducción).
 - **Receso dentro de un turno:** no reduce las franjas útiles del curso ni interviene en la traducción
@@ -712,6 +829,12 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
 - **Diferido: la capacidad de aula** (antigua S2) y la **cobertura de emergencia** (antigua S3). La
   capacidad de aula podría **reintroducirse más adelante como aviso post-solver** (fuera del solver),
   no como invariante.
+  > **Riesgo documental anotado por la 013 (2026-11-06); sin resolver.** Conviven **dos specs con el
+  > número 009** —`009-tipos-de-aula-y-eventos` y `009-agrupacion-bloques-materias`— y la etiqueta
+  > **«S3»** se ha usado para **dos cosas distintas**: la **cobertura de emergencia** (antigua S3 de
+  > esta spec, aquí diferida) y la **agrupación de bloques** (S3 de `009-agrupacion-bloques-materias`,
+  > hoy en el motor con `PESO_AGRUPACION`). Toda cita de «S3» debe leerse por su contexto; en la 013
+  > **S3 es la agrupación**. No se renumera ni se renombra en esta entrega.
 - **El receso.** Es metadata que el solver **ignora**: no reduce las franjas útiles ni interviene en
   la traducción de disponibilidad (constitución §7.5).
 - **El horario del profesor derivado.** Se deriva por **post-proceso** fuera del solver (constitución
@@ -746,14 +869,26 @@ podrían retomarse más adelante (algunas en las specs 006/007). No se implement
    eliminó por redundante con D8)— y la función objetivo implementa S1 y S2 con `PESO_HORAS >
    COSTE_SUPLENTE > 0` (coste de suplente **fijo**), sin violar nunca una invariante; un titular a tope
    deja de ser **preferido** y lo cubre un suplente (RF-1 a RF-5).
+   > **Superado solo en D10 por la 010 (2026-10-25).** La 010 supersede el catálogo en lo que toca al
+   > aula: D10 (aula fija «siempre su aula») deja de existir como tal y su contenido pasa a la regla de
+   > **tipo** con **aula de referencia**, desplazamiento y vuelta, más D8 y D9 ampliadas. El resto del
+   > criterio —D1–D7, D11, D13, S1 y S2 con `PESO_HORAS > COSTE_SUPLENTE > 0`— sigue vigente.
 3. El contrato de configuración identifica el curso por año y sección, exige su **turno** y su **plan**
    (obligatorios, RF-7), la **salida se indexa por esa identidad** (el nombre derivado es presentación,
    no del solver), trata el **modo de aula fija como global** (parte del preset) con plan por curso y
    número de estudiantes (**opcional**), deriva las materias del plan, admite años de docente y `peso`
-   de suplente (aceptado, sin uso), declara la versión `1.0` y su serialización es consistente y
+   de suplente (aceptado, sin uso), declara la versión `2.0` y su serialización es consistente y
    equivalente (RF-7 a RF-10).
-4. La validación previa incluye V1–V15, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
+   > **Superado en la versión por la 010 (2026-10-25).** Este criterio decía `1.0`; la versión vigente
+   > del contrato es **`2.0`** y `1.0`, ausente o desconocida se rechaza como entrada inválida. El
+   > resto del criterio sigue vigente.
+4. La validación previa incluye V1–V19, con V1–V12 enumeradas (las reglas **nuevas** son el chequeo de
    `peso` no negativo y el de `duracion_minutos > 0`) (RF-11).
+   > **Superado en el rango por la 010 (2026-10-25 y 2026-10-26) y por la 013 (2026-11-06).** Este
+   > criterio decía V1 a V15; la 010 añade **V16** (aula y materia declaran tipo), **V17** (cada tipo
+   > requerido tiene aulas, en ambos modos) y **V18** (el aula de referencia es del tipo
+   > general/ordinario), y la 013 añade **V19** (forma y referencias de `preferencias`). V1–V12 siguen
+   > enumeradas aquí; el detalle de V1, V2, V16, V17 y V18 vive en la 010, y el de V19 en la 013.
 5. La entrada del solver se construye desde los datos persistidos más el preset, embebe solo los planes
    referenciados y traduce el aula del curso a su índice; el solver no consulta la base de datos
    (RF-13).
