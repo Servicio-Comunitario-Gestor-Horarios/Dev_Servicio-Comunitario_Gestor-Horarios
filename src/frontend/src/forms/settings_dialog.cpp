@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFormLayout>
@@ -18,6 +19,8 @@
 #include <backend/services/NucleoDatos.hpp>
 #include <backend/services/calculo_eventos.hpp>
 
+#include "frontend/preferencias_generacion.hpp"
+
 namespace {
 const char* kOrganizacion = "LiceoRobertSerra";
 const char* kAplicacion = "GestorHorarios";
@@ -25,7 +28,7 @@ const char* kAplicacion = "GestorHorarios";
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle("Configuración del Sistema");
-    setFixedSize(560, 440);
+    setFixedSize(560, 480);
 
     setWindowModality(Qt::ApplicationModal);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
@@ -114,12 +117,22 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     m_spinDias->setRange(1, 7);
     m_spinDias->setValue(5);
 
+    m_comboMaxAnios = new QComboBox(avanzadoTab);
+    m_comboMaxAnios->setObjectName(QStringLiteral("maxAniosCombo"));
+    m_comboMaxAnios->addItem("Hasta 5to año (liceos regulares)",
+                             PreferenciasGeneracion::kMaxAniosMinimo);
+    m_comboMaxAnios->addItem("Hasta 6to año (liceos técnicos)",
+                             PreferenciasGeneracion::kMaxAniosMaximo);
+    m_comboMaxAnios->setToolTip(
+        "Controla hasta qué año se pueden crear cursos en «Años y secciones».");
+
     m_checkAulaFija = new QCheckBox(
         "Usar el aula fija asignada a cada curso", avanzadoTab);
     m_checkAulaFija->setChecked(true);
 
     form->addRow("Duración de la hora académica (bloque)", m_spinDuracion);
     form->addRow("Días a planificar", m_spinDias);
+    form->addRow("Año máximo permitido", m_comboMaxAnios);
     form->addRow(QString(), m_checkAulaFija);
 
     avanzadoLayout->addLayout(form);
@@ -127,7 +140,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     QLabel *ayuda = new QLabel(
         "Estos valores se usan al generar el horario y al guardar un preset. "
         "La duración es global y se comprueba contra la ventana de cada turno; "
-        "las franjas por día se calculan sumando las de los turnos.",
+        "las franjas por día se calculan sumando las de los turnos. El año "
+        "máximo limita la creación de cursos en «Años y secciones».",
         avanzadoTab);
     ayuda->setWordWrap(true);
     ayuda->setStyleSheet("color: #64748b; font-size: 12px;");
@@ -156,6 +170,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
         settings.setValue("darkMode", m_darkModeSwitch->isChecked());
         settings.setValue("generacion/dias", m_spinDias->value());
         settings.setValue("generacion/aulaFija", m_checkAulaFija->isChecked());
+        PreferenciasGeneracion::guardarMaxAnios(m_comboMaxAnios->currentData().toInt());
         accept();
     });
 
@@ -168,6 +183,11 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     QSettings settingsUi(kOrganizacion, kAplicacion);
     m_spinDias->setValue(qBound(1, settingsUi.value("generacion/dias", 5).toInt(), 7));
     m_checkAulaFija->setChecked(settingsUi.value("generacion/aulaFija", true).toBool());
+
+    const int maxAnios = PreferenciasGeneracion::maxAnios();
+    const int indiceMax = m_comboMaxAnios->findData(maxAnios);
+    if (indiceMax >= 0)
+        m_comboMaxAnios->setCurrentIndex(indiceMax);
 }
 
 bool SettingsDialog::isDarkMode() const {

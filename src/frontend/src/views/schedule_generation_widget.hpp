@@ -62,6 +62,15 @@ public:
     /// Vuelve a leer cursos/docentes/planes del núcleo y repuebla las tablas.
     void recargarDesdeNucleo();
 
+    /**
+     * @brief Refresca cursos y catálogos sin perder lo elegido en docentes.
+     *
+     * Se usa tras crear o eliminar años/secciones: actualiza la tabla de cursos
+     * y las opciones de años de los docentes, conservando las horas, el turno y
+     * el plan que el usuario ya hubiera ajustado.
+     */
+    void refrescarCursos();
+
     /// Relee días/aula fija de la configuración (ventana de Configuración → Avanzado)
     /// sin tocar las tablas de cursos y docentes.
     void recargarConfiguracionAvanzada();
